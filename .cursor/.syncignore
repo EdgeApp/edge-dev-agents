@@ -1,0 +1,6 @@
+# Files to exclude from convention-sync (one glob per line)
+# Patterns match against relative paths like: commands/foo.sh, rules/bar.mdc
+
+# WIP commands
+commands/hudl.md
+commands/github-pr-hudl.sh
