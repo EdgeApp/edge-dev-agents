@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# convention-sync.sh — Sync ~/.cursor/ files with the edge-conventions repo.
+# convention-sync.sh — Sync ~/.cursor/ files with the edge-dev-agents repo.
 # Usage: ./convention-sync.sh [repo-dir] [--stage] [--commit -m "message"] [--repo-to-user]
 # Compares ~/.cursor/{skills,rules,scripts} against <repo-dir>/.cursor/ and
 # outputs a structured JSON summary of new, modified, and deleted files.
@@ -22,20 +22,20 @@ resolve_default_repo_dir() {
   local cwd remote_url default_repo
 
   cwd="$(pwd)"
-  if [[ "$(basename "$cwd")" == "edge-conventions" ]]; then
+  if [[ "$(basename "$cwd")" == "edge-dev-agents" ]]; then
     printf '%s\n' "$cwd"
     return 0
   fi
 
   if git -C "$cwd" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     remote_url="$(git -C "$cwd" remote get-url origin 2>/dev/null || true)"
-    if [[ "$remote_url" == *"edge-conventions"* ]]; then
+    if [[ "$remote_url" == *"edge-dev-agents"* ]]; then
       printf '%s\n' "$cwd"
       return 0
     fi
   fi
 
-  default_repo="$HOME/git/edge-conventions"
+  default_repo="$HOME/git/edge-dev-agents"
   if [[ -d "$default_repo/.git" || -f "$default_repo/.git" ]]; then
     printf '%s\n' "$default_repo"
     return 0
@@ -53,18 +53,18 @@ validate_repo_dir() {
     return 1
   fi
 
-  if [[ "$(basename "$repo_dir")" == "edge-conventions" ]]; then
+  if [[ "$(basename "$repo_dir")" == "edge-dev-agents" ]]; then
     return 0
   fi
 
   if git -C "$repo_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     remote_url="$(git -C "$repo_dir" remote get-url origin 2>/dev/null || true)"
-    if [[ "$remote_url" == *"edge-conventions"* ]]; then
+    if [[ "$remote_url" == *"edge-dev-agents"* ]]; then
       return 0
     fi
   fi
 
-  echo "ERROR: Repo directory does not appear to be the edge-conventions checkout: $repo_dir" >&2
+  echo "ERROR: Repo directory does not appear to be the edge-dev-agents checkout: $repo_dir" >&2
   return 1
 }
 
@@ -80,7 +80,7 @@ done
 
 if [[ -z "$REPO_DIR" ]]; then
   if ! REPO_DIR="$(resolve_default_repo_dir)"; then
-    echo "ERROR: Could not resolve the edge-conventions repo. Run with an explicit repo path." >&2
+    echo "ERROR: Could not resolve the edge-dev-agents repo. Run with an explicit repo path." >&2
     echo "Usage: convention-sync.sh [repo-dir] [--stage] [--commit -m \"message\"]" >&2
     exit 1
   fi
