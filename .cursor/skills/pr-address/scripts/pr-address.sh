@@ -12,6 +12,7 @@
 #   resolve-id     --owner <o> --repo <r> --pr <n> --node-id <id>
 #   headline       --owner <o> --repo <r> --sha <sha>
 #   fetch-pr-body  --owner <o> --repo <r> --pr <n>         Fetch current PR body → /tmp/pr-body.md
+#   ensure-branch  --owner <o> --repo <r> --pr <n>         Checkout PR branch, stash if needed, pull
 #   autosquash                                             Rebase --autosquash from merge-base
 #
 # Exit codes: 0 = success, 1 = error, 2 = needs user input (e.g. gh not authenticated)
@@ -316,6 +317,33 @@ case "$CMD" in
     echo ">> Wrote PR body to /tmp/pr-body.md ($(wc -c < /tmp/pr-body.md | tr -d ' ') bytes)"
     ;;
 
+  ensure-branch)
+    require_gh
+    if [[ -z "$OWNER" || -z "$REPO" || -z "$PR" ]]; then
+      echo "Error: --owner, --repo, --pr required" >&2; exit 1
+    fi
+
+    PR_BRANCH=$(gh api "repos/$OWNER/$REPO/pulls/$PR" --jq '.head.ref')
+    CURRENT_BRANCH=$(git branch --show-current)
+
+    if [[ "$CURRENT_BRANCH" == "$PR_BRANCH" ]]; then
+      echo ">> Already on $PR_BRANCH — pulling latest"
+      git pull --ff-only 2>&1 || git pull --rebase 2>&1
+      echo ">> BRANCH_READY=$PR_BRANCH STASHED=false"
+    else
+      STASHED=false
+      if ! git diff --quiet HEAD 2>/dev/null || ! git diff --cached --quiet HEAD 2>/dev/null || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
+        echo ">> Stashing uncommitted changes on $CURRENT_BRANCH"
+        git stash -u
+        STASHED=true
+      fi
+      echo ">> Switching from $CURRENT_BRANCH to $PR_BRANCH"
+      git checkout "$PR_BRANCH" 2>&1
+      git pull --ff-only 2>&1 || git pull --rebase 2>&1
+      echo ">> BRANCH_READY=$PR_BRANCH STASHED=$STASHED PREVIOUS_BRANCH=$CURRENT_BRANCH"
+    fi
+    ;;
+
   autosquash)
     DEFAULT_UPSTREAM=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
       || echo "origin/$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')")
@@ -325,7 +353,7 @@ case "$CMD" in
     ;;
 
   *)
-    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|resolve-thread|mark-addressed|resolve-id|headline|fetch-pr-body|autosquash} [args]" >&2
+    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|resolve-thread|mark-addressed|resolve-id|headline|fetch-pr-body|ensure-branch|autosquash} [args]" >&2
     exit 1
     ;;
 esac

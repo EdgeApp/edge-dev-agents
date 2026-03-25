@@ -20,6 +20,20 @@ metadata:
 <rule id="resolution-source-of-truth">Only explicitly resolved threads (`isResolved: true`) or `<!-- addressed:... -->` markers count as resolved. Recency (commits after a comment) does NOT mean resolved.</rule>
 </rules>
 
+<step id="0" name="Ensure correct branch">
+Before any other work, ensure the PR's branch is checked out and up to date:
+
+```bash
+~/.cursor/skills/pr-address/scripts/pr-address.sh ensure-branch --owner <OWNER> --repo <REPO> --pr <NUMBER>
+```
+
+The script:
+- If already on the PR branch → pulls latest
+- If on a different branch → stashes uncommitted changes (if any), checks out the PR branch, pulls latest
+
+Output includes `BRANCH_READY`, `STASHED`, and (if switched) `PREVIOUS_BRANCH`. If `STASHED=true`, inform the user that changes were stashed on the previous branch.
+</step>
+
 <step id="1" name="Fetch all unresolved feedback and PR body">
 Always fetch live from GitHub. Run both in parallel:
 
