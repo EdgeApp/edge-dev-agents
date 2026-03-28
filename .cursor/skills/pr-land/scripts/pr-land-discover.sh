@@ -145,23 +145,46 @@ async function main() {
   const results = { prs: [], errors: [] };
 
   // 1. Resolve Asana tasks → explicit PRs
+  // GitHub integration attachments are the source of truth.
+  // Only fall back to scanning task notes if no attachments found.
+  const ghPrRe =
+    /https:\/\/github\.com\/EdgeApp\/([^/]+)\/pull\/(\d+)/g;
+
   for (const gid of asanaGids) {
     try {
       const task = await asanaGet(
         `/tasks/${gid}?opt_fields=name,notes,permalink_url`
       );
-      // Look for GitHub PR URLs in task notes
-      const ghPrRe =
-        /https:\/\/github\.com\/EdgeApp\/([^/]+)\/pull\/(\d+)/g;
-      let match;
       let found = false;
-      while ((match = ghPrRe.exec(task.notes || "")) !== null) {
-        explicitPrs.push({ repo: match[1], prNumber: Number(match[2]) });
-        found = true;
+
+      // Check task attachments first (GitHub integration — authoritative)
+      const attachments = await asanaGet(
+        `/tasks/${gid}/attachments?opt_fields=resource_subtype,view_url`
+      );
+      for (const att of attachments) {
+        if (att.resource_subtype !== "external" || !att.view_url) continue;
+        const m = att.view_url.match(
+          /^https:\/\/github\.com\/EdgeApp\/([^/]+)\/pull\/(\d+)/
+        );
+        if (m) {
+          explicitPrs.push({ repo: m[1], prNumber: Number(m[2]) });
+          found = true;
+        }
       }
+
+      // Fall back to task notes only if no attachments matched
+      if (!found) {
+        let match;
+        while ((match = ghPrRe.exec(task.notes || "")) !== null) {
+          explicitPrs.push({ repo: match[1], prNumber: Number(match[2]) });
+          found = true;
+        }
+        ghPrRe.lastIndex = 0;
+      }
+
       if (!found) {
         results.errors.push(
-          `Asana task ${gid} (${task.name}): no GitHub PR link found in description`
+          `Asana task ${gid} (${task.name}): no GitHub PR link found in attachments or description`
         );
       }
     } catch (e) {

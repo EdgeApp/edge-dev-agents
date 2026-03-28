@@ -187,7 +187,7 @@ echo '[{"repo":"...","branch":"master"}]' | ~/.cursor/skills/pr-land/scripts/pr-
 After script completes:
 1. Show version bump details to user
 2. If confirmed, push master and tag: `git push origin master && git push origin v<version>`
-3. Prompt user to run `npm publish` in a real terminal (requires interactive 2FA)
+3. Prompt user to run `npm login` and `npm publish` in a real terminal. Both commands require browser-based authentication (npm opens a URL for web login + 2FA approval) that cannot be automated.
 
 **STOP HERE. Do NOT proceed to step 7 until the user confirms npm publish succeeded.**
 </step>
