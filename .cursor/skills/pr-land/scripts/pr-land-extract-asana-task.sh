@@ -43,7 +43,7 @@ async function main() {
     process.exit(2);
   }
 
-  const regex = /https:\/\/app\.asana\.com\/\d+\/\d+\/(?:task\/)?(\d+)/i;
+  const regex = /https:\/\/app\.asana\.com\/(?:\d+\/\d+\/(?:project\/\d+\/)?(?:task\/)?(\d+))/i;
   const tasks = [];
   const missing = [];
 

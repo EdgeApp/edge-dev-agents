@@ -38,7 +38,7 @@ Arguments are classified automatically:
 <rule id="unexpected-exit">Unexpected exit codes → STOP immediately. If any script returns an exit code not documented in this file, STOP and report to user. Do NOT attempt to interpret, retry, or work around unexpected errors.</rule>
 <rule id="sequential-rebase">Sequential merging requires rebase. Each subsequent PR MUST be rebased onto the updated base branch after the previous merge.</rule>
 <rule id="publish-gating">Don't publish if outstanding PRs remain. Only offer to publish a repo when ALL approved PRs for that repo are merged. If any were skipped or held back, do NOT publish that repo.</rule>
-<rule id="npm-publish-gate">Step 8 CANNOT begin until the user explicitly confirms npm publish succeeded. `npm publish` requires interactive 2FA — the agent cannot run it. Do NOT infer publish completion from git push or tagging. STOP and WAIT for user confirmation.</rule>
+<rule id="npm-publish-gate">Step 7 CANNOT begin until the user explicitly confirms npm publish succeeded. `npm publish` requires interactive 2FA — the agent cannot run it. Do NOT infer publish completion from git push or tagging. STOP and WAIT for user confirmation.</rule>
 <rule id="asana-last">Asana updates are LAST. Do NOT update Asana tasks until ALL merges, publishes, and GUI dependency upgrades are complete. Only update status for PRs that are fully landed (merged, and if non-GUI: published + GUI deps updated).</rule>
 </rules>
 
@@ -159,34 +159,8 @@ The merge script processes PRs **sequentially** with automatic rebase-before-mer
 **On exit 4:** Agent resolves semantically, pushes, re-runs merge. Script detects already-merged PRs and skips them.
 </step>
 
-<step id="6" name="Staging Cherry-Pick">
-**Trigger:** Only for `edge-react-gui` PRs whose CHANGELOG entries are in the `## X.Y.Z (staging)` section (not `## Unreleased`). Check the merged PR's CHANGELOG diff to determine this — if the entry was added under a `(staging)` heading, the PR needs cherry-picking.
-
-**Skip** this step entirely if no merged PRs have staging CHANGELOG entries.
-
-For qualifying PRs, invoke the `/staging-cherry-pick` skill:
-
-```bash
-echo '[{"repo":"edge-react-gui","prNumber":123,"mergeSha":"abc123"}]' | ~/.cursor/skills/staging-cherry-pick/scripts/staging-cherry-pick.sh
-```
-
-Pass the `mergeSha` from the merge step's JSON output. The script cherry-picks individual (non-merge) commits onto the staging branch.
-
-**On exit 3 (CHANGELOG conflict):** Resolve semantically (existing staging entries first, then the new entry), then `git add CHANGELOG.md && GIT_EDITOR=true git cherry-pick --continue`. Re-run for remaining PRs.
-
-**On exit 1 (code conflict):** STOP and report to user.
-
-After cherry-picks succeed, ask user to confirm push:
-```bash
-git push origin staging
-```
-
-Then restore the previous branch.
-</step>
-
-<step id="7" name="Publish">
+<step id="6" name="Publish">
 **Gating:** Only non-GUI repos. Only when ALL approved PRs for the repo are merged. Skip if any were skipped/held back.
-
 
 Ask for user confirmation:
 ```
@@ -215,11 +189,11 @@ After script completes:
 2. If confirmed, push master and tag: `git push origin master && git push origin v<version>`
 3. Prompt user to run `npm publish` in a real terminal (requires interactive 2FA)
 
-**STOP HERE. Do NOT proceed to step 8 until the user confirms npm publish succeeded.**
+**STOP HERE. Do NOT proceed to step 7 until the user confirms npm publish succeeded.**
 </step>
 
-<step id="8" name="Update GUI Dependencies">
-**Trigger:** Only if non-`edge-react-gui` repos were merged and published in steps 5–7.
+<step id="7" name="Update GUI Dependencies">
+**Trigger:** Only if non-`edge-react-gui` repos were merged and published in step 6. All non-GUI EdgeApp repos are GUI dependencies, so publishing always requires a GUI dep upgrade.
 
 Ask user to confirm `npm publish` completed, then:
 
@@ -243,6 +217,33 @@ Ask user to confirm `npm publish` completed, then:
    git stash pop
    ```
    If stash pop fails with conflicts, STOP and report. If "No stash entries", that's fine.
+</step>
+
+<step id="8" name="Staging Cherry-Pick">
+**Trigger:** Only for `edge-react-gui` commits that target the `## X.Y.Z (staging)` CHANGELOG section (not `## Unreleased`). This includes both merged PR commits and GUI dependency upgrade commits from step 7.
+
+Check CHANGELOG diffs to determine which commits qualify — if the entry was added under a `(staging)` heading, it needs cherry-picking.
+
+**Skip** this step entirely if no commits have staging CHANGELOG entries.
+
+For qualifying PRs/commits, invoke the `/staging-cherry-pick` skill:
+
+```bash
+echo '[{"repo":"edge-react-gui","prNumber":123,"mergeSha":"abc123"}]' | ~/.cursor/skills/staging-cherry-pick/scripts/staging-cherry-pick.sh
+```
+
+Pass the `mergeSha` from the merge step's JSON output. For dep upgrade commits, pass the commit SHA from step 7. The script cherry-picks individual (non-merge) commits onto the staging branch.
+
+**On exit 3 (CHANGELOG conflict):** Resolve semantically (existing staging entries first, then the new entry), then `git add CHANGELOG.md && GIT_EDITOR=true git cherry-pick --continue`. Re-run for remaining PRs.
+
+**On exit 1 (code conflict):** STOP and report to user.
+
+After cherry-picks succeed, ask user to confirm push:
+```bash
+git push origin staging
+```
+
+Then restore the previous branch.
 </step>
 
 <step id="9" name="Update Asana Tasks">
