@@ -6,14 +6,24 @@ metadata:
   author: j0ntz
 ---
 
-<goal>Land approved PRs on `$GIT_BRANCH_PREFIX/*` branches by autosquashing fixups, rebasing onto the default upstream branch, and pushing.</goal>
+<goal>Land approved PRs by autosquashing fixups, rebasing onto the default upstream branch, and merging. Accepts repo names, explicit PR references, or Asana task URLs.</goal>
 
 <usage>
 ```
-/pr-land                           # All EdgeApp repos with $GIT_BRANCH_PREFIX/* PRs
-/pr-land edge-react-gui            # Specific repo
-/pr-land edge-react-gui edge-core-js  # Multiple repos
+/pr-land                                          # All EdgeApp repos with $GIT_BRANCH_PREFIX/* PRs
+/pr-land edge-react-gui                           # Specific repo
+/pr-land edge-react-gui edge-core-js              # Multiple repos
+/pr-land edge-react-gui#123                       # Specific PR (shorthand)
+/pr-land https://github.com/EdgeApp/edge-react-gui/pull/123  # Specific PR (URL)
+/pr-land https://app.asana.com/0/1234/5678        # Asana task → resolves linked PRs
+/pr-land edge-react-gui#123 edge-core-js          # Mix: explicit PR + repo scan
 ```
+
+Arguments are classified automatically:
+- **Repo names** → branch-prefix scan (original behavior)
+- **PR URLs / shorthand** (`repo#N`) → fetched directly, no branch-prefix filter
+- **Asana task URLs** → resolved to linked GitHub PRs via Asana API (requires `ASANA_TOKEN`)
+- **No args** → scans all EdgeApp repos
 </usage>
 
 <rules description="Non-negotiable constraints.">
@@ -47,7 +57,7 @@ metadata:
 
 | Script | Exit 0 | Exit 1 | Exit 2 | Exit 3 | Exit 4 |
 |--------|--------|--------|--------|--------|--------|
-| `pr-land-discover.sh` | Success | Error | - | - | - |
+| `pr-land-discover.sh` | Success | Error | Auth needed | - | - |
 | `pr-land-comments.sh` | Success | Error | - | - | - |
 | `pr-land-prepare.sh` | Ready | All failed | - | - | - |
 | `verify-repo.sh` | Pass | Code fail | CHANGELOG fail | - | - |
@@ -63,10 +73,13 @@ metadata:
 ONE tool call:
 
 ```bash
-~/.cursor/skills/pr-land/scripts/pr-land-discover.sh [repo1 repo2 ...]
+~/.cursor/skills/pr-land/scripts/pr-land-discover.sh [args...]
 ```
 
-Returns JSON with all `$GIT_BRANCH_PREFIX/*` PRs and their approval status.
+Args can be repo names, PR URLs, PR shorthand (`repo#N`), or Asana task URLs (mixed freely).
+No args = scan all EdgeApp repos for `$GIT_BRANCH_PREFIX/*` PRs.
+
+Returns JSON: `{ "prs": [...], "errors": [...] }`. Each PR has `repo`, `prNumber`, `branch`, `title`, `approved`, `changesRequested`, `reviewers`. Errors include Asana resolution failures or PR fetch failures.
 </step>
 
 <step id="2" name="Comment Check and Addressing">

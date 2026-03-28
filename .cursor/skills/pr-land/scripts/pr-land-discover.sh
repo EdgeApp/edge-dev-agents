@@ -1,14 +1,21 @@
 #!/usr/bin/env node
-// pr-land-discover.sh — Discovers all user's open PRs across EdgeApp repos
-// with approval status using a single GraphQL query.
+// pr-land-discover.sh — Discovers open PRs across EdgeApp repos with approval status.
 //
-// Usage: ./pr-land-discover.sh [repo1] [repo2] ...
-// Example: ./pr-land-discover.sh edge-react-gui edge-core-js
-// Example: ./pr-land-discover.sh  (no args = all EdgeApp repos)
+// Accepts mixed argument types:
+//   Repo names:     edge-react-gui edge-core-js
+//   PR URLs:        https://github.com/EdgeApp/edge-react-gui/pull/123
+//   PR shorthand:   edge-react-gui#123
+//   Asana tasks:    https://app.asana.com/0/<project>/<taskGid>
+//   No args:        all EdgeApp repos (branch-prefix scan)
+//
+// Explicit PRs (URL/shorthand) are fetched directly — no branch-prefix filter.
+// Asana tasks are resolved to linked GitHub PRs via the Asana API (requires ASANA_TOKEN).
+// Repo names trigger the original branch-prefix scan.
 
 const { spawnSync } = require("child_process");
+const https = require("https");
 
-const specifiedRepos = process.argv.slice(2);
+const args = process.argv.slice(2);
 const edgeAppRepos = [
   "edge-react-gui",
   "edge-exchange-plugins",
@@ -17,7 +24,39 @@ const edgeAppRepos = [
   "edge-login-ui-rn",
   "edge-currency-plugins",
 ];
-const repos = specifiedRepos.length > 0 ? specifiedRepos : edgeAppRepos;
+
+// --- Argument classification ---
+
+const PR_URL_RE = /^https:\/\/github\.com\/EdgeApp\/([^/]+)\/pull\/(\d+)/;
+const PR_SHORT_RE = /^([a-z][a-z0-9-]+)#(\d+)$/;
+const ASANA_URL_RE = /^https:\/\/app\.asana\.com\/\d+\/\d+\/(?:task\/)?(\d+)/;
+
+const repoArgs = [];
+const explicitPrs = []; // {repo, prNumber}
+const asanaGids = [];
+
+for (const arg of args) {
+  let m;
+  if ((m = arg.match(PR_URL_RE))) {
+    explicitPrs.push({ repo: m[1], prNumber: Number(m[2]) });
+  } else if ((m = arg.match(PR_SHORT_RE))) {
+    explicitPrs.push({ repo: m[1], prNumber: Number(m[2]) });
+  } else if ((m = arg.match(ASANA_URL_RE))) {
+    asanaGids.push(m[1]);
+  } else {
+    repoArgs.push(arg);
+  }
+}
+
+// If no args at all, default to scanning all repos
+const scanRepos =
+  args.length === 0
+    ? edgeAppRepos
+    : repoArgs.length > 0
+      ? repoArgs
+      : [];
+
+// --- Helpers ---
 
 function requireGh() {
   const check = spawnSync("gh", ["auth", "status"], { encoding: "utf8" });
@@ -28,11 +67,11 @@ function requireGh() {
 }
 
 function ghGraphql(query, variables = {}) {
-  const args = ["api", "graphql", "-f", `query=${query}`];
+  const gqlArgs = ["api", "graphql", "-f", `query=${query}`];
   for (const [k, v] of Object.entries(variables)) {
-    args.push(typeof v === "number" ? "-F" : "-f", `${k}=${v}`);
+    gqlArgs.push(typeof v === "number" ? "-F" : "-f", `${k}=${v}`);
   }
-  const result = spawnSync("gh", args, { encoding: "utf8" });
+  const result = spawnSync("gh", gqlArgs, { encoding: "utf8" });
   if (result.status !== 0) {
     throw new Error(`GraphQL failed: ${(result.stderr || "").trim()}`);
   }
@@ -43,14 +82,125 @@ function ghGraphql(query, variables = {}) {
   return parsed.data;
 }
 
-requireGh();
+function ghApi(endpoint) {
+  const result = spawnSync("gh", ["api", endpoint], { encoding: "utf8" });
+  if (result.status !== 0) {
+    throw new Error(`gh api failed: ${(result.stderr || "").trim()}`);
+  }
+  return JSON.parse(result.stdout);
+}
 
-// Build a single GraphQL query with aliases for all repos.
-// Each alias fetches open PRs + latest review state in one round-trip.
-const repoFragments = repos
-  .map((repo, i) => {
-    const alias = `repo${i}`;
-    return `${alias}: repository(owner: "EdgeApp", name: "${repo}") {
+function asanaGet(path) {
+  const token = process.env.ASANA_TOKEN;
+  if (!token) throw new Error("ASANA_TOKEN not set");
+  return new Promise((resolve, reject) => {
+    const req = https.get(
+      `https://app.asana.com/api/1.0${path}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+      (res) => {
+        let body = "";
+        res.on("data", (d) => (body += d));
+        res.on("end", () => {
+          if (res.statusCode !== 200)
+            return reject(new Error(`Asana ${res.statusCode}: ${body}`));
+          resolve(JSON.parse(body).data);
+        });
+      }
+    );
+    req.on("error", reject);
+  });
+}
+
+function extractReviewers(reviews) {
+  const latestByUser = {};
+  for (const r of reviews) {
+    const login = r.author?.login;
+    if (!login) continue;
+    if (
+      !latestByUser[login] ||
+      new Date(r.submittedAt) > new Date(latestByUser[login].submittedAt)
+    ) {
+      latestByUser[login] = r;
+    }
+  }
+  const reviewers = Object.values(latestByUser);
+  return {
+    approved: reviewers.some((r) => r.state === "APPROVED"),
+    changesRequested: reviewers.some((r) => r.state === "CHANGES_REQUESTED"),
+    reviewers: reviewers.map((r) => ({
+      user: r.author.login,
+      state: r.state,
+    })),
+  };
+}
+
+// --- Main ---
+
+async function main() {
+  requireGh();
+
+  const results = { prs: [], errors: [] };
+
+  // 1. Resolve Asana tasks → explicit PRs
+  for (const gid of asanaGids) {
+    try {
+      const task = await asanaGet(
+        `/tasks/${gid}?opt_fields=name,notes,permalink_url`
+      );
+      // Look for GitHub PR URLs in task notes
+      const ghPrRe =
+        /https:\/\/github\.com\/EdgeApp\/([^/]+)\/pull\/(\d+)/g;
+      let match;
+      let found = false;
+      while ((match = ghPrRe.exec(task.notes || "")) !== null) {
+        explicitPrs.push({ repo: match[1], prNumber: Number(match[2]) });
+        found = true;
+      }
+      if (!found) {
+        results.errors.push(
+          `Asana task ${gid} (${task.name}): no GitHub PR link found in description`
+        );
+      }
+    } catch (e) {
+      results.errors.push(`Asana task ${gid}: ${e.message}`);
+    }
+  }
+
+  // 2. Fetch explicit PRs directly (no branch-prefix filter)
+  for (const { repo, prNumber } of explicitPrs) {
+    try {
+      const pr = ghApi(`repos/EdgeApp/${repo}/pulls/${prNumber}`);
+      const reviewsRaw = ghApi(
+        `repos/EdgeApp/${repo}/pulls/${prNumber}/reviews`
+      );
+      const { approved, changesRequested, reviewers } = extractReviewers(
+        reviewsRaw.map((r) => ({
+          author: { login: r.user?.login },
+          state: r.state,
+          submittedAt: r.submitted_at,
+        }))
+      );
+      results.prs.push({
+        repo,
+        prNumber: pr.number,
+        branch: pr.head.ref,
+        title: pr.title,
+        updatedAt: pr.updated_at,
+        approved,
+        changesRequested,
+        reviewers,
+      });
+    } catch (e) {
+      results.errors.push(`${repo}#${prNumber}: ${e.message}`);
+    }
+  }
+
+  // 3. Scan repos by branch prefix (original behavior)
+  if (scanRepos.length > 0) {
+    const repoFragments = scanRepos
+      .map((repo, i) => {
+        const alias = `repo${i}`;
+        return `${alias}: repository(owner: "EdgeApp", name: "${repo}") {
     name
     pullRequests(first: 100, states: OPEN) {
       nodes {
@@ -68,65 +218,62 @@ const repoFragments = repos
       }
     }
   }`;
-  })
-  .join("\n  ");
+      })
+      .join("\n  ");
 
-const query = `{ ${repoFragments} }`;
+    const query = `{ ${repoFragments} }`;
 
-let data;
-try {
-  data = ghGraphql(query);
-} catch (e) {
-  console.error("ERROR:", e.message);
-  process.exit(1);
-}
-
-const results = { prs: [], errors: [] };
-
-for (const key of Object.keys(data)) {
-  const repoData = data[key];
-  if (!repoData) continue;
-  const repo = repoData.name;
-
-  for (const pr of repoData.pullRequests.nodes) {
-    if (!pr.headRefName.startsWith("jon/")) continue;
-
-    // Dedupe reviews: keep latest per reviewer
-    const latestByUser = {};
-    for (const r of pr.reviews.nodes) {
-      const login = r.author?.login;
-      if (!login) continue;
-      if (
-        !latestByUser[login] ||
-        new Date(r.submittedAt) > new Date(latestByUser[login].submittedAt)
-      ) {
-        latestByUser[login] = r;
-      }
+    let data;
+    try {
+      data = ghGraphql(query);
+    } catch (e) {
+      console.error("ERROR:", e.message);
+      process.exit(1);
     }
 
-    const reviewers = Object.values(latestByUser);
-    const approved = reviewers.some((r) => r.state === "APPROVED");
-    const changesRequested = reviewers.some(
-      (r) => r.state === "CHANGES_REQUESTED"
-    );
+    for (const key of Object.keys(data)) {
+      const repoData = data[key];
+      if (!repoData) continue;
+      const repo = repoData.name;
 
-    results.prs.push({
-      repo,
-      prNumber: pr.number,
-      branch: pr.headRefName,
-      title: pr.title,
-      updatedAt: pr.updatedAt,
-      approved,
-      changesRequested,
-      reviewers: reviewers.map((r) => ({
-        user: r.author.login,
-        state: r.state,
-      })),
-    });
+      for (const pr of repoData.pullRequests.nodes) {
+        if (!pr.headRefName.startsWith("jon/")) continue;
+
+        const { approved, changesRequested, reviewers } = extractReviewers(
+          pr.reviews.nodes
+        );
+
+        results.prs.push({
+          repo,
+          prNumber: pr.number,
+          branch: pr.headRefName,
+          title: pr.title,
+          updatedAt: pr.updatedAt,
+          approved,
+          changesRequested,
+          reviewers,
+        });
+      }
+    }
   }
+
+  // Dedupe by repo+prNumber (in case Asana/explicit overlap with scan)
+  const seen = new Set();
+  results.prs = results.prs.filter((pr) => {
+    const key = `${pr.repo}#${pr.prNumber}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  results.prs.sort(
+    (a, b) =>
+      a.repo.localeCompare(b.repo) || a.branch.localeCompare(b.branch)
+  );
+  console.log(JSON.stringify(results, null, 2));
 }
 
-results.prs.sort(
-  (a, b) => a.repo.localeCompare(b.repo) || a.branch.localeCompare(b.branch)
-);
-console.log(JSON.stringify(results, null, 2));
+main().catch((e) => {
+  console.error("ERROR:", e.message);
+  process.exit(1);
+});
