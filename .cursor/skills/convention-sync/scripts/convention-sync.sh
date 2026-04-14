@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # convention-sync.sh — Sync ~/.cursor/ files with the edge-dev-agents repo.
 # Usage: ./convention-sync.sh [repo-dir] [--stage] [--commit -m "message"] [--repo-to-user]
-# Compares ~/.cursor/{skills,rules,scripts} against <repo-dir>/.cursor/ and
-# outputs a structured JSON summary of new, modified, and deleted files.
+# Compares ~/.cursor/{README.md,skills,rules,scripts} against the distribution
+# copy in <repo-dir> and outputs a structured JSON summary of new, modified,
+# and deleted files.
 # With --stage: copies changed files and stages them in git (or copies to user dir with --repo-to-user).
 # With --commit: stages + commits (requires -m). Only valid for user-to-repo direction.
 #
@@ -99,6 +100,9 @@ USER_DIR="$HOME/.cursor"
 REPO_CURSOR="$REPO_DIR/.cursor"
 DIRS="skills rules scripts"
 SYNCIGNORE="$USER_DIR/.syncignore"
+USER_README="$USER_DIR/README.md"
+REPO_ROOT_README="$REPO_DIR/README.md"
+LEGACY_REPO_README="$REPO_CURSOR/README.md"
 
 # Load ignore patterns from .syncignore (one glob per line, # comments, blank lines skipped)
 ignore_patterns=()
@@ -127,50 +131,75 @@ mod_json="[]"
 del_json="[]"
 ignored_json="[]"
 
-# Check README.md separately (single file, not a directory)
-if [[ -f "$USER_DIR/README.md" ]] && ! is_ignored "README.md"; then
-  if [[ ! -f "$REPO_CURSOR/README.md" ]]; then
-    new_json=$(echo "$new_json" | jq '. + ["README.md"]')
-  elif ! diff -q "$USER_DIR/README.md" "$REPO_CURSOR/README.md" >/dev/null 2>&1; then
-    mod_json=$(echo "$mod_json" | jq '. + ["README.md"]')
+compare_readme() {
+  local source_readme="$1"
+  local target_readme="$2"
+
+  if is_ignored "README.md"; then
+    ignored_json=$(echo "$ignored_json" | jq '. + ["README.md"]')
+    return
   fi
-elif [[ -f "$REPO_CURSOR/README.md" ]] && ! is_ignored "README.md"; then
-  del_json=$(echo "$del_json" | jq '. + ["README.md"]')
+
+  if [[ -f "$source_readme" ]]; then
+    if [[ ! -f "$target_readme" ]]; then
+      new_json=$(echo "$new_json" | jq '. + ["README.md"]')
+    elif ! diff -q "$source_readme" "$target_readme" >/dev/null 2>&1; then
+      mod_json=$(echo "$mod_json" | jq '. + ["README.md"]')
+    fi
+  elif [[ -f "$target_readme" ]]; then
+    del_json=$(echo "$del_json" | jq '. + ["README.md"]')
+  fi
+}
+
+compare_dirs() {
+  local source_base="$1"
+  local target_base="$2"
+  local source_path target_path rel entry
+
+  for dir in $DIRS; do
+    source_path="$source_base/$dir"
+    target_path="$target_base/$dir"
+
+    if [[ -d "$source_path" ]]; then
+      while IFS= read -r rel; do
+        [[ -z "$rel" ]] && continue
+        entry="$dir/$rel"
+        if is_ignored "$entry"; then
+          ignored_json=$(echo "$ignored_json" | jq --arg f "$entry" '. + [$f]')
+          continue
+        fi
+        if [[ ! -f "$target_path/$rel" ]]; then
+          new_json=$(echo "$new_json" | jq --arg f "$entry" '. + [$f]')
+        elif ! diff -q "$source_path/$rel" "$target_path/$rel" >/dev/null 2>&1; then
+          mod_json=$(echo "$mod_json" | jq --arg f "$entry" '. + [$f]')
+        fi
+      done < <(cd "$source_path" && find . -type f ! -name '.DS_Store' | sed 's|^\./||')
+    fi
+
+    if [[ -d "$target_path" ]]; then
+      while IFS= read -r rel; do
+        [[ -z "$rel" ]] && continue
+        entry="$dir/$rel"
+        is_ignored "$entry" && continue
+        if [[ ! -f "$source_path/$rel" ]]; then
+          del_json=$(echo "$del_json" | jq --arg f "$entry" '. + [$f]')
+        fi
+      done < <(cd "$target_path" && find . -type f ! -name '.DS_Store' | sed 's|^\./||')
+    fi
+  done
+}
+
+if [[ "$DIRECTION" == "user-to-repo" ]]; then
+  compare_readme "$USER_README" "$REPO_ROOT_README"
+  compare_dirs "$USER_DIR" "$REPO_CURSOR"
+
+  if [[ -f "$LEGACY_REPO_README" ]] && ! is_ignored ".cursor/README.md"; then
+    del_json=$(echo "$del_json" | jq '. + [".cursor/README.md"]')
+  fi
+else
+  compare_readme "$REPO_ROOT_README" "$USER_README"
+  compare_dirs "$REPO_CURSOR" "$USER_DIR"
 fi
-
-for dir in $DIRS; do
-  user_path="$USER_DIR/$dir"
-  repo_path="$REPO_CURSOR/$dir"
-
-  [[ -d "$user_path" ]] || continue
-
-  while IFS= read -r rel; do
-    [[ -z "$rel" ]] && continue
-    entry="$dir/$rel"
-    if is_ignored "$entry"; then
-      ignored_json=$(echo "$ignored_json" | jq --arg f "$entry" '. + [$f]')
-      continue
-    fi
-    repo_file="$repo_path/$rel"
-    if [[ ! -f "$repo_file" ]]; then
-      new_json=$(echo "$new_json" | jq --arg f "$entry" '. + [$f]')
-    elif ! diff -q "$user_path/$rel" "$repo_file" >/dev/null 2>&1; then
-      mod_json=$(echo "$mod_json" | jq --arg f "$entry" '. + [$f]')
-    fi
-  done < <(cd "$user_path" && find . -type f ! -name '.DS_Store' | sed 's|^\./||')
-
-  if [[ -d "$repo_path" ]]; then
-    while IFS= read -r rel; do
-      [[ -z "$rel" ]] && continue
-      entry="$dir/$rel"
-      is_ignored "$entry" && continue
-      user_file="$user_path/$rel"
-      if [[ ! -f "$user_file" ]]; then
-        del_json=$(echo "$del_json" | jq --arg f "$entry" '. + [$f]')
-      fi
-    done < <(cd "$repo_path" && find . -type f ! -name '.DS_Store' | sed 's|^\./||')
-  fi
-done
 
 total=$(echo "$new_json $mod_json $del_json" | jq -s '.[0] + .[1] + .[2] | length')
 
@@ -201,9 +230,8 @@ if [[ "$DO_STAGE" == true && "$total" -gt 0 ]]; then
   if [[ "$DIRECTION" == "user-to-repo" ]]; then
     while IFS= read -r f; do
       [[ -z "$f" ]] && continue
-      # README.md is at .cursor/ root, others are in subdirs
       if [[ "$f" == "README.md" ]]; then
-        cp "$USER_DIR/$f" "$REPO_CURSOR/$f"
+        cp "$USER_DIR/$f" "$REPO_DIR/$f"
       else
         mkdir -p "$(dirname "$REPO_CURSOR/$f")"
         cp "$USER_DIR/$f" "$REPO_CURSOR/$f"
@@ -212,18 +240,34 @@ if [[ "$DO_STAGE" == true && "$total" -gt 0 ]]; then
 
     while IFS= read -r f; do
       [[ -z "$f" ]] && continue
-      rm -f "$REPO_CURSOR/$f"
+      if [[ "$f" == "README.md" ]]; then
+        rm -f "$REPO_DIR/$f"
+      elif [[ "$f" == ".cursor/README.md" ]]; then
+        rm -f "$LEGACY_REPO_README"
+      else
+        rm -f "$REPO_CURSOR/$f"
+      fi
     done <<< "$all_del"
 
     cd "$REPO_DIR"
     while IFS= read -r f; do
       [[ -z "$f" ]] && continue
-      git add ".cursor/$f"
+      if [[ "$f" == "README.md" ]]; then
+        git add "$f"
+      else
+        git add ".cursor/$f"
+      fi
     done <<< "$all_copy"
 
     while IFS= read -r f; do
       [[ -z "$f" ]] && continue
-      git rm -f --quiet ".cursor/$f" 2>/dev/null || true
+      if [[ "$f" == "README.md" ]]; then
+        git rm -f --quiet "$f" 2>/dev/null || true
+      elif [[ "$f" == ".cursor/README.md" ]]; then
+        git rm -f --quiet "$f" 2>/dev/null || true
+      else
+        git rm -f --quiet ".cursor/$f" 2>/dev/null || true
+      fi
     done <<< "$all_del"
 
     if [[ "$DO_COMMIT" == true ]]; then
@@ -233,7 +277,7 @@ if [[ "$DO_STAGE" == true && "$total" -gt 0 ]]; then
     while IFS= read -r f; do
       [[ -z "$f" ]] && continue
       if [[ "$f" == "README.md" ]]; then
-        cp "$REPO_CURSOR/$f" "$USER_DIR/$f"
+        cp "$REPO_DIR/$f" "$USER_DIR/$f"
       else
         mkdir -p "$(dirname "$USER_DIR/$f")"
         cp "$REPO_CURSOR/$f" "$USER_DIR/$f"

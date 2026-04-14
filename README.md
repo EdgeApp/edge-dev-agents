@@ -7,6 +7,10 @@ and meta-tooling for maintaining the workflow itself.
 The distributable Cursor content lives under `.cursor/`. This repo is the
 versioned home for those skills, rules, scripts, and docs.
 
+The canonical local doc lives at `~/.cursor/README.md`. During
+`/convention-sync`, that file is mirrored to `edge-dev-agents/README.md`, and
+the repo copy should not keep a second `.cursor/README.md`.
+
 ## Installation
 
 **1. Set the required env var** in your `~/.zshrc`:
@@ -47,9 +51,8 @@ companion script directly when onboarding:
 
 ```text
 edge-dev-agents/
-├── README.md          # Repo overview
+├── README.md          # Synced copy of ~/.cursor/README.md
 └── .cursor/
-    ├── README.md      # Source for convention-sync PR descriptions
     ├── skills/        # Slash skills (*/SKILL.md) + companion scripts
     ├── scripts/       # Shared portability and dashboard scripts
     ├── commands/      # Minimal command wrappers
@@ -104,7 +107,7 @@ scripts, not be re-described independently across skills.
 | [`/asana-task-update`](.cursor/skills/asana-task-update/SKILL.md) | Generic Asana mutations such as attach PR, assign, unassign, and status updates |
 | [`/standup`](.cursor/skills/standup/SKILL.md) | Generate daily standup notes from Asana and GitHub activity |
 | [`/chat-audit`](.cursor/skills/chat-audit/SKILL.md) | Audit Cursor chat sessions for waste, drift, and workflow gaps |
-| [`/convention-sync`](.cursor/skills/convention-sync/SKILL.md) | Sync `~/.cursor/` with this repo and update PR descriptions from `.cursor/README.md` |
+| [`/convention-sync`](.cursor/skills/convention-sync/SKILL.md) | Sync `~/.cursor/` with this repo, mirror the local README to repo root, and update PR descriptions from `README.md` |
 | [`/author`](.cursor/skills/author/SKILL.md) | Create, revise, and debug skills, scripts, and rules |
 | [`/fix-eslint`](.cursor/skills/fix-eslint/SKILL.md) | Apply documented fixes for recurring Edge React GUI ESLint warnings |
 
@@ -151,7 +154,7 @@ scripts, not be re-described independently across skills.
 | [`asana-task-update.sh`](.cursor/skills/asana-task-update/scripts/asana-task-update.sh) | Apply reusable Asana task mutations |
 | [`asana-create-dep-task.sh`](.cursor/skills/dep-pr/scripts/asana-create-dep-task.sh) | Create dependent Asana tasks |
 | [`asana-whoami.sh`](.cursor/skills/asana-whoami.sh) | Return current Asana identity |
-| [`convention-sync.sh`](.cursor/skills/convention-sync/scripts/convention-sync.sh) | Sync `~/.cursor/` and `edge-dev-agents` in either direction |
+| [`convention-sync.sh`](.cursor/skills/convention-sync/scripts/convention-sync.sh) | Sync `~/.cursor/` and `edge-dev-agents` in either direction, mirroring `~/.cursor/README.md` to repo root `README.md` |
 | [`generate-claude-md.sh`](.cursor/skills/convention-sync/scripts/generate-claude-md.sh) | Regenerate `~/.claude/CLAUDE.md` from always-apply rules |
 | [`tool-sync.sh`](.cursor/scripts/tool-sync.sh) | Sync Cursor assets into OpenCode and Claude-compatible formats |
 | [`port-to-opencode.sh`](.cursor/scripts/port-to-opencode.sh) | Convert Cursor files into OpenCode-friendly mirrors |

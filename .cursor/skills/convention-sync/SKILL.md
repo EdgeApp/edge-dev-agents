@@ -6,14 +6,14 @@ metadata:
   author: j0ntz
 ---
 
-<goal>Sync cursor files between `~/.cursor/` and the `edge-dev-agents` repo, commit, push, and update PR description from README. Also maintains cross-tool compatibility: symlinks `~/.claude/skills` → `~/.cursor/skills` and generates `~/.claude/CLAUDE.md` from always-apply rules.</goal>
+<goal>Sync cursor files between `~/.cursor/` and the `edge-dev-agents` repo, commit, push, and update PR description from the synced repo root README. Also maintains cross-tool compatibility: symlinks `~/.claude/skills` → `~/.cursor/skills` and generates `~/.claude/CLAUDE.md` from always-apply rules.</goal>
 
 <rules>
 <rule id="local-is-canonical">`~/.cursor/` is the canonical source. Edits happen locally; the repo is the distribution copy. Default direction is `user-to-repo`. Use `--repo-to-user` only for onboarding or pulling changes authored by others. The script does not detect bidirectional conflicts — whichever direction you run overwrites the other side.</rule>
 <rule id="use-companion-script">Use `~/.cursor/skills/convention-sync/scripts/convention-sync.sh` for diffing and syncing. Do NOT manually diff or copy files.</rule>
 <rule id="dry-run-first">Always run without `--stage` first to show the summary. Only stage/commit after user confirms.</rule>
 <rule id="no-script-bypass">If the script fails, report the error and STOP.</rule>
-<rule id="readme-is-source">`.cursor/README.md` is the source of truth for documentation. The script mirrors it to the PR description automatically.</rule>
+<rule id="readme-is-source">`~/.cursor/README.md` is the canonical local documentation source. The sync script mirrors it to `<repo>/README.md`, and PR descriptions must be updated from that synced repo root README.</rule>
 <rule id="claude-compat">Every run ensures `~/.claude/skills` symlinks to `~/.cursor/skills` and regenerates `~/.claude/CLAUDE.md` from `alwaysApply: true` rules. This enables OpenCode and Claude Code to discover skills and rules without separate config.</rule>
 <rule id="target-repo-resolution">For user-to-repo sync, target the `edge-dev-agents` checkout. Do NOT assume the current repo is correct just because it contains a `.cursor/` folder. Let the companion script resolve and validate the repo path.</rule>
 </rules>
@@ -46,7 +46,7 @@ Sync summary (user → repo):
   Deleted: file5
   Ignored: file6, file7 (via .syncignore)
 
-PR #N: Will update description from README.md (or "No open PR")
+PR #N: Will update description from repo `README.md` (or "No open PR")
 
 Commit and push? [y/N]
 ```
@@ -69,10 +69,10 @@ Then push:
 cd <repo-dir> && git push origin HEAD
 ```
 
-If an open PR exists, update the PR description from README:
+If an open PR exists, update the PR description from the synced repo root README:
 
 ```bash
-cd <repo-dir> && gh pr edit --body-file .cursor/README.md
+cd <repo-dir> && gh pr edit --body-file README.md
 ```
 </step>
 
@@ -81,5 +81,6 @@ cd <repo-dir> && gh pr edit --body-file .cursor/README.md
 <case name="Current repo has a .cursor folder but is not edge-dev-agents">Do not sync into that repo. Fall back to `~/git/edge-dev-agents` or ask for the correct repo path.</case>
 <case name="Dry-run resolved a repo path">Reuse the `repoDir` value from the script's JSON output for the PR query, commit run, push, and PR edit steps.</case>
 <case name="Selective sync">To permanently exclude files, add glob patterns to `~/.cursor/.syncignore` (one per line, `#` comments). The script skips matching entries and reports them in the `ignored` array. To exclude ad-hoc, remove files from staging with `git reset HEAD .cursor/<file>` before committing.</case>
-<case name="No README">If `.cursor/README.md` doesn't exist, skip PR description update and warn the user.</case>
+<case name="README migration">During migration, the dry-run may report deletion of `.cursor/README.md` in the repo copy. That is expected: the repo should keep only the root `README.md`.</case>
+<case name="No README">If `~/.cursor/README.md` doesn't exist, skip PR description update and warn the user.</case>
 </edge-cases>
