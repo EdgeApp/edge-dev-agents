@@ -47,6 +47,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
           isResolved
           comments(first: 50) {
             nodes {
+              databaseId
               createdAt
               author { login }
               path
@@ -127,6 +128,8 @@ async function main() {
         if (new Date(c.createdAt) > lastCommitDate) {
           recentComments.push({
             type: "inline",
+          threadId: thread.id,
+          commentId: c.databaseId,
             user: c.author?.login,
             path: c.path,
             body: c.body?.slice(0, 200)
@@ -154,6 +157,7 @@ async function main() {
       if (new Date(r.submittedAt) > lastCommitDate) {
         recentComments.push({
           type: "review-body",
+          reviewId: r.databaseId,
           user,
           state: r.state,
           body: r.body.slice(0, 200)
@@ -169,6 +173,7 @@ async function main() {
       if (new Date(c.createdAt) > lastCommitDate) {
         recentComments.push({
           type: "top-level",
+          commentId: c.databaseId,
           user,
           body: c.body?.slice(0, 200)
         })

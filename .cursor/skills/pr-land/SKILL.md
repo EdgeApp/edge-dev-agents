@@ -48,6 +48,7 @@ Arguments are classified automatically:
 |--------|---------|
 | `pr-land-discover.sh` | Discover PRs and approval status |
 | `pr-land-comments.sh` | Check for recent unaddressed feedback (inline threads, review bodies, top-level comments) |
+| `git-branch-ops.sh` | Shared autosquash / push helper for explicit git branch actions |
 | `pr-land-prepare.sh` | Rebase + conflict detection + verification |
 | `verify-repo.sh` | Verification (CHANGELOG + code; lint scoped to changed files when `--base` given) |
 | `pr-land-merge.sh` | Rebase + verify + merge via GitHub API |
@@ -59,6 +60,7 @@ Arguments are classified automatically:
 |--------|--------|--------|--------|--------|--------|
 | `pr-land-discover.sh` | Success | Error | Auth needed | - | - |
 | `pr-land-comments.sh` | Success | Error | - | - | - |
+| `git-branch-ops.sh` | Success | Error | - | - | - |
 | `pr-land-prepare.sh` | Ready | All failed | - | - | - |
 | `verify-repo.sh` | Pass | Code fail | CHANGELOG fail | - | - |
 | `pr-land-merge.sh` | Merged | Verify fail | - | - | CHANGELOG conflict |
@@ -87,7 +89,7 @@ Returns JSON: `{ "prs": [...], "errors": [...] }`. Each PR has `repo`, `prNumber
 echo '[{"repo":"...","prNumber":123,"branch":"<prefix>/..."}]' | ~/.cursor/skills/pr-land/scripts/pr-land-comments.sh
 ```
 
-Returns PRs with unaddressed feedback posted after the last commit. The script checks **three sources**:
+Returns PRs with unaddressed feedback posted after the last commit. The script checks **three sources** and includes the IDs needed to reply or mark them addressed:
 
 1. **Unresolved inline review threads** — threads where `isResolved: false` with comments newer than last commit
 2. **Review bodies** — the latest review from each non-author/non-bot reviewer, if it has a non-empty body newer than last commit (catches feedback written in the approve/reject dialog, regardless of review state)
@@ -97,14 +99,25 @@ Items previously marked with `<!-- addressed:review:ID -->` or `<!-- addressed:c
 
 <sub-step name="Comment handling">
 1. AI/bot comments: Already filtered out by the script.
-2. Human reviewer comments on approved PRs — address and set aside:
-   1. Read the comment and understand the requested change
-   2. Make the fix as a fixup commit: `~/.cursor/skills/im/scripts/lint-commit.sh --fixup <hash> [files...]`
-   3. Push the fixup to the branch
-   4. Reply on the PR thread explaining what was fixed (1 sentence, factual). Use `gh pr comment <number> --repo EdgeApp/<repo> --body "..."` for top-level comments, or reply to the specific thread if the feedback was inline.
-   5. **Remove this PR from the merge set** — it needs re-review after the fixup
-   6. Continue with remaining PRs that have no outstanding comments
-   7. Report addressed PRs to the user at the end of the workflow
+2. Human reviewer comments are **blocking until the user decides how to handle them**. Use the `approved` and `changesRequested` fields from discovery to determine the path:
+   1. **`changesRequested: true`**:
+      - Treat the feedback as re-review-blocking
+      - If the user wants it addressed now, make the fix as a visible fixup commit, push it, reply/resolve the feedback, and **remove the PR from the merge set** so it can go back for review
+      - If the user does not want to address it now, leave the PR out of the merge set and report it as blocked by requested changes
+   2. **`approved: true` and `changesRequested: false`**:
+      - Present the recent human comments to the user and ask whether to **ignore** them or **address** them before continuing
+      - If the user chooses **ignore**: leave the code unchanged and continue the landing workflow
+      - If the user chooses **address**:
+        1. Read the comment and understand the requested change
+        2. Make the fix as a fixup commit: `~/.cursor/skills/lint-commit.sh --fixup <hash> [files...]`
+        3. Push the updated branch with `~/.cursor/skills/git-branch-ops.sh push --force-with-lease --branch <branch>`. Use `--force-with-lease` because `lint-commit.sh --fixup` may autosquash immediately.
+        4. Reply on the PR item explaining what was fixed (1 sentence, factual):
+           - **Inline** (`type: "inline"`): Use `commentId` and `threadId` from `pr-land-comments.sh` output with `~/.cursor/skills/pr-address/scripts/pr-address.sh reply ...` followed by `resolve-thread ...`
+           - **Review body** (`type: "review-body"`): Use `reviewId` with `~/.cursor/skills/pr-address/scripts/pr-address.sh mark-addressed --type review ...`
+           - **Top-level** (`type: "top-level"`): Use `commentId` with `~/.cursor/skills/pr-address/scripts/pr-address.sh mark-addressed --type comment ...`
+        5. Continue the landing workflow immediately — do **not** remove the PR from the merge set solely because an already-approved reviewer left optional comments
+   3. Continue with remaining PRs that have no outstanding blocking comment decision
+   4. Report ignored comments, addressed-and-continued PRs, and set-aside PRs at the end of the workflow
 
 **Do NOT block the rest of the flow** for PRs with comments.
 </sub-step>
@@ -130,6 +143,11 @@ The prepare script handles: clone/checkout, autosquash fixups, rebase onto upstr
 
 <step id="4" name="Push">
 After prepare succeeds, push with `--force-with-lease`.
+Use:
+
+```bash
+~/.cursor/skills/git-branch-ops.sh push --force-with-lease --branch <branch>
+```
 </step>
 
 <step id="5" name="Merge">
@@ -197,26 +215,17 @@ After script completes:
 
 Ask user to confirm `npm publish` completed, then:
 
-1. Save current branch and switch to develop:
-   ```bash
-   cd <gui-repo-dir>
-   ORIG_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-   git checkout develop && git pull origin develop
-   ```
-
-2. Run `upgrade-dep.sh` for each published package (sequentially):
+1. Run `upgrade-dep.sh` for each published package (sequentially):
    ```bash
    cd <gui-repo-dir> && ~/.cursor/skills/pr-land/scripts/upgrade-dep.sh <package-name>
    ```
-   If any fails, STOP and report. Ask user how to proceed.
+   The script stashes any working changes, switches to `develop`, resets it to `origin/develop`, performs the dependency upgrade, and leaves any stash entries in place. On success it prints `UPGRADE_READY ... sha=<commit_sha>`. If any run fails, STOP and report. Ask user how to proceed.
 
-3. Restore original branch:
+2. After all dependency upgrades succeed, show the created `develop` commit SHA(s) to the user and ask for confirmation to land them:
    ```bash
-   cd <gui-repo-dir>
-   git checkout $ORIG_BRANCH
-   git stash pop
+   ~/.cursor/skills/git-branch-ops.sh push --branch develop
    ```
-   If stash pop fails with conflicts, STOP and report. If "No stash entries", that's fine.
+   This push is required before the workflow can treat GUI dependency updates as landed. Do NOT proceed to staging cherry-pick or Asana updates until the `develop` push is confirmed complete.
 </step>
 
 <step id="8" name="Staging Cherry-Pick">
@@ -317,7 +326,7 @@ Both prepare and merge scripts can detect CHANGELOG-only conflicts. In either ca
 1. Script outputs clear resolution instructions
 2. Agent resolves semantically (upstream entries first)
 3. `git add CHANGELOG.md && GIT_EDITOR=true git rebase --continue`
-4. Push with `--force-with-lease`
+4. Push with `~/.cursor/skills/git-branch-ops.sh push --force-with-lease --branch <branch>`
 5. Re-run the script to verify and proceed
 </conflict-handling>
 
@@ -348,7 +357,7 @@ Both prepare and merge scripts can detect CHANGELOG-only conflicts. In either ca
 3. Read CHANGELOG.md with conflict markers
 4. Resolve semantically using StrReplace
 5. `git add CHANGELOG.md && GIT_EDITOR=true git rebase --continue`
-6. `git push --force-with-lease`
+6. `~/.cursor/skills/git-branch-ops.sh push --force-with-lease`
 7. Re-run `~/.cursor/skills/pr-land/scripts/pr-land-merge.sh` — verification runs automatically
 </sub-step>
 

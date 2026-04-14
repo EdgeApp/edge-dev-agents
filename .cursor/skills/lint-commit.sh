@@ -10,8 +10,8 @@
 # Options:
 #   -m "msg"       Commit message (mutually exclusive with --fixup)
 #   --fixup <hash> Create a fixup commit targeting <hash>
-#   --reorder      After fixup commit, rebase to place it after its target (default: true)
-#   --no-reorder   Skip the reorder rebase
+#   --reorder      After fixup commit, autosquash from merge-base with upstream (default: true)
+#   --no-reorder   Skip the autosquash follow-up
 #
 # If files are given, they are the primary scope for linting/committing.
 # The script may also auto-include generated companion files like:
@@ -28,7 +28,7 @@
 #   4. git add -A && git commit --no-verify
 #   5. Run yarn test --findRelatedTests -u on committed .ts/.tsx files
 #   6. If snapshots changed, amend the commit to include them
-#   7. If commit is a fixup (--fixup or -m "fixup! ..."), reorder via rebase
+#   7. If commit is a fixup (--fixup or -m "fixup! ..."), autosquash via shared helper
 set -euo pipefail
 
 MESSAGE=""
@@ -290,7 +290,7 @@ if [[ ${#LINT_FILES[@]} -gt 0 && -x ./node_modules/.bin/jest ]]; then
   fi
 fi
 
-# Step 7: Reorder fixup commits to be adjacent to their targets
+# Step 7: Autosquash fixup commits when requested
 # Detects fixup commits by --fixup flag or "fixup! " prefix in message
 IS_FIXUP="false"
 if [[ -n "$FIXUP" ]]; then
@@ -300,27 +300,18 @@ elif [[ "$MESSAGE" == fixup!* ]]; then
 fi
 
 if [[ "$IS_FIXUP" == "true" && "$REORDER" == "true" ]]; then
-  echo ">> Reordering fixup commit..."
-  
-  # Find the merge-base with the default upstream branch
+  echo ">> Autosquashing fixup commit..."
+
   DEFAULT_UPSTREAM=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
     || echo "origin/$(git remote show origin 2>/dev/null | sed -n '/HEAD branch/s/.*: //p')" \
     || echo "origin/master")
-  
-  BASE=$(git merge-base "$DEFAULT_UPSTREAM" HEAD 2>/dev/null || echo "")
-  
-  if [[ -n "$BASE" ]]; then
-    # Interactive rebase with autosquash to reorder (editor does nothing, so commits aren't squashed)
-    if GIT_EDITOR=true git -c sequence.editor=: rebase -i "$BASE" --autosquash 2>/dev/null; then
-      echo ">> Fixup reordered successfully"
-    else
-      # Rebase failed (likely conflict) - abort and warn
-      git rebase --abort 2>/dev/null || true
-      echo ">> Warning: Could not reorder fixup (conflict). Fixup remains at HEAD." >&2
-      echo ">> Run 'git rebase -i --autosquash $BASE' manually to reorder." >&2
-    fi
+
+  if ~/.cursor/skills/git-branch-ops.sh autosquash --merge-base-with "$DEFAULT_UPSTREAM" 2>/dev/null; then
+    echo ">> Fixup autosquashed successfully"
   else
-    echo ">> Warning: Could not determine merge-base for reorder" >&2
+    git rebase --abort 2>/dev/null || true
+    echo ">> Warning: Could not autosquash fixup (conflict). Fixup remains at HEAD." >&2
+    echo ">> Run '~/.cursor/skills/git-branch-ops.sh autosquash --merge-base-with $DEFAULT_UPSTREAM' manually." >&2
   fi
 fi
 

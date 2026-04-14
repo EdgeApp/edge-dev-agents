@@ -347,9 +347,7 @@ case "$CMD" in
   autosquash)
     DEFAULT_UPSTREAM=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
       || echo "origin/$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')")
-    BASE=$(git merge-base "$DEFAULT_UPSTREAM" HEAD)
-    GIT_EDITOR=true git -c sequence.editor=: rebase -i "$BASE" --autosquash
-    echo ">> Autosquash complete"
+    ~/.cursor/skills/git-branch-ops.sh autosquash --merge-base-with "$DEFAULT_UPSTREAM"
     ;;
 
   *)

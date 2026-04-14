@@ -102,7 +102,7 @@ git log -1 --format='%s' <commit_sha>
 After all fixup commits are created, push to the remote so the reviewer can see the changes referenced in replies:
 
 ```bash
-git push
+~/.cursor/skills/git-branch-ops.sh push
 ```
 </sub-step>
 </step>
@@ -177,14 +177,14 @@ If `hasHumanReviewers` is `true`, **do NOT autosquash**. Leave fixup commits vis
 
 When autosquashing is allowed:
 ```bash
-~/.cursor/skills/pr-address/scripts/pr-address.sh autosquash
+~/.cursor/skills/git-branch-ops.sh autosquash
 ```
 
 If conflicts occur, resolve them, then: `GIT_EDITOR=true git rebase --continue`. If a commit becomes empty after squashing: `git rebase --skip`.
 
 Force push is required after autosquash because the rebase rewrites history:
 ```bash
-git push --force-with-lease
+~/.cursor/skills/git-branch-ops.sh push --force-with-lease
 ```
 </step>
 
