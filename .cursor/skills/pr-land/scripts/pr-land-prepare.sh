@@ -137,11 +137,11 @@ async function prepareBranch(repo, branch) {
 
     if (isChangelogOnly(conflictFiles)) {
       console.error(
-        "\nCHANGELOG-only conflict. Resolve semantically, then re-run."
+        "\nCHANGELOG-only conflict. Rebase left in conflict state — resolve semantically, `git add CHANGELOG.md && GIT_EDITOR=true git rebase --continue`, then re-run prepare to verify."
       );
-      runGit(["rebase", "--abort"], repoDir, { allowFailure: true });
+      // Do NOT abort the rebase: the agent resolves in place and runs --continue.
       result.status = "changelog_conflict";
-      result.message = "CHANGELOG conflict - resolve semantically, then re-run";
+      result.message = "CHANGELOG conflict - resolve semantically, continue rebase, then re-run";
       result.conflictFiles = conflictFiles;
       return result;
     }

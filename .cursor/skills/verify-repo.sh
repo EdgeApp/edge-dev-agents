@@ -16,6 +16,11 @@ const { readFileSync, existsSync, writeFileSync } = require("fs");
 const path = require("path");
 const os = require("os");
 
+// Bump node heap for large repos (default ~4GB OOMs on big codebases).
+// Append rather than overwrite so an outer NODE_OPTIONS wins. Child processes
+// (tsc, eslint, jest) inherit this via execSync.
+process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS ?? ""} --max-old-space-size=8192`.trim();
+
 // Parse arguments: positional repo-dir + optional --base <ref> + optional --require-changelog
 let repoDir = process.cwd();
 let baseRef = null;

@@ -10,7 +10,7 @@ metadata:
 
 <rules description="Non-negotiable constraints.">
 <rule id="standards-first">Read review standards BEFORE examining code. Load both `~/.cursor/rules/review-standards.mdc` and `~/.cursor/rules/typescript-standards.mdc` in parallel.</rule>
-<rule id="use-companion-script">Use `scripts/github-pr-review.sh` for all GitHub API operations. Do not use raw `curl`, `gh`, or MCP tools inline.</rule>
+<rule id="use-companion-script">Use `~/.cursor/skills/pr-review/scripts/github-pr-review.sh` for all GitHub API operations. Do not use raw `curl`, `gh`, or MCP tools inline.</rule>
 <rule id="no-script-bypass">If a companion script fails, report the error and STOP. Do NOT fall back to raw `gh`, `curl`, or other workarounds.</rule>
 <rule id="no-duplicate-feedback">Check existing reviews from the context output. Do not repeat feedback already given by another reviewer.</rule>
 <rule id="batch-reads">When reviewing changed files, batch independent Read/Grep calls in a single message.</rule>
@@ -21,7 +21,7 @@ metadata:
 Run the companion script to fetch PR metadata, changed files with patches, and existing reviews:
 
 ```bash
-scripts/github-pr-review.sh context [--pr <number>] [--owner <owner>] [--repo <repo>]
+~/.cursor/skills/pr-review/scripts/github-pr-review.sh context [--pr <number>] [--owner <owner>] [--repo <repo>]
 ```
 
 If the user provides a PR URL or number, pass `--pr`. If they also specify a repo, pass `--owner` and `--repo`. If nothing is provided, the script auto-detects from the current branch.
@@ -74,7 +74,7 @@ Cross-reference findings against `reviews[]` from the context output. Omit any f
 If there are findings to report, prepare a review JSON and submit via the companion script:
 
 ```bash
-echo '<review-json>' | scripts/github-pr-review.sh submit \
+echo '<review-json>' | ~/.cursor/skills/pr-review/scripts/github-pr-review.sh submit \
   --pr <number> --owner <owner> --repo <repo> --sha <headSha>
 ```
 

@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Standalone replacement for the upgrade_dep shell function.
+# upgrade-dep.sh
+# Upgrade one package on the current branch and commit the bump + lockfiles.
+#
 # Usage: upgrade-dep.sh <package> [version]
 #
-# Stashes any working changes on the current branch, switches to develop,
-# hard-resets to origin/develop, upgrades a dependency in package.json,
-# runs yarn + prepare, and creates a commit with the resulting lockfile / pod
-# updates. Stashes remain stashed; the caller decides what to do with them.
+# PRECONDITION: caller has already placed us on a clean `develop` (or the
+# target branch) synced to origin. This script does NOT stash, checkout,
+# fetch, or reset — doing so would wipe commits from a prior `upgrade-dep.sh`
+# invocation in the same `/pr-land` run.
+#
+# Bumps the version in package.json, runs yarn + prepare + prepare.ios, and
+# commits package.json + lockfiles with message "Upgrade <package>@<version>".
 
 usage() {
     echo "Usage: upgrade-dep.sh <package> [version]"
@@ -16,13 +21,6 @@ usage() {
 
 package=""
 new_version=""
-orig_branch="$(git branch --show-current)"
-
-has_working_changes() {
-    ! git diff --quiet HEAD 2>/dev/null || \
-    ! git diff --cached --quiet HEAD 2>/dev/null || \
-    [[ -n "$(git ls-files --others --exclude-standard)" ]]
-}
 
 case "$#" in
     1)
@@ -36,18 +34,6 @@ case "$#" in
         usage
         ;;
 esac
-
-# Stash any working changes before switching to develop:
-if has_working_changes; then
-    git stash -u
-    echo ">> STASHED=true branch=$orig_branch"
-else
-    echo ">> STASHED=false branch=$orig_branch"
-fi
-
-git checkout develop
-git fetch origin develop
-git reset --hard origin/develop
 
 # Resolve latest version from npm if none provided
 if [ -z "$new_version" ]; then

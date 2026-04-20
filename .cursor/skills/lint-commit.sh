@@ -31,6 +31,10 @@
 #   7. If commit is a fixup (--fixup or -m "fixup! ..."), autosquash via shared helper
 set -euo pipefail
 
+# Bump node heap for large repos (default ~4GB OOMs on big codebases).
+# Append rather than overwrite so an outer NODE_OPTIONS wins.
+export NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=8192"
+
 MESSAGE=""
 FIXUP=""
 REORDER="true"  # Default to reordering fixups

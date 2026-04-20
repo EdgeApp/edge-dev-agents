@@ -133,7 +133,7 @@ scripts, not be re-described independently across skills.
 | [`pr-land-merge.sh`](.cursor/skills/pr-land/scripts/pr-land-merge.sh) | Merge | Rebase again, verify, and merge sequentially |
 | [`pr-land-publish.sh`](.cursor/skills/pr-land/scripts/pr-land-publish.sh) | Publish | Version bump, changelog update, commit, and tag |
 | [`pr-land-extract-asana-task.sh`](.cursor/skills/pr-land/scripts/pr-land-extract-asana-task.sh) | Asana extraction | Pull task IDs from landed PR metadata |
-| [`upgrade-dep.sh`](.cursor/skills/pr-land/scripts/upgrade-dep.sh) | GUI deps | Stash local work, reset `develop`, upgrade deps, and emit ready commit SHAs |
+| [`upgrade-dep.sh`](.cursor/skills/pr-land/scripts/upgrade-dep.sh) | GUI deps | Bump one package on the current branch, run yarn/prepare, commit lockfile updates. Caller must sync `develop` first. |
 | [`staging-cherry-pick.sh`](.cursor/skills/staging-cherry-pick/scripts/staging-cherry-pick.sh) | Staging | Cherry-pick staging-qualified commits onto `staging` |
 | [`verify-repo.sh`](.cursor/skills/verify-repo.sh) | Verification | Run changelog and code verification |
 

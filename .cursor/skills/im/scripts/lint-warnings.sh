@@ -21,6 +21,10 @@
 #   2 - Error (missing files, eslint runtime/config failure, etc.)
 set -euo pipefail
 
+# Bump node heap for large repos (edge-currency-accountbased etc. OOM at the
+# default ~4GB). Append rather than overwrite so an outer NODE_OPTIONS wins.
+export NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=8192"
+
 PATTERNS_FILE="$HOME/.cursor/rules/typescript-standards.mdc"
 
 if [[ $# -eq 0 ]]; then

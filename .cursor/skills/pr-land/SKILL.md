@@ -16,13 +16,14 @@ metadata:
 /pr-land edge-react-gui#123                       # Specific PR (shorthand)
 /pr-land https://github.com/EdgeApp/edge-react-gui/pull/123  # Specific PR (URL)
 /pr-land https://app.asana.com/0/1234/5678        # Asana task → resolves linked PRs
+/pr-land https://app.asana.com/.../task/<parent>  # Parent task → walks subtasks
 /pr-land edge-react-gui#123 edge-core-js          # Mix: explicit PR + repo scan
 ```
 
 Arguments are classified automatically:
 - **Repo names** → branch-prefix scan (original behavior)
 - **PR URLs / shorthand** (`repo#N`) → fetched directly, no branch-prefix filter
-- **Asana task URLs** → resolved to linked GitHub PRs via Asana API (requires `ASANA_TOKEN`)
+- **Asana task URLs** → resolved to linked GitHub PRs via Asana API (requires `ASANA_TOKEN`). Parent tasks are walked: each subtask's attachments are scanned for PRs; subtasks without a linked PR are skipped silently (e.g. a verification-only subtask).
 - **No args** → scans all EdgeApp repos
 </usage>
 
@@ -38,7 +39,8 @@ Arguments are classified automatically:
 <rule id="unexpected-exit">Unexpected exit codes → STOP immediately. If any script returns an exit code not documented in this file, STOP and report to user. Do NOT attempt to interpret, retry, or work around unexpected errors.</rule>
 <rule id="sequential-rebase">Sequential merging requires rebase. Each subsequent PR MUST be rebased onto the updated base branch after the previous merge.</rule>
 <rule id="publish-gating">Don't publish if outstanding PRs remain. Only offer to publish a repo when ALL approved PRs for that repo are merged. If any were skipped or held back, do NOT publish that repo.</rule>
-<rule id="npm-publish-gate">Step 7 CANNOT begin until the user explicitly confirms npm publish succeeded. `npm publish` requires interactive 2FA — the agent cannot run it. Do NOT infer publish completion from git push or tagging. STOP and WAIT for user confirmation.</rule>
+<rule id="npm-otp-required">`npm publish` MUST be run with `--otp=<code>` supplied by the user. Do NOT attempt `npm publish` without an OTP. Do NOT run `npm login` — auth comes from the `_authToken` in `~/.npmrc`. If `npm whoami` fails before the first publish, STOP and report; do not try to re-authenticate.</rule>
+<rule id="defer-gui">If the discovered PR set contains BOTH `edge-react-gui` PRs and at least one non-GUI PR, all GUI PRs are DEFERRED — they do NOT enter steps 3-7 (prepare/push/merge/publish/upgrade-dep). GUI PRs are processed in step 8 (new) after step 7's dep upgrades land on develop. If the batch is pure GUI or pure non-GUI, no deferral — proceed as normal.</rule>
 <rule id="asana-last">Asana updates are LAST. Do NOT update Asana tasks until ALL merges, publishes, and GUI dependency upgrades are complete. Only update status for PRs that are fully landed (merged, and if non-GUI: published + GUI deps updated).</rule>
 </rules>
 
@@ -82,6 +84,13 @@ Args can be repo names, PR URLs, PR shorthand (`repo#N`), or Asana task URLs (mi
 No args = scan all EdgeApp repos for `$GIT_BRANCH_PREFIX/*` PRs.
 
 Returns JSON: `{ "prs": [...], "errors": [...] }`. Each PR has `repo`, `prNumber`, `branch`, `title`, `approved`, `changesRequested`, `reviewers`. Errors include Asana resolution failures or PR fetch failures.
+
+<sub-step name="Split by type">
+After discovery, partition `prs` into `nonGuiPrs` (`repo !== "edge-react-gui"`) and `guiPrs` (`repo === "edge-react-gui"`).
+
+1. If BOTH arrays are non-empty → mixed-batch path per `defer-gui`: only `nonGuiPrs` flow through steps 3-7. Tell the user: `Deferring <N> GUI PR(s) until after non-GUI deps are published and upgraded on develop.`
+2. If only one array is non-empty → no deferral; all PRs flow through steps 3-7 normally.
+</sub-step>
 </step>
 
 <step id="2" name="Comment Check and Addressing">
@@ -124,6 +133,8 @@ Items previously marked with `<!-- addressed:review:ID -->` or `<!-- addressed:c
 </step>
 
 <step id="3" name="Prepare Branches">
+When the `defer-gui` rule applies (mixed batch), feed only `nonGuiPrs` into `pr-land-prepare.sh`. GUI PRs enter prepare in step 8.
+
 ONE tool call per batch:
 
 ```bash
@@ -203,23 +214,63 @@ echo '[{"repo":"...","branch":"master"}]' | ~/.cursor/skills/pr-land/scripts/pr-
 - `2` = No unreleased changes in CHANGELOG
 
 After script completes:
-1. Show version bump details to user
-2. If confirmed, push master and tag: `git push origin master && git push origin v<version>`
-3. Prompt user to run `npm login` and `npm publish` in a real terminal. Both commands require browser-based authentication (npm opens a URL for web login + 2FA approval) that cannot be automated.
 
-**STOP HERE. Do NOT proceed to step 7 until the user confirms npm publish succeeded.**
+<sub-step name="Push version commit + tag">
+1. Show version bump details to user (repo, old → new version, entries).
+2. Ask user to confirm the push.
+3. If confirmed, push master and tag: `cd <repoDir> && git push origin master && git push origin v<version>`.
+</sub-step>
+
+<sub-step name="Sanity-check npm auth (once, before first publish)">
+Before publishing the first repo of the run, verify the token:
+```bash
+cd <repoDir> && npm whoami
+```
+If it fails or prints an unexpected username: STOP and tell the user to check `~/.npmrc`. Do NOT attempt `npm login`. Do NOT prompt for credentials.
+</sub-step>
+
+<sub-step name="Publish each repo with OTP from user">
+For each repo, in sequence:
+
+1. Ask the user exactly: `OTP for <repo> (npm publish)?` — wait for a 6-digit code.
+2. Run:
+   ```bash
+   cd <repoDir> && npm publish --otp=<otp>
+   ```
+3. On success: capture the published version from output, proceed to the next repo.
+4. On failure with `EOTP` / "OTP required" / any auth error: treat as a stale OTP (OTPs are single-use and ~30s-lived). Ask for a fresh OTP and retry. Retry at most **2 times**; on third failure STOP and report.
+5. On any other failure (network, registry error, version conflict): STOP and report — do not retry.
+
+After all repos publish successfully, proceed to step 7 automatically. Do NOT ask for a second confirmation — the exit codes are the confirmation.
+</sub-step>
 </step>
 
 <step id="7" name="Update GUI Dependencies">
-**Trigger:** Only if non-`edge-react-gui` repos were merged and published in step 6. All non-GUI EdgeApp repos are GUI dependencies, so publishing always requires a GUI dep upgrade.
+**Trigger:** Only if non-`edge-react-gui` repos were published successfully in step 6 (exit 0 per repo). All non-GUI EdgeApp repos are GUI dependencies, so publishing always requires a GUI dep upgrade. Flows directly from step 6 — no additional user confirmation.
 
-Ask user to confirm `npm publish` completed, then:
+<sub-step name="Sync develop once (before any upgrade)">
+`upgrade-dep.sh` assumes it is run on a clean `develop` synced to origin and does NOT manage the branch itself (running it N times would otherwise reset develop N times and wipe prior-package commits). Do this ONCE before the upgrade loop:
 
-1. Run `upgrade-dep.sh` for each published package (sequentially):
+```bash
+cd <gui-repo-dir>
+# Stash any uncommitted working changes so the reset is safe
+if ! git diff --quiet HEAD 2>/dev/null || ! git diff --cached --quiet HEAD 2>/dev/null || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
+  git stash -u
+fi
+git checkout develop
+git fetch origin develop
+git reset --hard origin/develop
+```
+
+Stashes remain stashed — the user can restore them after the run.
+</sub-step>
+
+<sub-step name="Upgrade each published package">
+1. Run `upgrade-dep.sh` for each published package, sequentially, on the now-clean `develop`:
    ```bash
    cd <gui-repo-dir> && ~/.cursor/skills/pr-land/scripts/upgrade-dep.sh <package-name>
    ```
-   The script stashes any working changes, switches to `develop`, resets it to `origin/develop`, performs the dependency upgrade, and leaves any stash entries in place. On success it prints `UPGRADE_READY ... sha=<commit_sha>`. If any run fails, STOP and report. Ask user how to proceed.
+   Each invocation bumps the version in package.json, runs yarn + prepare, and commits package.json + lockfiles. On success it prints `UPGRADE_READY ... sha=<commit_sha>`. If any run fails, STOP and report. Ask user how to proceed.
 
 2. After all dependency upgrades succeed, show the created `develop` commit SHA(s) to the user and ask for confirmation to land them:
    ```bash
@@ -228,7 +279,22 @@ Ask user to confirm `npm publish` completed, then:
    This push is required before the workflow can treat GUI dependency updates as landed. Do NOT proceed to staging cherry-pick or Asana updates until the `develop` push is confirmed complete.
 </step>
 
-<step id="8" name="Staging Cherry-Pick">
+<step id="8" name="Prepare and Merge GUI PRs (deferred)">
+**Trigger:** Only runs when `guiPrs` was populated at step 1 AND step 7's dep upgrades pushed to develop successfully. Skip entirely if no GUI PRs exist. If step 7 failed or was skipped due to no non-GUI merges, also skip this step.
+
+At this point, `origin/develop` contains the new dep-upgrade commits from step 7, so each GUI PR will rebase cleanly onto a develop that already has its new dep versions.
+
+Re-run steps 3, 4, and 5 against `guiPrs`:
+
+1. Feed `guiPrs` into `pr-land-prepare.sh` (same invocation shape as step 3).
+2. On CHANGELOG conflict: resolve semantically, `git add CHANGELOG.md && GIT_EDITOR=true git rebase --continue`, re-run prepare — same flow as step 3's CHANGELOG sub-step.
+3. For each prepared GUI branch, push with `~/.cursor/skills/git-branch-ops.sh push --force-with-lease --branch <branch>` (step 4).
+4. Feed `guiPrs` into `pr-land-merge.sh` (step 5).
+
+Do NOT re-enter steps 6 or 7 — GUI does not publish to npm and has no deps of its own to upgrade.
+</step>
+
+<step id="9" name="Staging Cherry-Pick">
 **Trigger:** Only for `edge-react-gui` commits that target the `## X.Y.Z (staging)` CHANGELOG section (not `## Unreleased`). This includes both merged PR commits and GUI dependency upgrade commits from step 7.
 
 Check CHANGELOG diffs to determine which commits qualify — if the entry was added under a `(staging)` heading, it needs cherry-picking.
@@ -255,7 +321,7 @@ git push origin staging
 Then restore the previous branch.
 </step>
 
-<step id="9" name="Update Asana Tasks">
+<step id="10" name="Update Asana Tasks">
 **Runs ONLY after ALL merges, cherry-picks, publishes, and GUI dep upgrades are complete.**
 
 Only update for fully landed PRs:
@@ -272,6 +338,9 @@ printf '[{"repo":"edge-react-gui","prNumber":123}]' | ~/.cursor/skills/pr-land/s
 ```
 
 The helper outputs JSON like `{ "tasks": [{ "taskGid": "...", "label": "repo#123" }], "missing": [{ "label": "...", "reason": "..." }] }`.
+
+**Parent-walking:** `taskGid` is the PR's linked task's PARENT when a parent exists (the feature-level task that represents the unit of work across repos). Standalone tasks (no parent) return themselves. Only updates the parent — leave subtasks alone; they have their own state that is managed separately. Sibling subtasks of the same parent dedupe to one entry; `label` lists all contributing PRs (e.g. `"edge-react-gui#123, edge-core-js#456"`).
+
 Review the `missing` array, report any entries lacking an Asana link, and skip those PRs for Asana updates.
 </sub-step>
 
@@ -281,11 +350,11 @@ For each task in `.tasks`, run:
 ```bash
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
   --task <task_gid> \
-  --set-status "Verification Needed" \
+  --set-board-state "QA Verification" \
   --unassign
 ```
 
-This replaces the old dedicated verification updater behavior.
+Writes to the new Board State 🤖 field. The legacy Status field is no longer updated.
 
 **Exit codes per call:**
 - `0` = success
@@ -294,14 +363,14 @@ This replaces the old dedicated verification updater behavior.
 </sub-step>
 </step>
 
-<step id="10" name="End-of-Workflow Report">
+<step id="11" name="End-of-Workflow Report">
 ```
 === PR Land Summary ===
 
 Fully landed:
-  ✓ <repo>#<number> (<branch>) — merged, cherry-picked to staging, Asana updated
-  ✓ <repo>#<number> (<branch>) — merged, Asana updated
-  ✓ <repo>#<number> (<branch>) — merged, published v<version>, GUI deps updated, Asana updated
+  ✓ <repo>#<number> (<branch>) — merged, cherry-picked to staging, Asana → QA Verification
+  ✓ <repo>#<number> (<branch>) — merged, Asana → QA Verification
+  ✓ <repo>#<number> (<branch>) — merged, published v<version>, GUI deps updated, Asana → QA Verification
 
 Addressed but needs re-review:
   ⚠ <repo>#<number> (<branch>) — fixup pushed, awaiting review
@@ -374,4 +443,5 @@ Verification checks: no conflict markers remaining, proper entry format (`- type
 7. Unexpected errors halt execution — undocumented exit codes stop immediately
 8. Publish gating — repos with outstanding PRs are not published
 9. Asana is last — task updates only after full pipeline completes
+10. GUI deferral prevents incomplete migrations — GUI never lands before its coordinated non-GUI deps are published and upgraded on develop
 </safety-guarantees>

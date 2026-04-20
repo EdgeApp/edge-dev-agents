@@ -146,9 +146,28 @@ async function main() {
 
   // 1. Resolve Asana tasks → explicit PRs
   // GitHub integration attachments are the source of truth.
-  // Only fall back to scanning task notes if no attachments found.
+  // Walk subtasks as well, since parent tasks often carry multiple subtasks each
+  // holding their own PR. Subtasks without PR attachments are silently skipped.
+  // Only fall back to scanning task notes (parent only) if nothing else found.
   const ghPrRe =
     /https:\/\/github\.com\/EdgeApp\/([^/]+)\/pull\/(\d+)/g;
+
+  async function extractPrsFromAttachments(taskGid) {
+    const out = [];
+    const attachments = await asanaGet(
+      `/tasks/${taskGid}/attachments?opt_fields=resource_subtype,view_url`
+    );
+    for (const att of attachments) {
+      if (att.resource_subtype !== "external" || !att.view_url) continue;
+      const m = att.view_url.match(
+        /^https:\/\/github\.com\/EdgeApp\/([^/]+)\/pull\/(\d+)/
+      );
+      if (m) {
+        out.push({ repo: m[1], prNumber: Number(m[2]) });
+      }
+    }
+    return out;
+  }
 
   for (const gid of asanaGids) {
     try {
@@ -157,22 +176,25 @@ async function main() {
       );
       let found = false;
 
-      // Check task attachments first (GitHub integration — authoritative)
-      const attachments = await asanaGet(
-        `/tasks/${gid}/attachments?opt_fields=resource_subtype,view_url`
+      // Parent task attachments
+      for (const pr of await extractPrsFromAttachments(gid)) {
+        explicitPrs.push(pr);
+        found = true;
+      }
+
+      // Subtasks: walk each and pull PR attachments. Subtasks without PRs are
+      // silently skipped (e.g. a verification-only subtask).
+      const subtasks = await asanaGet(
+        `/tasks/${gid}/subtasks?opt_fields=name`
       );
-      for (const att of attachments) {
-        if (att.resource_subtype !== "external" || !att.view_url) continue;
-        const m = att.view_url.match(
-          /^https:\/\/github\.com\/EdgeApp\/([^/]+)\/pull\/(\d+)/
-        );
-        if (m) {
-          explicitPrs.push({ repo: m[1], prNumber: Number(m[2]) });
+      for (const sub of subtasks) {
+        for (const pr of await extractPrsFromAttachments(sub.gid)) {
+          explicitPrs.push(pr);
           found = true;
         }
       }
 
-      // Fall back to task notes only if no attachments matched
+      // Fall back to parent task notes only if nothing else matched.
       if (!found) {
         let match;
         while ((match = ghPrRe.exec(task.notes || "")) !== null) {
@@ -184,7 +206,7 @@ async function main() {
 
       if (!found) {
         results.errors.push(
-          `Asana task ${gid} (${task.name}): no GitHub PR link found in attachments or description`
+          `Asana task ${gid} (${task.name}): no GitHub PR link found on task or subtasks`
         );
       }
     } catch (e) {

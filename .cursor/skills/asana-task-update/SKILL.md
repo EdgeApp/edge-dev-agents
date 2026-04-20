@@ -35,10 +35,10 @@ metadata:
   --attach-pr --pr-url <url> --pr-title "<title>" --pr-number <num> \
   --assign --skip-assign-if-missing --set-status "Review Needed" --auto-est-review-hrs
 
-# Publish Needed -> Verification Needed (and unassign)
+# Post-merge: set Board State to QA Verification and unassign
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
   --task <task_gid> \
-  --set-status "Verification Needed" --unassign
+  --set-board-state "QA Verification" --unassign
 ```
 </usage>
 
@@ -49,7 +49,8 @@ Determine which updates are needed by the caller and build one command with all 
 - `--assign` or `--assign <user_gid>`
 - `--skip-assign-if-missing`
 - `--unassign`
-- `--set-status "Review Needed|Publish Needed|Verification Needed"`
+- `--set-status "Review Needed|Publish Needed|Verification Needed"` (legacy Status field)
+- `--set-board-state "Incoming Requests|Refinement|Ready to Pull|In Progress|PR Review|QA Verification|Blocked|Done|Icebox"` (new Board State 🤖 field)
 - `--set-reviewer <user_gid>`
 - `--set-implementor <user_gid>`
 - `--set-priority <enum_gid>`

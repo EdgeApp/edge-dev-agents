@@ -20,6 +20,7 @@ SKIP_ASSIGN_IF_MISSING=false
 DO_UNASSIGN=false
 
 SET_STATUS=""
+SET_BOARD_STATE=""
 SET_REVIEWER_GID=""
 SET_IMPLEMENTOR_GID=""
 SET_PRIORITY_GID=""
@@ -45,6 +46,7 @@ while [[ $# -gt 0 ]]; do
     --skip-assign-if-missing) SKIP_ASSIGN_IF_MISSING=true; shift ;;
     --unassign) DO_UNASSIGN=true; shift ;;
     --set-status) SET_STATUS="$2"; shift 2 ;;
+    --set-board-state) SET_BOARD_STATE="$2"; shift 2 ;;
     --set-reviewer|--reviewer) SET_REVIEWER_GID="$2"; shift 2 ;;
     --set-implementor|--implementor) SET_IMPLEMENTOR_GID="$2"; shift 2 ;;
     --set-priority) SET_PRIORITY_GID="$2"; shift 2 ;;
@@ -59,7 +61,7 @@ if [[ -z "$TASK_GID" ]]; then
   exit 1
 fi
 
-if ! $DO_ATTACH && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_STATUS" ]] && [[ -z "$SET_REVIEWER_GID" ]] && [[ -z "$SET_IMPLEMENTOR_GID" ]] && [[ -z "$SET_PRIORITY_GID" ]] && [[ -z "$SET_PLANNED_GID" ]] && ! $AUTO_EST_REVIEW; then
+if ! $DO_ATTACH && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_STATUS" ]] && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_REVIEWER_GID" ]] && [[ -z "$SET_IMPLEMENTOR_GID" ]] && [[ -z "$SET_PRIORITY_GID" ]] && [[ -z "$SET_PLANNED_GID" ]] && ! $AUTO_EST_REVIEW; then
   echo "Error: No operations specified" >&2
   exit 1
 fi
@@ -82,6 +84,7 @@ STATUS_FIELD="1190660107346181"
 REVIEW_NEEDED_OPTION="1190660107348334"
 PUBLISH_NEEDED_OPTION="1191304757575656"
 VERIFICATION_NEEDED_OPTION="1190660107348340"
+BOARD_STATE_FIELD="1213992584300456"
 REVIEWER_FIELD="1203334388004673"
 IMPLEMENTOR_FIELD="1203334386796983"
 SPENT_DEV_HRS_FIELD="1202996660964169"
@@ -92,6 +95,21 @@ status_to_gid() {
     "Review Needed") echo "$REVIEW_NEEDED_OPTION" ;;
     "Publish Needed") echo "$PUBLISH_NEEDED_OPTION" ;;
     "Verification Needed") echo "$VERIFICATION_NEEDED_OPTION" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+board_state_to_gid() {
+  case "$1" in
+    "Incoming Requests") echo "1214109511460876" ;;
+    "Refinement") echo "1214109511571763" ;;
+    "Ready to Pull") echo "1213992584300457" ;;
+    "In Progress") echo "1213992584300458" ;;
+    "PR Review") echo "1214074445437890" ;;
+    "QA Verification") echo "1213992584300459" ;;
+    "Blocked") echo "1213992584300460" ;;
+    "Done") echo "1213992584300461" ;;
+    "Icebox") echo "1214109610541444" ;;
     *) echo "$1" ;;
   esac
 }
@@ -181,6 +199,10 @@ if [[ -n "$SET_STATUS" ]]; then
   STATUS_GID="$(status_to_gid "$SET_STATUS")"
   CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$STATUS_FIELD" --arg v "$STATUS_GID" '. + {($k): $v}')
 fi
+if [[ -n "$SET_BOARD_STATE" ]]; then
+  BOARD_STATE_GID="$(board_state_to_gid "$SET_BOARD_STATE")"
+  CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$BOARD_STATE_FIELD" --arg v "$BOARD_STATE_GID" '. + {($k): $v}')
+fi
 if [[ -n "$SET_REVIEWER_GID" ]]; then
   CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$REVIEWER_FIELD" --arg v "$SET_REVIEWER_GID" '. + {($k): [$v]}')
 fi
@@ -232,6 +254,9 @@ if $DO_UNASSIGN; then
 fi
 if [[ -n "$SET_STATUS" ]]; then
   echo ">> Status: $SET_STATUS"
+fi
+if [[ -n "$SET_BOARD_STATE" ]]; then
+  echo ">> Board State: $SET_BOARD_STATE"
 fi
 if [[ -n "$SET_REVIEWER_GID" ]]; then
   echo ">> Reviewer field: set"

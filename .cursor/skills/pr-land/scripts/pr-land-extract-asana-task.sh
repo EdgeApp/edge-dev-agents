@@ -3,8 +3,15 @@
 // Extracts Asana task GIDs from PR bodies so /pr-land can skip loading full descriptions.
 // Input: JSON array of {repo, prNumber}. Output: JSON object {tasks: [...], missing: [...]}, where each entry contains label/repo info.
 //
+// Each PR body's Asana link is resolved to its PARENT task when one exists, so
+// /pr-land updates the feature parent (the thing that represents the unit of
+// work) rather than the per-repo subtask. Walks up only one level. Output
+// deduplicated by taskGid so sibling subtasks collapse into a single parent
+// entry. Falls back to the original GID (no walk-up) if ASANA_TOKEN is unset.
+//
 // The script is intentionally terse: it only emits structured JSON and does not print raw PR bodies.
 const { execSync } = require("child_process");
+const https = require("https");
 const path = require("path");
 
 async function readStdin() {
@@ -26,6 +33,43 @@ function fetchPrBody(repo, prNumber) {
 
 function buildLabel(repo, prNumber) {
   return `${repo}#${prNumber}`;
+}
+
+function asanaGetTask(gid) {
+  const token = process.env.ASANA_TOKEN;
+  if (!token) return Promise.resolve(null);
+  return new Promise((resolve, reject) => {
+    const req = https.get(
+      `https://app.asana.com/api/1.0/tasks/${gid}?opt_fields=parent.gid`,
+      { headers: { Authorization: `Bearer ${token}` } },
+      (res) => {
+        let body = "";
+        res.on("data", (d) => (body += d));
+        res.on("end", () => {
+          if (res.statusCode !== 200)
+            return reject(new Error(`Asana ${res.statusCode}: ${body}`));
+          try {
+            resolve(JSON.parse(body).data);
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }
+    );
+    req.on("error", reject);
+  });
+}
+
+async function resolveToParent(gid) {
+  try {
+    const data = await asanaGetTask(gid);
+    if (data && data.parent && data.parent.gid) return data.parent.gid;
+  } catch (err) {
+    console.error(
+      `Warning: failed to resolve parent for task ${gid}: ${err.message}. Using original GID.`
+    );
+  }
+  return gid;
 }
 
 async function main() {
@@ -70,8 +114,10 @@ async function main() {
 
     const match = body.match(regex);
     if (match) {
+      const originalGid = match[1];
+      const resolvedGid = await resolveToParent(originalGid);
       tasks.push({
-        taskGid: match[1],
+        taskGid: resolvedGid,
         label,
       });
     } else {
@@ -82,7 +128,20 @@ async function main() {
     }
   }
 
-  console.log(JSON.stringify({ tasks, missing }, null, 2));
+  // Dedupe by taskGid: sibling subtasks collapse into one parent entry.
+  // Preserve first-seen order and merge labels for traceability.
+  const seen = new Map();
+  for (const entry of tasks) {
+    const existing = seen.get(entry.taskGid);
+    if (existing) {
+      existing.label = `${existing.label}, ${entry.label}`;
+    } else {
+      seen.set(entry.taskGid, { taskGid: entry.taskGid, label: entry.label });
+    }
+  }
+  const dedupedTasks = Array.from(seen.values());
+
+  console.log(JSON.stringify({ tasks: dedupedTasks, missing }, null, 2));
   process.exit(0);
 }
 

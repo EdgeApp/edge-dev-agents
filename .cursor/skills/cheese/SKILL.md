@@ -1,0 +1,83 @@
+---
+name: cheese
+description: Push a "cheese build" — hard-reset a test-* branch to the current edge-react-gui feature branch and force-push to trigger a Jenkins test build. Optionally pins unreleased dep repos (accb, exch, core, etc.) as prebuilt tarballs when the GUI work depends on unmerged dep changes. Use when the user asks for a "cheese build", "test build", or names a branch like test-feta / test-<name>.
+compatibility: Requires jq, yarn. Must be run from within an edge-react-gui checkout.
+metadata:
+  author: j0ntz
+---
+
+<goal>Produce a cheese build by hard-resetting a test-* branch to a source ref and force-pushing it, optionally pinning unreleased dep repos as prebuilt tarballs so the build server can install without running each dep's prepare script.</goal>
+
+<rules description="Non-negotiable constraints.">
+<rule id="cheese-branch-only">Target branch MUST match `test-*`. For any other branch name, stop and ask the user to confirm it is scratch space safe to force-push.</rule>
+<rule id="clean-working-tree">Require a clean working tree in edge-react-gui (no staged, unstaged, or untracked files) before starting. Do NOT auto-stash — tell the user to commit or stash first.</rule>
+<rule id="tarball-not-git-url">When pinning an unreleased dep, use a prebuilt tarball (`yarn pack`), never a git URL. Git URLs make yarn run the dep's `prepare` script on the build server, which fails on native toolchain deps (bs-platform needs python; ed25519 fails to build against current Node v8 ABI).</rule>
+<rule id="use-companion-script">Run the full workflow via `~/.cursor/skills/cheese/scripts/cheese-build.sh`. Do not inline git / yarn / pack operations in chat.</rule>
+<rule id="force-with-lease">The script pushes with `--force-with-lease` via `~/.cursor/skills/git-branch-ops.sh`. Never use plain `--force`.</rule>
+</rules>
+
+<dep-aliases description="Short names for common Edge dep repos. Resolve to $HOME/git/<repo-name>. Aliases are case-insensitive. Explicit absolute paths are also accepted by --pin.">
+
+| Alias | Repo |
+|---|---|
+| accb | edge-currency-accountbased |
+| exch | edge-exchange-plugins |
+| core | edge-core-js |
+| monero | edge-currency-monero |
+| plugins | edge-currency-plugins |
+| login-ui | edge-login-ui-rn |
+| info | edge-info-server |
+
+</dep-aliases>
+
+<step id="1" name="Parse inputs">
+From the user message, determine:
+
+1. **Cheese branch** — default `test-feta`. Use the user's explicit name if given (e.g. `test-gouda`).
+2. **Source ref** — default: current HEAD of `edge-react-gui`. Use an explicit ref if the user names one.
+3. **Deps to pin** — from any aliases or paths the user mentions. None is valid (GUI-only cheese build).
+
+Resolve each alias to `$HOME/git/<repo>`. If an alias doesn't map, ask the user for the absolute path.
+</step>
+
+<step id="2" name="Confirm plan">
+Show the user a one-block summary:
+
+```
+Cheese branch: test-<name>
+From:          <source-ref> (<short-sha>)
+Deps to pin:   (none) | <name1>, <name2>, ...
+```
+
+Proceed directly unless any of:
+- Cheese branch doesn't match `test-*` → confirm
+- Pinning ≥ 3 deps → confirm
+- User input was ambiguous → ask
+
+Otherwise go straight to step 3.
+</step>
+
+<step id="3" name="Run script">
+Invoke with resolved absolute paths:
+
+```bash
+~/.cursor/skills/cheese/scripts/cheese-build.sh \
+  --branch <cheese-branch> \
+  --from <source-ref> \
+  [--pin <absolute-path-to-dep-repo>]...
+```
+
+The script handles: clean-tree check, checkout + hard reset, per-dep `yarn && yarn prepare` + `yarn pack`, tarball copy + `package.json` rewrite, `yarn install` to refresh lock, `lint-commit.sh` for the pin commit, and `git-branch-ops.sh push --force-with-lease`.
+</step>
+
+<step id="4" name="Report">
+Print the remote branch URL and final SHA from the script output. Jenkins picks up the push automatically — no further action needed.
+</step>
+
+<edge-cases>
+<case name="Currently on cheese branch">Ask the user which feature branch to reset against; cheese branches can't self-reset.</case>
+<case name="Dep repo on master/develop">If a pin target is on its default branch, the published version is enough. Warn; proceed only if the user confirms.</case>
+<case name="Tarball missing lib/">The script verifies each tarball contains `package/lib/` before committing. If missing, the script aborts — run `yarn prepare` manually in the dep repo and retry.</case>
+<case name="Dirty working tree">Script exits with code 2 and tells the user to commit or stash first. Never auto-stash — their WIP is their responsibility.</case>
+<case name="Dep name not in gui's dependencies">Script exits if the dep's npm name isn't in `edge-react-gui/package.json` under `dependencies`. Common cause: dep renamed or devDependency — resolve manually.</case>
+</edge-cases>
