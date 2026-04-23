@@ -163,29 +163,18 @@ The script appends `<!-- addressed:review:ID -->` or `<!-- addressed:comment:ID 
 </sub-step>
 </step>
 
-<step id="4" name="Autosquash (only when no external human reviewers)">
-Only autosquash if `hasHumanReviewers` is `false`. This means no external human reviewer (someone other than `currentUser`) has commented.
+<step id="4" name="Finalize fixups (autosquash if safe)">
+Delegate the autosquash-safety decision and execution to the shared finalize helper. It fetches reviewer state, autosquashes + force-pushes when there are no external human reviewers, and no-ops with a reason when humans are actively reviewing. Policy lives in that one script and is shared with other skills (bugbot) so behavior never drifts.
 
-Autosquash is **allowed** when only:
-- Automated reviewers (`cursor`, `chatgpt-codex-connector`, or other bots) commented, OR
-- `currentUser` commented (your own notes/action items)
-
-Autosquash is **blocked** when:
-- Any external human reviewer has commented — they are actively reviewing and need to see the fixup commits
-
-If `hasHumanReviewers` is `true`, **do NOT autosquash**. Leave fixup commits visible for human reviewers to verify before squashing on merge.
-
-When autosquashing is allowed:
 ```bash
-~/.cursor/skills/git-branch-ops.sh autosquash
+~/.cursor/skills/pr-finalize-fixups.sh --owner <OWNER> --repo <REPO> --pr <NUMBER>
 ```
 
-If conflicts occur, resolve them, then: `GIT_EDITOR=true git rebase --continue`. If a commit becomes empty after squashing: `git rebase --skip`.
+Output is one line of JSON:
+- `{"autosquashed": true, "newHead": "<sha>"}` — branch history rewritten, force-pushed.
+- `{"autosquashed": false, "reason": "has external human reviewers", "reviewers": [...]}` — fixup commits left in place for the reviewer(s).
 
-Force push is required after autosquash because the rebase rewrites history:
-```bash
-~/.cursor/skills/git-branch-ops.sh push --force-with-lease
-```
+If the script exits non-zero, the autosquash hit a conflict mid-rebase. The working tree is in `REBASE_HEAD` state; report the error and STOP so the user can resolve manually (`git status`, fix files, `GIT_EDITOR=true git rebase --continue`, or `git rebase --abort`).
 </step>
 
 <step id="5" name="Verification">

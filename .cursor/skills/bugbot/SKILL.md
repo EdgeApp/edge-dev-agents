@@ -9,7 +9,7 @@ metadata:
 <goal>Get a PR to bugbot-clean state end-to-end: run one scan cycle now, self-arm a recurring schedule when bugbot hasn't yet signed off, and self-disarm when it has.</goal>
 
 <rules description="Non-negotiable constraints.">
-<rule id="use-companion-scripts">Do NOT call `gh` directly. Use `~/.cursor/skills/bugbot/scripts/bugbot.sh` for bugbot check-run queries and `~/.cursor/skills/pr-address/scripts/pr-address.sh` for all thread operations (fetch, fetch-thread, reply, resolve-thread, ensure-branch).</rule>
+<rule id="use-companion-scripts">Do NOT call `gh` directly. Use `~/.cursor/skills/bugbot/scripts/bugbot.sh` for bugbot check-run queries, `~/.cursor/skills/pr-address/scripts/pr-address.sh` for all thread operations (fetch, fetch-thread, reply, resolve-thread, ensure-branch), and `~/.cursor/skills/pr-finalize-fixups.sh` for the post-fixup autosquash decision (SHARED with /pr-address — policy lives there, not here).</rule>
 <rule id="no-script-bypass">If a companion script fails, report the error and STOP. Do NOT fall back to raw `gh`, `curl`, or other workarounds.</rule>
 <rule id="cursor-bot-only">Only process threads whose first comment's author login is `cursor[bot]` (the literal `[bot]` suffix is required). Skip human threads, other-bot threads, and reviewer threads — those belong to `/pr-address`.</rule>
 <rule id="conclusion-is-not-clean">`check-run.conclusion: neutral` does NOT mean the PR is clean. `neutral` means bugbot posted findings that are non-blocking. ALWAYS combine check-run `status == "completed"` with "0 unresolved `cursor[bot]` threads" before declaring clean.</rule>
@@ -123,45 +123,47 @@ For each cursor[bot] thread, fetch the full body:
 Inside the `<!-- DESCRIPTION START -->...<!-- DESCRIPTION END -->` markers is the finding. Classify it by running through the `<classification-heuristics>` block (below) in order. The DEFAULT is "valid" — invalidity requires a cited heuristic match.
 </sub-step>
 
-<sub-step id="4c" name="Valid: apply fixup, push, reply, resolve">
-For valid findings:
+<sub-step id="4c" name="Valid: apply fixups (serialized, no push yet)">
+For each thread classified valid, in order:
 
-1. Read the affected file and determine the fix. Apply via Edit/Write.
+1. Read the affected file and apply the fix via Edit/Write.
 2. Locate the fixup target:
    ```bash
    git log --oneline -- <path>
    ```
-   Pick the commit that introduced the behavior being fixed. Grab its headline (everything after the SHA).
-3. Run the typecheck first:
-   ```bash
-   # For the repo's usual build/type command (e.g. `yarn build.types`, `yarn tsc`, `tsc`). Skip if not available.
-   ```
+   Pick the commit that introduced the behavior being fixed. Use its exact headline.
+3. Typecheck first if the repo has one (`yarn build.types`, `yarn tsc`, `tsc`). Skip if unavailable.
 4. Commit as a fixup:
    ```bash
    ~/.cursor/skills/lint-commit.sh --no-reorder -m "fixup! <target-headline>" <files...>
    ```
-5. Capture the new fixup SHA (returned by lint-commit.sh or via `git rev-parse --short HEAD`).
-6. Push:
-   ```bash
-   ~/.cursor/skills/git-branch-ops.sh push
-   ```
-7. Reply on the thread. Use the thread's first-comment numeric id (the `id` field in `fetch-thread`'s `comments[0]`):
-   ```bash
-   ~/.cursor/skills/pr-address/scripts/pr-address.sh reply \
-     --owner <OWNER> --repo <REPO> --pr <NUMBER> \
-     --comment-id <numeric_id> \
-     --body "Valid — fixed in <fixup_sha>. <one-sentence description of the fix and file:line if relevant>."
-   ```
-8. Resolve:
-   ```bash
-   ~/.cursor/skills/pr-address/scripts/pr-address.sh resolve-thread \
-     --thread-id "<threadId>"
-   ```
+5. Capture the new fixup SHA: `git rev-parse --short HEAD`. Record a `{threadId, commentId, fixupSha}` entry so Step 4e can reply with the correct SHA per thread.
+
+Do NOT push inside this loop — Step 4d pushes once after all fixups land.
 </sub-step>
 
-<sub-step id="4d" name="Invalid: reply citing heuristic, resolve">
-For invalid findings, NO commit and NO push. Reply citing the specific heuristic:
+<sub-step id="4d" name="Push all fixups once">
+After every valid thread has been committed:
 
+```bash
+~/.cursor/skills/git-branch-ops.sh push
+```
+
+One non-force push makes all fixup SHAs visible to GitHub so Step 4e's reply bodies render as commit links. Skip this sub-step if Step 4c produced zero fixups (all threads were invalid).
+</sub-step>
+
+<sub-step id="4e" name="Reply and resolve every thread (valid and invalid)">
+For each processed thread, post one reply then resolve. Replies and resolves for independent threads are safe to parallelize (multiple Bash tool calls in one message).
+
+Valid threads — reply body cites the fixup SHA from Step 4c's record:
+```bash
+~/.cursor/skills/pr-address/scripts/pr-address.sh reply \
+  --owner <OWNER> --repo <REPO> --pr <NUMBER> \
+  --comment-id <numeric_id> \
+  --body "Valid — fixed in <fixup_sha>. <one-sentence description of the fix and file:line>."
+```
+
+Invalid threads — reply body cites the matched heuristic:
 ```bash
 ~/.cursor/skills/pr-address/scripts/pr-address.sh reply \
   --owner <OWNER> --repo <REPO> --pr <NUMBER> \
@@ -169,20 +171,36 @@ For invalid findings, NO commit and NO push. Reply citing the specific heuristic
   --body "<one-sentence explanation naming the heuristic: self-invalidating / pre-existing intentional / already-addressed / duplicate / wrong about the API>. <brief evidence citing code paths, author comments, or sibling threads>."
 ```
 
-Then `resolve-thread` as in 4c step 8.
+Then resolve:
+```bash
+~/.cursor/skills/pr-address/scripts/pr-address.sh resolve-thread --thread-id "<threadId>"
+```
 </sub-step>
 
-<sub-step id="4e" name="Batch tool calls within a cycle">
-Replies and resolves for independent threads are safe to parallelize (multiple Bash tool calls in one message). Fixup commits must be serialized because they share the working tree and branch state. After all fixups, push once at the end of the cycle rather than after each commit — fewer force pushes, single rebuild trigger on the bugbot side.
+<sub-step id="4f" name="Finalize: autosquash if no external human reviewers">
+Delegate to the shared finalize helper. Identical call site as `/pr-address` Step 4 — policy lives in the script so the two skills never drift:
+
+```bash
+~/.cursor/skills/pr-finalize-fixups.sh --owner <OWNER> --repo <REPO> --pr <NUMBER>
+```
+
+Output is one line of JSON:
+- `{"autosquashed": true, "newHead": "<sha>"}` — history rewritten, force-pushed. Use `newHead` in the Step 4g status line.
+- `{"autosquashed": false, "reason": "has external human reviewers", "reviewers": [...]}` — fixups preserved; use the Step 4d push's HEAD for Step 4g.
+
+If the script exits non-zero, the autosquash hit a conflict. Do NOT emit a status line or run Step 5 — report the error and STOP so the user can resolve manually. An armed cron (from a previous cycle) will keep firing; the next cycle with a clean tree will retry.
+
+Skip this sub-step entirely if Step 4c produced zero fixups.
 </sub-step>
 
-<sub-step id="4f" name="Status line for the findings outcome">
-After processing all threads, set the status line to one of:
+<sub-step id="4g" name="Status line for the findings outcome">
+Set the final status line based on what happened in 4c–4f:
 
-- `bugbot addressed <N> thread(s) on <HEAD_SHORT>; new HEAD <NEW_SHORT>` if you pushed fixups
-- `bugbot addressed <N> thread(s) on <HEAD_SHORT>; no fixups` if all were reply-only
+- `bugbot addressed <N> thread(s) on <HEAD_SHORT>; autosquashed to <NEW_HEAD>` — fixups pushed and squashed.
+- `bugbot addressed <N> thread(s) on <HEAD_SHORT>; new HEAD <NEW_HEAD>` — fixups pushed, autosquash skipped (human reviewers present).
+- `bugbot addressed <N> thread(s) on <HEAD_SHORT>; no fixups` — all threads were invalid.
 
-The new HEAD will need a fresh scan; Step 5 keeps the cron armed so the next cycle handles it.
+The new HEAD needs a fresh bugbot scan. Step 5 keeps the cron armed so the next cycle handles it.
 </sub-step>
 </step>
 
