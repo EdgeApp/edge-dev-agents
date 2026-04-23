@@ -1,12 +1,12 @@
 ---
 name: bugbot
-description: Address Cursor Bugbot PR review findings for one scan cycle. Checks bugbot's check-run status on HEAD, classifies each unresolved bugbot thread as valid or invalid, fixes valid ones with fixup commits, pushes, and replies+resolves each thread. Reports a single grep-able status line so the caller's scheduler (Cursor Automations, Codex Automations, Claude Code /loop or /schedule) can decide whether to run again. Use when the user says "address bugbot", "handle bugbot comments", or pastes a PR URL and asks about bugbot status. Only handles `cursor[bot]` feedback — leaves human and other-bot threads for /pr-address.
-compatibility: Requires git, gh. Composes with pr-address, lint-commit.sh, git-branch-ops.sh.
+description: Address Cursor Bugbot PR review findings until the PR is actually clean. Runs one scan cycle (check bugbot's check-run status on HEAD, classify each unresolved bugbot thread, fix valid ones with fixup commits, push, reply+resolve) and — on Claude Code — self-schedules a 5-minute recurring cycle that stops automatically when bugbot reports the PR clean. On Cursor/Codex the recurring schedule is set up once via Automations and the skill's cycle runs identically on each fire. Only handles `cursor[bot]` feedback — leaves human and other-bot threads for /pr-address. Use when the user says "address bugbot", "handle bugbot comments", or pastes a PR URL and asks about bugbot status.
+compatibility: Requires git, gh. Composes with pr-address, lint-commit.sh, git-branch-ops.sh. Self-schedules on Claude Code via CronList/CronCreate/CronDelete tools when available.
 metadata:
   author: j0ntz
 ---
 
-<goal>Run one Cursor Bugbot scan cycle on a PR: read the check-run, address valid findings as fixup commits, and report status so the caller's scheduler can decide whether to loop.</goal>
+<goal>Get a PR to bugbot-clean state end-to-end: run one scan cycle now, self-arm a recurring schedule when bugbot hasn't yet signed off, and self-disarm when it has.</goal>
 
 <rules description="Non-negotiable constraints.">
 <rule id="use-companion-scripts">Do NOT call `gh` directly. Use `~/.cursor/skills/bugbot/scripts/bugbot.sh` for bugbot check-run queries and `~/.cursor/skills/pr-address/scripts/pr-address.sh` for all thread operations (fetch, fetch-thread, reply, resolve-thread, ensure-branch).</rule>
@@ -18,7 +18,8 @@ metadata:
 <rule id="commit-via-script">Fixups MUST use `~/.cursor/skills/lint-commit.sh --no-reorder -m "fixup! {target-headline}" [files...]`. Do not run `git commit` directly and do not manually run eslint — the commit script handles it.</rule>
 <rule id="fixup-target-headline">Before each fixup, run `git log --oneline -- <changed-file>` to find the commit that introduced the behavior being fixed and use its exact headline (not a generic one). The fixup must target a real commit on the branch so the later autosquash resolves correctly.</rule>
 <rule id="no-summary-comment">Do NOT post a top-level PR summary comment. Reply inline on each thread only. The scheduler consumes per-cycle status from stdout; extra body comments add noise on recurring runs.</rule>
-<rule id="no-scheduling-from-skill">Do NOT call `CronCreate`, `/loop`, or any tool-specific scheduling API from within the skill. The caller owns scheduling; this skill is a single cycle only. See `<scheduling>` at the bottom for per-tool setup.</rule>
+<rule id="self-schedule-on-claude-code">When `CronList`, `CronCreate`, and `CronDelete` tools are available (Claude Code), the skill MUST manage its own recurring schedule per Step 5: arm a 5-minute cron on any non-clean outcome if one isn't already armed; delete any matching cron on clean/skipped. On tools without those APIs (Cursor/Codex), skip Step 5 — the user configures their tool's Automation manually per `<scheduling>`.</rule>
+<rule id="one-cron-per-pr">Never arm a second cron for a `(owner, repo, pr)` tuple that already has one. Always `CronList` first and match by the prompt substring; only `CronCreate` if no existing cron matches.</rule>
 <rule id="script-timeouts">Set `block_until_ms: 60000` when invoking `bugbot.sh` or `pr-address.sh` — GitHub API calls can take up to 30s and bugbot's `--paginate` query may take longer on busy PRs.</rule>
 <rule id="this-file-wins">If any other instruction conflicts with this file, **this file wins** for `bugbot`.</rule>
 </rules>
@@ -74,28 +75,27 @@ Returns compact JSON: `{"status":"<s>","conclusion":"<c>","sha":"<short>"}`.
 If the script exits 2 with `PROMPT_GH_AUTH`, prompt the user: "`gh` CLI is not authenticated. Please run: `gh auth login`". Then STOP.
 </step>
 
-<step id="3" name="Interpret and act — priority-ordered decision table">
-Pick the FIRST matching row and follow its action. Do not evaluate later rows.
+<step id="3" name="Interpret — priority-ordered decision table">
+Pick the FIRST matching row. Set an internal `OUTCOME` variable to one of `waiting` | `no-check-run` | `skipped` | `clean` | `findings`. Then run Step 4 if `OUTCOME == findings`, and ALWAYS run Step 5 last to manage the recurring schedule.
 
-1. **`status == "queued"` OR `status == "in_progress"`** →
-   Output exactly: `waiting for bugbot to finish scanning <HEAD_SHORT>`.
-   Do NOT fetch threads, commit, push, reply, or resolve anything. STOP.
+1. **`status == "queued"` OR `status == "in_progress"`** → `OUTCOME = waiting`.
+   Status line: `waiting for bugbot to finish scanning <HEAD_SHORT>`.
+   Do NOT fetch threads, commit, push, reply, or resolve anything.
 
-2. **`status == "none"`** →
-   Output exactly: `no bugbot check-run on <HEAD_SHORT> yet`.
-   Do NOT act. STOP. (The scheduler will try again next cycle; bugbot may start scanning shortly.)
+2. **`status == "none"`** → `OUTCOME = no-check-run`.
+   Status line: `no bugbot check-run on <HEAD_SHORT> yet`.
+   Do NOT act. (Bugbot may start scanning shortly.)
 
-3. **`status == "completed"` AND `conclusion == "skipped"`** →
-   Output exactly: `bugbot skipped <HEAD_SHORT>`.
-   Treat as clean for this SHA — bugbot explicitly declined to scan (often because the diff only changed docs/config). STOP and advise the caller it is safe to disable the scheduler.
+3. **`status == "completed"` AND `conclusion == "skipped"`** → `OUTCOME = skipped`.
+   Status line: `bugbot skipped <HEAD_SHORT>`.
+   Treat as clean for this SHA — bugbot explicitly declined to scan (often because the diff only changed docs/config).
 
-4. **`status == "completed"` (any other conclusion) AND 0 unresolved `cursor[bot]` threads** →
+4. **`status == "completed"` (any other conclusion) AND 0 unresolved `cursor[bot]` threads** → `OUTCOME = clean`.
    Verify unresolved count with `pr-address.sh fetch` (see Step 4a).
-   Output exactly: `bugbot clean on <HEAD_SHORT>`.
-   STOP and advise the caller it is safe to disable the scheduler.
+   Status line: `bugbot clean on <HEAD_SHORT>`.
 
-5. **`status == "completed"` AND >0 unresolved `cursor[bot]` threads** →
-   Proceed to Step 4 to address findings.
+5. **`status == "completed"` AND >0 unresolved `cursor[bot]` threads** → `OUTCOME = findings`.
+   Proceed to Step 4 to address them.
 
 **Critical**: Row 4 MUST combine the `completed` status with a live thread-count check. `conclusion: neutral` alone can mean "posted findings, non-blocking" — declaring clean on conclusion-only would silently skip real issues.
 </step>
@@ -176,14 +176,54 @@ Then `resolve-thread` as in 4c step 8.
 Replies and resolves for independent threads are safe to parallelize (multiple Bash tool calls in one message). Fixup commits must be serialized because they share the working tree and branch state. After all fixups, push once at the end of the cycle rather than after each commit — fewer force pushes, single rebuild trigger on the bugbot side.
 </sub-step>
 
-<sub-step id="4f" name="End-of-cycle output">
-After processing all threads, output exactly one line:
+<sub-step id="4f" name="Status line for the findings outcome">
+After processing all threads, set the status line to one of:
 
-`bugbot addressed <N> thread(s) on <HEAD_SHORT>; new HEAD <NEW_SHORT>` if you pushed fixups,
-or `bugbot addressed <N> thread(s) on <HEAD_SHORT>; no fixups` if all were reply-only.
+- `bugbot addressed <N> thread(s) on <HEAD_SHORT>; new HEAD <NEW_SHORT>` if you pushed fixups
+- `bugbot addressed <N> thread(s) on <HEAD_SHORT>; no fixups` if all were reply-only
 
-The new HEAD will need a fresh scan; the caller's next scheduled cycle handles that.
+The new HEAD will need a fresh scan; Step 5 keeps the cron armed so the next cycle handles it.
 </sub-step>
+</step>
+
+<step id="5" name="Manage recurring schedule (Claude Code only)">
+This step runs AFTER every other step, on every outcome. Its job: arm a 5-minute recurring cycle on non-clean outcomes and tear it down on clean outcomes, so interactive `/bugbot` invocations Just Work without the user composing with `/loop`.
+
+**If `CronList`, `CronCreate`, and `CronDelete` tools are NOT available** (Cursor, Codex, agent harnesses without Claude Code scheduling): skip this step entirely. Emit the status line from Step 3/4f and exit. The user's Cursor/Codex Automation (configured per `<scheduling>`) keeps firing until they disable it when they see the clean status.
+
+**If those tools ARE available** (Claude Code):
+
+1. Build the cron prompt string: `/bugbot <owner>/<repo>#<pr>` (matching exactly what the user invoked). This string is the unique key for finding/removing this PR's cron.
+
+2. Query existing crons:
+   ```
+   CronList()
+   ```
+   Find entries whose `prompt` contains the cron prompt string from (1). Save any matching job IDs into `EXISTING_IDS`.
+
+3. Act on `OUTCOME`:
+
+   - `OUTCOME == clean` OR `OUTCOME == skipped`:
+     For each id in `EXISTING_IDS`: `CronDelete(id)`.
+     Append ` · monitor stopped` to the status line if any were deleted, or ` · no monitor was armed` if not.
+
+   - `OUTCOME == waiting` OR `OUTCOME == no-check-run` OR `OUTCOME == findings`:
+     If `EXISTING_IDS` is empty:
+     ```
+     CronCreate(cron: "*/5 * * * *", prompt: "<cron prompt from step 1>", recurring: true)
+     ```
+     Append ` · monitoring every 5m (job <new_id>)` to the status line.
+
+     If `EXISTING_IDS` is non-empty: do NOT CronCreate. Append ` · continuing monitor (job <existing_id>)` to the status line.
+
+4. Emit the final status line as the last stdout line of the cycle.
+
+**Why this design**:
+- Interactive `/bugbot owner/repo#N` invocation arms a monitor and returns.
+- Subsequent cron fires find the existing cron and skip re-arming.
+- Clean cycle deletes the cron cleanly; user sees `bugbot clean on <SHA> · monitor stopped`.
+- No piling-up of crons; no orphan schedules on clean.
+- Matching by prompt-substring (not job id) means the skill can tear down crons even when the current invocation came from the cron itself.
 </step>
 
 <classification-heuristics description="Invalidity patterns observed in real bugbot runs. A finding is VALID by default; match one of these with cited evidence to mark it INVALID.">
@@ -214,31 +254,40 @@ The finding asserts an API shape or data-model behavior that contradicts what ea
 
 </classification-heuristics>
 
-<scheduling description="This skill is a single cycle. Use your tool's native scheduler to run it recurrently. All examples use a 5-minute cadence — bugbot scans typically take 4–7 minutes, so tighter polling just wastes cycles.">
+<scheduling description="How the recurring schedule is set up per tool. On Claude Code the skill self-arms; on Cursor/Codex the user configures their Automations panel once.">
 
-<tool name="Claude Code (session-scoped)">
+<tool name="Claude Code (default — self-armed)">
+Just invoke the skill — it arms its own schedule on non-clean outcomes and tears it down on clean outcomes (see Step 5).
+
 ```
-/loop 5m /bugbot <owner>/<repo>#<pr>
+/bugbot <owner>/<repo>#<pr>
 ```
-Stop with `CronDelete <job-id>` when the cycle outputs `bugbot clean on <SHA>` or `bugbot skipped <SHA>`. The `/loop` wrapper prompt can grep for those strings and call `CronDelete` itself.
+
+First cycle runs immediately. If bugbot hasn't finished / has findings, a session-scoped cron is armed automatically (`*/5 * * * *`). Each cron fire is another `/bugbot` cycle. The cycle that reaches clean deletes its own cron and reports `bugbot clean on <SHA> · monitor stopped`.
+
+Manual cadence override: `/loop 15m /bugbot ...` still works — Step 5 skips arming a new cron when it finds the existing `/loop`-created one, so the two don't fight.
 </tool>
 
 <tool name="Claude Code (durable cloud schedule)">
+For survive-across-sessions monitoring (e.g. you want bugbot polling overnight while you're logged off):
+
 ```
 /schedule every 5 minutes: /bugbot <owner>/<repo>#<pr>
 ```
-Cancel from `/schedule list` when the PR is clean.
+
+Each fire re-runs the skill. Step 5's self-teardown logic uses `CronDelete` which only covers session-scoped crons — for `/schedule`-created ones, cancel from `/schedule list` when you see the clean status.
 </tool>
 
 <tool name="Cursor (Automations)">
 In the Automations panel, create a recurring Automation:
 - Schedule: cron `*/5 * * * *`
 - Prompt: `/bugbot <owner>/<repo>#<pr>`
-- Disable the Automation manually when the clean report fires.
+
+The skill's Step 5 is a no-op in Cursor (no CronList API to the agent), so the Automation keeps firing until you disable it. Each cycle's status line tells you when it's safe to disable.
 </tool>
 
 <tool name="Codex (Automations)">
-Ask Codex: "Create a standalone automation that runs every 5 minutes with prompt `/bugbot <owner>/<repo>#<pr>`." Disable when clean.
+Ask Codex: "Create a standalone automation that runs every 5 minutes with prompt `/bugbot <owner>/<repo>#<pr>`." Same caveat as Cursor — the skill doesn't self-teardown; disable the automation when the clean status appears.
 </tool>
 
 </scheduling>
@@ -250,4 +299,6 @@ Ask Codex: "Create a standalone automation that runs every 5 minutes with prompt
 <case name="Thread from a non-cursor[bot] author">Skip. This skill is scoped to bugbot. For mixed human/bot reviews, run `/pr-address` separately.</case>
 <case name="Empty PR / no check-runs ever">Step 2 returns `status: "none"`. Step 3 row 2 applies — report and wait. Bugbot has up to ~1 minute before it enqueues a scan.</case>
 <case name="Script exit 2 (PROMPT_GH_AUTH / PROMPT_GH_INSTALL)">Prompt the user to install/authenticate `gh`, STOP. Do not fall back to curl or manual API calls.</case>
+<case name="Cron tools are deferred / not loaded in the agent context">On Claude Code with `CronList`, `CronCreate`, `CronDelete` deferred, load them via `ToolSearch` with `query: "select:CronCreate,CronList,CronDelete"` before running Step 5. If loading fails, fall back to the Cursor/Codex path: emit the status line without scheduling and let the caller manage the Automation manually.</case>
+<case name="PR branch was deleted (PR merged/closed)">`ensure-branch` will fail. If Step 5 has already armed a cron, CronDelete it before exiting. Report the error and STOP — the scheduler no longer has anything useful to do.</case>
 </edge-cases>
