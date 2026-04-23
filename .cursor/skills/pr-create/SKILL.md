@@ -1,12 +1,12 @@
 ---
 name: pr-create
-description: Create a pull request from the current branch, with optional Asana attach/assign updates.
+description: Create a pull request from the current branch, with optional Asana attach.
 compatibility: Requires git, gh, node, jq. ASANA_TOKEN for Asana updates. ASANA_GITHUB_SECRET for Asana PR attachment.
 metadata:
   author: j0ntz
 ---
 
-<goal>Create a PR from the current branch, optionally attach it to Asana and assign reviewer.</goal>
+<goal>Create a PR from the current branch, optionally attach it to Asana.</goal>
 
 <rules description="Non-negotiable constraints.">
 <rule id="use-companion-script">Do NOT call `gh` directly for PR creation. Use `~/.cursor/skills/pr-create/scripts/pr-create.sh`.</rule>
@@ -15,8 +15,8 @@ metadata:
 <rule id="no-dirty-pr">Do NOT create a PR when there are uncommitted changes.</rule>
 <rule id="no-base-push">Do NOT push to `master`/`develop` directly.</rule>
 <rule id="verification-required">Run verification before creating the PR.</rule>
-<rule id="flag-contract">`--asana-attach`/`--asana-assign` only run when a task GID is available from chat context or explicit `--asana-task <gid>`. If no task GID is available, fail fast and skip Asana updates.</rule>
-<rule id="hands-off-assign">When `--asana-assign` is requested from a hands-off flow, pass `--skip-assign-if-missing` to `asana-task-update.sh` so missing reviewers do not block PR completion.</rule>
+<rule id="no-reviewer-assignment">Do NOT auto-assign Asana reviewers, set review-needed status, or estimate review hours from this skill. Reviewer choice is a human step; callers that want those behaviors must invoke `asana-task-update` themselves.</rule>
+<rule id="flag-contract">`--asana-attach` only runs when a task GID is available from chat context or explicit `--asana-task <gid>`. If no task GID is available, fail fast and skip the attach.</rule>
 <rule id="script-timeouts">Asana updates can take up to 90s. Use `block_until_ms: 120000` for `asana-task-update.sh` calls.</rule>
 <rule id="repo-template-required">If the repo has `.github/PULL_REQUEST_TEMPLATE.md`, the PR body must preserve that template's section headings. Do NOT substitute generic sections like `Summary` or `Test plan`.</rule>
 </rules>
@@ -67,30 +67,27 @@ Write body to `/tmp/pr-body.md`, then run:
 The companion script validates body files against the repo template and rejects generic fallback sections on templated repos. Capture PR URL and number from JSON output.
 </step>
 
-<step id="5" name="Optional Asana updates">
-If neither `--asana-attach` nor `--asana-assign` was requested, skip.
+<step id="5" name="Optional Asana PR attach">
+If `--asana-attach` was not requested, skip.
 
-If either flag is requested, resolve `task_gid` from:
+If `--asana-attach` is requested, resolve `task_gid` from:
 
 1. explicit `--asana-task <gid>` argument
 2. chat context (previous task-review/im context)
 
 If no task GID is available, fail fast and report:
 
-> Asana flags were requested but no task GID was found in flags or chat context.
+> `--asana-attach` was requested but no task GID was found in flags or chat context.
 
 Then call:
 
 ```bash
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
   --task <task_gid> \
-  [--attach-pr --pr-url <pr_url> --pr-title "<title>" --pr-number <number>] \
-  [--assign --skip-assign-if-missing --set-status "Review Needed" --auto-est-review-hrs]
+  --attach-pr --pr-url <pr_url> --pr-title "<title>" --pr-number <number>
 ```
 
-- `--asana-attach` maps to `--attach-pr ...`
-- `--asana-assign` maps to `--assign --skip-assign-if-missing --set-status "Review Needed" --auto-est-review-hrs`
-- If both are set, combine in one command.
+Do NOT pass `--assign`, `--set-status`, or `--auto-est-review-hrs` from this skill. Reviewer assignment and review-status updates are intentionally out of scope — see `no-reviewer-assignment` rule.
 </step>
 
 <step id="6" name="Report result">

@@ -150,6 +150,24 @@ The prepare script handles: clone/checkout, autosquash fixups, rebase onto upstr
 <sub-step name="On code conflict">PR is skipped and reported in the `skipped` array. Rebase is aborted to leave repo clean. Other PRs continue.</sub-step>
 
 <sub-step name="On CHANGELOG conflict">Agent resolves semantically (upstream entries first, then ours), then re-runs prepare.</sub-step>
+
+<sub-step name="On CHANGELOG placement warning">
+If any entry in `prepared[i].placementWarnings` is non-empty, the PR added CHANGELOG entries under a DATED released heading (e.g. `## 4.46.0 (2026-03-20)`) instead of `## Unreleased (develop)` or `## X.Y.Z (staging)`. This usually means the author placed the entry under the then-current released version but the PR actually targets a later unreleased version.
+
+Do NOT push (step 4) until the user decides. For each warning, show the user the `line`, `section`, and `text`, then ask exactly:
+```
+CHANGELOG entry under released section "<section>":
+  <text>
+(a) leave as-is  (b) move to ## Unreleased (develop)  (c) move to ## X.Y.Z (staging)
+```
+
+1. If user picks **(a)**: continue to step 4.
+2. If user picks **(b)** or **(c)**: use the Edit tool to move the offending line(s) into the target section, preserving `added → changed → deprecated → fixed → removed → security` ordering within that section. Then stage and amend the top commit on the branch:
+   ```bash
+   git -C <repoDir> add CHANGELOG.md && GIT_EDITOR=true git -C <repoDir> commit --amend --no-edit
+   ```
+   Re-run `pr-land-prepare.sh` to re-verify before pushing. Do NOT bypass precommit hooks.
+</sub-step>
 </step>
 
 <step id="4" name="Push">

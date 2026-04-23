@@ -48,7 +48,23 @@ If `ATTACHMENTS: (none)` appears in script output, do **not** probe `/tmp/asana-
 </step>
 
 <step id="2" name="Determine target repo">
-**Task title prefixes are deterministic signals:**
+**Resolve the target repo by examining code, not task text.** Task titles, descriptions, keywords, and attachments are noisy — the same terms (e.g. "swap", "wallet", "send", "plugin") appear across multiple repos, and text hints frequently mislead. Code is the only authoritative signal for *where* a change must land. You will need to explore the code to scope the work anyway — do it up front for repo resolution.
+
+<sub-step name="Resolution workflow">
+1. **Extract concrete handles from the task text.** Pull out specific file names, function names, scene names, plugin IDs, component names, config keys, URLs/hostnames, error strings, or feature identifiers. Ignore vague domain words.
+2. **Grep the candidate repos** for those handles. Start broad across all four repos; narrow to the repo where the matching code actually lives:
+   - `edge-react-gui` — app UI, scenes, redux, navigation, plugin orchestration
+   - `edge-exchange-plugins` — swap/exchange plugins
+   - `edge-currency-accountbased` — account-based currency drivers (EVM, Cosmos, Solana, etc.)
+   - `edge-core-js` — EdgeAccount, login, core SDK APIs
+3. **Confirm by reading the matched code.** A name collision across repos is possible; verify the matching code actually corresponds to the behavior the task describes.
+4. **If code examination is inconclusive** (no grep hit, or hits span multiple repos), ASK the user before proceeding. Do not guess from text alone.
+
+State the resolved repo and cite the files/symbols that pinned it in the Step 3 summary.
+</sub-step>
+
+<sub-step name="Prefix shortcut (when present)">
+If the task title starts with one of these prefixes, the prefix is a deterministic shortcut that skips grep-based resolution. Prefixes are the exception, not the norm:
 
 | Prefix | Repository | Branch from |
 |--------|------|-------------|
@@ -57,9 +73,27 @@ If `ATTACHMENTS: (none)` appears in script output, do **not** probe `/tmp/asana-
 | `accb:` | `edge-currency-accountbased` | `master` |
 | `core:` | `edge-core-js` | `master` |
 
-**Always create feature branches from the "Branch from" column.** `edge-react-gui` uses `develop` as its integration branch; the others use `master`.
+Treat prefix absence as normal. A prefix only skips Step 2's grep work — the Step 3 summary should still cite the specific files/symbols affected (you'll need them for the implementation plan).
+</sub-step>
 
-If no prefix is present, infer from the task description, keywords, or attached PRs. If still unclear, ask the user.
+<sub-step name="Linked PRs short-circuit resolution">
+If the task has an attached or linked GitHub PR, the PR's repo is the authoritative target — no grep needed.
+</sub-step>
+
+<sub-step name="Branch-from defaults">
+Always create feature branches from the "Branch from" column: `edge-react-gui` branches from `develop`; `edge-exchange-plugins`, `edge-currency-accountbased`, and `edge-core-js` branch from `master`.
+</sub-step>
+
+<sub-step name="Cross-repo work — split into Asana subtasks">
+If grep shows the work genuinely spans more than one repo (e.g. a GUI change depending on a new core-js API), a single PR cannot cover it. Before implementing:
+
+1. **Stop and flag the split to the user.** Name each repo and cite the files/symbols that belong in each.
+2. **Create one Asana subtask per repo under the parent**, titled with that repo's prefix (e.g. `gui: ...`, `core: ...`). Subtasks allow multiple PRs to attach to the same parent task.
+3. Wait for user confirmation before creating subtasks or proceeding.
+4. After the split, treat each subtask as its own task-review target — re-run Step 2 per subtask.
+
+Do not attempt to satisfy a multi-repo task with a single PR.
+</sub-step>
 </step>
 
 <step id="3" name="Summarize understanding">

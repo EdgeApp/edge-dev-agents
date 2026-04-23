@@ -19,7 +19,7 @@
 // Output: JSON with results for each branch
 
 const { execSync } = require("child_process");
-const { existsSync } = require("fs");
+const { existsSync, readFileSync } = require("fs");
 const path = require("path");
 const {
   getRepoDir,
@@ -30,6 +30,83 @@ const {
   runVerification,
   installAndPrepare,
 } = require(path.join(__dirname, "edge-repo.js"));
+
+// Detect NEW CHANGELOG entries (added vs baseRef) placed under a DATED
+// released heading instead of `## Unreleased` or `## X.Y.Z (staging)`.
+// Pure inspection — returns an array of { line, text, section } misplaced entries.
+// Does not modify the repo. Empty array means no concerns.
+function checkChangelogPlacement(repoDir, baseRef) {
+  const changelogPath = path.join(repoDir, "CHANGELOG.md");
+  if (!existsSync(changelogPath)) return [];
+
+  let content;
+  try {
+    content = readFileSync(changelogPath, "utf8");
+  } catch (e) {
+    return [];
+  }
+  const lines = content.split("\n");
+
+  // Build ordered list of section headings with kind: unreleased | staging | released
+  const sections = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    let kind = null;
+    if (/^## Unreleased/i.test(line)) kind = "unreleased";
+    else if (/^## .+\(staging\)/i.test(line)) kind = "staging";
+    else if (/^## \d+\.\d+\.\d+/.test(line)) kind = "released";
+    if (kind != null) {
+      sections.push({ startLine: i + 1, text: line.replace(/^##\s*/, "").trim(), kind });
+    }
+  }
+
+  const sectionForLine = (lineNum) => {
+    let last = null;
+    for (const s of sections) {
+      if (s.startLine <= lineNum) last = s;
+      else break;
+    }
+    return last;
+  };
+
+  // Diff-added lines on HEAD side
+  let diffOut;
+  try {
+    diffOut = execSync(
+      `git diff --unified=0 --no-color ${baseRef}...HEAD -- CHANGELOG.md`,
+      { cwd: repoDir, encoding: "utf8" }
+    );
+  } catch (e) {
+    return [];
+  }
+
+  const misplaced = [];
+  let headLine = 0;
+  for (const raw of diffOut.split("\n")) {
+    const h = raw.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (h) {
+      headLine = parseInt(h[1], 10);
+      continue;
+    }
+    if (raw.startsWith("+++") || raw.startsWith("---")) continue;
+    if (raw.startsWith("+")) {
+      const text = raw.slice(1);
+      if (/^- (added|changed|deprecated|fixed|removed|security):/i.test(text)) {
+        const sect = sectionForLine(headLine);
+        if (sect != null && sect.kind === "released") {
+          misplaced.push({ line: headLine, text, section: sect.text });
+        }
+      }
+      headLine++;
+    } else if (raw.startsWith("-")) {
+      // deleted line on BASE side — do not advance HEAD line counter
+    } else if (raw.length > 0) {
+      headLine++;
+    }
+  }
+
+  return misplaced;
+}
 
 function describeBranchState(repoDir, branch) {
   const parts = [];
@@ -172,6 +249,21 @@ async function prepareBranch(repo, branch) {
     return result;
   }
 
+  // Step 7: Inspect CHANGELOG placement — warn if new entries landed under a
+  // dated released heading instead of `## Unreleased` or staging. Non-fatal:
+  // the agent prompts the user to decide (leave / move to Unreleased / move to
+  // staging) before pushing.
+  const misplaced = checkChangelogPlacement(repoDir, upstream);
+  if (misplaced.length > 0) {
+    console.error(
+      `\n⚠ CHANGELOG placement warning: ${misplaced.length} new entry(s) under a released heading:`
+    );
+    for (const m of misplaced) {
+      console.error(`  line ${m.line} in "${m.section}": ${m.text}`);
+    }
+    result.placementWarnings = misplaced;
+  }
+
   result.status = "ready";
   result.message = "Branch prepared and verified successfully";
   return result;
@@ -217,7 +309,10 @@ async function main() {
   if (results.prepared.length > 0) {
     console.error(`Ready (${results.prepared.length}):`);
     for (const r of results.prepared) {
-      console.error(`  ✓ ${r.repo}/${r.branch}`);
+      const warn = r.placementWarnings?.length
+        ? ` ⚠ ${r.placementWarnings.length} CHANGELOG placement warning(s)`
+        : "";
+      console.error(`  ✓ ${r.repo}/${r.branch}${warn}`);
     }
   }
   if (results.skipped.length > 0) {

@@ -1,18 +1,17 @@
 ---
 name: one-shot
-description: End-to-end flow for a task: plan/context, implementation, PR creation, and Asana attach/assign in one command.
+description: End-to-end flow for a task: plan/context, implementation, PR creation, and Asana PR attach in one command.
 compatibility: Requires git, gh, node, jq. ASANA_TOKEN for Asana integration. ASANA_GITHUB_SECRET for PR attachment.
 metadata:
   author: j0ntz
 ---
 
-<goal>Run the full legacy-style task-to-PR workflow in one command by orchestrating `/asana-plan`, `/im`, and `/pr-create`.</goal>
+<goal>Run the full task-to-PR workflow in one command by orchestrating `/asana-plan`, `/im`, and `/pr-create`.</goal>
 
 <rules description="Non-negotiable constraints.">
 <rule id="orchestrate-existing-skills">Do not re-implement logic already defined in `/asana-plan`, `/im`, or `/pr-create`. Delegate to those skills.</rule>
-<rule id="attach-and-assign-default">By default, invoke `/pr-create` with both `--asana-attach` and `--asana-assign`.</rule>
-<rule id="hands-off-assignment">This workflow is hands-off. If reviewer assignment cannot be resolved from task state or explicit input, let `/pr-create` skip assignment rather than pausing for reviewer input.</rule>
-<rule id="task-gid-required-for-asana-flags">If Asana attach/assign flags are active, a task GID must be available from the Asana URL input or explicit `--asana-task` flag; otherwise fail fast.</rule>
+<rule id="attach-default">By default, invoke `/pr-create` with `--asana-attach`. Do NOT pass `--asana-assign` — reviewer assignment is out of scope for this workflow (see `pr-create`'s `no-reviewer-assignment` rule).</rule>
+<rule id="task-gid-required-for-attach">If `--asana-attach` is active, a task GID must be available from the Asana URL input or explicit `--asana-task` flag; otherwise fail fast.</rule>
 <rule id="no-script-bypass">If any delegated skill or companion script fails, report and stop. Do not bypass with manual alternatives.</rule>
 <rule id="pr-body-owned-by-pr-create">Do not draft alternate PR markdown formats inside this workflow. `/pr-create` owns PR body generation and template compliance.</rule>
 </rules>
@@ -26,8 +25,7 @@ Accept one of:
 Optional flags:
 
 - `--asana-task <gid>` (explicit Asana GID override)
-- `--no-asana-attach`
-- `--no-asana-assign`
+- `--no-asana-attach` (skip the Asana PR-attach step)
 </step>
 
 <step id="2" name="Plan/context phase">
@@ -44,10 +42,7 @@ Run `/im` using the approved `/asana-plan` output.
 </step>
 
 <step id="4" name="PR phase">
-Run `/pr-create` with defaults:
-
-- include `--asana-attach` unless `--no-asana-attach`
-- include `--asana-assign` unless `--no-asana-assign`
+Run `/pr-create` with `--asana-attach` unless `--no-asana-attach` was passed. Never pass `--asana-assign`.
 
 Task GID source priority:
 
@@ -65,6 +60,6 @@ Return the final PR URL and which delegated phases ran:
 </step>
 
 <edge-cases>
-<case name="No Asana input with attach/assign enabled">Fail fast and ask for `--asana-task <gid>` or disable flags with `--no-asana-attach` / `--no-asana-assign`.</case>
-<case name="Ad-hoc text task">Allow workflow with `--no-asana-attach --no-asana-assign` when no task link/GID exists.</case>
+<case name="No Asana input with attach enabled">Fail fast and ask for `--asana-task <gid>` or disable the attach with `--no-asana-attach`.</case>
+<case name="Ad-hoc text task">Allow workflow with `--no-asana-attach` when no task link/GID exists.</case>
 </edge-cases>
