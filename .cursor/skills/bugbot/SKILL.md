@@ -16,6 +16,7 @@ metadata:
 <rule id="require-paginate">When the companion scripts query bot comments, they already pass `--paginate` — PRs with >30 bot comments miss newest without it. Do not implement your own comment queries; delegate.</rule>
 <rule id="reply-before-resolve">ALWAYS reply explaining how a thread was addressed (fix SHA for valid, invalidity class for invalid) BEFORE calling `resolve-thread`. No silent resolutions.</rule>
 <rule id="commit-via-script">Fixups MUST use `~/.cursor/skills/lint-commit.sh --no-reorder -m "fixup! {target-headline}" [files...]`. Do not run `git commit` directly and do not manually run eslint — the commit script handles it.</rule>
+<rule id="slot-after-each-fixup">Immediately after every successful `lint-commit.sh` call, run `~/.cursor/skills/slot-fixup.sh` to slot the new fixup next to its target's group. Keeps the "every fixup sits next to its target" invariant continuously. If `slot-fixup.sh` exits non-zero (rebase conflict), report and STOP — do not continue the cycle. The cron will retry on the next fire once resolved.</rule>
 <rule id="fixup-target-headline">Before each fixup, run `git log --oneline -- <changed-file>` to find the commit that introduced the behavior being fixed and use its exact headline (not a generic one). The fixup must target a real commit on the branch so the later autosquash resolves correctly.</rule>
 <rule id="no-summary-comment">Do NOT post a top-level PR summary comment. Reply inline on each thread only. The scheduler consumes per-cycle status from stdout; extra body comments add noise on recurring runs.</rule>
 <rule id="self-schedule-on-claude-code">When `CronList`, `CronCreate`, and `CronDelete` tools are available (Claude Code), the skill MUST manage its own recurring schedule per Step 5: arm a 5-minute cron on any non-clean outcome if one isn't already armed; delete any matching cron on clean/skipped. On tools without those APIs (Cursor/Codex), skip Step 5 — the user configures their tool's Automation manually per `<scheduling>`.</rule>
@@ -123,7 +124,21 @@ For each cursor[bot] thread, fetch the full body:
 Inside the `<!-- DESCRIPTION START -->...<!-- DESCRIPTION END -->` markers is the finding. Classify it by running through the `<classification-heuristics>` block (below) in order. The DEFAULT is "valid" — invalidity requires a cited heuristic match.
 </sub-step>
 
-<sub-step id="4c" name="Valid: apply fixups (serialized, no push yet)">
+<sub-step id="4b1" name="Squash stale fixups (Fixups A → squash before Fixups B)">
+Before applying any new fixups, ask the shared finalize helper whether existing fixup commits on the branch are stale relative to the latest human review:
+
+```bash
+~/.cursor/skills/pr-finalize-fixups.sh squash-stale --owner <OWNER> --repo <REPO> --pr <NUMBER>
+```
+
+The script returns either `{"action":"autosquash",...}` (existing fixups were squashed and force-pushed) or `{"action":"noop",...}` (nothing to squash). Identical call site as `/pr-address` Step 1.5 — policy lives in the script so the two skills never drift.
+
+If the script exits non-zero (conflict mid-rebase), report and STOP. The cron will retry on the next fire once the user resolves the conflict.
+
+Skip this sub-step if Step 4b classified zero threads as valid (no fixups will be made anyway).
+</sub-step>
+
+<sub-step id="4c" name="Valid: apply fixups (one at a time, slot after each)">
 For each thread classified valid, in order:
 
 1. Read the affected file and apply the fix via Edit/Write.
@@ -137,19 +152,24 @@ For each thread classified valid, in order:
    ```bash
    ~/.cursor/skills/lint-commit.sh --no-reorder -m "fixup! <target-headline>" <files...>
    ```
-5. Capture the new fixup SHA: `git rev-parse --short HEAD`. Record a `{threadId, commentId, fixupSha}` entry so Step 4e can reply with the correct SHA per thread.
+5. **Immediately slot the new fixup next to its target's group** (per `slot-after-each-fixup` rule):
+   ```bash
+   ~/.cursor/skills/slot-fixup.sh
+   ```
+   If `slot-fixup.sh` reports a conflict, STOP — do not continue the cycle. The cron will retry once resolved.
+6. Capture the slotted fixup SHA: `git rev-parse --short HEAD` may not be the new fixup anymore (it's been moved earlier in history). Use `git log --grep="^fixup! <target-headline>$" --format=%h -1` to find the most recent fixup with that headline; that's the one we just made. Record a `{threadId, commentId, fixupSha}` entry so Step 4e can reply with the correct SHA per thread.
 
 Do NOT push inside this loop — Step 4d pushes once after all fixups land.
 </sub-step>
 
 <sub-step id="4d" name="Push all fixups once">
-After every valid thread has been committed:
+After every valid thread has been committed and slotted:
 
 ```bash
-~/.cursor/skills/git-branch-ops.sh push
+~/.cursor/skills/git-branch-ops.sh push --force-with-lease
 ```
 
-One non-force push makes all fixup SHAs visible to GitHub so Step 4e's reply bodies render as commit links. Skip this sub-step if Step 4c produced zero fixups (all threads were invalid).
+Force-with-lease is required because per-fixup slotting (Step 4c.5) rewrote tip. The push makes all fixup SHAs visible to GitHub so Step 4e's reply bodies render as commit links. Skip this sub-step if Step 4c produced zero fixups (all threads were invalid).
 </sub-step>
 
 <sub-step id="4e" name="Reply and resolve every thread (valid and invalid)">
@@ -177,7 +197,7 @@ Then resolve:
 ```
 </sub-step>
 
-<sub-step id="4f" name="Finalize: autosquash if no external human reviewers">
+<sub-step id="4f" name="Finalize: autosquash or push (mode-dependent)">
 Delegate to the shared finalize helper. Identical call site as `/pr-address` Step 4 — policy lives in the script so the two skills never drift:
 
 ```bash
@@ -185,8 +205,8 @@ Delegate to the shared finalize helper. Identical call site as `/pr-address` Ste
 ```
 
 Output is one line of JSON:
-- `{"autosquashed": true, "newHead": "<sha>"}` — history rewritten, force-pushed. Use `newHead` in the Step 4g status line.
-- `{"autosquashed": false, "reason": "has external human reviewers", "reviewers": [...]}` — fixups preserved; use the Step 4d push's HEAD for Step 4g.
+- `{"action": "autosquash", "mode": "autosquash", "newHead": "<sha>"}` — history rewritten, force-pushed. Use `newHead` in the Step 4g status line.
+- `{"action": "push", "mode": "preserve", "newHead": "<sha>"}` — fixups preserved for the active reviewer; force-pushed. Use `newHead` in the Step 4g status line.
 
 If the script exits non-zero, the autosquash hit a conflict. Do NOT emit a status line or run Step 5 — report the error and STOP so the user can resolve manually. An armed cron (from a previous cycle) will keep firing; the next cycle with a clean tree will retry.
 
@@ -196,8 +216,8 @@ Skip this sub-step entirely if Step 4c produced zero fixups.
 <sub-step id="4g" name="Status line for the findings outcome">
 Set the final status line based on what happened in 4c–4f:
 
-- `bugbot addressed <N> thread(s) on <HEAD_SHORT>; autosquashed to <NEW_HEAD>` — fixups pushed and squashed.
-- `bugbot addressed <N> thread(s) on <HEAD_SHORT>; new HEAD <NEW_HEAD>` — fixups pushed, autosquash skipped (human reviewers present).
+- `bugbot addressed <N> thread(s) on <HEAD_SHORT>; autosquashed to <NEW_HEAD>` — fixups pushed and squashed (autosquash mode).
+- `bugbot addressed <N> thread(s) on <HEAD_SHORT>; new HEAD <NEW_HEAD>` — fixups pushed, autosquash deferred (preserve mode — active reviewer).
 - `bugbot addressed <N> thread(s) on <HEAD_SHORT>; no fixups` — all threads were invalid.
 
 The new HEAD needs a fresh bugbot scan. Step 5 keeps the cron armed so the next cycle handles it.

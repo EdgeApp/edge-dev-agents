@@ -3,7 +3,7 @@
 // Surfaces unresolved inline threads, review bodies, and top-level comments
 // posted after the last commit. Uses a single GraphQL query per PR.
 //
-// Skips: resolved threads, bot/author comments, items with addressed markers.
+// Skips: resolved threads, bot comments, current-user (self) comments, items with addressed markers.
 //
 // Usage: echo '[{"repo":"...","prNumber":123,"branch":"..."}]' | ./pr-land-comments.sh
 
@@ -95,12 +95,23 @@ function isBot(login) {
   return !login || login.includes("[bot]")
 }
 
+function getCurrentUser() {
+  const result = spawnSync("gh", ["api", "user", "--jq", ".login"], {
+    encoding: "utf8"
+  })
+  if (result.status !== 0) {
+    throw new Error(`Failed to get current user: ${(result.stderr || "").trim()}`)
+  }
+  return result.stdout.trim()
+}
+
 async function main() {
   let input = ""
   for await (const chunk of process.stdin) input += chunk
 
   const prs = JSON.parse(input)
   const results = []
+  const currentUser = getCurrentUser()
 
   for (const { repo, prNumber, branch } of prs) {
     let data
@@ -114,7 +125,6 @@ async function main() {
     }
 
     const pr = data.repository.pullRequest
-    const prAuthor = pr.author?.login
     const lastCommitDate = pr.commits.nodes[0]
       ? new Date(pr.commits.nodes[0].commit.committedDate)
       : new Date(0)
@@ -141,7 +151,7 @@ async function main() {
     const latestByUser = {}
     for (const r of pr.reviews.nodes) {
       const user = r.author?.login
-      if (!user || user === prAuthor || r.state === "PENDING") continue
+      if (!user || user === currentUser || r.state === "PENDING") continue
       if (isBot(user)) continue
       const prev = latestByUser[user]
       if (
@@ -167,7 +177,7 @@ async function main() {
 
     for (const c of pr.comments.nodes) {
       const user = c.author?.login
-      if (!user || user === prAuthor || isBot(user)) continue
+      if (!user || user === currentUser || isBot(user)) continue
       if ((c.body || "").includes("<!-- addressed:")) continue
       if (addressedIds.has(c.databaseId)) continue
       if (new Date(c.createdAt) > lastCommitDate) {

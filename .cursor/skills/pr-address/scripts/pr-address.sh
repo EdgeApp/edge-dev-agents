@@ -13,6 +13,7 @@
 #   headline       --owner <o> --repo <r> --sha <sha>
 #   fetch-pr-body  --owner <o> --repo <r> --pr <n>         Fetch current PR body → /tmp/pr-body.md
 #   ensure-branch  --owner <o> --repo <r> --pr <n>         Checkout PR branch, stash if needed, pull
+#   review-mode    --owner <o> --repo <r> --pr <n>         Determine autosquash/preserve mode from latest human activity
 #   autosquash                                             Rebase --autosquash from merge-base
 #
 # Exit codes: 0 = success, 1 = error, 2 = needs user input (e.g. gh not authenticated)
@@ -143,12 +144,12 @@ case "$CMD" in
       const latestByUser = {}
       for (const r of pr.reviews.nodes) {
         const user = r.author?.login
-        if (!user || user === prAuthor || r.state === 'PENDING' || isBot(user)) continue
+        if (!user || user === currentUser || r.state === 'PENDING' || isBot(user)) continue
         const prev = latestByUser[user]
         if (!prev || new Date(r.submittedAt) > new Date(prev.submittedAt)) {
           latestByUser[user] = r
         }
-        if (!isAutomatedReviewer(user) && user !== currentUser) {
+        if (!isAutomatedReviewer(user)) {
           humanCommenters.add(user)
         }
       }
@@ -161,9 +162,9 @@ case "$CMD" in
 
       const topLevel = pr.comments.nodes.filter(c => {
         const user = c.author?.login
-        if (!user || user === prAuthor || isBot(user)) return false
+        if (!user || user === currentUser || isBot(user)) return false
         if ((c.body || '').includes('<!-- addressed:')) return false
-        if (!isAutomatedReviewer(user) && user !== currentUser) {
+        if (!isAutomatedReviewer(user)) {
           humanCommenters.add(user)
         }
         return !addressedIds.has(c.databaseId)
@@ -344,6 +345,112 @@ case "$CMD" in
     fi
     ;;
 
+  review-mode)
+    require_gh
+    if [[ -z "$OWNER" || -z "$REPO" || -z "$PR" ]]; then
+      echo "Error: --owner, --repo, --pr required" >&2; exit 1
+    fi
+
+    # Pull every reviews/comments/thread record (resolved or not) so we can find
+    # the most-recent human activity. The "fetch" subcommand only returns
+    # unresolved items, which would miss the case where the human's last action
+    # was an inline comment that's already been resolved.
+    gh api graphql \
+      -f query='query($owner: String!, $repo: String!, $number: Int!) {
+        repository(owner: $owner, name: $repo) {
+          pullRequest(number: $number) {
+            author { login }
+            reviewThreads(first: 100) {
+              nodes {
+                comments(first: 50) {
+                  nodes { createdAt author { login } }
+                }
+              }
+            }
+            reviews(last: 100) {
+              nodes { author { login } state submittedAt }
+            }
+            comments(last: 100) {
+              nodes { createdAt author { login } }
+            }
+          }
+        }
+      }' \
+      -f owner="$OWNER" -f repo="$REPO" -F number="$PR" \
+    | GH_USER=$(gh api user --jq '.login') node -e "
+      const fs = require('fs')
+      const data = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'))
+      const pr = data.data.repository.pullRequest
+      const prAuthor = pr.author?.login
+      const currentUser = process.env.GH_USER
+
+      const isBot = u => !u || u.includes('[bot]') || u === 'cursor'
+      const isAutomated = u => isBot(u) || u === 'chatgpt-codex-connector'
+      // Exclude only currentUser + bots/automated. Works uniformly for solo
+      // PRs (currentUser == prAuthor — author/self excluded) and collab PRs
+      // (currentUser != prAuthor — author is a peer reviewer, included).
+      const isHuman = u => u && u !== currentUser && !isAutomated(u)
+
+      const events = []
+
+      // Inline review comments (across all threads, resolved or not).
+      for (const t of pr.reviewThreads.nodes) {
+        for (const c of t.comments.nodes) {
+          if (isHuman(c.author?.login)) {
+            events.push({
+              type: 'inline',
+              user: c.author.login,
+              timestamp: c.createdAt,
+              state: null
+            })
+          }
+        }
+      }
+
+      // Formal review submissions.
+      for (const r of pr.reviews.nodes) {
+        const user = r.author?.login
+        if (!isHuman(user)) continue
+        if (r.state === 'PENDING') continue
+        events.push({
+          type: 'review',
+          user,
+          timestamp: r.submittedAt,
+          state: r.state
+        })
+      }
+
+      // Top-level PR comments.
+      for (const c of pr.comments.nodes) {
+        if (isHuman(c.author?.login)) {
+          events.push({
+            type: 'topLevel',
+            user: c.author.login,
+            timestamp: c.createdAt,
+            state: null
+          })
+        }
+      }
+
+      events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      const latest = events[0] || null
+
+      let mode
+      if (latest == null) {
+        mode = 'autosquash'
+      } else if (latest.type === 'review' && (latest.state === 'APPROVED' || latest.state === 'DISMISSED')) {
+        mode = 'autosquash'
+      } else {
+        mode = 'preserve'
+      }
+
+      process.stdout.write(JSON.stringify({
+        mode,
+        latestHumanActivity: latest
+      }) + '\n')
+    "
+    ;;
+
   autosquash)
     DEFAULT_UPSTREAM=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
       || echo "origin/$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')")
@@ -351,7 +458,7 @@ case "$CMD" in
     ;;
 
   *)
-    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|resolve-thread|mark-addressed|resolve-id|headline|fetch-pr-body|ensure-branch|autosquash} [args]" >&2
+    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|resolve-thread|mark-addressed|resolve-id|headline|fetch-pr-body|ensure-branch|review-mode|autosquash} [args]" >&2
     exit 1
     ;;
 esac
