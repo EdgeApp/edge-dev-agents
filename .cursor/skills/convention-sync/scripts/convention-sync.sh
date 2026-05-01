@@ -104,6 +104,30 @@ USER_README="$USER_DIR/README.md"
 REPO_ROOT_README="$REPO_DIR/README.md"
 LEGACY_REPO_README="$REPO_CURSOR/README.md"
 
+# Pull-before-push gate (user-to-repo only).
+# Fetches origin and detects whether the remote branch has commits we don't.
+# Dry-run includes the count for visibility; --stage/--commit aborts if > 0.
+ORIGIN_AHEAD=0
+ORIGIN_BRANCH=""
+if [[ "$DIRECTION" == "user-to-repo" ]]; then
+  if git -C "$REPO_DIR" fetch origin --quiet 2>/dev/null; then
+    current_branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    if [[ -n "$current_branch" && "$current_branch" != "HEAD" ]]; then
+      if git -C "$REPO_DIR" rev-parse --verify --quiet "origin/$current_branch" >/dev/null 2>&1; then
+        ORIGIN_AHEAD=$(git -C "$REPO_DIR" rev-list --count "HEAD..origin/$current_branch" 2>/dev/null || echo 0)
+        ORIGIN_BRANCH="origin/$current_branch"
+      fi
+    fi
+  fi
+fi
+
+if [[ "$DO_STAGE" == "true" && "$ORIGIN_AHEAD" -gt 0 ]]; then
+  echo "ERROR: $ORIGIN_BRANCH is $ORIGIN_AHEAD commit(s) ahead of local HEAD." >&2
+  echo "Pull first to integrate remote changes, then re-run convention-sync:" >&2
+  echo "  cd $REPO_DIR && git pull --rebase" >&2
+  exit 1
+fi
+
 # Load ignore patterns from .syncignore (one glob per line, # comments, blank lines skipped)
 ignore_patterns=()
 if [[ -f "$SYNCIGNORE" ]]; then
@@ -130,6 +154,46 @@ new_json="[]"
 mod_json="[]"
 del_json="[]"
 ignored_json="[]"
+warnings_json="[]"
+
+repo_path_for() {
+  # Translate a sync entry (e.g. "skills/foo.sh" or "README.md") into the
+  # path used inside the repo so git log can look up history.
+  local entry="$1"
+  if [[ "$entry" == "README.md" ]]; then
+    printf '%s\n' "README.md"
+  else
+    printf '%s\n' ".cursor/$entry"
+  fi
+}
+
+local_path_for() {
+  local entry="$1"
+  if [[ "$entry" == "README.md" ]]; then
+    printf '%s\n' "$USER_DIR/README.md"
+  else
+    printf '%s\n' "$USER_DIR/$entry"
+  fi
+}
+
+file_mtime() {
+  local f="$1"
+  stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null || true
+}
+
+last_commit_ts() {
+  git -C "$REPO_DIR" log -1 --format=%ct -- "$1" 2>/dev/null || true
+}
+
+last_commit_short() {
+  git -C "$REPO_DIR" log -1 --format='%h %s' -- "$1" 2>/dev/null || true
+}
+
+add_warning() {
+  warnings_json=$(echo "$warnings_json" | jq \
+    --arg f "$1" --arg k "$2" --arg c "$3" \
+    '. + [{file: $f, kind: $k, lastCommit: $c}]')
+}
 
 compare_readme() {
   local source_readme="$1"
@@ -202,6 +266,49 @@ else
 fi
 
 total=$(echo "$new_json $mod_json $del_json" | jq -s '.[0] + .[1] + .[2] | length')
+
+# Compute upstream-divergence warnings (user-to-repo only).
+# Compares each affected path's most-recent commit timestamp to the local
+# file's mtime. If the upstream commit is newer, the local copy is likely
+# stale and overwriting would clobber another machine's work.
+if [[ "$DIRECTION" == "user-to-repo" ]]; then
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    repo_p="$(repo_path_for "$entry")"
+    local_p="$(local_path_for "$entry")"
+    commit_ts="$(last_commit_ts "$repo_p")"
+    [[ -z "$commit_ts" ]] && continue
+    local_mtime="$(file_mtime "$local_p")"
+    [[ -z "$local_mtime" ]] && continue
+    if [[ "$commit_ts" -gt "$local_mtime" ]]; then
+      add_warning "$entry" "stale-local" "$(last_commit_short "$repo_p")"
+    fi
+  done < <(echo "$mod_json" | jq -r '.[]')
+
+  # New files: warn if path has prior history (re-adding something previously
+  # deleted upstream after our local was last written).
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    repo_p="$(repo_path_for "$entry")"
+    local_p="$(local_path_for "$entry")"
+    commit_ts="$(last_commit_ts "$repo_p")"
+    [[ -z "$commit_ts" ]] && continue
+    local_mtime="$(file_mtime "$local_p")"
+    [[ -z "$local_mtime" ]] && continue
+    if [[ "$commit_ts" -gt "$local_mtime" ]]; then
+      add_warning "$entry" "re-adding-deleted" "$(last_commit_short "$repo_p")"
+    fi
+  done < <(echo "$new_json" | jq -r '.[]')
+
+  # Deletions: always warn — no local mtime to compare against.
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    repo_p="$(repo_path_for "$entry")"
+    last_c="$(last_commit_short "$repo_p")"
+    [[ -z "$last_c" ]] && continue
+    add_warning "$entry" "deletion" "$last_c"
+  done < <(echo "$del_json" | jq -r '.[]')
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -297,7 +404,10 @@ jq -n \
   --argjson modified "$mod_json" \
   --argjson deleted "$del_json" \
   --argjson ignored "$ignored_json" \
+  --argjson warnings "$warnings_json" \
   --argjson total "$total" \
+  --argjson originAhead "$ORIGIN_AHEAD" \
+  --arg originBranch "$ORIGIN_BRANCH" \
   --arg staged "$DO_STAGE" \
   --arg committed "$DO_COMMIT" \
-  '{repoDir: $repoDir, total: $total, new: $new, modified: $modified, deleted: $deleted, ignored: $ignored, staged: ($staged == "true"), committed: ($committed == "true")}'
+  '{repoDir: $repoDir, originBranch: $originBranch, originAhead: $originAhead, total: $total, new: $new, modified: $modified, deleted: $deleted, ignored: $ignored, warnings: $warnings, staged: ($staged == "true"), committed: ($committed == "true")}'
