@@ -6,16 +6,24 @@
 //   PR URLs:        https://github.com/EdgeApp/edge-react-gui/pull/123
 //   PR shorthand:   edge-react-gui#123
 //   Asana tasks:    https://app.asana.com/0/<project>/<taskGid>
-//   No args:        all EdgeApp repos (branch-prefix scan)
+//   --branch-scan:  scan all EdgeApp repos for $GIT_BRANCH_PREFIX/* PRs
+//   No args:        Asana "PR Pipeline" section, incomplete tasks assigned to me
+//
+// No args (default): queries the configured Asana section, filters to incomplete
+// tasks assigned to the current Asana user (resolved via asana-whoami.sh), and
+// walks each task's attachments + subtasks for GitHub PR links. Tasks without a
+// PR link are reported in `errors` but do not block. Requires ASANA_TOKEN.
 //
 // Explicit PRs (URL/shorthand) are fetched directly — no branch-prefix filter.
-// Asana tasks are resolved to linked GitHub PRs via the Asana API (requires ASANA_TOKEN).
-// Repo names trigger the original branch-prefix scan.
+// Asana tasks are resolved to linked GitHub PRs via the Asana API.
+// Repo names trigger a branch-prefix scan of those repos.
+// --branch-scan triggers the legacy no-args behavior (all EdgeApp repos).
 
 const { spawnSync } = require("child_process");
 const https = require("https");
+const path = require("path");
 
-const args = process.argv.slice(2);
+const rawArgs = process.argv.slice(2);
 const edgeAppRepos = [
   "edge-react-gui",
   "edge-exchange-plugins",
@@ -24,6 +32,24 @@ const edgeAppRepos = [
   "edge-login-ui-rn",
   "edge-currency-plugins",
 ];
+
+// "🔍 Review/Publish" section in the EdgeApp PR Pipeline project — the no-args queue.
+// Project: https://app.asana.com/1/9976422036640/project/1213880789473005
+// Resolved via: GET /projects/1213880789473005/sections
+const ASANA_PR_LAND_SECTION_GID = "1214062531915722";
+
+const BRANCH_PREFIX = process.env.GIT_BRANCH_PREFIX || "jon";
+
+// Parse flags out of args (the rest is classified below).
+let useBranchScan = false;
+const args = [];
+for (const arg of rawArgs) {
+  if (arg === "--branch-scan") {
+    useBranchScan = true;
+  } else {
+    args.push(arg);
+  }
+}
 
 // --- Argument classification ---
 
@@ -51,13 +77,15 @@ for (const arg of args) {
   }
 }
 
-// If no args at all, default to scanning all repos
+// No-args default = Asana section scan (handled in main()).
+// --branch-scan with no other args = scan all EdgeApp repos for branch-prefix PRs.
+// Otherwise scan only explicitly named repos.
+const noArgs = args.length === 0;
 const scanRepos =
-  args.length === 0
+  useBranchScan && repoArgs.length === 0
     ? edgeAppRepos
-    : repoArgs.length > 0
-      ? repoArgs
-      : [];
+    : repoArgs;
+const useAsanaSection = noArgs && !useBranchScan;
 
 // --- Helpers ---
 
@@ -143,6 +171,41 @@ async function main() {
   requireGh();
 
   const results = { prs: [], errors: [] };
+
+  // 0. No-args: pull task GIDs from the configured Asana section, filtered to
+  //    incomplete tasks assigned to the current user. They flow through the
+  //    same Asana resolution path below as if the user passed task URLs.
+  if (useAsanaSection) {
+    if (!process.env.ASANA_TOKEN) {
+      results.errors.push(
+        "No-args mode requires ASANA_TOKEN. Set it, pass repo/PR/task args, or use --branch-scan."
+      );
+    } else {
+      try {
+        const whoami = spawnSync(
+          path.join(__dirname, "..", "..", "asana-whoami.sh"),
+          [],
+          { encoding: "utf8" }
+        );
+        if (whoami.status !== 0) {
+          throw new Error(`asana-whoami.sh failed: ${(whoami.stderr || "").trim()}`);
+        }
+        const userGid = whoami.stdout.trim();
+
+        const sectionTasks = await asanaGet(
+          `/sections/${ASANA_PR_LAND_SECTION_GID}/tasks` +
+            `?opt_fields=name,assignee.gid,completed&completed_since=now&limit=100`
+        );
+        for (const t of sectionTasks) {
+          if (t.completed) continue;
+          if (!t.assignee || t.assignee.gid !== userGid) continue;
+          asanaGids.push(t.gid);
+        }
+      } catch (e) {
+        results.errors.push(`Asana section scan: ${e.message}`);
+      }
+    }
+  }
 
   // 1. Resolve Asana tasks → explicit PRs
   // GitHub integration attachments are the source of truth.
@@ -285,7 +348,7 @@ async function main() {
       const repo = repoData.name;
 
       for (const pr of repoData.pullRequests.nodes) {
-        if (!pr.headRefName.startsWith("jon/")) continue;
+        if (!pr.headRefName.startsWith(`${BRANCH_PREFIX}/`)) continue;
 
         const { approved, changesRequested, reviewers } = extractReviewers(
           pr.reviews.nodes

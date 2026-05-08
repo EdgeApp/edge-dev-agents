@@ -10,8 +10,9 @@ metadata:
 
 <usage>
 ```
-/pr-land                                          # All EdgeApp repos with $GIT_BRANCH_PREFIX/* PRs
-/pr-land edge-react-gui                           # Specific repo
+/pr-land                                          # Asana "PR Pipeline" section, incomplete tasks assigned to me
+/pr-land --branch-scan                            # All EdgeApp repos with $GIT_BRANCH_PREFIX/* PRs (legacy)
+/pr-land edge-react-gui                           # Specific repo (branch-prefix scan)
 /pr-land edge-react-gui edge-core-js              # Multiple repos
 /pr-land edge-react-gui#123                       # Specific PR (shorthand)
 /pr-land https://github.com/EdgeApp/edge-react-gui/pull/123  # Specific PR (URL)
@@ -21,10 +22,11 @@ metadata:
 ```
 
 Arguments are classified automatically:
-- **Repo names** → branch-prefix scan (original behavior)
-- **PR URLs / shorthand** (`repo#N`) → fetched directly, no branch-prefix filter
+- **No args** → queries the configured Asana "PR Pipeline" section (GID hardcoded in `pr-land-discover.sh`), filters to incomplete tasks assigned to the current Asana user (resolved from `ASANA_TOKEN` via `~/.cursor/skills/asana-whoami.sh`), and walks each task's attachments + subtasks for GitHub PR links. Tasks with no PR link are reported in `errors` but do not block.
+- **`--branch-scan`** → legacy behavior: scans all EdgeApp repos for `$GIT_BRANCH_PREFIX/*` PRs.
+- **Repo names** → branch-prefix scan, limited to the named repos.
+- **PR URLs / shorthand** (`repo#N`) → fetched directly, no branch-prefix filter.
 - **Asana task URLs** → resolved to linked GitHub PRs via Asana API (requires `ASANA_TOKEN`). Parent tasks are walked: each subtask's attachments are scanned for PRs; subtasks without a linked PR are skipped silently (e.g. a verification-only subtask).
-- **No args** → scans all EdgeApp repos
 </usage>
 
 <rules description="Non-negotiable constraints.">
@@ -80,8 +82,8 @@ ONE tool call:
 ~/.cursor/skills/pr-land/scripts/pr-land-discover.sh [args...]
 ```
 
-Args can be repo names, PR URLs, PR shorthand (`repo#N`), or Asana task URLs (mixed freely).
-No args = scan all EdgeApp repos for `$GIT_BRANCH_PREFIX/*` PRs.
+Args can be repo names, PR URLs, PR shorthand (`repo#N`), Asana task URLs (mixed freely), or `--branch-scan`.
+No args = pull incomplete tasks assigned to me from the Asana "PR Pipeline" section and walk each for PR attachments + subtask PR attachments. Use `--branch-scan` for the legacy "scan all EdgeApp repos for `$GIT_BRANCH_PREFIX/*` PRs" behavior.
 
 Returns JSON: `{ "prs": [...], "errors": [...] }`. Each PR has `repo`, `prNumber`, `branch`, `title`, `approved`, `changesRequested`, `reviewers`. Errors include Asana resolution failures or PR fetch failures.
 
