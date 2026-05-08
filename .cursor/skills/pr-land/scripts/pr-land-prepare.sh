@@ -235,15 +235,10 @@ async function prepareBranch(repo, branch) {
     return result;
   }
 
-  // Step 6: Run verification.
-  // Lint is skipped: PR was already lint-validated by CI at PR creation,
-  // and any /pr-land-introduced fixups go through lint-commit.sh's eslint --fix.
-  // Re-running eslint here would block on pre-existing baseline debt unrelated
-  // to this PR.
+  // Step 6: Run verification (lint scoped to files changed vs upstream)
   console.error("\nRunning verification...");
   const verifyResult = runVerification(repoDir, upstream, {
     skipInstall: true,
-    skipLint: true,
   });
 
   if (!verifyResult.success) {

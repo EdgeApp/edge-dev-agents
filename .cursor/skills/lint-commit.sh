@@ -210,6 +210,18 @@ fi
 if node -e "process.exit(require('./package.json').scripts?.['update-eslint-warnings'] ? 0 : 1)" 2>/dev/null; then
   echo ">> update-eslint-warnings"
   npm run --silent update-eslint-warnings
+
+  # Safety net: update-eslint-warnings (or any repo-side script) may have
+  # auto-staged config changes that introduce errors — e.g., naively
+  # graduating a file off a warning-override list when the file still has
+  # demoted rule violations. Re-validate; if eslint now fails, restore
+  # eslint.config.mjs so the bad config can't ride into a commit.
+  if [[ ${#LINT_FILES[@]} -gt 0 ]] && ! ./node_modules/.bin/eslint --quiet "${LINT_FILES[@]}" 2>/dev/null; then
+    echo "Error: post-graduation lint failed. Restoring eslint.config.mjs and aborting." >&2
+    git checkout HEAD -- eslint.config.mjs 2>/dev/null || true
+    git reset HEAD -- eslint.config.mjs 2>/dev/null || true
+    exit 1
+  fi
 fi
 
 if [[ "$PRIMARY_SCOPE_DECLARED" == "true" ]]; then

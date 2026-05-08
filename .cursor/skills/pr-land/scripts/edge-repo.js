@@ -73,10 +73,9 @@ function runVerification(repoDir, baseRef, options = {}) {
   const baseArg = baseRef != null ? ` --base "${baseRef}"` : "";
   const changelogArg = options.requireChangelog ? " --require-changelog" : "";
   const skipInstallArg = options.skipInstall ? " --skip-install" : "";
-  const skipLintArg = options.skipLint ? " --skip-lint" : "";
   try {
     execSync(
-      `node "${verifyScript}" "${repoDir}"${baseArg}${changelogArg}${skipInstallArg}${skipLintArg}`,
+      `node "${verifyScript}" "${repoDir}"${baseArg}${changelogArg}${skipInstallArg}`,
       { stdio: "inherit", encoding: "utf8" }
     );
     return { success: true };

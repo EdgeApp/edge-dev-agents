@@ -1,13 +1,10 @@
 #!/usr/bin/env node
 // verify-repo.sh
 // Runs full verification: CHANGELOG + code verification (prepare, tsc, lint, test)
-// Usage: ./verify-repo.sh [repo-dir] [--base <upstream-ref>] [--skip-install] [--skip-lint]
+// Usage: ./verify-repo.sh [repo-dir] [--base <upstream-ref>] [--skip-install]
 // If repo-dir not provided, uses current directory
 // If --base is provided, lint is scoped to files changed vs that ref
 // If --skip-install is provided, skips the initial `yarn` dependency install
-// If --skip-lint is provided, skips the eslint step entirely
-//   (used by /pr-land, where lint is already validated by CI at PR creation
-//    and by lint-commit.sh on every fixup commit added during the run).
 //
 // Exit codes:
 //   0 = All verification passed
@@ -24,12 +21,11 @@ const os = require("os");
 // (tsc, eslint, jest) inherit this via execSync.
 process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS ?? ""} --max-old-space-size=8192`.trim();
 
-// Parse arguments: positional repo-dir + optional flags
+// Parse arguments: positional repo-dir + optional --base <ref> + optional --require-changelog
 let repoDir = process.cwd();
 let baseRef = null;
 let requireChangelog = false;
 let skipInstall = false;
-let skipLint = false;
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--base" && i + 1 < args.length) {
@@ -38,8 +34,6 @@ for (let i = 0; i < args.length; i++) {
     requireChangelog = true;
   } else if (args[i] === "--skip-install") {
     skipInstall = true;
-  } else if (args[i] === "--skip-lint") {
-    skipLint = true;
   } else if (!args[i].startsWith("--")) {
     repoDir = args[i];
   }
@@ -262,11 +256,6 @@ function verifyCode() {
   for (const cmd of commands) {
     if (scripts[cmd] == null) {
       console.log(`⏭  yarn ${cmd} - skipped (not in package.json)`);
-      continue;
-    }
-
-    if (cmd === "lint" && skipLint) {
-      console.log("⏭  yarn lint - skipped (--skip-lint)");
       continue;
     }
 

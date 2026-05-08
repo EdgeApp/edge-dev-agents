@@ -143,10 +143,16 @@ function asanaGet(path) {
 }
 
 function extractReviewers(reviews) {
+  // Per GitHub semantics, only APPROVED / CHANGES_REQUESTED / DISMISSED change
+  // a reviewer's effective state. COMMENTED (and PENDING) are informational and
+  // must not shadow a prior APPROVED — otherwise an approver who later leaves a
+  // comment-thread reply drops off the approver list.
+  const STATE_CHANGING = new Set(["APPROVED", "CHANGES_REQUESTED", "DISMISSED"]);
   const latestByUser = {};
   for (const r of reviews) {
     const login = r.author?.login;
     if (!login) continue;
+    if (!STATE_CHANGING.has(r.state)) continue;
     if (
       !latestByUser[login] ||
       new Date(r.submittedAt) > new Date(latestByUser[login].submittedAt)

@@ -54,7 +54,7 @@ Arguments are classified automatically:
 | `pr-land-comments.sh` | Check for recent unaddressed feedback (inline threads, review bodies, top-level comments) |
 | `git-branch-ops.sh` | Shared autosquash / push helper for explicit git branch actions |
 | `pr-land-prepare.sh` | Rebase + conflict detection + verification |
-| `verify-repo.sh` | Verification (CHANGELOG + code; `/pr-land` always passes `--skip-lint` — lint is trusted from CI at PR creation and from `lint-commit.sh` on any /pr-land-introduced fixups) |
+| `verify-repo.sh` | Verification (CHANGELOG + code; lint scoped to changed files when `--base` given) |
 | `pr-land-merge.sh` | Rebase + verify + merge via GitHub API |
 | `pr-land-publish.sh` | Version bump, changelog update, commit + tag (no push) |
 | `staging-cherry-pick.sh` | Cherry-pick merged PR commits onto staging (see `/staging-cherry-pick` skill) |
