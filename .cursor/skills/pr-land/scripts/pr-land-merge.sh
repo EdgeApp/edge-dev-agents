@@ -327,9 +327,11 @@ async function main() {
     console.error("✓ Pushed");
 
     // STEP 3: Run local verification (MANDATORY — no bypass)
+    // Lint is skipped per /pr-land policy (already validated by CI + lint-commit.sh).
     console.error("Running local verification (MANDATORY)...");
     const verification = runVerification(repoDir, getUpstreamBranch(repo), {
       skipInstall: true,
+      skipLint: true,
     });
 
     if (!verification.success) {
