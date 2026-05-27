@@ -37,7 +37,7 @@ const QUERY = `
 query($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
-      author { login }
+      author { __typename login }
       commits(last: 1) {
         nodes { commit { committedDate } }
       }
@@ -49,7 +49,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
             nodes {
               databaseId
               createdAt
-              author { login }
+              author { __typename login }
               path
               body
             }
@@ -59,7 +59,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
       reviews(last: 50) {
         nodes {
           databaseId
-          author { login }
+          author { __typename login }
           state
           body
           submittedAt
@@ -69,7 +69,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
         nodes {
           databaseId
           createdAt
-          author { login }
+          author { __typename login }
           body
         }
       }
@@ -91,7 +91,12 @@ function extractAddressedIds(comments) {
   return ids
 }
 
-function isBot(login) {
+function isBot(author) {
+  // GraphQL distinguishes bots via __typename === "Bot". REST callers append
+  // "[bot]" to logins; keep the suffix check as a defensive fallback.
+  if (!author) return true
+  if (author.__typename === "Bot") return true
+  const login = typeof author === "string" ? author : author.login
   return !login || login.includes("[bot]")
 }
 
@@ -135,11 +140,13 @@ async function main() {
     for (const thread of pr.reviewThreads.nodes) {
       if (thread.isResolved) continue
       for (const c of thread.comments.nodes) {
+        if (isBot(c.author)) continue
+        if (c.author?.login === currentUser) continue
         if (new Date(c.createdAt) > lastCommitDate) {
           recentComments.push({
             type: "inline",
-          threadId: thread.id,
-          commentId: c.databaseId,
+            threadId: thread.id,
+            commentId: c.databaseId,
             user: c.author?.login,
             path: c.path,
             body: c.body?.slice(0, 200)
@@ -152,7 +159,7 @@ async function main() {
     for (const r of pr.reviews.nodes) {
       const user = r.author?.login
       if (!user || user === currentUser || r.state === "PENDING") continue
-      if (isBot(user)) continue
+      if (isBot(r.author)) continue
       const prev = latestByUser[user]
       if (
         !prev ||
@@ -177,7 +184,7 @@ async function main() {
 
     for (const c of pr.comments.nodes) {
       const user = c.author?.login
-      if (!user || user === currentUser || isBot(user)) continue
+      if (!user || user === currentUser || isBot(c.author)) continue
       if ((c.body || "").includes("<!-- addressed:")) continue
       if (addressedIds.has(c.databaseId)) continue
       if (new Date(c.createdAt) > lastCommitDate) {

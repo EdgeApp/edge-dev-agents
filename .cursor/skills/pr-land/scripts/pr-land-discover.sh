@@ -113,8 +113,9 @@ function ghGraphql(query, variables = {}) {
   return parsed.data;
 }
 
-function ghApi(endpoint) {
-  const result = spawnSync("gh", ["api", endpoint], { encoding: "utf8" });
+function ghApi(endpoint, { paginate = false } = {}) {
+  const args = paginate ? ["api", "--paginate", endpoint] : ["api", endpoint];
+  const result = spawnSync("gh", args, { encoding: "utf8" });
   if (result.status !== 0) {
     throw new Error(`gh api failed: ${(result.stderr || "").trim()}`);
   }
@@ -161,9 +162,16 @@ function extractReviewers(reviews) {
     }
   }
   const reviewers = Object.values(latestByUser);
+  // Latest state-changing review wins for aggregate flags. A stale
+  // CHANGES_REQUESTED from a reviewer who hasn't engaged in months should not
+  // block when a later reviewer has since approved. The per-user `reviewers`
+  // array still surfaces everyone's latest state for visibility.
+  const latest = reviewers
+    .slice()
+    .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))[0];
   return {
-    approved: reviewers.some((r) => r.state === "APPROVED"),
-    changesRequested: reviewers.some((r) => r.state === "CHANGES_REQUESTED"),
+    approved: latest?.state === "APPROVED",
+    changesRequested: latest?.state === "CHANGES_REQUESTED",
     reviewers: reviewers.map((r) => ({
       user: r.author.login,
       state: r.state,
@@ -287,8 +295,13 @@ async function main() {
   for (const { repo, prNumber } of explicitPrs) {
     try {
       const pr = ghApi(`repos/EdgeApp/${repo}/pulls/${prNumber}`);
+      // Paginate: PRs with extensive review history (e.g. cursor[bot] +
+      // back-and-forth) can have hundreds of review records, and the user's
+      // APPROVED is often the LAST review. Without --paginate we'd silently
+      // miss approvals past the first 30.
       const reviewsRaw = ghApi(
-        `repos/EdgeApp/${repo}/pulls/${prNumber}/reviews`
+        `repos/EdgeApp/${repo}/pulls/${prNumber}/reviews`,
+        { paginate: true }
       );
       const { approved, changesRequested, reviewers } = extractReviewers(
         reviewsRaw.map((r) => ({

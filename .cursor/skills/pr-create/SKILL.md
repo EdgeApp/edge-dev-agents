@@ -1,7 +1,7 @@
 ---
 name: pr-create
 description: Create a pull request from the current branch, with optional Asana attach.
-compatibility: Requires git, gh, node, jq. ASANA_TOKEN for Asana updates. ASANA_GITHUB_SECRET for Asana PR attachment.
+compatibility: Requires git, gh, node, jq. ASANA_TOKEN for Asana updates. ASANA_GITHUB_SECRET is OPTIONAL — only consumed by the `--asana-attach` widget path; the Asana link in the PR body works without it.
 metadata:
   author: j0ntz
 ---

@@ -71,9 +71,13 @@ if [[ -z "${ASANA_TOKEN:-}" ]]; then
   exit 1
 fi
 
+# --attach-pr is OPTIONAL on a workspace where the Asana ↔ GitHub widget
+# integration is disabled. If the secret is missing, skip the widget call with
+# a warning rather than failing — the canonical Asana ↔ PR link lives in the PR
+# body (injected by /pr-create) and downstream skills do not need the widget.
 if $DO_ATTACH && [[ -z "${ASANA_GITHUB_SECRET:-}" ]]; then
-  echo "Error: ASANA_GITHUB_SECRET not set (required for --attach-pr)" >&2
-  exit 1
+  echo ">> PR attach: skipped (ASANA_GITHUB_SECRET not set; widget integration not configured)" >&2
+  DO_ATTACH=false
 fi
 
 ASANA_API="https://app.asana.com/api/1.0"
@@ -138,7 +142,9 @@ if $DO_ATTACH; then
     exit 1
   fi
 
-  ATTACH_RESULT=$(curl -s -X POST "https://github.integrations.asana.plus/custom/v1/actions/widget" \
+  ATTACH_BODY_FILE=$(mktemp)
+  ATTACH_HTTP_CODE=$(curl -sS -o "$ATTACH_BODY_FILE" -w "%{http_code}" \
+    -X POST "https://github.integrations.asana.plus/custom/v1/actions/widget" \
     -H "Authorization: Bearer $ASANA_GITHUB_SECRET" \
     -H "Content-Type: application/json" \
     -d "{
@@ -148,10 +154,20 @@ if $DO_ATTACH; then
       \"pullRequestName\": $(jq -Rn --arg v "$PR_TITLE" '$v'),
       \"pullRequestNumber\": $PR_NUMBER,
       \"pullRequestURL\": \"$PR_URL\"
-    }" 2>&1)
+    }" 2>/dev/null || echo "000")
 
-  ATTACH_STATUS=$(echo "$ATTACH_RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0].get('result','unknown'))" 2>/dev/null || echo "error: $ATTACH_RESULT")
-  echo ">> PR attach: $ATTACH_STATUS"
+  if [[ "$ATTACH_HTTP_CODE" =~ ^(401|403|404)$ ]]; then
+    # Asana ↔ GitHub widget integration is disabled at the workspace level
+    # (or the secret is invalid). Skip gracefully — the PR body's Asana link
+    # is the canonical link and downstream skills do not need the widget.
+    echo ">> PR attach: skipped (integration returned $ATTACH_HTTP_CODE; widget integration disabled or secret invalid)" >&2
+  elif [[ "$ATTACH_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+    ATTACH_STATUS=$(python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0].get('result','unknown'))" <"$ATTACH_BODY_FILE" 2>/dev/null || echo "ok (unparseable)")
+    echo ">> PR attach: $ATTACH_STATUS"
+  else
+    echo ">> PR attach: failed (HTTP $ATTACH_HTTP_CODE): $(cat "$ATTACH_BODY_FILE")" >&2
+  fi
+  rm -f "$ATTACH_BODY_FILE"
 fi
 
 if $DO_ASSIGN || [[ -n "$SET_REVIEWER_GID" ]] || [[ -n "$SET_IMPLEMENTOR_GID" ]] || $AUTO_EST_REVIEW || [[ -n "$SET_PRIORITY_GID" ]] || [[ -n "$SET_PLANNED_GID" ]]; then

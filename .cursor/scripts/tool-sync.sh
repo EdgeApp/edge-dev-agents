@@ -259,6 +259,7 @@ sync_opencode() {
     # Skill dirs with SKILL.md + scripts/
     for skill_dir in "$CURSOR_DIR"/skills/*/; do
       [[ -d "$skill_dir" ]] || continue
+      skill_dir="${skill_dir%/}"  # strip trailing slash from glob
       local name
       name=$(basename "$skill_dir")
       if [[ -f "$skill_dir/SKILL.md" ]]; then
@@ -323,6 +324,7 @@ sync_claude() {
   if [[ -d "$CURSOR_DIR/skills" ]]; then
     for skill_dir in "$CURSOR_DIR"/skills/*/; do
       [[ -d "$skill_dir" ]] || continue
+      skill_dir="${skill_dir%/}"  # strip trailing slash from glob
       local name
       name=$(basename "$skill_dir")
       if [[ -f "$skill_dir/SKILL.md" ]]; then

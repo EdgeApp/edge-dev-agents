@@ -1,0 +1,51 @@
+# Interaction-only companion to buy-quote.yaml: PIN login -> Buy tab -> enter $500.
+# Captures nothing — capture-buy-quote.sh grabs the proof screenshot externally
+# (see that script for why an external burst beats an in-flow screenshot on this build).
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  PIN_DIGIT: "1"
+  BUY_AMOUNT: "500"
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Exit PIN"
+    timeout: 40000
+- assertVisible: "1"
+- assertVisible: "0"
+- tapOn:
+    text: ${PIN_DIGIT}
+    waitToSettleTimeoutMs: 900
+- tapOn:
+    text: ${PIN_DIGIT}
+    waitToSettleTimeoutMs: 900
+- tapOn:
+    text: ${PIN_DIGIT}
+    waitToSettleTimeoutMs: 900
+- tapOn:
+    text: ${PIN_DIGIT}
+    waitToSettleTimeoutMs: 1500
+- extendedWaitUntil:
+    visible: "Buy"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: "Security is Our Priority"
+    commands:
+      - tapOn: "Cancel"
+- runFlow:
+    when:
+      visible: "How Did You Discover Edge?"
+    commands:
+      - tapOn: "Dismiss"
+- runFlow:
+    when:
+      visible: "Claim Your Web3 Handle"
+    commands:
+      - tapOn: "Not Now"
+- tapOn: "Buy"
+- extendedWaitUntil:
+    visible: "Amount USD"
+    timeout: 15000
+- tapOn: "Amount USD"
+- inputText: ${BUY_AMOUNT}

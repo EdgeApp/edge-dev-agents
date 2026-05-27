@@ -234,28 +234,37 @@ function verifyCode() {
   const scripts = pkg.scripts || {};
   const commands = ["prepare", "tsc", "lint", "test"];
 
+  // Detect package manager: package-lock.json → npm, yarn.lock → yarn, neither → npm.
+  // If both exist (recently-migrated repos), prefer npm.
+  const hasNpmLock = existsSync(path.join(repoDir, "package-lock.json"));
+  const hasYarnLock = existsSync(path.join(repoDir, "yarn.lock"));
+  const PM = hasNpmLock ? "npm" : hasYarnLock ? "yarn" : "npm";
+  // Run-script forms: `npm run <cmd>` vs `yarn <cmd>`. Install: `npm install --no-audit --no-fund` vs `yarn install`.
+  const installCmd = PM === "npm" ? "npm install --no-audit --no-fund" : "yarn install";
+  const runCmd = (cmd) => PM === "npm" ? `npm run ${cmd}` : `yarn ${cmd}`;
+
   console.log("");
-  console.log("Code verification:");
+  console.log(`Code verification (using ${PM}):`);
 
   if (!skipInstall) {
-    console.log("▶  yarn...");
-    const installResult = runCommandWithLog("yarn", "yarn-install", repoDir);
+    console.log(`▶  ${installCmd}...`);
+    const installResult = runCommandWithLog(installCmd, `${PM}-install`, repoDir);
     if (!installResult.success) {
-      console.error(`✗  yarn - FAILED (log: ${installResult.logPath})\n`);
+      console.error(`✗  ${installCmd} - FAILED (log: ${installResult.logPath})\n`);
       return {
         success: false,
-        failedStep: "yarn",
+        failedStep: installCmd,
         logPath: installResult.logPath,
       };
     }
-    console.log("✓  yarn - passed\n");
+    console.log(`✓  ${installCmd} - passed\n`);
   } else {
-    console.log("⏭  yarn - skipped (--skip-install)");
+    console.log(`⏭  ${PM} install - skipped (--skip-install)`);
   }
 
   for (const cmd of commands) {
     if (scripts[cmd] == null) {
-      console.log(`⏭  yarn ${cmd} - skipped (not in package.json)`);
+      console.log(`⏭  ${runCmd(cmd)} - skipped (not in package.json)`);
       continue;
     }
 
@@ -273,7 +282,7 @@ function verifyCode() {
       }
 
       if (changedFiles.length === 0) {
-        console.log("⏭  yarn lint - skipped (no lintable files changed)");
+        console.log(`⏭  ${runCmd("lint")} - skipped (no lintable files changed)`);
         continue;
       }
 
@@ -297,17 +306,18 @@ function verifyCode() {
       };
     }
 
-    console.log(`▶  yarn ${cmd}...`);
-    const yarnResult = runCommandWithLog(`yarn ${cmd}`, `yarn-${cmd}`, repoDir);
-    if (yarnResult.success) {
-      console.log(`✓  yarn ${cmd} - passed\n`);
+    const fullCmd = runCmd(cmd);
+    console.log(`▶  ${fullCmd}...`);
+    const result = runCommandWithLog(fullCmd, `${PM}-${cmd}`, repoDir);
+    if (result.success) {
+      console.log(`✓  ${fullCmd} - passed\n`);
       continue;
     }
-    console.error(`✗  yarn ${cmd} - FAILED (log: ${yarnResult.logPath})\n`);
+    console.error(`✗  ${fullCmd} - FAILED (log: ${result.logPath})\n`);
     return {
       success: false,
-      failedStep: `yarn ${cmd}`,
-      logPath: yarnResult.logPath,
+      failedStep: fullCmd,
+      logPath: result.logPath,
     };
   }
 
