@@ -1,0 +1,133 @@
+---
+name: build-and-test
+description: Run build and test verification for the active repo. Detects edge-react-gui and runs a real iOS UI test via maestro (Buy $500 quote with proof screenshot); detects Node/TypeScript repos and runs `tsc --noEmit` + smoke checks; falls back to a placeholder ack for unknown repo shapes. Use during the Testing phase of /one-shot.
+metadata:
+  author: j0ntz
+---
+
+<goal>
+Verify the active repo builds cleanly before /one-shot marks a task complete. Returns a clear PASS/FAIL signal the caller can include in the Asana summary or use to gate the watch loop.
+</goal>
+
+<rules description="Non-negotiable constraints.">
+<rule id="autodetect-repo-shape">Inspect the current working directory to decide what to run:
+1. If `package.json` `name` is `edge-react-gui` → iOS UI test (maestro) path (step 0). Check this first.
+2. Else if `package.json` exists and a `tsconfig.json` exists → Node + TypeScript path (step 1).
+3. Else if `package.json` exists with a `test` script but no tsconfig → Node path (step 2).
+4. If `Cargo.toml` exists → not implemented yet, fall through to placeholder.
+5. Otherwise → placeholder mode (step 3).</rule>
+<rule id="report-failures-actionable">On FAIL, surface the exact command, exit code, and last 30 lines of output. Do not try to fix anything inside this skill — the caller decides whether to amend or block.</rule>
+<rule id="no-mutation">This skill does NOT edit source code, commit, push, or change Asana state. It runs verification commands and reports results only.</rule>
+<rule id="scripts-over-inline">Deterministic operations (sim selection, RN build, capture loop) MUST run via the companion scripts under `~/.cursor/skills/build-and-test/scripts/`. Do not inline their logic as raw bash blocks in this SKILL.md or in agent reasoning.</rule>
+<rule id="npm-only-for-edge-react-gui">edge-react-gui uses npm (package-lock.json present, no yarn.lock). All scripts in this skill use npm. Never invoke `yarn` against edge-react-gui.</rule>
+</rules>
+
+<step id="0" name="iOS UI test (maestro) — edge-react-gui only">
+
+A real on-simulator UI test that logs into the pre-provisioned test account, navigates to the Buy tab, requests a $500 quote, and captures a proof screenshot. PASS requires the screenshot to actually render the resolved quote.
+
+### 0a. Prerequisites (check, install if missing)
+
+- `xcrun -version` → Xcode CLT
+- `maestro --version` → install with `curl -Ls "https://get.maestro.mobile.dev" | bash`, then add `$HOME/.maestro/bin` to PATH. maestro needs JDK 11+; Temurin 17 works.
+
+### 0b. Resolve + boot the simulator
+
+There can be multiple "iPhone 16 Pro Max" devices across runtimes. **Only the iOS 18 device holds the test account** (`edge-rjqa3`, PIN `1111`, region California/USA, BTC wallet). The iOS 26.x device does NOT.
+
+```bash
+UDID=$(~/.cursor/skills/build-and-test/scripts/select-ios-sim.sh \
+  --runtime "iOS 18" --device "iPhone 16 Pro Max" --boot)
+```
+
+If the script exits 2 (ambiguous), narrow `--runtime` (e.g. `"iOS 18.6"`).
+
+### 0c. Build + install + launch the app
+
+```bash
+~/.cursor/skills/build-and-test/scripts/ios-rn-build.sh \
+  --udid "$UDID" --bundle-id co.edgesecure.app
+```
+
+Skips the full RN build when the app is already installed (cached path: seconds; cold build: 30–60 min). Pass `--force-rebuild` to always rebuild.
+
+### 0d. Run the maestro capture
+
+```bash
+~/.cursor/skills/build-and-test/scripts/capture-buy-quote.sh
+```
+
+Drives `maestro/buy-quote-input.yaml` (login → Buy → $500), then captures via an external simctl screenshot burst — keeping the last frame taken while the app was alive. Retries up to 5 cycles. Writes `/tmp/agent-mvp-buy-quote-screenshot.png` on success.
+
+### 0e. PASS / FAIL contract
+
+On capture-buy-quote.sh exit 0, the screenshot must visibly show **USD 500**, a non-empty **Amount BTC**, and the **`1 BTC = <rate> USD`** line. Emit:
+
+```
+build-and-test: PASS (iOS maestro — Buy $500 quote)
+screenshot: /tmp/agent-mvp-buy-quote-screenshot.png
+```
+
+On exit nonzero, emit FAIL with the last 30 lines of the script's output:
+
+```
+build-and-test: FAIL — Buy $500 quote not captured
+<last 30 lines>
+```
+
+Return success exit only on PASS.
+
+### 0f. Critical gotchas baked into the flow (do not "fix" them)
+
+<rule id="spaced-pin-taps">Edge's RN keypad drops digits tapped too fast → wrong PIN → exponential lockout (465s → 914s → …). Each PIN digit tap in `buy-quote-input.yaml` uses `waitToSettleTimeoutMs`. Never speed it up. If a run logs "Invalid PIN: Account locked for N seconds", wait — do NOT tap.</rule>
+<rule id="no-hideKeyboard">On this debug build, `hideKeyboard` reliably triggers an RN Fabric text-measure SIGABRT. The flow leaves the keyboard up. Do not add `hideKeyboard` steps.</rule>
+<rule id="no-hierarchy-polling-on-buy">`assertVisible`/`extendedWaitUntil` traverse the a11y hierarchy on a poll loop, provoking the same Fabric crash on the Buy scene. The flow stops polling once the amount is entered; the capture script uses external simctl screenshots (no hierarchy traversal).</rule>
+
+</step>
+
+<step id="1" name="Node + TypeScript path">
+Run, in order:
+
+```bash
+[ -d node_modules ] || npm install --no-audit --no-fund
+npx tsc --noEmit
+```
+
+Emit PASS:
+```
+build-and-test: PASS (tsc --noEmit clean)
+```
+
+Or FAIL with the last 30 lines of failing output:
+```
+build-and-test: FAIL — <command> exit <code>
+<last 30 lines>
+```
+</step>
+
+<step id="2" name="Node path (no TypeScript)">
+```bash
+[ -d node_modules ] || npm install --no-audit --no-fund
+npm test
+```
+
+Same PASS/FAIL contract as step 1.
+</step>
+
+<step id="3" name="Placeholder fallback (unknown repo shape)">
+Emit exactly:
+```
+build-and-test: placeholder mode — no commands executed (repo shape not auto-detected).
+```
+Return success.
+</step>
+
+<edge-cases>
+<case name="Simulator selection ambiguous (exit 2)">Re-run `select-ios-sim.sh` with a more specific `--runtime` (e.g. `"iOS 18.6"`). If still ambiguous, surface the list to the caller and set `blocked = Yes` on the Asana task with the candidate UDIDs and ask which to use.</case>
+<case name="Simulator boot fails">Run `xcrun simctl shutdown all && xcrun simctl erase <UDID>` is destructive — do NOT run it. Set `blocked = Yes` with the boot error.</case>
+<case name="ios-rn-build.sh exits 2 (sim not booted)">Re-run step 0b. If it fails twice, set `blocked = Yes`.</case>
+<case name="Cold RN build needed and would take >30 min">Acceptable in --yolo. Watch loop should NOT timeout the iteration during a known cold-build window — that's handled by /one-shot's `iOS prep budget` policy.</case>
+<case name="capture-buy-quote.sh exhausts retries">Emit FAIL with the maestro tail. Do NOT set `blocked = Yes` unless the failure mode is clearly a true-blocker (e.g. simulator died entirely, app uninstalled). A normal capture exhaustion is a real test FAIL the caller (watch loop) should react to.</case>
+<case name="maestro install fails">Set `blocked = Yes` with the install error and a note about JDK requirement.</case>
+<case name="Repo is edge-react-gui but the test account / sim was wiped">Set `blocked = Yes` — the test relies on `edge-rjqa3` with PIN 1111. Re-provisioning is a human step.</case>
+</edge-cases>

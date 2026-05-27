@@ -1,0 +1,84 @@
+# Maestro flow: Edge iOS "Buy" $500 quote — end-to-end proof screenshot.
+#
+# Target: the iPhone 16 Pro Max / iOS 18 simulator that holds the pre-provisioned
+# test account "edge-rjqa3" (PIN 1111, region California/USA, BTC wallet). The Edge
+# app must already be installed (build + install steps are in build-and-test/SKILL.md).
+#
+# Run: maestro test ~/.cursor/skills/build-and-test/maestro/buy-quote.yaml
+#
+# Notes / gotchas baked into this flow:
+#   * PIN digit taps are spaced with waitToSettleTimeoutMs. Edge's RN keypad drops
+#     digits when tapped too fast, which produces a WRONG PIN and an exponential
+#     account lockout (465s -> 914s -> ...). Never tap the keypad faster than this.
+#   * This debug build has an intermittent RN Fabric text-measure crash on the Buy
+#     (Ramp) scene (RCTTextLayoutManager / folly EvictingCacheMap SIGABRT). The
+#     scene renders healthy for several seconds first, so we enter the amount and
+#     screenshot promptly. If it crashes before the quote, just re-run.
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  PIN_DIGIT: "1"        # test account PIN is 1111 -> tap "1" four times
+  BUY_AMOUNT: "500"
+  SCREENSHOT_PATH: /tmp/agent-mvp-buy-quote-screenshot
+---
+- launchApp
+
+# --- PIN login (account already provisioned on this simulator) ---
+- extendedWaitUntil:
+    visible: "Exit PIN"
+    timeout: 40000
+# make sure the whole keypad is rendered & interactive before tapping
+- assertVisible: "1"
+- assertVisible: "0"
+- tapOn:
+    text: ${PIN_DIGIT}
+    waitToSettleTimeoutMs: 900
+- tapOn:
+    text: ${PIN_DIGIT}
+    waitToSettleTimeoutMs: 900
+- tapOn:
+    text: ${PIN_DIGIT}
+    waitToSettleTimeoutMs: 900
+- tapOn:
+    text: ${PIN_DIGIT}
+    waitToSettleTimeoutMs: 1500
+
+# --- wait for the main tab bar, then dismiss optional post-login modals ---
+- extendedWaitUntil:
+    visible: "Buy"
+    timeout: 30000
+- runFlow:
+    when: { visible: "Security is Our Priority" }
+    commands: [{ tapOn: "Cancel" }]
+- runFlow:
+    when: { visible: "How Did You Discover Edge?" }
+    commands: [{ tapOn: "Dismiss" }]
+- runFlow:
+    when: { visible: "Claim Your Web3 Handle" }
+    commands: [{ tapOn: "Not Now" }]
+
+# --- navigate to the Buy (Buy Crypto) scene ---
+- tapOn: "Buy"
+- extendedWaitUntil:
+    visible: "Amount USD"
+    timeout: 15000
+
+# --- enter the $500 fiat amount ---
+# NOTE: do NOT call `hideKeyboard` here — on this debug build it forces a re-layout
+# that reliably triggers the RN Fabric text-measure SIGABRT. The USD + converted-BTC
+# fields and the exchange-rate line are all above the keyboard, so leave it up.
+- tapOn: "Amount USD"
+- inputText: ${BUY_AMOUNT}
+
+# --- let the live quote resolve, then capture ---
+# IMPORTANT: do NOT use extendedWaitUntil / assertVisible here. Those traverse the
+# accessibility hierarchy on a poll loop, which forces RN text re-measurement and
+# reliably triggers the Fabric text-cache SIGABRT on this debug build. waitForAnimationToEnd
+# only diffs screenshots (no hierarchy traversal), so the scene survives long enough for the
+# quote ("Amount BTC" value + "1 BTC = <rate> USD") to render before we grab the screenshot.
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: ${SCREENSHOT_PATH}
+# NOTE: this single in-flow screenshot is best-effort — it races the intermittent
+# crash. For a GUARANTEED resolved-quote capture, run capture-buy-quote.sh, which
+# drives buy-quote-input.yaml and grabs the screenshot via an external simctl burst.

@@ -1,0 +1,10 @@
+---
+description: Prose style rules for all written output
+alwaysApply: true
+---
+
+# Writing Style
+
+- NEVER use em-dashes (`—`) in chat responses, code comments, commit messages, PR descriptions, or any other written output. Use a period, comma, colon, semicolon, or parentheses instead, whichever reads best. This is a hard rule with no exceptions.
+- The em-dash character to avoid is U+2014 (`—`). Hyphens (`-`) and en-dashes (`–`) are fine.
+- Keep chat responses tight unless instructed to give a detailed response. Lead with the answer or the action. Skip recap of what was just said. Prefer tables and short bullets over prose when comparing items. Aim for the shortest response that fully answers; if a one-liner suffices, send a one-liner.

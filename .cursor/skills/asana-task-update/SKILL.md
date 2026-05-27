@@ -1,7 +1,7 @@
 ---
 name: asana-task-update
 description: Update Asana tasks via one reusable workflow (attach PRs, assign/unassign, set status, and update task fields). Use when any skill needs to modify Asana task state.
-compatibility: Requires jq. ASANA_TOKEN for Asana API updates. ASANA_GITHUB_SECRET for PR attach operations.
+compatibility: Requires jq. ASANA_TOKEN for Asana API updates. ASANA_GITHUB_SECRET is OPTIONAL — only used by `--attach-pr`. When unset or when the Asana ↔ GitHub widget integration is disabled at the workspace level, `--attach-pr` warns and skips gracefully (exit 0) rather than failing.
 metadata:
   author: j0ntz
 ---
@@ -11,7 +11,7 @@ metadata:
 <rules description="Non-negotiable constraints.">
 <rule id="use-companion-script">Use `~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh` for all Asana task mutations. Do not call raw Asana APIs directly from skills that can delegate here.</rule>
 <rule id="task-required">Every operation requires `--task <task_gid>`.</rule>
-<rule id="attach-requires-secret">`--attach-pr` requires `ASANA_GITHUB_SECRET`. Other operations require `ASANA_TOKEN`.</rule>
+<rule id="attach-graceful-without-secret">`--attach-pr` uses the Asana ↔ GitHub widget integration. If `ASANA_GITHUB_SECRET` is unset, or if the integration endpoint returns 401/403/404 (integration disabled at the workspace level), the script warns once and skips the widget call with exit 0 — it does NOT fail the workflow. The PR body's Asana link (injected by `/pr-create`) remains the canonical Asana ↔ PR link consumed by downstream skills. Other operations (`--set-status`, `--set-board-state`, `--assign`, etc.) require `ASANA_TOKEN`.</rule>
 <rule id="prompt-codes">If the script exits code 2 with `PROMPT_REVIEWER` or `PROMPT_IMPLEMENTOR`, ask the user and re-run with explicit `--reviewer` or `--implementor`. Hands-off callers may instead pass `--skip-assign-if-missing` to convert missing-reviewer assignment into a non-blocking skip.</rule>
 <rule id="script-timeouts">Asana updates can take time. Use `block_until_ms: 120000` for script calls.</rule>
 </rules>
