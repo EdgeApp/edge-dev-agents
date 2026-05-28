@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# spawn-test-session.sh — Start a tmux session running `claude --rc`, matching the
+# spawn pattern the watchdog expects (pane survives claude exit via `exec bash`).
+#
+# TWO MODES:
+#
+# 1. SLOT MODE (parallel agent lane) — triggered by --slot-index:
+#      spawn-test-session.sh --yolo --slot-index <N> --task-gid <gid> \
+#        --sim-udid <udid> --metro-port <port> --worktree-path <path> --label "<rc-label>"
+#    The wrapper bash exports $AGENT_SIM_UDID and $AGENT_METRO_PORT so build-and-test
+#    and debugger scripts inherit the slot's sim + Metro port transparently, and cwd
+#    is the slot's worktree (NOT ~/git). Session is named claude-asana-<task-gid>.
+#    The watcher (not this script) sends the /one-shot prompt once RC is ready.
+#
+# 2. LEGACY MODE (manual smoke tests) — when --slot-index is omitted:
+#      spawn-test-session.sh [--yolo] [session-id] [initial-prompt]
+#    cwd is ~/git, no per-slot env. Preserved so existing manual workflows still work.
+#
+# Exit codes: 0 = session spawned, 1 = error (session exists, missing tooling).
+
+set -euo pipefail
+
+YOLO=false
+SLOT_INDEX=""
+TASK_GID=""
+SIM_UDID=""
+METRO_PORT=""
+WORKTREE_PATH=""
+LABEL=""
+POSITIONAL=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --yolo|-y)        YOLO=true; shift ;;
+    --slot-index)     SLOT_INDEX="$2";    shift 2 ;;
+    --task-gid)       TASK_GID="$2";       shift 2 ;;
+    --sim-udid)       SIM_UDID="$2";       shift 2 ;;
+    --metro-port)     METRO_PORT="$2";     shift 2 ;;
+    --worktree-path)  WORKTREE_PATH="$2";  shift 2 ;;
+    --label)          LABEL="$2";          shift 2 ;;
+    *) POSITIONAL+=("$1"); shift ;;
+  esac
+done
+
+command -v tmux  >/dev/null 2>&1 || { echo "tmux not found"; exit 1; }
+command -v claude >/dev/null 2>&1 || { echo "claude CLI not found"; exit 1; }
+
+# ── Resolve mode ──────────────────────────────────────────────────────────────
+if [[ -n "$SLOT_INDEX" ]]; then
+  # SLOT MODE
+  [[ -n "$TASK_GID" && -n "$WORKTREE_PATH" ]] || {
+    echo "slot mode requires --task-gid and --worktree-path" >&2; exit 1; }
+  ID="$TASK_GID"
+  CWD="$WORKTREE_PATH"
+  PROMPT="${LABEL:-Asana task $TASK_GID}"
+else
+  # LEGACY MODE
+  ID="${POSITIONAL[0]:-test-mvp}"
+  PROMPT="${POSITIONAL[1]:-MVP test session. Reply "ack" so I can see this from mobile, then wait for further instructions.}"
+  CWD="$HOME/git"
+fi
+
+SESSION="claude-asana-${ID}"
+
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+  echo "Session '$SESSION' already exists. Attach with: tmux attach -t $SESSION"
+  echo "Or kill with: tmux kill-session -t $SESSION"
+  exit 1
+fi
+
+# Escape the prompt/label for embedding inside a double-quoted bash string.
+ESC_PROMPT="${PROMPT//\\/\\\\}"     # backslash
+ESC_PROMPT="${ESC_PROMPT//\"/\\\"}" # double quote
+ESC_PROMPT="${ESC_PROMPT//\$/\\\$}" # dollar (prevent var expansion in heredoc)
+ESC_PROMPT="${ESC_PROMPT//\`/\\\`}" # backtick (prevent command substitution)
+
+if [[ "$YOLO" == true ]]; then
+  CLAUDE_INVOKE="claude --dangerously-skip-permissions --rc \"$ESC_PROMPT\""
+else
+  CLAUDE_INVOKE="claude --rc \"$ESC_PROMPT\""
+fi
+
+# Build the per-slot env exports (empty in legacy mode).
+ENV_EXPORTS=""
+if [[ -n "$SLOT_INDEX" ]]; then
+  [[ -n "$SIM_UDID" ]]   && ENV_EXPORTS+="export AGENT_SIM_UDID=\"$SIM_UDID\"
+"
+  [[ -n "$METRO_PORT" ]] && ENV_EXPORTS+="export AGENT_METRO_PORT=\"$METRO_PORT\"
+"
+fi
+
+# Write the inner command to a temp script; tmux execs it directly. The script
+# lives in /tmp until macOS cleans it up — `exec bash` never returns, so we cannot
+# reliably delete it ourselves without risking a race.
+TMPSCRIPT=$(mktemp -t claude-spawn.XXXXXX)
+cat > "$TMPSCRIPT" <<EOF
+#!/usr/bin/env bash
+${ENV_EXPORTS}cd "$CWD"
+$CLAUDE_INVOKE
+echo "[claude exited at \$(date)]"
+exec bash
+EOF
+chmod +x "$TMPSCRIPT"
+
+tmux new-session -d -s "$SESSION" "bash $TMPSCRIPT"
+
+echo "Spawned tmux session: $SESSION${YOLO:+ (yolo)}"
+if [[ -n "$SLOT_INDEX" ]]; then
+  echo "  slot $SLOT_INDEX  |  cwd $CWD  |  sim ${SIM_UDID:-none}  |  metro ${METRO_PORT:-8081}"
+fi
+echo "  Attach locally: tmux attach -t $SESSION"
+echo "  Kill session:   tmux kill-session -t $SESSION"
+echo "  (inner cmd:     $TMPSCRIPT)"
