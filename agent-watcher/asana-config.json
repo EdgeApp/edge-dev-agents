@@ -1,0 +1,64 @@
+{
+  "workspace_gid": "9976422036640",
+  "team_gid": "1190661726966109",
+  "team_name": "test",
+  "project_gid": "1215088146871429",
+  "project_name": "Agent MVP — Test Kanban",
+  "project_url": "https://app.asana.com/1/9976422036640/project/1215088146871429",
+  "user_gid": "1200972350160586",
+  "user_email": "jon@edge.app",
+  "custom_fields": {
+    "agent_status": {
+      "gid": "1215088146891589",
+      "options": {
+        "Pending": "1215088146891590",
+        "Planning": "1215088146891591",
+        "Developing": "1215088146891592",
+        "Reviewing": "1215088146891593",
+        "Testing": "1215088146891594",
+        "Complete": "1215088146891595"
+      },
+      "section_gids": {
+        "Pending": "1215088146881144",
+        "Planning": "1215158802669790",
+        "Developing": "1215158705341597",
+        "Reviewing": "1215158736217710",
+        "Testing": "1215158740998633",
+        "Complete": "1215158738301289"
+      }
+    },
+    "blocked": {
+      "gid": "1215088177189902",
+      "options": {
+        "No": "1215088177189903",
+        "Yes": "1215088177189904"
+      }
+    }
+  },
+  "watcher": {
+    "_doc": {
+      "max_concurrent": "Max parallel agent sessions. Slot accounting is by LIVE tmux sessions, not Asana state. Env override: AGENT_WATCHER_MAX_CONCURRENT.",
+      "metro_base_port": "Slot N gets Metro port (metro_base_port + N). Slot 0 = 8081 (RN default).",
+      "master_sim": "The iOS 18 iPhone 16 Pro Max sim holding the test account; cloned per slot. Resolved by device+runtime unless a UDID is hardcoded.",
+      "resource_guardrail": "Pre-spawn safety gate. Skip spawning this tick if 1-min load avg > max_load_avg OR free RAM < min_free_ram_gb. Env overrides: AGENT_WATCHER_MAX_LOAD_AVG, AGENT_WATCHER_MIN_FREE_RAM_GB.",
+      "npm_migration_commit": "Commit cherry-picked onto each fresh agent worktree so RN tooling uses npm not yarn.",
+      "worktrees_root": "Where per-task worktrees live: <worktrees_root>/<task-gid>/<repo>/.",
+      "repos_root": "Where main repo checkouts live: <repos_root>/<repo>.",
+      "default_repo": "Repo a spawned agent works in (worktree + sim are provisioned for it)."
+    },
+    "default_repo": "edge-react-gui",
+    "max_concurrent": 2,
+    "metro_base_port": 8081,
+    "master_sim": {
+      "device": "iPhone 16 Pro Max",
+      "runtime": "iOS 18"
+    },
+    "resource_guardrail": {
+      "max_load_avg": 12.0,
+      "min_free_ram_gb": 8.0
+    },
+    "npm_migration_commit": "4d169a59e2",
+    "worktrees_root": "~/git/.agent-worktrees",
+    "repos_root": "~/git"
+  }
+}

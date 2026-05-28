@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# update-status.sh — Update agent_status (and optionally blocked) on an Asana task.
+# As a side effect, also moves the task to the kanban section that matches the new
+# status, so a Board view of the project reflects the agent_status in real time.
+#
+# Usage:
+#   update-status.sh <task_gid> <status_name> [--blocked yes|no]
+#
+# Status names: Pending | Planning | Developing | Reviewing | Testing | Complete
+#
+# Reads custom field GIDs and section GIDs from ~/.config/agent-watcher/asana-config.json
+# and ASANA_TOKEN from credentials.json.
+#
+# Exit codes:
+#   0 = success (custom-field update applied; section move best-effort)
+#   1 = Asana API error on the custom-field update
+#   2 = usage / missing config error
+#
+# Escape hatch: the section move is best-effort. If the kanban hasn't been set
+# up yet (no section_gids in config) or the move call fails, we warn to stderr
+# and still exit 0 — the canonical state is the custom field, not the section.
+
+set -euo pipefail
+
+CONFIG="$HOME/.config/agent-watcher/asana-config.json"
+CRED="$HOME/.config/agent-watcher/credentials.json"
+
+[[ -f "$CONFIG" ]] || { echo "Missing $CONFIG" >&2; exit 2; }
+[[ -f "$CRED"   ]] || { echo "Missing $CRED"   >&2; exit 2; }
+
+usage() {
+  cat <<EOF >&2
+Usage: $(basename "$0") <task_gid> <status_name> [--blocked yes|no]
+  status_name: Pending | Planning | Developing | Reviewing | Testing | Complete
+EOF
+  exit 2
+}
+
+TASK_GID="${1:-}"
+STATUS_NAME="${2:-}"
+[[ -n "$TASK_GID" && -n "$STATUS_NAME" ]] || usage
+
+BLOCKED=""
+if [[ "${3:-}" == "--blocked" ]]; then
+  BLOCKED="${4:-}"
+  [[ "$BLOCKED" == "yes" || "$BLOCKED" == "no" ]] || usage
+fi
+
+TOKEN=$(jq -r .asana_token "$CRED")
+STATUS_FIELD_GID=$(jq -r .custom_fields.agent_status.gid "$CONFIG")
+STATUS_OPT_GID=$(jq -r --arg s "$STATUS_NAME" '.custom_fields.agent_status.options[$s] // empty' "$CONFIG")
+
+if [[ -z "$STATUS_OPT_GID" ]]; then
+  echo "Unknown status: $STATUS_NAME" >&2
+  echo "Valid: $(jq -r '.custom_fields.agent_status.options | keys | join(", ")' "$CONFIG")" >&2
+  exit 2
+fi
+
+# Build the custom_fields payload as JSON
+CF_JSON=$(jq -n \
+  --arg sf "$STATUS_FIELD_GID" \
+  --arg so "$STATUS_OPT_GID" \
+  '{($sf): $so}')
+
+if [[ -n "$BLOCKED" ]]; then
+  BLOCKED_FIELD_GID=$(jq -r .custom_fields.blocked.gid "$CONFIG")
+  if [[ "$BLOCKED" == "yes" ]]; then
+    BLOCKED_OPT_GID=$(jq -r .custom_fields.blocked.options.Yes "$CONFIG")
+  else
+    BLOCKED_OPT_GID=$(jq -r .custom_fields.blocked.options.No "$CONFIG")
+  fi
+  CF_JSON=$(jq -n \
+    --argjson base "$CF_JSON" \
+    --arg bf "$BLOCKED_FIELD_GID" \
+    --arg bo "$BLOCKED_OPT_GID" \
+    '$base + {($bf): $bo}')
+fi
+
+PAYLOAD=$(jq -n --argjson cf "$CF_JSON" '{data: {custom_fields: $cf}}')
+
+RESPONSE=$(curl -sS \
+  -X PUT \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "$PAYLOAD" \
+  "https://app.asana.com/api/1.0/tasks/$TASK_GID")
+
+if echo "$RESPONSE" | jq -e .errors >/dev/null 2>&1; then
+  echo "Asana API error:" >&2
+  echo "$RESPONSE" | jq . >&2
+  exit 1
+fi
+
+echo "Updated task $TASK_GID: agent_status=$STATUS_NAME${BLOCKED:+, blocked=$BLOCKED}"
+
+# Best-effort section move so a Board view of the kanban reflects the status.
+SECTION_GID=$(jq -r --arg s "$STATUS_NAME" '.custom_fields.agent_status.section_gids[$s] // empty' "$CONFIG")
+if [[ -z "$SECTION_GID" ]]; then
+  echo ">> section move: skipped (no section_gids in config — run setup-kanban-sections.sh once)" >&2
+else
+  MOVE_RESP=$(curl -sS -X POST \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$(jq -n --arg t "$TASK_GID" '{data: {task: $t}}')" \
+    "https://app.asana.com/api/1.0/sections/$SECTION_GID/addTask")
+  if echo "$MOVE_RESP" | jq -e .errors >/dev/null 2>&1; then
+    echo ">> section move: WARN — Asana returned errors: $(echo "$MOVE_RESP" | jq -c .errors)" >&2
+  else
+    echo ">> section move: $STATUS_NAME"
+  fi
+fi
