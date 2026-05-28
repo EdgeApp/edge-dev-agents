@@ -34,6 +34,8 @@ Optional flags:
 - `--asana-task <gid>` (explicit Asana GID override)
 - `--asana-attach` (opt-in to the Asana ↔ GitHub widget attach step — requires the integration to be enabled at the workspace and `ASANA_GITHUB_SECRET` to be set; off by default per `no-attach-default`)
 - `--yolo` (hands-off mode: defer soft questions to a final summary, only block on true-blockers — see `yolo-hands-off-mode` and `yolo-true-blockers` rules)
+
+**Per-task worktree:** when the agent-watcher spawns this session as a parallel slot, the working directory is a dedicated git worktree under `~/git/.agent-worktrees/<task-gid>/<repo>/`, not the main `~/git/<repo>` checkout. Treat it as a normal checkout — build, test, commit, and push from there exactly as usual. The branch (`agent/<task-gid>`) is pre-created off `origin/develop` with the npm-migration commit cherry-picked on top when the repo needs it, and `env.json` is symlinked in from the main checkout, so npm tooling and secrets work without extra setup.
 </step>
 
 <step id="2" name="Plan/context phase">

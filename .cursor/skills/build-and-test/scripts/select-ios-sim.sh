@@ -3,11 +3,16 @@
 #
 # Usage:
 #   select-ios-sim.sh --runtime <runtime-substring> --device <device-name> [--boot]
+#   select-ios-sim.sh --accept-udid <udid> [--boot]
 #
 #   --runtime: matches the runtime header in `xcrun simctl list devices`.
 #              Examples: "iOS 18", "iOS 18.6", "iOS 26".
 #              Use "iOS 18" (broad) when you want any 18.x device that matches the device name.
 #   --device:  exact device name as it appears in the list (e.g. "iPhone 16 Pro Max").
+#   --accept-udid: caller already has a UDID (e.g. a per-slot sim clone) — skip
+#              runtime/device resolution entirely, just confirm the UDID exists
+#              (and boots, with --boot) and echo it back. Mutually exclusive with
+#              --runtime/--device. Watcher-spawned sessions pass $AGENT_SIM_UDID here.
 #   --boot:    boot the resolved sim and open Simulator.app.
 #
 # Prints the UDID on stdout, status messages on stderr.
@@ -21,19 +26,38 @@ set -euo pipefail
 
 RUNTIME=""
 DEVICE=""
+ACCEPT_UDID=""
 BOOT=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --runtime) RUNTIME="$2"; shift 2 ;;
-    --device)  DEVICE="$2";  shift 2 ;;
-    --boot)    BOOT=true;    shift ;;
+    --runtime)     RUNTIME="$2";     shift 2 ;;
+    --device)      DEVICE="$2";      shift 2 ;;
+    --accept-udid) ACCEPT_UDID="$2"; shift 2 ;;
+    --boot)        BOOT=true;        shift ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
 
+# --accept-udid short-circuit: trust a caller-supplied UDID, just verify + (boot).
+if [[ -n "$ACCEPT_UDID" ]]; then
+  if ! xcrun simctl list devices 2>/dev/null | grep -q "$ACCEPT_UDID"; then
+    echo "select-ios-sim: --accept-udid $ACCEPT_UDID not found in simctl device list" >&2
+    exit 1
+  fi
+  echo ">> select-ios-sim: accepting caller UDID $ACCEPT_UDID" >&2
+  if $BOOT; then
+    xcrun simctl boot "$ACCEPT_UDID" 2>/dev/null || true   # no-op if already booted
+    open -a Simulator
+    echo ">> select-ios-sim: booted + opened Simulator.app" >&2
+  fi
+  echo "$ACCEPT_UDID"
+  exit 0
+fi
+
 [[ -n "$RUNTIME" && -n "$DEVICE" ]] || {
   echo "Usage: select-ios-sim.sh --runtime <runtime> --device <device-name> [--boot]" >&2
+  echo "   or: select-ios-sim.sh --accept-udid <udid> [--boot]" >&2
   exit 1
 }
 

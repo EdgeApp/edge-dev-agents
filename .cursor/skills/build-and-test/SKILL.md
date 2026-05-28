@@ -26,6 +26,8 @@ Verify the active repo builds cleanly before /one-shot marks a task complete. Re
 
 A real on-simulator UI test that logs into the pre-provisioned test account, navigates to the Buy tab, requests a $500 quote, and captures a proof screenshot. PASS requires the screenshot to actually render the resolved quote.
 
+**Parallel-session env contract:** when the agent-watcher spawns this session as one of several parallel slots, it exports `$AGENT_SIM_UDID` (the slot's cloned simulator) and `$AGENT_METRO_PORT` (the slot's Metro port) into the shell. The scripts below honor them automatically — `select-ios-sim.sh --accept-udid "$AGENT_SIM_UDID"` skips name/runtime resolution and trusts the clone, and `ios-rn-build.sh` falls back to `$AGENT_SIM_UDID` / `$AGENT_METRO_PORT` when `--udid` / `--port` are not passed (forwarding a non-8081 port to `react-native run-ios`). On a manual run with neither var set, behavior is unchanged: resolve the iOS 18 sim by name and use Metro 8081.
+
 ### 0a. Prerequisites (check, install if missing)
 
 - `xcrun -version` → Xcode CLT

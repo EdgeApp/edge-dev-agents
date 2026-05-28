@@ -24,6 +24,8 @@ metadata:
 
 Expected: exit 0 with `>> check-metro: ready (Metro on :8081, N Hermes target(s))`.
 
+Both `check-metro.sh` (`--port`) and `cdp-attach.js` (`--metro`) default to `$AGENT_METRO_PORT` when it's set (watcher-spawned parallel slots), else 8081 — so in a slot you can omit the port flags and still hit the right Metro. An explicit flag always overrides.
+
 If exit 1 (Metro down) or 2 (no Hermes target): report the error from stderr to the user/caller and stop. The fix is on their side (start Metro, launch the app on a sim/device).
 
 </step>

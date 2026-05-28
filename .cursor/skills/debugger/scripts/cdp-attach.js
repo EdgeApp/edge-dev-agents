@@ -57,7 +57,9 @@ const opts = {
   condition: null,
   trigger: null,
   report: 'stack,locals',
-  metro: 'localhost:8081',
+  // Default Metro endpoint follows the slot's port when the watcher set it,
+  // else the RN default 8081. Explicit --metro always wins.
+  metro: `localhost:${process.env.AGENT_METRO_PORT || '8081'}`,
   targetRegex: 'React Native|Hermes|Bridgeless',
   timeoutMs: 8000,
 }

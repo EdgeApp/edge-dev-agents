@@ -8,6 +8,9 @@
 # Usage:
 #   check-metro.sh [--port 8081]
 #
+# Port default follows $AGENT_METRO_PORT when set (watcher-spawned slots), else
+# 8081. An explicit --port always wins.
+#
 # Exit codes:
 #   0 = ready (Metro alive, ≥1 Hermes target)
 #   1 = Metro not reachable on the requested port
@@ -16,7 +19,7 @@
 
 set -euo pipefail
 
-PORT=8081
+PORT="${AGENT_METRO_PORT:-8081}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --port) PORT="$2"; shift 2 ;;
