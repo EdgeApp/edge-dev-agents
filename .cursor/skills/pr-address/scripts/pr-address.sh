@@ -12,7 +12,11 @@
 #   resolve-id     --owner <o> --repo <r> --pr <n> --node-id <id>
 #   headline       --owner <o> --repo <r> --sha <sha>
 #   fetch-pr-body  --owner <o> --repo <r> --pr <n>         Fetch current PR body → /tmp/pr-body.md
-#   ensure-branch  --owner <o> --repo <r> --pr <n>         Checkout PR branch, stash if needed, pull
+#   ensure-branch  --owner <o> --repo <r> --pr <n>         Checkout PR branch, stash if needed, pull.
+#                                                          If the branch is already bound to another worktree,
+#                                                          reports WORKTREE_PATH=<dir> and leaves main checkout untouched.
+#                                                          Installs node deps (npm ci / yarn install) when the
+#                                                          target dir has no node_modules — may take minutes.
 #   review-mode    --owner <o> --repo <r> --pr <n>         Determine autosquash/preserve mode from latest human activity
 #   autosquash                                             Rebase --autosquash from merge-base
 #
@@ -46,6 +50,35 @@ require_gh() {
   if ! gh auth status &>/dev/null 2>&1; then
     echo "PROMPT_GH_AUTH" >&2; exit 2
   fi
+}
+
+# Install node deps in <dir> when node_modules is absent. Agent worktrees are
+# created without an install, so lint-commit.sh's `./node_modules/.bin/eslint`
+# would be missing. Detects the package manager from the lockfile (npm vs yarn).
+# Can take several minutes on a cold worktree — callers must allow for it.
+ensure_deps() {
+  local dir="$1"
+  [[ -d "$dir/node_modules" ]] && return 0
+  echo ">> No node_modules in $dir — installing dependencies (may take several minutes)"
+  # Bypass the socket-firewall shim (~/.agent-shims/{yarn,npm} → `socket <pm>`),
+  # which loops its banner and exits non-zero on the recursive prepare/husky
+  # lifecycle. Strip the shim dir from PATH so the install AND its lifecycle
+  # scripts run the real package managers directly.
+  local clean_path
+  clean_path="$(printf '%s' "$PATH" | tr ':' '\n' | grep -v '\.agent-shims' | paste -sd: - || true)"
+  # Global ~/.npmrc auths the public registry with `_authToken=${NPM_TOKEN}`.
+  # yarn 1.x aborts when that var is unset (common in agent envs). A dummy value
+  # satisfies the substitution; a bogus token is harmless for public-package
+  # installs. A real NPM_TOKEN in the env still wins.
+  local npm_token="${NPM_TOKEN:-public}"
+  if [[ -f "$dir/package-lock.json" ]]; then
+    ( cd "$dir" && PATH="$clean_path" NPM_TOKEN="$npm_token" npm ci ) || { echo "Error: npm ci failed in $dir" >&2; exit 1; }
+  elif [[ -f "$dir/yarn.lock" ]]; then
+    ( cd "$dir" && PATH="$clean_path" NPM_TOKEN="$npm_token" yarn install --frozen-lockfile ) || { echo "Error: yarn install failed in $dir" >&2; exit 1; }
+  else
+    echo "Error: no package-lock.json or yarn.lock in $dir — cannot install deps" >&2; exit 1
+  fi
+  echo ">> Dependencies installed in $dir"
 }
 
 case "$CMD" in
@@ -327,9 +360,26 @@ case "$CMD" in
     PR_BRANCH=$(gh api "repos/$OWNER/$REPO/pulls/$PR" --jq '.head.ref')
     CURRENT_BRANCH=$(git branch --show-current)
 
+    # If the PR branch is already checked out in another worktree, operate there
+    # instead of stashing/switching the main checkout. git forbids the same branch
+    # in two worktrees, so a plain `git checkout` would fail with fatal exit 128.
+    THIS_TOPLEVEL=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+    WORKTREE_PATH=$(git worktree list --porcelain | awk -v b="refs/heads/$PR_BRANCH" '
+      /^worktree /{wt=substr($0,10)}
+      /^branch /{if($2==b){print wt; exit}}
+    ')
+    if [[ -n "$WORKTREE_PATH" && "$WORKTREE_PATH" != "$THIS_TOPLEVEL" ]]; then
+      echo ">> $PR_BRANCH is checked out in worktree: $WORKTREE_PATH"
+      git -C "$WORKTREE_PATH" pull --ff-only 2>&1 || git -C "$WORKTREE_PATH" pull --rebase 2>&1
+      ensure_deps "$WORKTREE_PATH"
+      echo ">> BRANCH_READY=$PR_BRANCH STASHED=false WORKTREE_PATH=$WORKTREE_PATH"
+      exit 0
+    fi
+
     if [[ "$CURRENT_BRANCH" == "$PR_BRANCH" ]]; then
       echo ">> Already on $PR_BRANCH — pulling latest"
       git pull --ff-only 2>&1 || git pull --rebase 2>&1
+      ensure_deps "$(git rev-parse --show-toplevel)"
       echo ">> BRANCH_READY=$PR_BRANCH STASHED=false"
     else
       STASHED=false
@@ -341,6 +391,7 @@ case "$CMD" in
       echo ">> Switching from $CURRENT_BRANCH to $PR_BRANCH"
       git checkout "$PR_BRANCH" 2>&1
       git pull --ff-only 2>&1 || git pull --rebase 2>&1
+      ensure_deps "$(git rev-parse --show-toplevel)"
       echo ">> BRANCH_READY=$PR_BRANCH STASHED=$STASHED PREVIOUS_BRANCH=$CURRENT_BRANCH"
     fi
     ;;

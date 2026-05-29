@@ -39,6 +39,11 @@ metadata:
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
   --task <task_gid> \
   --set-board-state "QA Verification" --unassign
+
+# Attach a run-report markdown file to the task
+~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
+  --task <task_gid> \
+  --attach-file /tmp/agent-run-report.md --attach-name agent-run-report.md
 ```
 </usage>
 
@@ -46,6 +51,7 @@ metadata:
 Determine which updates are needed by the caller and build one command with all flags:
 
 - `--attach-pr --pr-url --pr-title --pr-number`
+- `--attach-file <path> [--attach-name <name>]` (upload a local file, e.g. a run-report `.md`, as a native task attachment; distinct from `--attach-pr`)
 - `--assign` or `--assign <user_gid>`
 - `--skip-assign-if-missing`
 - `--unassign`

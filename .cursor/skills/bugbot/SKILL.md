@@ -41,7 +41,7 @@ Before any other work, ensure the PR's branch is checked out and up to date. Del
   --owner <OWNER> --repo <REPO> --pr <NUMBER>
 ```
 
-Output includes `BRANCH_READY`, `STASHED`, and (if switched) `PREVIOUS_BRANCH`. If `STASHED=true`, inform the user that changes were stashed on the previous branch.
+Output includes `BRANCH_READY`, `STASHED`, and (if switched) `PREVIOUS_BRANCH`. If `STASHED=true`, inform the user that changes were stashed on the previous branch. If the output contains `WORKTREE_PATH=<dir>`, the PR branch lives in another git worktree — `cd "<dir>"` first and run ALL subsequent git, commit, and companion-script operations there, leaving the main checkout untouched. If the target dir has no `node_modules`, the script installs deps (`npm ci`/`yarn install`) — this can take several minutes, so invoke with `block_until_ms: 600000`.
 </step>
 
 <step id="1" name="Fetch HEAD SHA">

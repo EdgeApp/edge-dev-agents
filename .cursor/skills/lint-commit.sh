@@ -42,8 +42,15 @@ export NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=8192"
 # wrappers work because socket locates their real binaries). Strip the shim dir
 # from PATH so `yarn` resolves to the real binary. Tradeoff: bypasses Socket's
 # supply-chain scanning for yarn. npm keeps the working socket wrapper.
+#
+# Also default NPM_TOKEN to empty: the hardened ~/.npmrc references
+# `${NPM_TOKEN}` for registry auth, and yarn v1 aborts at startup if the var is
+# undefined (npm tolerates it). Local scripts like `localize` need no registry
+# auth, so an empty token is harmless; a real exported NPM_TOKEN still wins.
 run_yarn() {
-  PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -v '/\.agent-shims$' | paste -sd ':' -)" yarn "$@"
+  NPM_TOKEN="${NPM_TOKEN:-}" \
+    PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -v '/\.agent-shims$' | paste -sd ':' -)" \
+    yarn "$@"
 }
 
 MESSAGE=""

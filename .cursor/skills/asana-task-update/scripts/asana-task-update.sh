@@ -14,6 +14,10 @@ PR_URL=""
 PR_TITLE=""
 PR_NUMBER=""
 
+DO_ATTACH_FILE=false
+ATTACH_FILE_PATH=""
+ATTACH_FILE_NAME=""
+
 DO_ASSIGN=false
 ASSIGN_GID=""
 SKIP_ASSIGN_IF_MISSING=false
@@ -34,6 +38,8 @@ while [[ $# -gt 0 ]]; do
     --pr-url) PR_URL="$2"; shift 2 ;;
     --pr-title) PR_TITLE="$2"; shift 2 ;;
     --pr-number) PR_NUMBER="$2"; shift 2 ;;
+    --attach-file) DO_ATTACH_FILE=true; ATTACH_FILE_PATH="$2"; shift 2 ;;
+    --attach-name) ATTACH_FILE_NAME="$2"; shift 2 ;;
     --assign)
       DO_ASSIGN=true
       if [[ $# -ge 2 && "${2:0:2}" != "--" ]]; then
@@ -61,7 +67,7 @@ if [[ -z "$TASK_GID" ]]; then
   exit 1
 fi
 
-if ! $DO_ATTACH && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_STATUS" ]] && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_REVIEWER_GID" ]] && [[ -z "$SET_IMPLEMENTOR_GID" ]] && [[ -z "$SET_PRIORITY_GID" ]] && [[ -z "$SET_PLANNED_GID" ]] && ! $AUTO_EST_REVIEW; then
+if ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_STATUS" ]] && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_REVIEWER_GID" ]] && [[ -z "$SET_IMPLEMENTOR_GID" ]] && [[ -z "$SET_PRIORITY_GID" ]] && [[ -z "$SET_PLANNED_GID" ]] && ! $AUTO_EST_REVIEW; then
   echo "Error: No operations specified" >&2
   exit 1
 fi
@@ -168,6 +174,25 @@ if $DO_ATTACH; then
     echo ">> PR attach: failed (HTTP $ATTACH_HTTP_CODE): $(cat "$ATTACH_BODY_FILE")" >&2
   fi
   rm -f "$ATTACH_BODY_FILE"
+fi
+
+# Upload a local file (e.g. a run report markdown) as a native Asana attachment.
+# This is a real file upload to the task, distinct from --attach-pr (the GitHub widget).
+if $DO_ATTACH_FILE; then
+  if [[ ! -f "$ATTACH_FILE_PATH" ]]; then
+    echo "Error: --attach-file path not found: $ATTACH_FILE_PATH" >&2
+    exit 1
+  fi
+  FORM_SPEC="file=@${ATTACH_FILE_PATH};type=text/markdown"
+  [[ -n "$ATTACH_FILE_NAME" ]] && FORM_SPEC="${FORM_SPEC};filename=${ATTACH_FILE_NAME}"
+  if FILE_ATTACH_OUT=$(curl -sf -X POST "$ASANA_API/tasks/$TASK_GID/attachments" \
+      -H "Authorization: Bearer $ASANA_TOKEN" \
+      -F "$FORM_SPEC" 2>/dev/null); then
+    echo ">> File attach: $(echo "$FILE_ATTACH_OUT" | jq -r '.data.name // "attachment"')"
+  else
+    echo ">> File attach: FAILED ($ATTACH_FILE_PATH)" >&2
+    exit 1
+  fi
 fi
 
 if $DO_ASSIGN || [[ -n "$SET_REVIEWER_GID" ]] || [[ -n "$SET_IMPLEMENTOR_GID" ]] || $AUTO_EST_REVIEW || [[ -n "$SET_PRIORITY_GID" ]] || [[ -n "$SET_PLANNED_GID" ]]; then

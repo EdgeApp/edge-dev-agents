@@ -257,8 +257,13 @@ function verifyCode() {
   // Run-script forms: `npm run <cmd>` vs `yarn <cmd>`. Install: `npm install --no-audit --no-fund` vs `yarn install`.
   const installCmd = PM === "npm" ? "npm install --no-audit --no-fund" : "yarn install";
   const runCmd = (cmd) => PM === "npm" ? `npm run ${cmd}` : `yarn ${cmd}`;
-  // For yarn, run with the socket shims stripped from PATH (see shimFreePath).
-  const pmEnv = PM === "yarn" ? { PATH: shimFreePath() } : {};
+  // For yarn, run with the socket shims stripped from PATH (see shimFreePath)
+  // and default NPM_TOKEN to empty so yarn v1 can expand the `${NPM_TOKEN}`
+  // reference in the hardened ~/.npmrc instead of aborting at startup.
+  const pmEnv =
+    PM === "yarn"
+      ? { PATH: shimFreePath(), NPM_TOKEN: process.env.NPM_TOKEN ?? "" }
+      : {};
 
   console.log("");
   console.log(`Code verification (using ${PM}):`);
