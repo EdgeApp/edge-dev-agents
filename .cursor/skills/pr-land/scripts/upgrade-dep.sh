@@ -11,8 +11,10 @@ set -euo pipefail
 # fetch, or reset — doing so would wipe commits from a prior `upgrade-dep.sh`
 # invocation in the same `/pr-land` run.
 #
-# Bumps the version in package.json, runs yarn + prepare + prepare.ios, and
-# commits package.json + lockfiles with message "Upgrade <package>@<version>".
+# Bumps the version in package.json, runs install + prepare + prepare.ios via
+# whichever package manager the repo uses (npm or yarn, auto-detected via
+# ~/.cursor/skills/pm.sh), and commits package.json + lockfile with message
+# "Upgrade <package>@<version>".
 
 usage() {
     echo "Usage: upgrade-dep.sh <package> [version]"
@@ -54,12 +56,17 @@ sed -i "" "s#\"$package\": \".*\"#\"$package\": \"$new_version\"#" package.json
 # Install and prepare
 export LANG="${LANG:-en_US.UTF-8}"
 export LC_ALL="${LC_ALL:-en_US.UTF-8}"
-yarn && yarn prepare && yarn prepare.ios
+~/.cursor/skills/pm.sh install
+~/.cursor/skills/pm.sh run prepare
+~/.cursor/skills/pm.sh run prepare.ios
 
-# Remove git+ prefixes from yarn.lock
-sed -i "" "s/git+//" yarn.lock
+# yarn.lock-only cleanup: yarn writes git+ prefixes for git deps; npm's
+# package-lock does not. Skip the sed when there is no yarn.lock.
+if [[ -f yarn.lock ]]; then
+  sed -i "" "s/git+//" yarn.lock
+fi
 
-# Stage and commit
+# Stage and commit (git add -A picks up whichever lockfile changed)
 git add -A
 git commit -m "Upgrade $package@$new_version" --no-verify
 echo ">> UPGRADE_READY package=$package version=$new_version sha=$(git rev-parse HEAD) branch=$(git branch --show-current)"

@@ -6,7 +6,7 @@
 // How it works:
 //   1. Checks out the branch and fetches latest
 //   2. Parses CHANGELOG.md for unreleased entries
-//   3. Runs verification (yarn verify or yarn tsc && yarn lint)
+//   3. Runs verification via ~/.cursor/skills/pm.sh (verify, else tsc + lint)
 //   4. Bumps version (minor for added/changed, patch for fixed)
 //   5. Updates CHANGELOG.md with version header
 //   6. Commits and tags locally (does NOT push)
@@ -24,6 +24,7 @@
 
 const { execSync } = require("child_process");
 const { existsSync, readFileSync, writeFileSync } = require("fs");
+const os = require("os");
 const path = require("path");
 const { getRepoDir, runGit: _runGit, installAndPrepare } = require(path.join(__dirname, "edge-repo.js"));
 
@@ -176,10 +177,11 @@ async function publishRepo(repo, branch) {
       installAndPrepare(repoDir);
 
       const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+      const pmScript = path.join(os.homedir(), ".cursor/skills/pm.sh");
       if (pkg.scripts?.verify) {
-        execSync("yarn verify", { cwd: repoDir, stdio: "inherit" });
+        execSync(`"${pmScript}" run verify`, { cwd: repoDir, stdio: "inherit" });
       } else {
-        execSync("yarn tsc && yarn lint", { cwd: repoDir, stdio: "inherit" });
+        execSync(`"${pmScript}" run tsc && "${pmScript}" run lint`, { cwd: repoDir, stdio: "inherit" });
       }
     } catch (e) {
       results.error = "Verification failed";

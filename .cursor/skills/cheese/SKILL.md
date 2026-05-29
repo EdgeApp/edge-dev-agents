@@ -11,8 +11,8 @@ metadata:
 <rules description="Non-negotiable constraints.">
 <rule id="cheese-branch-only">Target branch MUST match `test-*`. For any other branch name, stop and ask the user to confirm it is scratch space safe to force-push.</rule>
 <rule id="clean-working-tree">Require a clean working tree in edge-react-gui (no staged, unstaged, or untracked files) before starting. Do NOT auto-stash — tell the user to commit or stash first.</rule>
-<rule id="tarball-not-git-url">When pinning an unreleased dep, use a prebuilt tarball (`yarn pack`), never a git URL. Git URLs make yarn run the dep's `prepare` script on the build server, which fails on native toolchain deps (bs-platform needs python; ed25519 fails to build against current Node v8 ABI).</rule>
-<rule id="use-companion-script">Run the full workflow via `~/.cursor/skills/cheese/scripts/cheese-build.sh`. Do not inline git / yarn / pack operations in chat.</rule>
+<rule id="tarball-not-git-url">When pinning an unreleased dep, use a prebuilt tarball (`npm pack` or `yarn pack`, auto-detected from the dep repo's lockfile), never a git URL. Git URLs make the build server run the dep's `prepare` script, which fails on native toolchain deps (bs-platform needs python; ed25519 fails to build against current Node v8 ABI).</rule>
+<rule id="use-companion-script">Run the full workflow via `~/.cursor/skills/cheese/scripts/cheese-build.sh`. Do not inline git / pack / package-manager operations in chat.</rule>
 <rule id="force-with-lease">The script pushes with `--force-with-lease` via `~/.cursor/skills/git-branch-ops.sh`. Never use plain `--force`.</rule>
 </rules>
 
@@ -67,7 +67,7 @@ Invoke with resolved absolute paths:
   [--pin <absolute-path-to-dep-repo>]...
 ```
 
-The script handles: clean-tree check, checkout + hard reset, per-dep `yarn && yarn prepare` + `yarn pack`, tarball copy + `package.json` rewrite, `yarn install` to refresh lock, `lint-commit.sh` for the pin commit, and `git-branch-ops.sh push --force-with-lease`.
+The script handles: clean-tree check, checkout + hard reset, per-dep `install + prepare + pack` via `~/.cursor/skills/pm.sh` (auto-detects npm vs yarn from each repo's lockfile), tarball copy + `package.json` rewrite, GUI `install` to refresh the active lockfile, `lint-commit.sh` for the pin commit, and `git-branch-ops.sh push --force-with-lease`.
 </step>
 
 <step id="4" name="Report">
@@ -77,7 +77,7 @@ Print the remote branch URL and final SHA from the script output. Jenkins picks 
 <edge-cases>
 <case name="Currently on cheese branch">Ask the user which feature branch to reset against; cheese branches can't self-reset.</case>
 <case name="Dep repo on master/develop">If a pin target is on its default branch, the published version is enough. Warn; proceed only if the user confirms.</case>
-<case name="Tarball missing lib/">The script verifies each tarball contains `package/lib/` before committing. If missing, the script aborts — run `yarn prepare` manually in the dep repo and retry.</case>
+<case name="Tarball missing lib/">The script verifies each tarball contains `package/lib/` before committing. If missing, the script aborts — run `~/.cursor/skills/pm.sh run prepare` manually in the dep repo and retry.</case>
 <case name="Dirty working tree">Script exits with code 2 and tells the user to commit or stash first. Never auto-stash — their WIP is their responsibility.</case>
 <case name="Dep name not in gui's dependencies">Script exits if the dep's npm name isn't in `edge-react-gui/package.json` under `dependencies`. Common cause: dep renamed or devDependency — resolve manually.</case>
 </edge-cases>

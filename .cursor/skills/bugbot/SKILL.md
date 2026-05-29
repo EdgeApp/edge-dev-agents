@@ -147,7 +147,7 @@ For each thread classified valid, in order:
    git log --oneline -- <path>
    ```
    Pick the commit that introduced the behavior being fixed. Use its exact headline.
-3. Typecheck first if the repo has one (`yarn build.types`, `yarn tsc`, `tsc`). Skip if unavailable.
+3. Typecheck first if the repo has one. Use `~/.cursor/skills/pm.sh run build.types` or `~/.cursor/skills/pm.sh run tsc` (auto-detects npm vs yarn), falling back to bare `tsc`. Skip if unavailable.
 4. Commit as a fixup:
    ```bash
    ~/.cursor/skills/lint-commit.sh --no-reorder -m "fixup! <target-headline>" <files...>
