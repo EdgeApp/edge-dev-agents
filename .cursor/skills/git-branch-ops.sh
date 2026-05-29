@@ -81,7 +81,7 @@ run_autosquash() {
     fi
   fi
 
-  rm -f .git/index.lock
+  rm -f "$(git rev-parse --git-path index.lock)"
   GIT_EDITOR=true GIT_SEQUENCE_EDITOR=: git rebase -i "$BASE" --autosquash
   echo ">> Autosquash complete (base: $BASE)"
 }

@@ -11,8 +11,9 @@
 #   --branch   Target cheese branch (e.g. test-feta). Required.
 #   --from     Source ref to reset to. Default: current HEAD.
 #   --pin PATH Absolute path to a dep repo checkout. Repeatable.
-#              Runs yarn + yarn prepare + yarn pack in the dep, copies
-#              the resulting tarball into the GUI root with a timestamp
+#              Runs install + prepare + pack in the dep (npm or yarn,
+#              auto-detected via ~/.cursor/skills/pm.sh), copies the
+#              resulting tarball into the GUI root with a timestamp
 #              suffix, and rewrites package.json to point at it.
 #
 # Must be run from inside an edge-react-gui checkout with a clean tree.
@@ -110,19 +111,21 @@ if [[ ${#PINS[@]} -gt 0 ]]; then
     if [[ -x "$HOME/.cursor/skills/install-deps.sh" ]]; then
       (cd "$DEP_ROOT" && "$HOME/.cursor/skills/install-deps.sh")
     else
-      (cd "$DEP_ROOT" && yarn install --non-interactive && yarn prepare)
+      (cd "$DEP_ROOT" && "$HOME/.cursor/skills/pm.sh" install && "$HOME/.cursor/skills/pm.sh" run prepare)
     fi
 
-    (cd "$DEP_ROOT" && yarn pack --quiet >/dev/null)
-
-    SRC_TGZ="$DEP_ROOT/${DEP_NAME}-v${DEP_VERSION}.tgz"
+    # Pack using whichever package manager the dep repo uses. pm.sh prints
+    # the resulting tarball filename on stdout (npm and yarn use different
+    # naming conventions; pm.sh normalizes the capture).
+    PACK_NAME="$(cd "$DEP_ROOT" && "$HOME/.cursor/skills/pm.sh" pack)"
+    SRC_TGZ="$DEP_ROOT/$PACK_NAME"
     [[ -f "$SRC_TGZ" ]] || {
-      echo "yarn pack did not produce $SRC_TGZ" >&2; exit 1;
+      echo "pack did not produce $SRC_TGZ" >&2; exit 1;
     }
 
     # Verify tarball contains lib/ — build server will fail without it
     if ! tar -tzf "$SRC_TGZ" | grep -q '^package/lib/'; then
-      echo "tarball missing package/lib/ — run 'yarn prepare' in $DEP_ROOT and retry" >&2
+      echo "tarball missing package/lib/ — run 'prepare' in $DEP_ROOT and retry" >&2
       rm -f "$SRC_TGZ"
       exit 1
     fi
@@ -153,8 +156,10 @@ if [[ ${#PINS[@]} -gt 0 ]]; then
     echo ">> pinned $DEP_NAME -> ./$DST_NAME"
   done
 
-  echo ">> yarn install (refresh lock)"
-  yarn install --non-interactive
+  # Refresh the GUI's lockfile via whichever PM it uses.
+  GUI_LOCKFILE="$("$HOME/.cursor/skills/pm.sh" lockfile)"
+  echo ">> install (refresh $GUI_LOCKFILE)"
+  "$HOME/.cursor/skills/pm.sh" install
 
   # Commit via lint-commit.sh (handles --no-verify, staging, etc.)
   MSG_BODY="$(
@@ -165,7 +170,7 @@ if [[ ${#PINS[@]} -gt 0 ]]; then
 
   "$HOME/.cursor/skills/lint-commit.sh" -m "$MSG_BODY" \
     package.json \
-    yarn.lock \
+    "$GUI_LOCKFILE" \
     "${TARBALL_FILES[@]}"
 fi
 

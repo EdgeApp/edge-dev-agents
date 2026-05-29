@@ -113,7 +113,7 @@ This ensures the subsequent feature commit introduces zero pre-existing lint fin
 <edge-cases name="edge-react-gui only">
 The following apply only when working in the `edge-react-gui` repo:
 
-- New string literals should be added to `en_US.ts` in the SAME commit that uses them, not in a separate commit. The `lint-commit.sh` script handles `yarn localize` automatically when `en_US.ts` is in the changeset.
+- New string literals should be added to `en_US.ts` in the SAME commit that uses them, not in a separate commit. The `lint-commit.sh` script runs the `localize` script automatically (via npm or yarn, auto-detected) when `en_US.ts` is in the changeset.
 - **Editing `en_US.ts`**: Use grep to find exact insertion points rather than reading the file in chunks. The file is ~2500 lines; reading it piecemeal wastes context. Example:
   ```bash
   rg -n "nearby_string_key" src/locales/en_US.ts

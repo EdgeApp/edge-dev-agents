@@ -21,6 +21,9 @@ metadata:
 <rule id="yolo-true-blockers">Even in `--yolo`, STILL pause and set `blocked = Yes` on Asana when any of these apply: (a) destructive op with no recovery path (force push outside a PR branch, git history rewrite on shared branch, file deletion outside scratch/build dirs); (b) user-only credential needed (2FA, password, OAuth re-auth, signing key passphrase); (c) no defensible default exists (genuine ambiguity that could flip task outcome wholesale); (d) risk of overwriting unstaged user work (dirty working tree on a non-agent-created branch). When `blocked = Yes` is set, also write the reason to the Asana task as a comment.</rule>
 <rule id="yolo-stop-at-pr">In `--yolo` mode, NEVER merge the PR, tag a release, deploy, publish a package, or perform any other "land/ship" action. The agent's terminal action is reaching `agent_status = Complete` after the watch loop reports all-green. Merging is the human's decision. Force-pushing to the PR's own branch (to apply review/CI fixes) is allowed and expected.</rule>
 <rule id="pr-watch-loop-amend-pattern">When iterating on PR feedback (CI failures, bugbot findings, etc.) inside the watch loop, prefer `git commit --amend --no-edit` + `git push --force-with-lease` over fixup commits. The PR's history should stay a single clean commit (or the minimum set of logically distinct commits the original implementation needed). Never use `--force` without `--with-lease` — if the branch has been touched by someone else, that's a true-blocker (set `blocked = Yes`).</rule>
+<rule id="pr-watch-bounded-poll">The step-6 wait MUST be a single bounded, blocking call inside THIS session's own process: `timeout <remaining-seconds> gh pr checks <pr-num> --watch --interval 30`. It blocks the current tool call until checks settle or the timeout, spawns no new process, and returns control to react. Compute ONE 30-minute deadline at the start of step 6 and derive each `timeout` from the time remaining, so total wall-clock never exceeds 30 minutes.</rule>
+<rule id="never-self-respawn">Do the step-6 wait in THIS session's own single process. NEVER use `/loop`, `/schedule`, `ScheduleWakeup`, a background `claude &`, or `claude --resume` to wait or re-check — nothing that re-invokes, resumes, or schedules another `claude`/`cli` process. A long wait is one blocking call (`pr-watch-bounded-poll`), never a re-spawning loop.</rule>
+<rule id="bugbot-in-watch">Treat bugbot as a check inside the step-6 watch. `gh pr checks --watch` blocks until the `cursor[bot]` check-run completes, so it waits out bugbot latency; each fix's force-push re-triggers bugbot and the next re-entry re-blocks on the new HEAD. Green requires the `cursor[bot]` check-run present and completed-clean on the current HEAD SHA, plus no unresolved `cursor[bot]` threads. Invoke `/bugbot` only to FIX findings; `--watch` does the waiting. Do NOT arm bugbot's recurring cron; `CronDelete` it if already armed. If bugbot can't reach clean within the 30-min budget, set `blocked = Yes`.</rule>
 </rules>
 
 <step id="1" name="Collect input">
@@ -35,7 +38,7 @@ Optional flags:
 - `--asana-attach` (opt-in to the Asana ↔ GitHub widget attach step — requires the integration to be enabled at the workspace and `ASANA_GITHUB_SECRET` to be set; off by default per `no-attach-default`)
 - `--yolo` (hands-off mode: defer soft questions to a final summary, only block on true-blockers — see `yolo-hands-off-mode` and `yolo-true-blockers` rules)
 
-**Per-task worktree:** when the agent-watcher spawns this session as a parallel slot, the working directory is a dedicated git worktree under `~/git/.agent-worktrees/<task-gid>/<repo>/`, not the main `~/git/<repo>` checkout. Treat it as a normal checkout — build, test, commit, and push from there exactly as usual. The branch (`agent/<task-gid>`) is pre-created off `origin/develop` with the npm-migration commit cherry-picked on top when the repo needs it, and `env.json` is symlinked in from the main checkout, so npm tooling and secrets work without extra setup.
+**Per-task worktree:** when the agent-watcher spawns this session as a parallel slot, the working directory is a dedicated git worktree under `~/git/.agent-worktrees/<task-gid>/<repo>/`, not the main `~/git/<repo>` checkout. Treat it as a normal checkout — build, test, commit, and push from there exactly as usual. The branch (`agent/<task-gid>`) is pre-created off `origin/develop` with the npm-migration commit cherry-picked on top when the repo needs it, and `env.json` is copied in from the main checkout, so npm tooling and secrets work without extra setup.
 </step>
 
 <step id="2" name="Plan/context phase">
@@ -65,24 +68,22 @@ Task GID source priority:
 Set agent_status=Testing. Run `/build-and-test` for local verification. If it fails, amend HEAD with the fix (`git commit --amend --no-edit`), `git push --force-with-lease`, and re-run `/build-and-test`. Repeat up to 2 times. If still failing after 2 attempts, set `blocked = Yes` with reason and stop — the watch loop is not entered.
 </step>
 
-<step id="6" name="PR watch loop (gate to Complete)">
-The agent's session stays alive here, polling external green signals before marking `Complete`. Budget: 30 minutes total. Status stays at `Testing` throughout this loop.
+<step id="6" name="PR watch (gate to Complete)">
+Wait for external green signals before marking `Complete`. Budget: 30 minutes total wall-clock. Status stays at `Testing` throughout. Do the waiting per `pr-watch-bounded-poll` and `never-self-respawn` — one blocking `gh pr checks` call, never a self-respawning loop.
 
-Iterate until all-green OR budget exhausted:
+Compute the deadline once at the start (`now + 30 min`). Then iterate, re-entering the bounded watch with the remaining budget, until all-green or the deadline:
 
-1. **CI checks**: `gh pr checks <pr-num>`. Treat the rollup as:
-   - All `pass` → CI is green
-   - Any `pending` or `running` → wait, do not act yet
-   - Any `fail` → read the failing job's log via `gh run view --log-failed`, apply a fix, `git commit --amend --no-edit`, `git push --force-with-lease`, restart loop
-2. **Bugbot**: invoke `/bugbot` (per its own SKILL.md). It scans `cursor[bot]` threads and fixes valid findings. If bugbot self-schedules a recurring cycle, observe its progress on the next poll rather than blocking on it.
-3. **Sleep 60 seconds** between iterations to avoid burning API quota.
+1. **CI checks**: run `timeout <remaining-seconds> gh pr checks <pr-num> --watch --interval 30`. When it returns —
+   - exit 0 (all pass) → CI is green
+   - non-zero (a check failed) → read the failing job's log via `gh run view --log-failed`, apply a fix, then amend + force-push per `pr-watch-loop-amend-pattern`, then re-enter the bounded watch with the remaining budget
+2. **Bugbot**: handled as part of the watch per `bugbot-in-watch`. `gh pr checks --watch` blocks until the `cursor[bot]` check-run completes on HEAD; when the watch returns, if bugbot is red or has unresolved `cursor[bot]` threads, run `/bugbot`'s scan/fix logic, amend + force-push (which re-triggers bugbot), then re-enter the watch. Never arm bugbot's cron.
 
 Exit conditions:
-- **All green** (CI pass + bugbot reports clean + no unresolved review threads): proceed to step 7.
-- **30 min elapsed**: set `blocked = Yes` with a comment summarizing what was still red, then stop.
+- **All green** (CI checks pass + the `cursor[bot]` check-run is present and completed-clean on HEAD + no unresolved `cursor[bot]` threads): proceed to step 7.
+- **30 min wall-clock elapsed**: set `blocked = Yes` with a comment summarizing what was still red, then stop.
 - **True-blocker hit during a fix attempt**: set `blocked = Yes` per `yolo-true-blockers`, stop.
 
-Honor `yolo-stop-at-pr` strictly: never merge, never tag, never deploy. The loop's only mutations are force-pushes to the PR's own branch.
+Honor `yolo-stop-at-pr` strictly: never merge, never tag, never deploy. The only mutations here are force-pushes to the PR's own branch.
 </step>
 
 <step id="7" name="Report">
