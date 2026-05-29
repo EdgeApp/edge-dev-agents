@@ -86,7 +86,10 @@ const getSha = l => {
   return m ? m[1] : null
 }
 const getMsg = l => {
-  const m = l.match(/^[a-z]+\s+[0-9a-f]+\s+(.+)$/)
+  // Some git builds / `rebase.instructionFormat` settings emit the todo as
+  // `pick <sha> # <subject>`; strip the optional `# ` so subject matching
+  // works regardless of that prefix.
+  const m = l.match(/^[a-z]+\s+[0-9a-f]+\s+(?:#\s+)?(.+)$/)
   return m ? m[1] : ''
 }
 
@@ -138,10 +141,14 @@ const out = result.join('\n') + '\n' + (trailing.length > 0 ? trailing.join('\n'
 fs.writeFileSync(path, out)
 NODEEOF
 
+# --autostash lets slotting proceed when the working tree has unrelated
+# uncommitted changes (e.g. the next fixup's edits staged for a following
+# pass). It stashes tracked modifications before the rebase and restores them
+# after, without touching untracked files like node_modules.
 if ! SLOT_HEAD_SHA="$HEAD_SHA_FULL" SLOT_HEADLINE="$HEADLINE" \
     GIT_SEQUENCE_EDITOR="node $EDITOR_SCRIPT" \
     GIT_EDITOR=true \
-    git rebase -i "$BASE" >/dev/null 2>&1; then
+    git rebase --autostash -i "$BASE" >/dev/null 2>&1; then
   echo "Error: rebase failed during slotting" >&2
   if [[ -d .git/rebase-merge ]] || [[ -d .git/rebase-apply ]]; then
     echo "Aborting rebase to leave working tree clean" >&2

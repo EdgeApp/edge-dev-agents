@@ -80,7 +80,7 @@ alwaysApply: false
 
 <rule id="no-duplicate-redux-local">Don't track Redux state locally with `useState(reduxValue)` — it becomes stale when Redux updates. Read from `useSelector` directly.</rule>
 
-<rule id="module-level-cache-bugs">Module-level cached state that doesn't reset on logout/login leaks data between users. Export a clear function and call it on logout. This is a recurring bug pattern.</rule>
+<rule id="module-level-cache-bugs">Module-level cached state that doesn't reset on logout/login leaks data between users. Export a clear function and call it on logout. This is a recurring bug pattern. The clear function must reset **all** module-level singletons — including lazily-created connection/provider/resolver objects (e.g. an ethers provider, an SDK client), not just user-data maps — since those accumulate internal state that outlives a session.</rule>
 
 <rule id="settings-in-redux">Local account settings belong in Redux, not separate module-level caches. Redux is the right place for globally-available account information.</rule>
 

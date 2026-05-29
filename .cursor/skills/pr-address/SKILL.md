@@ -29,10 +29,14 @@ Before any other work, ensure the PR's branch is checked out and up to date:
 ```
 
 The script:
+- If the PR branch is already checked out in **another git worktree** → pulls latest there and reports `WORKTREE_PATH=<dir>`, leaving the main checkout untouched (git forbids the same branch in two worktrees)
 - If already on the PR branch → pulls latest
 - If on a different branch → stashes uncommitted changes (if any), checks out the PR branch, pulls latest
+- In every case, if the target directory has no `node_modules`, installs deps (`npm ci` or `yarn install` per the lockfile) so `lint-commit.sh`'s eslint resolves. **This can take several minutes on a cold worktree — invoke `ensure-branch` with `block_until_ms: 600000`.**
 
 Output includes `BRANCH_READY`, `STASHED`, and (if switched) `PREVIOUS_BRANCH`. If `STASHED=true`, inform the user that changes were stashed on the previous branch.
+
+<rule id="operate-in-worktree">If the output contains `WORKTREE_PATH=<dir>`, ALL subsequent git, commit, and companion-script operations for this PR MUST run inside `<dir>` — `cd "<dir>"` first (or pass `git -C "<dir>"`). Do NOT run them against the main checkout, and do NOT stash/switch the main checkout. The branch lives in that worktree.</rule>
 </step>
 
 <step id="1" name="Fetch all unresolved feedback and PR body">

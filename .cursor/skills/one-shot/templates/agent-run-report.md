@@ -1,0 +1,73 @@
+---
+task_gid: ""
+task_name: ""
+repo: ""
+branch: ""
+base: origin/develop
+pr: none                 # PR URL, or "none"
+outcome: complete        # complete | partial | blocked
+verified: not-run        # pass | partial | not-run | fail
+verify_blockers: []      # any of: precondition | harness | code | task-drafting
+started: ""              # ISO 8601
+ended: ""                # ISO 8601
+skills_used: []          # e.g. [asana-plan, im, pr-create, build-and-test, debugger]
+---
+
+## Summary
+<!-- cat: summary -->
+<!-- 3-6 lines: what was asked, what shipped, final state, links. -->
+_None observed._
+
+## Decisions
+<!-- cat: decisions -->
+<!-- Consequential / non-obvious choices only. Each: the decision, the rejected
+     alternative, and why. In --yolo this also captures auto-deferred decisions
+     (question, default chosen, reversibility). -->
+_None observed._
+
+## Dev Notes & Gotchas
+<!-- cat: dev-notes-gotchas -->
+<!-- Reusable codebase/product knowledge for the next agent on this repo. Prefix each
+     bullet with an inline tag for later slicing:
+       [build]  how to build/prepare/install for this work, what was actually needed
+       [test]   how to verify this area, preconditions, what a real test run requires
+       [debug]  debugging method that worked (e.g. CDP/debugger usage)
+       [gotcha] surprising behavior, footgun, non-obvious constraint -->
+_None observed._
+
+## Orchestration Issues
+<!-- cat: orchestration -->
+<!-- Friction with the autonomous harness itself (NOT the task code): worktree /
+     env.json / sim / metro / ports / resume / tmux / wakeup / resource limits /
+     auth in the spawned env. Enough detail to reproduce or fix. -->
+_None observed._
+
+## Skill Gaps
+<!-- cat: skill-gaps -->
+<!-- Per skill: name + what was missing / ambiguous / wrong / didn't trigger when it
+     should have + a concrete suggested fix. Feeds /author. -->
+_None observed._
+
+## Task-Drafting Feedback
+<!-- cat: task-drafting -->
+<!-- What the task description got right or wrong. Info the agent had to guess or hunt
+     for (creds, paths, acceptance criteria, scope bounds, push/no-push, required
+     account/KYC/funds preconditions). What to include in the next task of this kind. -->
+_None observed._
+
+## Follow-ups & Risks
+<!-- cat: follow-ups -->
+<!-- Forward-looking items the task surfaced but did not (and should not) resolve:
+     out-of-scope fixes, tech debt, future work, risks. Write each as an ACTIONABLE
+     proposal a reviewer can approve at a glance — not a vague observation. Omit
+     low-confidence hunches. One subsection per item, in this shape:
+
+       ### <imperative title, e.g. "Reset provider singletons on logout">
+       - **What & why:** 1-2 lines — the change and the reason it matters.
+       - **Where:** `path/to/file.ts:line`, PR, or area.
+       - **Proposed action:** the concrete change + the owner skill to carry it
+         (e.g. /author for a skill/rule, /im for code, /pr-address for review threads).
+       - **Confidence:** high | medium (drop low-confidence items entirely).
+
+     Keep to real, high-signal items. Use _None observed._ if there are none. -->
+_None observed._
