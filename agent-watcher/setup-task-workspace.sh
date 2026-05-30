@@ -122,10 +122,11 @@ ensure_env_json() {
 }
 
 link_shared_memory() {
-  # Surface shared Claude memory (orchestration + user context) in this worktree
-  # so the spawned agent sees it. The helper links BOTH the git-root and the
-  # worktree-path memory keyings. Idempotent and non-fatal — never blocks setup.
-  # Output is redirected to stderr so this script's stdout stays just "$WT".
+  # Surface shared Claude memory (orchestration + user context) for this task so
+  # the spawned agent sees it. A worktree session reads auto-memory from the MAIN
+  # repo's memory dir (verified empirically), and the helper resolves the worktree
+  # path to that git-root dir, so passing "$WT" links the right place. Idempotent
+  # and non-fatal — never blocks setup. Output → stderr so stdout stays just "$WT".
   local helper="$HOME/.claude/link-shared-memory.sh"
   if [[ -x "$helper" ]]; then
     "$helper" "$WT" >&2 || echo ">> setup-task-workspace: WARN — link-shared-memory failed (non-fatal)" >&2
