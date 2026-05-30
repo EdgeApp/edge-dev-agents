@@ -21,17 +21,16 @@ TARGET_CWD="${1:-$PWD}"
 
 [[ -d "$SHARED_DIR" ]] || { echo "Error: shared store $SHARED_DIR not found" >&2; exit 1; }
 
-# Resolve target memory dir(s). Claude keys auto-memory per "project". The docs
-# say worktrees share the MAIN git repo's dir (resolved via the common git dir),
-# but observed ~/.claude/projects also contains cwd-path-keyed dirs. To be robust
-# across Claude versions, link into BOTH the git-root-keyed dir and the literal
-# cwd-keyed dir when they differ (e.g. inside a git worktree).
+# Resolve the target memory dir. Claude keys auto-memory by the MAIN git repo
+# root: a session in a worktree reads memory from the main repo's dir, NOT the
+# worktree path. Verified empirically (a worktree `claude -p` session loaded the
+# git-root memory word but not a worktree-path one). So resolve via the common
+# git dir (worktrees -> main repo root), else the cwd outside a repo.
 cwd_abs="$(cd "$TARGET_CWD" && pwd)"
 common="$(git -C "$TARGET_CWD" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
 if [[ -n "$common" ]]; then gitroot="$(cd "$(dirname "$common")" && pwd)"; else gitroot="$cwd_abs"; fi
 
 roots=("$gitroot")
-[[ "$cwd_abs" != "$gitroot" ]] && roots+=("$cwd_abs")
 
 link_into() {
   local root="$1" san memdir base f
