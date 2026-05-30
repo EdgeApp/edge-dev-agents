@@ -21,3 +21,17 @@ present them at the END as alternatives to try — don't block on them mid-strea
 Learned from the memory/orchestration task: the failure modes were (1) stopping
 at plumbing instead of empirically testing, and (2) hedging mid-way (e.g.
 supporting both options) instead of proceeding and deferring the choice.
+
+## Tooling: `-p`/headless vs interactive
+
+Prefer interactive (tmux-driven) sessions for anything long-lived or high-volume;
+reserve `claude -p` (headless) for one-off, low-volume verification where a clean
+programmatic assertion matters (stdout / `--output-format json` / exit code).
+- `-p` gives clean captured output, a real completion + structured result; tmux
+  scraping (`capture-pane`) is fragile — ANSI, timing/no done-signal, scrollback
+  truncation. So `-p` is the right tool for a crisp one-off test assertion.
+- BUT post-2026-06-15, `-p`/Agent-SDK use on a Pro/Max subscription meters against
+  a separate SDK credit pool (API rates), not the subscription. Negligible for a
+  few probes; it bites at volume. Interactive use stays on the subscription.
+- Jon's orchestration spawns interactive `claude --rc` in tmux (NOT `-p`) →
+  billing-exempt; keep it that way. Don't convert the fleet to `-p`.
