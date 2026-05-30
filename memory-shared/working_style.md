@@ -22,16 +22,25 @@ Learned from the memory/orchestration task: the failure modes were (1) stopping
 at plumbing instead of empirically testing, and (2) hedging mid-way (e.g.
 supporting both options) instead of proceeding and deferring the choice.
 
-## Tooling: `-p`/headless vs interactive
+## Tooling & cost: interactive vs `-p`/headless
 
-Prefer interactive (tmux-driven) sessions for anything long-lived or high-volume;
-reserve `claude -p` (headless) for one-off, low-volume verification where a clean
-programmatic assertion matters (stdout / `--output-format json` / exit code).
-- `-p` gives clean captured output, a real completion + structured result; tmux
-  scraping (`capture-pane`) is fragile — ANSI, timing/no done-signal, scrollback
-  truncation. So `-p` is the right tool for a crisp one-off test assertion.
-- BUT post-2026-06-15, `-p`/Agent-SDK use on a Pro/Max subscription meters against
-  a separate SDK credit pool (API rates), not the subscription. Negligible for a
-  few probes; it bites at volume. Interactive use stays on the subscription.
-- Jon's orchestration spawns interactive `claude --rc` in tmux (NOT `-p`) →
-  billing-exempt; keep it that way. Don't convert the fleet to `-p`.
+**Guiding principle: be cost-conscious — squeeze the most out of the Max
+subscription WITHOUT incurring extra (pay-as-you-go) cost.** That's the real goal;
+the `-p` mechanics below are just how to honor it.
+
+- **Interactive Claude Code** — including the orchestration's tmux `claude --rc`
+  sessions — runs on the subscription with no extra metering. Prefer it for
+  anything long-lived or high-volume. Keep the agent fleet interactive; do NOT
+  convert it to `-p`.
+- **`-p` / headless (Agent SDK)** on a Pro/Max sub draws from a **monthly INCLUDED
+  credit allotment** (resets monthly, no rollover — Max-20x $200, Max-5x $100,
+  Pro $20; confirm current plan). Up to that allotment it's effectively free; you
+  only pay extra (pay-as-you-go API rates) AFTER it's exhausted, and only if
+  overflow/usage-credits is enabled. This split takes effect ~2026-06-15.
+- So `-p` is fine for occasional, low-volume one-off verification (well within the
+  monthly credit) where a clean programmatic assertion matters — and it's cleaner
+  than tmux scraping (stdout / `--output-format json` / exit code vs fragile
+  `capture-pane`). Avoid high-frequency `-p` loops that would burn the allotment
+  into paid overflow.
+- Monitor remaining credit at `claude.ai/settings/usage` (the SDK's
+  `total_cost_usd` is a client-side estimate, not authoritative).
