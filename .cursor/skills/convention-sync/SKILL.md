@@ -6,10 +6,11 @@ metadata:
   author: j0ntz
 ---
 
-<goal>Sync cursor files between `~/.cursor/` and the `edge-dev-agents` repo, commit, push, and update PR description from the synced repo root README. Also maintains cross-tool compatibility: symlinks `~/.claude/skills` → `~/.cursor/skills` and generates `~/.claude/CLAUDE.md` from always-apply rules.</goal>
+<goal>Sync the canonical home setup (`~/.cursor/` skills/rules/scripts + the agent orchestration system + shared Claude memories) into the `edge-dev-agents` repo, commit, push, and update the PR description from the synced repo root README. Also maintains cross-tool compatibility: symlinks `~/.claude/skills` → `~/.cursor/skills` and generates `~/.claude/CLAUDE.md` from always-apply rules. The repo is the distribution copy a second machine bootstraps from.</goal>
 
 <rules>
 <rule id="local-is-canonical">`~/.cursor/` is the canonical source. Edits happen locally; the repo is the distribution copy. Default direction is `user-to-repo`. Use `--repo-to-user` only for onboarding or pulling changes authored by others.</rule>
+<rule id="extra-trees">Beyond `~/.cursor`, the script also mirrors portable "extra trees" into the repo so a second Mac can be reproduced: the orchestration system (`~/.config/agent-watcher` → repo `agent-watcher/`), shared Claude memories (`~/.claude/memory-shared` → repo `memory-shared/`), and the memory link helper (`~/.claude/link-shared-memory.sh` → repo `bin/`). Secrets and machine-local state are EXCLUDED by hardcoded rsync excludes in the script (`credentials.json`, `*.log`, `*.state`, `pool.json`, `slots.json`, `watchdog-state.json`, `oom-repro/forensics`, `oom-repro/logs`); `credentials.example.json` is committed as a fill-in template. These appear in the JSON under `extra`/`extraTotal`. NEVER hand-add secret/state files to the repo. A fresh machine reproduces everything by cloning the repo and running `./bootstrap.sh` (installs the trees into home, seeds credentials from the example, links skills + shared memory). Auto-memory (`~/.claude/projects/<project>/memory/`) is machine-local per Anthropic docs and is intentionally NOT synced.</rule>
 <rule id="cross-machine-safety">The script auto-fetches origin on every run and emits two safety signals: `originAhead` (commits remote has past local HEAD) and `warnings` (per-file conflicts where a local copy looks stale relative to upstream). On `--stage`/`--commit` the script aborts if `originAhead > 0`. Always present `warnings` to the user as part of the dry-run summary so they can decide whether to overwrite.</rule>
 <rule id="use-companion-script">Use `~/.cursor/skills/convention-sync/scripts/convention-sync.sh` for diffing and syncing. Do NOT manually diff or copy files.</rule>
 <rule id="dry-run-first">Always run without `--stage` first to show the summary. Only stage/commit after user confirms.</rule>
@@ -34,7 +35,7 @@ Parse the JSON output and extract `repoDir`. Then check for an open PR:
 cd <repo-dir> && gh pr view --json number,url --jq '{number: .number, url: .url}' 2>/dev/null || echo '{}'
 ```
 
-Use the resolved repo path from the script for subsequent git and PR commands. If the script reports `total` as 0, report "Everything is in sync" and stop.
+Use the resolved repo path from the script for subsequent git and PR commands. If BOTH `total` and `extraTotal` are 0, report "Everything is in sync" and stop.
 </step>
 
 <step id="2" name="Present summary">
@@ -46,6 +47,7 @@ Sync summary (user → repo):
   Modified: file3, file4
   Deleted: file5
   Ignored: file6, file7 (via .syncignore)
+  Extra (orch + memories): agent-watcher/…, memory-shared/…, bin/…  (from `extra`; only if extraTotal > 0)
 
 ⚠️  origin/<branch> is N commit(s) ahead — pull before staging.   (only if originAhead > 0)
 ⚠️  Possible overwrites of upstream work:                         (only if warnings array non-empty)
