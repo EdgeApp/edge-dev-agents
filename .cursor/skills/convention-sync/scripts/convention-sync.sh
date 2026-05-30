@@ -461,7 +461,7 @@ if [[ "$DO_STAGE" == true ]] && (( total + extra_total > 0 )); then
     extra_total=$(echo "$extra_json" | jq 'length')
 
     if [[ "$DO_COMMIT" == true ]]; then
-      git commit -m "$COMMIT_MSG"
+      git commit -m "$COMMIT_MSG" >&2   # keep stdout pure JSON
     fi
   else
     while IFS= read -r f; do
