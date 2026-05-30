@@ -30,7 +30,8 @@ set -euo pipefail
 
 DIR="$HOME/.config/agent-watcher"
 CONFIG="$DIR/asana-config.json"
-POOL="$DIR/pool.json"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"; mkdir -p "$STATE_DIR"
+POOL="$STATE_DIR/pool.json"
 LOCK="$DIR/pool.lock"
 
 SIZE=""

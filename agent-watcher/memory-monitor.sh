@@ -19,12 +19,13 @@
 #   *       → green     → log only
 #   same level twice    → no action
 #
-# State at ~/.config/agent-watcher/memory-monitor.state
+# State at ${XDG_STATE_HOME:-~/.local/state}/agent-watcher/memory-monitor.state
 # Log at /tmp/memory-monitor.log
 
 set -uo pipefail
 
-STATE_FILE="$HOME/.config/agent-watcher/memory-monitor.state"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"; mkdir -p "$STATE_DIR"
+STATE_FILE="$STATE_DIR/memory-monitor.state"
 LOG_FILE="/tmp/memory-monitor.log"
 
 TOTAL_BYTES=$(sysctl -n hw.memsize)

@@ -26,7 +26,7 @@ const slots = require('./lib/slots.js')
 
 const HOME = process.env.HOME || ''
 const DIR = path.join(HOME, '.config/agent-watcher')
-const STATE_FILE = path.join(HOME, '.config/agent-watcher/watchdog-state.json')
+const STATE_FILE = path.join(slots.STATE_DIR, 'watchdog-state.json')
 const CRED_FILE = path.join(HOME, '.config/agent-watcher/credentials.json')
 const CFG_FILE = path.join(HOME, '.config/agent-watcher/asana-config.json')
 const IDLE_THRESHOLD_MS = 20 * 60 * 1000
