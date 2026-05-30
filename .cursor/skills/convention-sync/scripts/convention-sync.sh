@@ -104,6 +104,21 @@ USER_README="$USER_DIR/README.md"
 REPO_ROOT_README="$REPO_DIR/README.md"
 LEGACY_REPO_README="$REPO_CURSOR/README.md"
 
+# --- Extra portable trees (beyond ~/.cursor) ----------------------------------
+# Home is canonical; these are mirrored into the repo so a second machine can be
+# bootstrapped from it. Secrets and machine-local state are excluded so only
+# committable code/config is mirrored. Format: "SRC_ABS|REPO_SUBDIR|csv-excludes"
+# Excludes are rsync patterns (matched against the path relative to SRC).
+EXTRA_TREES=(
+  "$HOME/.config/agent-watcher|agent-watcher|credentials.json,*.log,*.state,pool.json,slots.json,watchdog-state.json,oom-repro/forensics,oom-repro/logs,.DS_Store,.git"
+  "$HOME/.claude/memory-shared|memory-shared|.DS_Store,.git"
+)
+# Single committable files (home canonical) → repo relpath. Format: "SRC_FILE|REPO_RELPATH"
+EXTRA_FILES=(
+  "$HOME/.claude/link-shared-memory.sh|bin/link-shared-memory.sh"
+)
+extra_json="[]"
+
 # Pull-before-push gate (user-to-repo only).
 # Fetches origin and detects whether the remote branch has commits we don't.
 # Dry-run includes the count for visibility; --stage/--commit aborts if > 0.
@@ -253,6 +268,68 @@ compare_dirs() {
   done
 }
 
+# Process the extra portable trees + files (user-to-repo only). In "dryrun" mode
+# it only populates extra_json for the summary; in "stage" mode it rsyncs/copies
+# into the repo (honoring excludes) and git-adds, then records the actually-staged
+# paths. extra_json is reset each call so a dryrun then stage doesn't double-count.
+process_extra() {
+  local mode="$1" tree src dest excludes destpath pair sfile rel rp pat line
+  local exargs expats
+  extra_json="[]"
+  for tree in "${EXTRA_TREES[@]+"${EXTRA_TREES[@]}"}"; do
+    IFS='|' read -r src dest excludes <<< "$tree"
+    [[ -d "$src" ]] || continue
+    exargs=(); expats=()
+    IFS=',' read -ra expats <<< "$excludes"   # split without glob-expanding patterns
+    for pat in "${expats[@]+"${expats[@]}"}"; do [[ -n "$pat" ]] && exargs+=( "--exclude=$pat" ); done
+    destpath="$REPO_DIR/$dest"
+    if [[ "$mode" == "stage" ]]; then
+      mkdir -p "$destpath"
+      # rsync stdout → /dev/null so the script's stdout stays pure JSON.
+      rsync -rlpt --delete "${exargs[@]}" "$src/" "$destpath/" >/dev/null
+      # Defensive: guarantee excluded files never land in the repo regardless of
+      # rsync-implementation exclude quirks (openrsync and rsync honor some bare
+      # filename patterns differently — this is why slots.json once slipped through).
+      for pat in "${expats[@]+"${expats[@]}"}"; do
+        [[ -z "$pat" ]] && continue
+        if [[ "$pat" == */* ]]; then rm -rf "${destpath:?}/$pat"
+        else find "$destpath" -name "$pat" -exec rm -rf {} + 2>/dev/null || true; fi
+      done
+      git -C "$REPO_DIR" add -A "$dest" >/dev/null 2>&1 || true
+      while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        extra_json=$(echo "$extra_json" | jq --arg f "$line" '. + [$f]')
+      done < <(git -C "$REPO_DIR" diff --cached --name-only -- "$dest" 2>/dev/null)
+    else
+      while IFS= read -r line; do
+        [[ -z "$line" || "$line" == */ ]] && continue
+        case "$line" in
+          "sending "*|"sent "*|"total "*|"created "*|"building "*|"delta"*|"Transfer "*|"transferred "*|"."|"./") continue ;;
+        esac
+        extra_json=$(echo "$extra_json" | jq --arg f "$dest/$line" '. + [$f]')
+      done < <(rsync -rlpt -n -v --delete "${exargs[@]}" "$src/" "$destpath/" 2>/dev/null)
+    fi
+  done
+  for pair in "${EXTRA_FILES[@]+"${EXTRA_FILES[@]}"}"; do
+    IFS='|' read -r sfile rel <<< "$pair"
+    [[ -f "$sfile" ]] || continue
+    rp="$REPO_DIR/$rel"
+    if [[ "$mode" == "stage" ]]; then
+      mkdir -p "$(dirname "$rp")"
+      cp "$sfile" "$rp"
+      git -C "$REPO_DIR" add "$rel" >/dev/null 2>&1 || true
+      if ! git -C "$REPO_DIR" diff --cached --quiet -- "$rel" 2>/dev/null; then
+        extra_json=$(echo "$extra_json" | jq --arg f "$rel" '. + [$f]')
+      fi
+    else
+      if [[ ! -f "$rp" ]] || ! diff -q "$sfile" "$rp" >/dev/null 2>&1; then
+        extra_json=$(echo "$extra_json" | jq --arg f "$rel" '. + [$f]')
+      fi
+    fi
+  done
+}
+
+extra_total=0
 if [[ "$DIRECTION" == "user-to-repo" ]]; then
   compare_readme "$USER_README" "$REPO_ROOT_README"
   compare_dirs "$USER_DIR" "$REPO_CURSOR"
@@ -260,6 +337,9 @@ if [[ "$DIRECTION" == "user-to-repo" ]]; then
   if [[ -f "$LEGACY_REPO_README" ]] && ! is_ignored ".cursor/README.md"; then
     del_json=$(echo "$del_json" | jq '. + [".cursor/README.md"]')
   fi
+
+  process_extra "dryrun"
+  extra_total=$(echo "$extra_json" | jq 'length')
 else
   compare_readme "$REPO_ROOT_README" "$USER_README"
   compare_dirs "$REPO_CURSOR" "$USER_DIR"
@@ -330,7 +410,7 @@ if [[ -x "$SCRIPT_DIR/generate-claude-md.sh" ]]; then
   "$SCRIPT_DIR/generate-claude-md.sh" >/dev/null
 fi
 
-if [[ "$DO_STAGE" == true && "$total" -gt 0 ]]; then
+if [[ "$DO_STAGE" == true ]] && (( total + extra_total > 0 )); then
   all_copy=$(echo "$new_json $mod_json" | jq -sr '.[0] + .[1] | .[]')
   all_del=$(echo "$del_json" | jq -r '.[]')
 
@@ -377,6 +457,9 @@ if [[ "$DO_STAGE" == true && "$total" -gt 0 ]]; then
       fi
     done <<< "$all_del"
 
+    process_extra "stage"
+    extra_total=$(echo "$extra_json" | jq 'length')
+
     if [[ "$DO_COMMIT" == true ]]; then
       git commit -m "$COMMIT_MSG"
     fi
@@ -406,8 +489,10 @@ jq -n \
   --argjson ignored "$ignored_json" \
   --argjson warnings "$warnings_json" \
   --argjson total "$total" \
+  --argjson extra "$extra_json" \
+  --argjson extraTotal "${extra_total:-0}" \
   --argjson originAhead "$ORIGIN_AHEAD" \
   --arg originBranch "$ORIGIN_BRANCH" \
   --arg staged "$DO_STAGE" \
   --arg committed "$DO_COMMIT" \
-  '{repoDir: $repoDir, originBranch: $originBranch, originAhead: $originAhead, total: $total, new: $new, modified: $modified, deleted: $deleted, ignored: $ignored, warnings: $warnings, staged: ($staged == "true"), committed: ($committed == "true")}'
+  '{repoDir: $repoDir, originBranch: $originBranch, originAhead: $originAhead, total: $total, new: $new, modified: $modified, deleted: $deleted, ignored: $ignored, warnings: $warnings, extra: $extra, extraTotal: $extraTotal, staged: ($staged == "true"), committed: ($committed == "true")}'

@@ -78,25 +78,27 @@ recover_slot() {
   esac
 }
 
-WATCHER_PROJECT_DIR="$HOME/.claude/projects/-Users-jontz-git"
-if [[ ! -d "$WATCHER_PROJECT_DIR" ]]; then
-  echo "No watcher-spawned sessions found (missing $WATCHER_PROJECT_DIR)" >&2
-  exit 1
-fi
-
-# Collect candidate jsonl files. A watcher-spawned session's first user
-# message is `/one-shot --yolo ...`. We check the first ~20 lines of each
-# .jsonl (each line is a JSON record).
+# Watcher-spawned sessions live under one of two shapes:
+#   ~/.claude/projects/-Users-jontz-git/<uuid>.jsonl
+#     (legacy: pre-parallelization, cwd was ~/git/)
+#   ~/.claude/projects/-Users-jontz-git--agent-worktrees-<task-gid>-<repo>/<uuid>.jsonl
+#     (current: per-task worktree under ~/git/.agent-worktrees/<gid>/<repo>/)
+# Scan all -Users-jontz-git* dirs and filter by the /one-shot --yolo signature.
 CANDIDATES=()
-for f in "$WATCHER_PROJECT_DIR"/*.jsonl; do
-  [[ -f "$f" ]] || continue
-  if head -20 "$f" | grep -q '"/one-shot --yolo' ; then
-    CANDIDATES+=("$f")
-  fi
+shopt -s nullglob
+for d in "$HOME/.claude/projects/-Users-jontz-git"*; do
+  [[ -d "$d" ]] || continue
+  for f in "$d"/*.jsonl; do
+    [[ -f "$f" ]] || continue
+    if head -20 "$f" | grep -q '"/one-shot --yolo' ; then
+      CANDIDATES+=("$f")
+    fi
+  done
 done
+shopt -u nullglob
 
 if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
-  echo "No watcher-spawned sessions found in $WATCHER_PROJECT_DIR" >&2
+  echo "No watcher-spawned sessions found in ~/.claude/projects/-Users-jontz-git*" >&2
   exit 1
 fi
 
@@ -145,5 +147,46 @@ if $RECOVER && [[ -n "$TERM" ]]; then
 fi
 
 LATEST_UUID=$(emit_candidates | head -1 | cut -f2)
-echo ">> resume-agent: resuming $LATEST_UUID"
-exec claude --resume "$LATEST_UUID"
+
+# Find the matching JSONL file and read the session's original cwd from it.
+# claude resumes the conversation by UUID but new tool calls run at the user's
+# current shell cwd — for a worktree session, those paths won't resolve unless
+# we `cd` to the original cwd first.
+LATEST_JSONL=""
+for f in "${CANDIDATES[@]}"; do
+  if [[ "$(basename "$f" .jsonl)" == "$LATEST_UUID" ]]; then
+    LATEST_JSONL="$f"
+    break
+  fi
+done
+
+ORIG_CWD=""
+if [[ -n "$LATEST_JSONL" ]]; then
+  # cwd is recorded on most JSONL records; the first non-null occurrence is the truth.
+  # `head -1` closes the pipe early; for a large history jq is still streaming and
+  # dies with SIGPIPE (141). `|| true` absorbs that so `set -e` doesn't abort here.
+  ORIG_CWD=$(jq -r 'select(.cwd != null) | .cwd' "$LATEST_JSONL" 2>/dev/null | head -1 || true)
+fi
+
+# `claude --resume` scopes session lookup to the project dir derived from cwd.
+# A worktree session lives under <worktrees_root>/<gid>/<repo>; claude resolves it
+# from that exact dir or from the repos root (~/git), but NOT from $HOME. So: cd to
+# the original cwd if it still exists (tool calls hit real files), else fall back to
+# the repos root (proven to resolve reaped worktree sessions). Never $HOME.
+if [[ -n "$ORIG_CWD" && -d "$ORIG_CWD" ]]; then
+  echo ">> resume-agent: cd $ORIG_CWD" >&2
+  cd "$ORIG_CWD"
+elif [[ -n "$ORIG_CWD" ]]; then
+  repos_root=$(jq -r '.watcher.repos_root // empty' "$DIR/asana-config.json" 2>/dev/null)
+  repos_root="${repos_root/#\~/$HOME}"
+  if [[ -n "$repos_root" && -d "$repos_root" ]]; then
+    echo ">> resume-agent: $ORIG_CWD gone (worktree reaped?) — resuming from repos root $repos_root" >&2
+    cd "$repos_root"
+  else
+    echo ">> resume-agent: $ORIG_CWD gone and repos root unavailable — resuming from \$HOME (resume may fail)" >&2
+    cd "$HOME"
+  fi
+fi
+
+echo ">> resume-agent: resuming $LATEST_UUID (--dangerously-skip-permissions)"
+exec claude --dangerously-skip-permissions --resume "$LATEST_UUID"

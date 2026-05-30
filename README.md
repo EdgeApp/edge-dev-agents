@@ -13,6 +13,18 @@ the repo copy should not keep a second `.cursor/README.md`.
 
 ## Installation
 
+**Fresh machine (one command):** clone this repo and run the bootstrap — it
+installs everything (cursor skills/rules, the orchestration system, and shared
+memories) into your home dir, seeds `credentials.json` from the example, and
+links skills + shared memory:
+
+```bash
+git clone <this-repo> ~/git/edge-dev-agents && cd ~/git/edge-dev-agents && ./bootstrap.sh
+# then edit ~/.config/agent-watcher/credentials.json with your real asana_token
+```
+
+For incremental onboarding instead of the full bootstrap:
+
 **1. Set the required env var** in your `~/.zshrc`:
 
 ```bash
@@ -41,11 +53,37 @@ companion script directly when onboarding:
 ## Table of Contents
 
 - [Architecture](#architecture)
+- [Orchestration & Memory](#orchestration--memory)
 - [Skills](#skills-slash-skills)
 - [Companion Scripts](#companion-scripts)
 - [Shared Modules](#shared-modules)
 - [Rules](#rules-mdc-files)
 - [Design Principles](#design-principles)
+
+## Orchestration & Memory
+
+Beyond cursor skills/rules, this repo mirrors two more portable trees so a
+second Mac is reproducible from a single clone + `./bootstrap.sh`:
+
+- **`agent-watcher/`** — the autonomous agent orchestration system (Asana
+  watcher daemon + worktree/iOS-sim pool helpers + watchdog). Canonical home is
+  `~/.config/agent-watcher` (XDG config; `~/.agents` is not an established
+  standard). Committed: scripts, `*.js`, `asana-config.json`, `README.md`,
+  `oom-repro/HANDOFF.md`+`scripts/`, and `credentials.example.json`. **Never
+  committed:** `credentials.json` (secret) and machine-local state
+  (`pool.json`, `slots.json`, `watchdog-state.json`, `*.state`, `*.log`,
+  `oom-repro/forensics`, `oom-repro/logs`).
+- **`memory-shared/`** + **`bin/link-shared-memory.sh`** — cross-cutting Claude
+  memory notes that should surface regardless of working directory. Canonical
+  home `~/.claude/memory-shared`; `link-shared-memory.sh` symlinks them into the
+  per-project auto-memory dirs (`~/.claude/projects/<project>/memory/`) and
+  maintains a managed block in each `MEMORY.md`. Claude auto-memory itself is
+  machine-local (per Anthropic docs) and is intentionally NOT synced — only the
+  shared store is. The only officially global Claude file is `~/.claude/CLAUDE.md`
+  (generated here from always-apply rules).
+
+`/convention-sync` keeps all of the above in sync (home → repo); `bootstrap.sh`
+does the reverse (repo → home) on a new machine.
 
 ## Architecture
 

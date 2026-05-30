@@ -2,10 +2,17 @@
 # gc-worktrees.sh — Manual garbage-collector for orphaned agent worktrees.
 #
 # Scans ~/git/.agent-worktrees/<gid>/<repo>/ and, for each, asks Asana what the
-# task's agent_status is. A worktree is an ORPHAN (and gets torn down) when:
+# task's agent_status is. A worktree is an ORPHAN candidate when:
 #   - the task's agent_status is "Complete", OR
 #   - the task no longer exists (deleted in Asana).
-# In-flight tasks (Planning/Developing/Reviewing/Testing) are left alone.
+# In-flight tasks (Planning/Developing/Reviewing/Testing) are always left alone.
+#
+# RETENTION CAP: orphan candidates are NOT all reaped. The newest --keep of them
+# (by worktree mtime) are retained for inspection/resume; only the older ones are
+# reaped. This mirrors the rc-watchdog retention policy so a manual run won't
+# silently destroy worktrees the watchdog is deliberately keeping. --keep defaults
+# to .watcher.keep_completed_worktrees from asana-config.json (fallback 5). Pass
+# --all to reap every orphan (keep=0, the pre-retention behavior).
 #
 # Teardown reuses cleanup-task-workspace.sh (worktree+branch) and, when slots.json
 # still holds the slot, delete-ios-sim.sh (sim) + slots.js release (slot entry).
@@ -14,7 +21,7 @@
 # (e.g. after a crash or reboot left sessions half-cleaned).
 #
 # Usage:
-#   gc-worktrees.sh [--dry-run]
+#   gc-worktrees.sh [--dry-run] [--keep N | --all]
 #
 # Exit codes:
 #   0 = scan complete (orphans removed, or none found)
@@ -29,10 +36,13 @@ CONFIG="$DIR/asana-config.json"
 CRED="$DIR/credentials.json"
 
 DRY_RUN=false
-for arg in "$@"; do
-  case "$arg" in
-    --dry-run) DRY_RUN=true ;;
-    *) echo "Unknown arg: $arg" >&2; exit 2 ;;
+KEEP=""   # empty → resolve from config below; --keep N overrides; --all sets 0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=true; shift ;;
+    --keep)    KEEP="$2";    shift 2 ;;
+    --all)     KEEP=0;       shift ;;
+    *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
@@ -47,6 +57,12 @@ fi
 TOKEN=$(jq -r .asana_token "$CRED")
 FIELD_GID=$(jq -r .custom_fields.agent_status.gid "$CONFIG")
 
+# Resolve the retention cap (newest N orphans kept). Default from config, fallback 5.
+if [[ -z "$KEEP" ]]; then
+  KEEP=$(jq -r '.watcher.keep_completed_worktrees // 5' "$CONFIG")
+fi
+[[ "$KEEP" =~ ^[0-9]+$ ]] || { echo "Invalid --keep value: $KEEP" >&2; exit 2; }
+
 # Returns the agent_status name, or "__MISSING__" if the task 404s, or "" on error.
 fetch_status() {
   local gid="$1"
@@ -60,8 +76,11 @@ fetch_status() {
   echo "$resp" | jq -r --arg f "$FIELD_GID" '.data.custom_fields[]? | select(.gid==$f) | .enum_value.name // ""'
 }
 
-removed=0
-kept=0
+# Pass 1: classify every worktree. In-flight ones are left alone immediately.
+# Complete/missing ones are orphan candidates, collected with their mtime so we
+# can retain the newest $KEEP and reap only the rest.
+ORPHANS=()   # entries: "<mtime>\t<gid>\t<repo>\t<reason>"
+kept_inflight=0
 for giddir in "$WORKTREES_ROOT"/*/; do
   [[ -d "$giddir" ]] || continue
   gid=$(basename "$giddir")
@@ -71,11 +90,28 @@ for giddir in "$WORKTREES_ROOT"/*/; do
     status=$(fetch_status "$gid")
 
     if [[ "$status" == "Complete" || "$status" == "__MISSING__" ]]; then
-      reason=$([[ "$status" == "__MISSING__" ]] && echo "task deleted" || echo "Complete")
-      echo ">> gc-worktrees: ORPHAN $gid/$repo ($reason)"
-      if $DRY_RUN; then
-        kept=$((kept))  # no-op; just reporting
-      else
+      reason=$([[ "$status" == "__MISSING__" ]] && echo "task-deleted" || echo "Complete")
+      mtime=$(stat -f "%m" "$repodir")
+      ORPHANS+=("${mtime}"$'\t'"${gid}"$'\t'"${repo}"$'\t'"${reason}")
+    else
+      echo ">> gc-worktrees: keep $gid/$repo (in-flight: agent_status=${status:-unknown})"
+      kept_inflight=$((kept_inflight + 1))
+    fi
+  done
+done
+
+# Pass 2: newest $KEEP orphans are retained; the rest are reaped (oldest first).
+removed=0
+retained=0
+if [[ ${#ORPHANS[@]} -gt 0 ]]; then
+  idx=0
+  while IFS=$'\t' read -r _mtime gid repo reason; do
+    if [[ $idx -lt $KEEP ]]; then
+      echo ">> gc-worktrees: retain $gid/$repo ($reason; within keep=$KEEP)"
+      retained=$((retained + 1))
+    else
+      echo ">> gc-worktrees: REAP $gid/$repo ($reason; beyond keep=$KEEP)"
+      if ! $DRY_RUN; then
         # Tear down sim from the slot record (if any) before dropping the slot.
         sim_udid=$(node "$DIR/lib/slots.js" get --task-gid "$gid" 2>/dev/null | jq -r '.sim_udid // empty' 2>/dev/null || true)
         [[ -n "$sim_udid" ]] && "$DIR/delete-ios-sim.sh" --udid "$sim_udid" || true
@@ -83,12 +119,10 @@ for giddir in "$WORKTREES_ROOT"/*/; do
         node "$DIR/lib/slots.js" release --task-gid "$gid" >/dev/null 2>&1 || true
       fi
       removed=$((removed + 1))
-    else
-      echo ">> gc-worktrees: keep $gid/$repo (agent_status=${status:-unknown})"
-      kept=$((kept + 1))
     fi
-  done
-done
+    idx=$((idx + 1))
+  done < <(printf '%s\n' "${ORPHANS[@]}" | sort -rn -t$'\t' -k1,1)
+fi
 
-echo ">> gc-worktrees: done — ${removed} orphan(s) $([[ $DRY_RUN == true ]] && echo "would be removed" || echo "removed"), ${kept} kept"
+echo ">> gc-worktrees: done — keep=$KEEP, ${retained} completed worktree(s) retained, ${removed} $([[ $DRY_RUN == true ]] && echo "would be reaped" || echo "reaped"), ${kept_inflight} in-flight kept"
 exit 0

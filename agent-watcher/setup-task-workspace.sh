@@ -6,7 +6,19 @@
 #     ~/git/.agent-worktrees/<task-gid>/<repo>/
 # on a fresh branch `agent/<task-gid>` based on origin/develop (configurable), with
 # the npm-migration commit cherry-picked on top so RN tooling uses npm not yarn.
-# env.json is SYMLINKED (not copied) from the main checkout so secrets stay single-source.
+# env.json is COPIED (a real file, NOT a symlink) from the main checkout. A symlink is
+# fragile: the repo's `configure` step (scripts/configure.ts → cleaner-config makeConfig)
+# rewrites env.json, and if the link isn't resolving to a real file when that runs, the
+# worktree ends up with a defaults-only skeleton (every secret blank/false/null). A real
+# copy is read by configure and its real, in-schema values survive the rewrite. Copy also
+# avoids the write-through footgun where a tool writing env.json clobbers the shared main
+# file. env.json is gitignored, so the copy never lands in a commit/PR.
+# node_modules is APFS-cloned (cp -c) from the main checkout so the agent session
+# does NOT run a full `npm install`. A scratch install in a project this size spawns
+# ~1500 node workers and OOM'd the machine on 2026-05-28 (see oom-repro/HANDOFF.md).
+# The clone is copy-on-write: ~26s for a 2.6 GB / 164k-file tree, single-process,
+# ~500 MB transient memory, near-zero new disk blocks. Each worktree's tree diverges
+# only on files it changes; the session's own `npm install` reconciles just the diff.
 #
 # Usage:
 #   setup-task-workspace.sh --task-gid <gid> --repo <name> [--base <ref>] [--cherry-pick <sha|none>]
@@ -17,7 +29,7 @@
 #   --cherry-pick  Commit to cherry-pick on top, or "none" to skip.
 #                  Default: .watcher.npm_migration_commit from asana-config.json.
 #
-# Idempotent: if the worktree already exists it is reused (env.json symlink re-ensured)
+# Idempotent: if the worktree already exists it is reused (env.json copy re-ensured)
 # and its path is returned without re-creating anything.
 #
 # Prints the worktree path on stdout, status on stderr.
@@ -68,10 +80,52 @@ fi
 WT="$WORKTREES_ROOT/$TASK_GID/$REPO"
 BRANCH="agent/$TASK_GID"
 
+# ── APFS clone of node_modules from the main checkout ─────────────────────────
+# Uses cp -c (clonefile) so it's instant and copy-on-write. Both paths live under
+# ~/git, the same APFS volume, so the clone never falls back to a full byte copy.
+# Best-effort: a failure warns and leaves the worktree without node_modules so the
+# session can still recover via its own `npm install`.
+clone_node_modules() {
+  local src="$MAIN_REPO/node_modules"
+  local dst="$WT/node_modules"
+  if [[ ! -d "$src" ]]; then
+    echo ">> setup-task-workspace: WARN — $src not present; skipping node_modules clone" >&2
+    return 0
+  fi
+  if [[ -e "$dst" ]]; then
+    echo ">> setup-task-workspace: node_modules already present in worktree; skipping clone" >&2
+    return 0
+  fi
+  local t0 t1
+  t0=$(date +%s)
+  if cp -cR "$src" "$dst" 2>/tmp/setup-clone.log; then
+    t1=$(date +%s)
+    echo ">> setup-task-workspace: APFS-cloned node_modules in $((t1 - t0))s ($src → $dst)" >&2
+  else
+    echo ">> setup-task-workspace: WARN — node_modules clone failed; session will need a full npm install" >&2
+    cat /tmp/setup-clone.log >&2
+    rm -rf "$dst" 2>/dev/null || true
+  fi
+}
+
+# ── Copy env.json from the main checkout (durable real file, NOT a symlink) ───
+# rm first so we never write *through* an existing symlink into the shared main
+# env.json. See the header comment for why a copy beats a symlink here.
+ensure_env_json() {
+  if [[ -f "$MAIN_REPO/env.json" ]]; then
+    rm -f "$WT/env.json"
+    cp "$MAIN_REPO/env.json" "$WT/env.json"
+    echo ">> setup-task-workspace: copied env.json ← $MAIN_REPO/env.json" >&2
+  else
+    echo ">> setup-task-workspace: WARN — $MAIN_REPO/env.json not found; worktree has NO secrets" >&2
+  fi
+}
+
 # ── Idempotent reuse ──────────────────────────────────────────────────────────
 if git -C "$MAIN_REPO" worktree list --porcelain | grep -qxF "worktree $WT"; then
   echo ">> setup-task-workspace: worktree already exists, reusing $WT" >&2
-  ln -sfn "$MAIN_REPO/env.json" "$WT/env.json" 2>/dev/null || true
+  ensure_env_json
+  clone_node_modules
   echo "$WT"
   exit 0
 fi
@@ -114,13 +168,11 @@ if [[ -n "$CHERRY_PICK" && "$CHERRY_PICK" != "none" ]]; then
   fi
 fi
 
-# ── Symlink env.json (single-source secrets; never a copy) ────────────────────
-if [[ -f "$MAIN_REPO/env.json" ]]; then
-  ln -sfn "$MAIN_REPO/env.json" "$WT/env.json"
-  echo ">> setup-task-workspace: linked env.json → $MAIN_REPO/env.json" >&2
-else
-  echo ">> setup-task-workspace: WARN — $MAIN_REPO/env.json not found; no symlink created" >&2
-fi
+# ── Copy env.json from the main checkout (real file; survives `configure`) ─────
+ensure_env_json
+
+# ── Clone node_modules (after cherry-pick so package.json is in its final state) ─
+clone_node_modules
 
 echo ">> setup-task-workspace: ready $WT (branch $BRANCH)" >&2
 echo "$WT"

@@ -201,9 +201,9 @@ function spawnForTask(task, cfg) {
 
   let simUdid
   try {
-    simUdid = shCapture(`${DIR}/clone-ios-sim.sh --name "agent-sim-${task.gid}"`).split('\n').pop()
+    simUdid = shCapture(`${DIR}/allocate-from-pool.sh --task-gid ${task.gid}`).split('\n').pop()
   } catch (e) {
-    log(`  clone-ios-sim failed (${e.status ?? '?'}) — skipping spawn for ${task.gid}`)
+    log(`  allocate-from-pool failed (${e.status ?? '?'}) — skipping spawn for ${task.gid}`)
     return false
   }
 
@@ -287,6 +287,20 @@ function main() {
   const toSpawn = pending.slice(0, available)
   const deferred = pending.slice(available)
   log(`Pending=${pending.length}, free slots=${available} → spawning ${toSpawn.length}, deferring ${deferred.length}`)
+
+  // Ensure the iOS-sim pool has enough free entries to cover all spawns this
+  // tick. Any dirty entries from prior reaps are refreshed here (delete stale
+  // sim + clone fresh). This is the only place where simctl clone runs;
+  // per-task allocation below is instant.
+  if (toSpawn.length > 0 && !DRY_RUN) {
+    const poolSize = cfg.watcher?.sim_pool?.size || MAX
+    log(`Ensuring iOS sim pool (size=${poolSize})…`)
+    const r = spawnSync(`${DIR}/ensure-sim-pool.sh`, ['--size', String(poolSize)], { stdio: 'inherit' })
+    if (r.status !== 0) {
+      log(`ensure-sim-pool failed (exit ${r.status}) — skipping spawns this tick`)
+      return
+    }
+  }
 
   // Step 6 + 7: spawn each picked task (slot persisted inside spawnForTask).
   for (const task of toSpawn) spawnForTask(task, cfg)

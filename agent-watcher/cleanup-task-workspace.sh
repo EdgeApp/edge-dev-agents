@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # cleanup-task-workspace.sh — Reverse of setup-task-workspace.sh.
 #
-# Removes a per-task worktree, unlinks its env.json symlink, and deletes the
+# Removes a per-task worktree, deletes its env.json copy, and deletes the
 # agent branch if it's safe (the branch matches our `agent/<gid>` convention).
 # Used by rc-watchdog.js during the completion sweep and by gc-worktrees.sh.
 #
@@ -40,9 +40,11 @@ MAIN_REPO="$REPOS_ROOT/$REPO"
 WT="$WORKTREES_ROOT/$TASK_GID/$REPO"
 BRANCH="agent/$TASK_GID"
 
-# Unlink the env.json symlink first so worktree removal can't follow it.
-if [[ -L "$WT/env.json" ]]; then
-  rm -f "$WT/env.json" && echo ">> cleanup-task-workspace: unlinked env.json" >&2
+# Delete the env.json copy first so we scrub the plaintext secrets even if the
+# worktree-remove below fails and the dir lingers. (-e: it's now a real file, not
+# a symlink; older worktrees may still have a symlink — rm -f handles both.)
+if [[ -e "$WT/env.json" || -L "$WT/env.json" ]]; then
+  rm -f "$WT/env.json" && echo ">> cleanup-task-workspace: removed env.json" >&2
 fi
 
 # Remove the worktree (force — it may have build artifacts / uncommitted state).

@@ -44,7 +44,9 @@
       "npm_migration_commit": "Commit cherry-picked onto each fresh agent worktree so RN tooling uses npm not yarn.",
       "worktrees_root": "Where per-task worktrees live: <worktrees_root>/<task-gid>/<repo>/.",
       "repos_root": "Where main repo checkouts live: <repos_root>/<repo>.",
-      "default_repo": "Repo a spawned agent works in (worktree + sim are provisioned for it)."
+      "default_repo": "Repo a spawned agent works in (worktree + sim are provisioned for it).",
+      "sim_pool": "Pre-cloned iOS sims kept ready so per-task spawn is fast (no inline simctl clone). Size defaults to max_concurrent. Lifecycle: free → in_use (on allocate) → dirty (on watchdog reap) → free (next ensure-sim-pool refresh). Refresh deletes the stale sim and clones from master.",
+      "keep_completed_worktrees": "How many completed/retired worktrees to keep on disk for inspection/resume before the watchdog prunes the oldest. On completion the sim + slot are freed immediately; only the worktree is retained. Worktrees with a LIVE session are never counted or pruned. Default 5; set 0 to destroy on completion (old behavior)."
     },
     "default_repo": "edge-react-gui",
     "max_concurrent": 2,
@@ -59,6 +61,10 @@
     },
     "npm_migration_commit": "4d169a59e2",
     "worktrees_root": "~/git/.agent-worktrees",
-    "repos_root": "~/git"
+    "repos_root": "~/git",
+    "sim_pool": {
+      "size": 2
+    },
+    "keep_completed_worktrees": 5
   }
 }
