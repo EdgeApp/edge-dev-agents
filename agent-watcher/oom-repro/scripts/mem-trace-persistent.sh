@@ -24,7 +24,7 @@
 
 set -u
 
-LOG_DIR="$HOME/.config/agent-watcher/oom-repro/logs"
+LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/oom-repro/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/trace-$(date +%Y-%m-%d).log"
 

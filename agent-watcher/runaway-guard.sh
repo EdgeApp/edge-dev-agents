@@ -37,8 +37,9 @@ THRESHOLD=${RUNAWAY_CLI_THRESHOLD:-50}          # per-pgid cli count that trigge
 RECORD_THRESHOLD=${RUNAWAY_RECORD_THRESHOLD:-25} # earlier count that triggers a forensic capture (parents still alive)
 CHECK_INTERVAL=${RUNAWAY_CHECK_INTERVAL:-3}
 LOOP_DURATION=${RUNAWAY_LOOP_DURATION:-57}
-LOG="$HOME/.config/agent-watcher/runaway-guard.log"
-FORENSIC_DIR="$HOME/.config/agent-watcher/oom-repro/forensics"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"; mkdir -p "$STATE_DIR"
+LOG="$STATE_DIR/runaway-guard.log"
+FORENSIC_DIR="$STATE_DIR/forensics"
 CAPTURE="$HOME/.config/agent-watcher/capture-runaway-forensics.sh"
 
 ts() { date "+%Y-%m-%dT%H:%M:%S"; }

@@ -21,55 +21,61 @@ TARGET_CWD="${1:-$PWD}"
 
 [[ -d "$SHARED_DIR" ]] || { echo "Error: shared store $SHARED_DIR not found" >&2; exit 1; }
 
-# Resolve the project root the way Claude keys auto-memory: the main git repo
-# root (worktrees share it via the common git dir), else the cwd outside a repo.
+# Resolve target memory dir(s). Claude keys auto-memory per "project". The docs
+# say worktrees share the MAIN git repo's dir (resolved via the common git dir),
+# but observed ~/.claude/projects also contains cwd-path-keyed dirs. To be robust
+# across Claude versions, link into BOTH the git-root-keyed dir and the literal
+# cwd-keyed dir when they differ (e.g. inside a git worktree).
+cwd_abs="$(cd "$TARGET_CWD" && pwd)"
 common="$(git -C "$TARGET_CWD" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-if [[ -n "$common" ]]; then
-  root="$(cd "$(dirname "$common")" && pwd)"
-else
-  root="$(cd "$TARGET_CWD" && pwd)"
-fi
+if [[ -n "$common" ]]; then gitroot="$(cd "$(dirname "$common")" && pwd)"; else gitroot="$cwd_abs"; fi
 
-# Sanitize: every "/" becomes "-" (e.g. /Users/jon -> -Users-jon).
-san="$(printf '%s' "$root" | sed 's#/#-#g')"
-memdir="$HOME/.claude/projects/$san/memory"
-mkdir -p "$memdir"
+roots=("$gitroot")
+[[ "$cwd_abs" != "$gitroot" ]] && roots+=("$cwd_abs")
 
-# Symlink each shared note (skip a MEMORY.md in the store, if any).
-for f in "$SHARED_DIR"/*.md; do
-  [[ -e "$f" ]] || continue
-  base="$(basename "$f")"
-  [[ "$base" == "MEMORY.md" ]] && continue
-  ln -sfn "$f" "$memdir/$base"
-done
-
-# Rebuild the delimited shared block in MEMORY.md, preserving any other lines.
-MEMDIR="$memdir" SHARED_DIR="$SHARED_DIR" node -e '
-  const fs = require("fs"); const path = require("path");
-  const memDir = process.env.MEMDIR, sharedDir = process.env.SHARED_DIR;
-  const START = "<!-- shared-memory:start -->", END = "<!-- shared-memory:end -->";
-  const files = fs.readdirSync(sharedDir).filter(f => f.endsWith(".md") && f !== "MEMORY.md").sort();
-  const lines = files.map(f => {
-    const txt = fs.readFileSync(path.join(sharedDir, f), "utf8");
-    const fm = /^---\n([\s\S]*?)\n---/.exec(txt);
-    let name = f.replace(/\.md$/, "").replace(/_/g, " "), desc = "";
-    if (fm) {
-      const n = /\bname:\s*"?([^"\n]+)"?/.exec(fm[1]); if (n) name = n[1].trim();
-      const d = /\bdescription:\s*"?([^"\n]+)"?/.exec(fm[1]); if (d) desc = d[1].trim();
+link_into() {
+  local root="$1" san memdir base f
+  # Sanitize the way Claude names project dirs: every "/" AND "." becomes "-"
+  # (e.g. /Users/jon/.agent-worktrees -> -Users-jon--agent-worktrees).
+  san="$(printf '%s' "$root" | sed 's#[/.]#-#g')"
+  memdir="$HOME/.claude/projects/$san/memory"
+  mkdir -p "$memdir"
+  # Symlink each shared note (skip a MEMORY.md in the store, if any).
+  for f in "$SHARED_DIR"/*.md; do
+    [[ -e "$f" ]] || continue
+    base="$(basename "$f")"
+    [[ "$base" == "MEMORY.md" ]] && continue
+    ln -sfn "$f" "$memdir/$base"
+  done
+  # Rebuild the delimited shared block in MEMORY.md, preserving any other lines.
+  MEMDIR="$memdir" SHARED_DIR="$SHARED_DIR" node -e '
+    const fs = require("fs"); const path = require("path");
+    const memDir = process.env.MEMDIR, sharedDir = process.env.SHARED_DIR;
+    const START = "<!-- shared-memory:start -->", END = "<!-- shared-memory:end -->";
+    const files = fs.readdirSync(sharedDir).filter(f => f.endsWith(".md") && f !== "MEMORY.md").sort();
+    const lines = files.map(f => {
+      const txt = fs.readFileSync(path.join(sharedDir, f), "utf8");
+      const fm = /^---\n([\s\S]*?)\n---/.exec(txt);
+      let name = f.replace(/\.md$/, "").replace(/_/g, " "), desc = "";
+      if (fm) {
+        const n = /\bname:\s*"?([^"\n]+)"?/.exec(fm[1]); if (n) name = n[1].trim();
+        const d = /\bdescription:\s*"?([^"\n]+)"?/.exec(fm[1]); if (d) desc = d[1].trim();
+      }
+      return `- [${name}](${f})${desc ? " — " + desc : ""}`;
+    });
+    const block = [START, "<!-- Symlinks to ~/.claude/memory-shared/ — managed by link-shared-memory.sh. Edit the source there. -->", ...lines, END].join("\n");
+    const memFile = path.join(memDir, "MEMORY.md");
+    let cur = fs.existsSync(memFile) ? fs.readFileSync(memFile, "utf8") : "";
+    const re = new RegExp(START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\s\\S]*?" + END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    if (re.test(cur)) {
+      cur = cur.replace(re, block);
+    } else {
+      cur = block + (cur.trim() ? "\n\n" + cur.trim() + "\n" : "\n");
     }
-    return `- [${name}](${f})${desc ? " — " + desc : ""}`;
-  });
-  const block = [START, "<!-- Symlinks to ~/.claude/memory-shared/ — managed by link-shared-memory.sh. Edit the source there. -->", ...lines, END].join("\n");
-  const memFile = path.join(memDir, "MEMORY.md");
-  let cur = fs.existsSync(memFile) ? fs.readFileSync(memFile, "utf8") : "";
-  const re = new RegExp(START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\s\\S]*?" + END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  if (re.test(cur)) {
-    cur = cur.replace(re, block);
-  } else {
-    cur = block + (cur.trim() ? "\n\n" + cur.trim() + "\n" : "\n");
-  }
-  fs.writeFileSync(memFile, cur.replace(/\n{3,}/g, "\n\n").replace(/\s*$/, "\n"));
-'
+    fs.writeFileSync(memFile, cur.replace(/\n{3,}/g, "\n\n").replace(/\s*$/, "\n"));
+  '
+  echo ">> linked into $memdir"
+}
 
-echo ">> linked $(ls "$SHARED_DIR"/*.md 2>/dev/null | grep -v MEMORY.md | wc -l | tr -d ' ') shared note(s) into $memdir"
-echo ">> project root: $root"
+for r in "${roots[@]}"; do link_into "$r"; done
+echo ">> shared notes: $(ls "$SHARED_DIR"/*.md 2>/dev/null | grep -v MEMORY.md | wc -l | tr -d ' ') | roots: ${roots[*]}"

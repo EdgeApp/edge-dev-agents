@@ -6,7 +6,7 @@
 // watcher (allocator), the watchdog (reaper), resume-agent, and gc-worktrees all
 // agree on what's live.
 //
-// State file: ~/.config/agent-watcher/slots.json
+// State file: ${XDG_STATE_HOME:-~/.local/state}/agent-watcher/slots.json
 //   { "slots": [ { slot_index, task_gid, worktree_path, sim_udid, metro_port, spawned_at }, ... ] }
 //
 // Concurrency contract (smoke check D5): every read-modify-write goes through
@@ -31,7 +31,11 @@ const path = require('node:path')
 
 const HOME = process.env.HOME || ''
 const DIR = path.join(HOME, '.config/agent-watcher')
-const SLOTS_PATH = process.env.AGENT_SLOTS_PATH || path.join(DIR, 'slots.json')
+// Machine-local state lives under XDG state (not the committed config dir).
+const STATE_DIR = process.env.XDG_STATE_HOME
+  ? path.join(process.env.XDG_STATE_HOME, 'agent-watcher')
+  : path.join(HOME, '.local/state/agent-watcher')
+const SLOTS_PATH = process.env.AGENT_SLOTS_PATH || path.join(STATE_DIR, 'slots.json')
 const LOCK_PATH = `${SLOTS_PATH}.lock`
 const METRO_BASE_PORT = parseInt(process.env.AGENT_METRO_BASE_PORT || '8081', 10)
 const LOCK_TIMEOUT_MS = 10_000
@@ -157,7 +161,7 @@ function release(taskGid) {
   })
 }
 
-module.exports = { list, get, allocate, release, metroPortForIndex, SLOTS_PATH }
+module.exports = { list, get, allocate, release, metroPortForIndex, SLOTS_PATH, STATE_DIR }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 

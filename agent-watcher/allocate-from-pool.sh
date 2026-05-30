@@ -13,7 +13,8 @@
 set -euo pipefail
 
 DIR="$HOME/.config/agent-watcher"
-POOL="$DIR/pool.json"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"; mkdir -p "$STATE_DIR"
+POOL="$STATE_DIR/pool.json"
 LOCK="$DIR/pool.lock"
 
 TASK_GID=""

@@ -14,7 +14,7 @@ set -euo pipefail
 
 PLIST="$HOME/Library/LaunchAgents/com.jontz.mem-trace.plist"
 LABEL="com.jontz.mem-trace"
-LOG_DIR="$HOME/.config/agent-watcher/oom-repro/logs"
+LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/oom-repro/logs"
 
 case "${1:-}" in
   --status)

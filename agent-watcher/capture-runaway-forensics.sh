@@ -14,7 +14,7 @@
 
 set -u
 PGID="${1:-}"
-DIR="$HOME/.config/agent-watcher/oom-repro/forensics"
+DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/forensics"
 mkdir -p "$DIR"
 TS=$(date +%Y%m%d-%H%M%S)
 OUT="$DIR/runaway-$TS${PGID:+-pgid$PGID}.log"

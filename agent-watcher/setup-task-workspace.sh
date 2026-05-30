@@ -121,11 +121,23 @@ ensure_env_json() {
   fi
 }
 
+link_shared_memory() {
+  # Surface shared Claude memory (orchestration + user context) in this worktree
+  # so the spawned agent sees it. The helper links BOTH the git-root and the
+  # worktree-path memory keyings. Idempotent and non-fatal — never blocks setup.
+  # Output is redirected to stderr so this script's stdout stays just "$WT".
+  local helper="$HOME/.claude/link-shared-memory.sh"
+  if [[ -x "$helper" ]]; then
+    "$helper" "$WT" >&2 || echo ">> setup-task-workspace: WARN — link-shared-memory failed (non-fatal)" >&2
+  fi
+}
+
 # ── Idempotent reuse ──────────────────────────────────────────────────────────
 if git -C "$MAIN_REPO" worktree list --porcelain | grep -qxF "worktree $WT"; then
   echo ">> setup-task-workspace: worktree already exists, reusing $WT" >&2
   ensure_env_json
   clone_node_modules
+  link_shared_memory
   echo "$WT"
   exit 0
 fi
@@ -173,6 +185,9 @@ ensure_env_json
 
 # ── Clone node_modules (after cherry-pick so package.json is in its final state) ─
 clone_node_modules
+
+# ── Surface shared Claude memory in this worktree (non-fatal) ─────────────────
+link_shared_memory
 
 echo ">> setup-task-workspace: ready $WT (branch $BRANCH)" >&2
 echo "$WT"

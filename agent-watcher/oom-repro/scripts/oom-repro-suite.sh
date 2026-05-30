@@ -35,7 +35,7 @@
 set -u
 
 OOM_DIR="$HOME/.config/agent-watcher/oom-repro"
-LOG_DIR="$OOM_DIR/logs/tests"
+LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/oom-repro/logs/tests"
 mkdir -p "$LOG_DIR"
 
 # ─── Prereq checks ───────────────────────────────────────────────────────────
@@ -602,9 +602,9 @@ T6_long_observation() {
   T5_edge_launch
   echo
   echo "T6 setup complete. Now use Edge with the large account normally."
-  echo "  Trace log: ~/.config/agent-watcher/oom-repro/logs/trace-$(date +%Y-%m-%d).log"
+  echo "  Trace log: ${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/oom-repro/logs/trace-$(date +%Y-%m-%d).log"
   echo "  Stop when: load > 30 OR compressor > 30 GB OR you call uncle."
-  echo "  Inspect: tail -f ~/.config/agent-watcher/oom-repro/logs/trace-$(date +%Y-%m-%d).log"
+  echo "  Inspect: tail -f ${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/oom-repro/logs/trace-$(date +%Y-%m-%d).log"
 }
 
 # ─── Driver ──────────────────────────────────────────────────────────────────
@@ -638,4 +638,4 @@ done
 echo
 echo "All requested tests complete."
 echo "  Per-test logs: $LOG_DIR/"
-echo "  Persistent trace: $OOM_DIR/logs/trace-$(date +%Y-%m-%d).log"
+echo "  Persistent trace: ${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/oom-repro/logs/trace-$(date +%Y-%m-%d).log"
