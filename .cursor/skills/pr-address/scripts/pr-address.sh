@@ -511,8 +511,16 @@ case "$CMD" in
       events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
       const latest = events[0] || null
 
+      // Ownership guard (HARD override): if we are not the PR author we must
+      // never rewrite the owner's history. Always preserve fixups so the owner
+      // squashes them at merge. Takes precedence over activity-based derivation;
+      // a missing prAuthor (couldn't resolve) also fails safe to preserve.
+      const isOwner = !!prAuthor && currentUser === prAuthor
+
       let mode
-      if (latest == null) {
+      if (!isOwner) {
+        mode = 'preserve'
+      } else if (latest == null) {
         mode = 'autosquash'
       } else if (latest.type === 'review' && (latest.state === 'APPROVED' || latest.state === 'DISMISSED')) {
         mode = 'autosquash'
@@ -522,6 +530,9 @@ case "$CMD" in
 
       process.stdout.write(JSON.stringify({
         mode,
+        isOwner,
+        prAuthor,
+        currentUser,
         latestHumanActivity: latest
       }) + '\n')
     "
