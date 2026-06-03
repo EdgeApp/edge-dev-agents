@@ -208,6 +208,8 @@ Output is one line of JSON:
 - `{"action": "autosquash", "mode": "autosquash", "newHead": "<sha>"}` — history rewritten, force-pushed. Use `newHead` in the Step 4g status line.
 - `{"action": "push", "mode": "preserve", "newHead": "<sha>"}` — fixups preserved for the active reviewer; force-pushed. Use `newHead` in the Step 4g status line.
 
+**Ownership guard:** if you are not the PR author (`currentUser !== prAuthor`), the helper forces `preserve` mode and squash-stale is a noop — bugbot never rewrites the history of a PR it doesn't own.
+
 If the script exits non-zero, the autosquash hit a conflict. Do NOT emit a status line or run Step 5 — report the error and STOP so the user can resolve manually. An armed cron (from a previous cycle) will keep firing; the next cycle with a clean tree will retry.
 
 Skip this sub-step entirely if Step 4c produced zero fixups.

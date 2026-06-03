@@ -5,12 +5,15 @@
 #
 # POLICY (single source of truth — do not duplicate in skill .md files):
 #
+#   Ownership guard (HARD override, checked first): if the authenticated gh user
+#   is NOT the PR author (currentUser != prAuthor), mode is ALWAYS preserve and
+#   squash-stale is a noop. We never autosquash or otherwise rewrite a PR we
+#   don't own — fixups are left on top for the owner to squash at merge. This
+#   takes precedence over the activity-based derivation below.
+#
 #   Modes — derived from the latest human activity on the PR (formal review,
-#   inline comment, or top-level comment). "Human" = anyone except the
-#   currently authenticated gh user (currentUser) and bots. The GitHub PR
-#   "author" gets no special treatment — in solo PRs (currentUser == prAuthor)
-#   the currentUser exclusion already covers them; in collab PRs they're a
-#   peer reviewer like anyone else.
+#   inline comment, or top-level comment), ONLY when we own the PR. "Human" =
+#   anyone except the currently authenticated gh user (currentUser) and bots.
 #     - autosquash : no human activity yet, OR latest activity is a review
 #                    with state APPROVED or DISMISSED (reviewer is no longer
 #                    actively reviewing).
@@ -121,6 +124,13 @@ LATEST_TS=$(echo "$MODE_JSON" | node -e "
   const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'))
   process.stdout.write(d.latestHumanActivity?.timestamp || '')
 ")
+# Ownership flag from review-mode. When false (we are not the PR author),
+# history must never be rewritten — review-mode already forces MODE=preserve,
+# and squash-stale becomes a hard noop below.
+IS_OWNER=$(echo "$MODE_JSON" | node -e "
+  const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'))
+  process.stdout.write(String(d.isOwner === true))
+")
 
 # Find latest existing fixup commit's timestamp on this branch (if any).
 DEFAULT_UPSTREAM="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
@@ -154,6 +164,12 @@ emit_noop() {
 }
 
 if [[ "$SUBCMD" == "squash-stale" ]]; then
+  # Ownership guard: never squash/rewrite history on a PR we don't own, even if
+  # the timestamp heuristic below would otherwise fire in preserve mode.
+  if [[ "$IS_OWNER" != "true" ]]; then
+    emit_noop "not PR owner — never rewrite owner history"
+    exit 0
+  fi
   if [[ -z "$LATEST_FIXUP_TS" ]]; then
     emit_noop "no existing fixups"
     exit 0
@@ -181,7 +197,9 @@ if [[ "$SUBCMD" == "squash-stale" ]]; then
 fi
 
 # finalize subcommand
-if [[ "$MODE" == "autosquash" ]]; then
+# The "&& IS_OWNER" is belt-and-suspenders: review-mode already forces preserve
+# when we don't own the PR, so a non-owner can never reach the autosquash path.
+if [[ "$MODE" == "autosquash" && "$IS_OWNER" == "true" ]]; then
   if [[ "$CHECK_ONLY" == "true" ]]; then
     emit_json "{action: '$(prefix_action autosquash)', mode: '$MODE', reason: 'no active reviewer'}"
     exit 0

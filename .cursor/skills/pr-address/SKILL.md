@@ -87,7 +87,7 @@ The script returns one of:
 - `{"action": "autosquash", "mode": "...", "newHead": "..."}` — existing fixups were squashed and force-pushed (clean slate for this pass).
 - `{"action": "noop", "mode": "...", "reason": "..."}` — nothing to squash (no existing fixups, or fixups are still part of the current review cycle).
 
-Policy (single source of truth lives in `pr-finalize-fixups.sh`): squash existing fixups when (a) mode is autosquash (no active reviewer), or (b) mode is preserve AND the latest human review timestamp postdates the latest fixup commit (the reviewer has already seen those fixups in their last review and has now come back with new feedback — start fresh).
+Policy (single source of truth lives in `pr-finalize-fixups.sh`): squash existing fixups when (a) mode is autosquash (no active reviewer), or (b) mode is preserve AND the latest human review timestamp postdates the latest fixup commit (the reviewer has already seen those fixups in their last review and has now come back with new feedback — start fresh). **Exception:** if you are not the PR author (`currentUser !== prAuthor`), squash-stale is always a noop — we never rewrite history on a PR we don't own.
 
 If the script exits non-zero (conflict), report and STOP so the user can resolve manually.
 </step>
@@ -187,6 +187,8 @@ The script appends `<!-- addressed:review:ID -->` or `<!-- addressed:comment:ID 
 
 <step id="4" name="Finalize fixups (autosquash or push, mode-dependent)">
 Delegate the autosquash-vs-push decision and execution to the shared finalize helper. It calls `pr-address.sh review-mode` to derive the mode from the latest human activity, then either autosquashes + force-pushes (autosquash mode) or just force-pushes (preserve mode). Policy lives in that one script and is shared with other skills (bugbot) so behavior never drifts.
+
+**Ownership guard:** if you are not the PR author (`currentUser !== prAuthor`), the helper forces `preserve` mode and never autosquashes — we never rewrite the history of a PR we don't own. Fixups stay on top for the owner to squash at merge.
 
 ```bash
 ~/.cursor/skills/pr-finalize-fixups.sh --owner <OWNER> --repo <REPO> --pr <NUMBER>
