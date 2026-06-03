@@ -108,6 +108,29 @@ function checkChangelogPlacement(repoDir, baseRef) {
   return misplaced;
 }
 
+// Locate a worktree (other than the canonical clone) that currently has
+// `branch` checked out. Tools like agent-watcher leave such worktrees behind,
+// and git refuses to `checkout` a branch already held by another worktree.
+// In that case prepare must operate inside that worktree — its content is the
+// same branch. Returns the worktree path, or null if none holds the branch.
+function findWorktreeForBranch(repoDir, branch) {
+  const res = runGit(["worktree", "list", "--porcelain"], repoDir, {
+    allowFailure: true,
+  });
+  if (!res.success || !res.stdout) return null;
+  const target = `refs/heads/${branch}`;
+  let currentPath = null;
+  for (const line of res.stdout.split("\n")) {
+    if (line.startsWith("worktree ")) {
+      currentPath = line.slice("worktree ".length).trim();
+    } else if (line.startsWith("branch ")) {
+      const ref = line.slice("branch ".length).trim();
+      if (ref === target && currentPath) return currentPath;
+    }
+  }
+  return null;
+}
+
 function describeBranchState(repoDir, branch) {
   const parts = [];
   const local = runGit(["rev-parse", branch], repoDir, { allowFailure: true });
@@ -132,8 +155,9 @@ function describeBranchState(repoDir, branch) {
 }
 
 async function prepareBranch(repo, branch) {
-  const repoDir = getRepoDir(repo);
+  const canonicalDir = getRepoDir(repo);
   const upstream = getUpstreamBranch(repo);
+  let repoDir = canonicalDir;
   const result = {
     repo,
     branch,
@@ -143,13 +167,12 @@ async function prepareBranch(repo, branch) {
   };
 
   console.error(`\n=== Preparing ${repo}/${branch} ===`);
-  console.error(`Directory: ${repoDir}`);
 
-  // Step 1: Ensure repo exists
-  if (!existsSync(path.join(repoDir, ".git"))) {
+  // Step 1: Ensure the canonical clone exists
+  if (!existsSync(path.join(canonicalDir, ".git"))) {
     console.error(`Cloning ${repo}...`);
     try {
-      execSync(`git clone git@github.com:EdgeApp/${repo}.git "${repoDir}"`, {
+      execSync(`git clone git@github.com:EdgeApp/${repo}.git "${canonicalDir}"`, {
         stdio: "inherit",
       });
     } catch (e) {
@@ -158,6 +181,18 @@ async function prepareBranch(repo, branch) {
       return result;
     }
   }
+
+  // If the branch is already checked out in another worktree (e.g. left behind
+  // by agent-watcher), git won't let the canonical clone check it out. Operate
+  // inside that worktree instead.
+  const wtDir = findWorktreeForBranch(canonicalDir, branch);
+  if (wtDir && path.resolve(wtDir) !== path.resolve(canonicalDir)) {
+    console.error(`Branch ${branch} is held by worktree: ${wtDir}`);
+    console.error(`Operating inside that worktree.`);
+    repoDir = wtDir;
+    result.repoDir = repoDir;
+  }
+  console.error(`Directory: ${repoDir}`);
 
   // Step 2: Fetch and checkout
   console.error(`Fetching and checking out ${branch}...`);

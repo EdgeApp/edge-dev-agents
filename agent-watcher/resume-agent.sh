@@ -2,7 +2,7 @@
 # resume-agent.sh — Find and resume a watcher-spawned claude session.
 #
 # Watcher-spawned sessions have a unique signature:
-#   (a) project dir is -Users-jontz-git (cwd was ~/git when spawned)
+#   (a) project dir is enc(~/git) — e.g. -Users-<user>-git (cwd was ~/git when spawned)
 #   (b) the first user message starts with `/one-shot --yolo`
 # Filtering on both excludes other claude sessions (this desktop app's history,
 # ad-hoc terminal sessions, etc.) that may incidentally mention the same term.
@@ -79,14 +79,17 @@ recover_slot() {
 }
 
 # Watcher-spawned sessions live under one of two shapes:
-#   ~/.claude/projects/-Users-jontz-git/<uuid>.jsonl
+#   ~/.claude/projects/<enc(~/git)>/<uuid>.jsonl
 #     (legacy: pre-parallelization, cwd was ~/git/)
-#   ~/.claude/projects/-Users-jontz-git--agent-worktrees-<task-gid>-<repo>/<uuid>.jsonl
+#   ~/.claude/projects/<enc(~/git)>--agent-worktrees-<task-gid>-<repo>/<uuid>.jsonl
 #     (current: per-task worktree under ~/git/.agent-worktrees/<gid>/<repo>/)
-# Scan all -Users-jontz-git* dirs and filter by the /one-shot --yolo signature.
+# claude encodes a project dir by replacing every "/" and "." in the cwd with "-".
+# Derive the prefix from $HOME so this works under any macOS user (not just "jontz").
+# Both shapes share the enc(~/git) prefix, so one glob catches them all.
+ENC_GIT_PREFIX=$(printf '%s' "$HOME/git" | sed 's#[/.]#-#g')
 CANDIDATES=()
 shopt -s nullglob
-for d in "$HOME/.claude/projects/-Users-jontz-git"*; do
+for d in "$HOME/.claude/projects/$ENC_GIT_PREFIX"*; do
   [[ -d "$d" ]] || continue
   for f in "$d"/*.jsonl; do
     [[ -f "$f" ]] || continue
@@ -98,7 +101,7 @@ done
 shopt -u nullglob
 
 if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
-  echo "No watcher-spawned sessions found in ~/.claude/projects/-Users-jontz-git*" >&2
+  echo "No watcher-spawned sessions found in ~/.claude/projects/${ENC_GIT_PREFIX}*" >&2
   exit 1
 fi
 

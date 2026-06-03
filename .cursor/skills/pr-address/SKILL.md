@@ -175,7 +175,7 @@ These have no native resolution mechanism. Post a top-level comment with a machi
 
 The script appends `<!-- addressed:review:ID -->` or `<!-- addressed:comment:ID -->` to the body. Subsequent `fetch` calls detect these markers and exclude already-addressed items.
 
-**Skip bot-only no-op items**: If a review body or top-level comment is from a bot user (e.g., `cursor`, `chatgpt-codex-connector`) AND contains no inline threads with actionable suggestions — only a summary or status message — do NOT post a `mark-addressed` comment. Human reviewer items must always be addressed or rejected, even terse ones like "This needs work".
+**Skip bot-only no-op items**: If a review body or top-level comment is from an automated reviewer AND contains no inline threads with actionable suggestions — only a summary or status message — do NOT post a `mark-addressed` comment. The `fetch` script classifies automated reviewers robustly via GraphQL `author.__typename === 'Bot'` (which also strips the `[bot]` suffix, so every Cursor agent — Bugbot and the Cursor Security Reviewer — appears as `cursor`), plus a `[bot]`-suffix fallback and the hard-coded `chatgpt-codex-connector` User account. Human reviewer items must always be addressed or rejected, even terse ones like "This needs work".
 </sub-step>
 
 <sub-step name="Reply guidelines">
