@@ -18,6 +18,7 @@ metadata:
 <rule id="slot-after-each-fixup">Immediately after every successful `lint-commit.sh` call, run `~/.cursor/skills/slot-fixup.sh` to slot the new fixup next to its target's group. This keeps the "every fixup sits next to its target" invariant continuously. If `slot-fixup.sh` exits non-zero (rebase conflict), report and STOP — do not continue the address-pass.</rule>
 <rule id="script-timeouts">GitHub API scripts can take up to 30s. Set `block_until_ms: 60000` when invoking `pr-address.sh`.</rule>
 <rule id="reply-before-resolve">ALWAYS reply explaining how a comment was addressed BEFORE resolving or marking it. No silent resolutions.</rule>
+<rule id="non-owner-reply-only">If you do NOT author the PR (`isOwner: false` in `fetch` output — i.e. `currentUser !== prAuthor`), you may reply to threads and push fixups, but you must NEVER resolve threads (`resolve-thread`) or post `mark-addressed` markers. Resolving/marking mutates the owner's PR state; leave every thread unresolved for the owner. This pairs with the finalize ownership guard (non-owner ⇒ `preserve` mode, never autosquash) — on a PR you don't own: push fixups + reply, never rewrite history, never resolve.</rule>
 <rule id="resolution-source-of-truth">Only explicitly resolved threads (`isResolved: true`) or `<!-- addressed:... -->` markers count as resolved. Recency (commits after a comment) does NOT mean resolved.</rule>
 </rules>
 
@@ -132,6 +133,10 @@ Repeat steps 1–4 for each remaining comment. Do not batch fixes across multipl
 <step id="3" name="Reply and resolve each comment">
 After fixing, reply to every processed comment — addressed or rejected — then resolve it.
 
+**Ownership gate (check `isOwner` from Step 1 `fetch` output first):**
+1. `isOwner: true` (you author the PR) → reply, then resolve threads / mark-addressed as described below.
+2. `isOwner: false` (`currentUser !== prAuthor`) → **reply only**. Do NOT run `resolve-thread` and do NOT run `mark-addressed`. Leave every thread unresolved for the owner. Skip the resolve/mark sub-steps entirely.
+
 <sub-step name="Inline threads (reply → resolve)">
 If a later fix may affect an already-addressed inline thread, inspect the thread first:
 
@@ -221,7 +226,8 @@ Propose modifications to `~/.cursor/rules/typescript-standards.mdc` to prevent s
 <case name="No gh auth">Script exits code 2 with `PROMPT_GH_AUTH`. Prompt user to run `gh auth login` and STOP.</case>
 <case name="No unresolved feedback">Report "No unresolved comments on this PR" and STOP.</case>
 <case name="Reviewer is still active">Mode is `preserve` — fixups are left in place for the reviewer to verify. They get squashed automatically on the NEXT address-pass once the reviewer comes back with more feedback (Step 1.5 squash-stale handles it), or on final merge.</case>
-<case name="Comment already addressed in code">If the current code already handles the feedback (e.g., from a previous fixup), still reply explaining this and resolve/mark the comment. Do not leave it unresolved.</case>
+<case name="Comment already addressed in code">If the current code already handles the feedback (e.g., from a previous fixup), still reply explaining this and resolve/mark the comment. Do not leave it unresolved. (Exception: if `isOwner: false`, reply only — never resolve/mark, per `non-owner-reply-only`.)</case>
+<case name="Not the PR author (isOwner: false)">When `fetch` reports `isOwner: false` (`currentUser !== prAuthor`), reply to every processed thread explaining the fix, but never resolve threads or mark-addressed — leave them for the owner. Combined with the finalize guard, the whole pass on an unowned PR is: push fixups + reply, with no history rewrite and no resolutions.</case>
 <case name="Already resolved thread needs follow-up">Fetch the thread history first. If the prior reply no longer reflects the latest fix, post one additional factual follow-up reply. Do not edit or delete prior replies in this workflow.</case>
 <case name="Slot-fixup conflict">If `slot-fixup.sh` exits non-zero, the rebase has been aborted automatically (working tree is clean) but the new fixup is still at tip, not yet slotted next to its target. Report to the user and STOP. They can either resolve the conflict manually or revert the fixup and re-approach.</case>
 </edge-cases>

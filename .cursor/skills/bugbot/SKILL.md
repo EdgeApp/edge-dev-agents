@@ -175,6 +175,8 @@ Force-with-lease is required because per-fixup slotting (Step 4c.5) rewrote tip.
 <sub-step id="4e" name="Reply and resolve every thread (valid and invalid)">
 For each processed thread, post one reply then resolve. Replies and resolves for independent threads are safe to parallelize (multiple Bash tool calls in one message).
 
+**Ownership gate (check `isOwner` from Step 4a `fetch` output):** if `isOwner: false` (`currentUser !== prAuthor` — not our PR), post the reply but do NOT call `resolve-thread`. Leave threads unresolved for the owner; we never mutate the PR state of a PR we don't own (this pairs with the finalize guard's `preserve` mode). Only resolve when `isOwner: true`.
+
 Valid threads — reply body cites the fixup SHA from Step 4c's record:
 ```bash
 ~/.cursor/skills/pr-address/scripts/pr-address.sh reply \
