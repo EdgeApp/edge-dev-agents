@@ -220,8 +220,13 @@ case "$CMD" in
         body: c.body, createdAt: c.createdAt
       }))
 
+      // isOwner: do we author this PR? When false, the workflow may reply and
+      // push fixups but must NEVER resolve threads, mark-addressed, or rewrite
+      // history. Fails safe to false if prAuthor couldn't be resolved.
+      const isOwner = !!prAuthor && currentUser === prAuthor
+
       console.log(JSON.stringify({
-        prAuthor, currentUser, headRef: pr.headRefName, baseRef: pr.baseRefName,
+        prAuthor, currentUser, isOwner, headRef: pr.headRefName, baseRef: pr.baseRefName,
         hasHumanReviewers: humanCommenters.size > 0,
         humanReviewers: Array.from(humanCommenters),
         threads, reviewBodies, topLevel
