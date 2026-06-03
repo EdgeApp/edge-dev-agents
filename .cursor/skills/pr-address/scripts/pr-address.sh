@@ -92,7 +92,7 @@ case "$CMD" in
       -f query='query($owner: String!, $repo: String!, $number: Int!) {
         repository(owner: $owner, name: $repo) {
           pullRequest(number: $number) {
-            author { login }
+            author { login __typename }
             headRefName
             baseRefName
             reviewThreads(first: 100) {
@@ -103,7 +103,7 @@ case "$CMD" in
                   nodes {
                     databaseId
                     createdAt
-                    author { login }
+                    author { login __typename }
                     path
                     line
                     body
@@ -114,7 +114,7 @@ case "$CMD" in
             reviews(last: 50) {
               nodes {
                 databaseId
-                author { login }
+                author { login __typename }
                 state
                 body
                 submittedAt
@@ -124,7 +124,7 @@ case "$CMD" in
               nodes {
                 databaseId
                 createdAt
-                author { login }
+                author { login __typename }
                 body
               }
             }
@@ -146,7 +146,21 @@ case "$CMD" in
         }
       }
 
-      const isBot = u => !u || u.includes('[bot]') || u === 'cursor'
+      // GraphQL marks bot actors with __typename === 'Bot' and strips the
+      // '[bot]' suffix from their login (so Cursor's Bugbot AND its Security
+      // Reviewer both appear as 'cursor'). Collect every bot login from the
+      // payload so detection covers all automated reviewers (coderabbitai,
+      // github-actions, sonarcloud, copilot, etc.) rather than a hard-coded list.
+      const botLogins = new Set()
+      const noteAuthor = a => { if (a && a.__typename === 'Bot' && a.login) botLogins.add(a.login) }
+      noteAuthor(pr.author)
+      for (const t of pr.reviewThreads.nodes) for (const c of t.comments.nodes) noteAuthor(c.author)
+      for (const r of pr.reviews.nodes) noteAuthor(r.author)
+      for (const c of pr.comments.nodes) noteAuthor(c.author)
+
+      // '[bot]' suffix = REST-sourced login fallback; chatgpt-codex-connector is a
+      // User-typed automation account (no Bot typename) so it stays hard-coded.
+      const isBot = u => !u || botLogins.has(u) || u.includes('[bot]')
       const isAutomatedReviewer = u => isBot(u) || u === 'chatgpt-codex-connector'
 
       const threads = pr.reviewThreads.nodes
@@ -233,7 +247,7 @@ case "$CMD" in
                   nodes {
                     databaseId
                     createdAt
-                    author { login }
+                    author { login __typename }
                     path
                     line
                     body
@@ -410,19 +424,19 @@ case "$CMD" in
       -f query='query($owner: String!, $repo: String!, $number: Int!) {
         repository(owner: $owner, name: $repo) {
           pullRequest(number: $number) {
-            author { login }
+            author { login __typename }
             reviewThreads(first: 100) {
               nodes {
                 comments(first: 50) {
-                  nodes { createdAt author { login } }
+                  nodes { createdAt author { login __typename } }
                 }
               }
             }
             reviews(last: 100) {
-              nodes { author { login } state submittedAt }
+              nodes { author { login __typename } state submittedAt }
             }
             comments(last: 100) {
-              nodes { createdAt author { login } }
+              nodes { createdAt author { login __typename } }
             }
           }
         }
@@ -435,7 +449,18 @@ case "$CMD" in
       const prAuthor = pr.author?.login
       const currentUser = process.env.GH_USER
 
-      const isBot = u => !u || u.includes('[bot]') || u === 'cursor'
+      // Identify bots by GraphQL __typename === 'Bot' (logins lose the '[bot]'
+      // suffix here, so e.g. Cursor's Bugbot and Security Reviewer both show as
+      // 'cursor'). Collect every bot login from the payload — see the fetch
+      // subcommand for the full rationale.
+      const botLogins = new Set()
+      const noteAuthor = a => { if (a && a.__typename === 'Bot' && a.login) botLogins.add(a.login) }
+      noteAuthor(pr.author)
+      for (const t of pr.reviewThreads.nodes) for (const c of t.comments.nodes) noteAuthor(c.author)
+      for (const r of pr.reviews.nodes) noteAuthor(r.author)
+      for (const c of pr.comments.nodes) noteAuthor(c.author)
+
+      const isBot = u => !u || botLogins.has(u) || u.includes('[bot]')
       const isAutomated = u => isBot(u) || u === 'chatgpt-codex-connector'
       // Exclude only currentUser + bots/automated. Works uniformly for solo
       // PRs (currentUser == prAuthor — author/self excluded) and collab PRs

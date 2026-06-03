@@ -42,6 +42,40 @@ function sanitizeBranchLabel(branch) {
   return branch.replace(/[^a-z0-9]/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 }
 
+// Locate a worktree (other than the canonical clone) that currently has
+// `branch` checked out. Tools like agent-watcher leave such worktrees behind,
+// and git refuses to `checkout` a branch already held by another worktree.
+// In that case operate inside that worktree — its content is the same branch.
+// Returns the worktree path, or null if none holds the branch.
+function findWorktreeForBranch(repoDir, branch) {
+  const res = runGit(["worktree", "list", "--porcelain"], repoDir, {
+    allowFailure: true,
+  });
+  if (!res.success || !res.stdout) return null;
+  const target = `refs/heads/${branch}`;
+  let currentPath = null;
+  for (const line of res.stdout.split("\n")) {
+    if (line.startsWith("worktree ")) {
+      currentPath = line.slice("worktree ".length).trim();
+    } else if (line.startsWith("branch ")) {
+      const ref = line.slice("branch ".length).trim();
+      if (ref === target && currentPath) return currentPath;
+    }
+  }
+  return null;
+}
+
+// Resolve the working directory for a branch: the canonical clone unless the
+// branch is held by another worktree, in which case that worktree.
+function resolveRepoDir(repo, branch) {
+  const canonicalDir = getRepoDir(repo);
+  const wtDir = findWorktreeForBranch(canonicalDir, branch);
+  if (wtDir && path.resolve(wtDir) !== path.resolve(canonicalDir)) {
+    return wtDir;
+  }
+  return canonicalDir;
+}
+
 function describeBranchState(repoDir, branch) {
   const notes = [];
   const local = runGit(["rev-parse", branch], repoDir, { allowFailure: true });
@@ -204,11 +238,14 @@ async function main() {
 
   for (let i = 0; i < prs.length; i++) {
     const { repo, prNumber, branch } = prs[i];
-    const repoDir = getRepoDir(repo);
+    const repoDir = resolveRepoDir(repo, branch);
 
     console.error(
       `\n=== Merging ${repo}#${prNumber} (${branch}) [${i + 1}/${prs.length}] ===`
     );
+    if (path.resolve(repoDir) !== path.resolve(getRepoDir(repo))) {
+      console.error(`Branch held by worktree — operating in: ${repoDir}`);
+    }
 
     // CHECK: Is PR already merged?
     const prStatus = checkPRStatus(repo, prNumber);
