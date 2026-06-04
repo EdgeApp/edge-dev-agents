@@ -140,6 +140,13 @@ function attemptRcRevive(session) {
   sh(`tmux send-keys -t "${session}" "<watchdog-revive-ping>" Enter`)
   sh('sleep 8')
   sh(`tmux send-keys -t "${session}" "/remote-control" Enter`)
+  // `/remote-control` opens a blocking modal (Continue / Esc). Left open it
+  // intercepts ALL keystrokes and wedges the session input — prompts and pings
+  // do nothing until dismissed, which is what made idle sessions look "hung".
+  // Dismiss it with Escape ("continue": keeps RC active, just closes the modal)
+  // so this revive probe can never leave the session stuck behind the dialog.
+  sh('sleep 2')
+  sh(`tmux send-keys -t "${session}" Escape`)
 }
 
 function log(msg) {
