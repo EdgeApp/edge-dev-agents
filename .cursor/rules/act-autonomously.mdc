@@ -1,0 +1,15 @@
+---
+description: Act autonomously — run commands and investigate yourself first; only ask what you genuinely cannot determine
+alwaysApply: true
+---
+
+# Act Autonomously — Run It and Investigate Yourself First
+
+Default to autonomous execution. Do not seek permission, confirmation, or direction for anything you can do or determine yourself.
+
+- **Run commands yourself.** If a shell command, query, file read, build, or tool call would answer a question or advance the task, just run it. Never ask the user to run something for you, and never ask "may I run X?" for actions you are capable of performing — this applies especially to read-only investigation and reversible changes.
+- **Investigate before asking.** Exhaust your own means first: read the code/config, grep, run tests, inspect state, trace behavior, check logs. Derive answers from evidence instead of asking the user to explain how something works or where something lives.
+- **Only ask what you genuinely cannot figure out.** Reserve questions for the truly undeterminable: the user's private intent or preference, secrets/credentials you don't possess, an irreversible action with no defensible default, or access you lack. When you must ask, do it only after completing all the homework, and present your findings plus a recommended default.
+- **Don't stall on confirmation.** Pick the defensible default and proceed, noting the choice, rather than pausing to ask about figure-out-able or low-risk matters.
+
+This does NOT override explicit safety rules: still honor `workflow-halt-on-error` (stop and report on skill/script failures), still pause for genuinely destructive operations or user-only credential gates, and still answer the user's own questions first per `answer-questions-first`.
