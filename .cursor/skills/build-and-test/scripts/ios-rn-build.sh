@@ -93,8 +93,42 @@ fi
 echo ">> ios-rn-build: $PM run prepare (via pm.sh)" >&2
 "$PM_SH" run prepare
 
+# Hermes: the podspec probes repo1.maven.org with curl to decide
+# prebuilt-tarball vs build-from-source. Under the sfw package-firewall shim
+# (agent shells), that probe inherits a proxy that fails, silently flipping
+# hermes to build-from-source (needs cmake/make, ~40 min). Pre-fetch the
+# debug tarball with plain curl and pin it; harmless no-op if the fetch
+# fails or the var is already set. (This script always builds Debug.)
+RN_VER="$(node -p "require('./node_modules/react-native/package.json').version" 2>/dev/null || true)"
+if [[ -n "$RN_VER" && -z "${HERMES_ENGINE_TARBALL_PATH:-}" ]]; then
+  HERMES_TARBALL="/tmp/hermes-ios-debug-$RN_VER.tar.gz"
+  HERMES_URL="https://repo1.maven.org/maven2/com/facebook/react/react-native-artifacts/$RN_VER/react-native-artifacts-$RN_VER-hermes-ios-debug.tar.gz"
+  if [[ ! -s "$HERMES_TARBALL" ]]; then
+    echo ">> ios-rn-build: pre-fetching hermes prebuilt tarball ($RN_VER)" >&2
+    curl -fsSL -o "$HERMES_TARBALL" "$HERMES_URL" || rm -f "$HERMES_TARBALL"
+  fi
+  if [[ -s "$HERMES_TARBALL" ]]; then
+    export HERMES_ENGINE_TARBALL_PATH="$HERMES_TARBALL"
+    echo ">> ios-rn-build: HERMES_ENGINE_TARBALL_PATH=$HERMES_TARBALL" >&2
+  fi
+fi
+
 echo ">> ios-rn-build: $PM run prepare.ios (via pm.sh)" >&2
 "$PM_SH" run prepare.ios
+
+# Refuse to race a foreign Metro: if the slot port is already LISTENed by a
+# process running from a DIFFERENT directory (stale Metro from a dead agent
+# session), `react-native run-ios` hangs on an interactive "use another port?"
+# prompt and can exit 0 without building. Fail loudly instead.
+PORT_PID="$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)"
+if [[ -n "$PORT_PID" ]]; then
+  PORT_CWD="$(lsof -a -p "$PORT_PID" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)"
+  if [[ "$PORT_CWD" != "$PWD" ]]; then
+    echo ">> ios-rn-build: FAIL — port $PORT is held by PID $PORT_PID (cwd: ${PORT_CWD:-unknown}), not this repo. Kill the stale Metro or pass a free --port." >&2
+    exit 1
+  fi
+  echo ">> ios-rn-build: reusing Metro already running on port $PORT for this repo" >&2
+fi
 
 RUN_ARGS=(--udid "$UDID")
 if [[ "$PORT" != "8081" ]]; then
@@ -103,5 +137,12 @@ if [[ "$PORT" != "8081" ]]; then
 fi
 echo ">> ios-rn-build: npx react-native run-ios ${RUN_ARGS[*]}  (cold build: 30-60 min)" >&2
 npx react-native run-ios "${RUN_ARGS[@]}"
+
+# run-ios can exit 0 without installing (e.g. after an interactive prompt is
+# EOF'd in a headless shell). PASS only if the app container actually exists.
+if ! xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>&1; then
+  echo ">> ios-rn-build: FAIL — run-ios exited 0 but $BUNDLE_ID is not installed on $UDID" >&2
+  exit 1
+fi
 
 echo ">> ios-rn-build: PASS (fresh build, installed, launched)"
