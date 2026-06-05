@@ -6,7 +6,7 @@
 # rebuild from scratch.
 #
 # Usage:
-#   ios-rn-build.sh --udid <UDID> --bundle-id <co.example.app> [--port <n>] [--force-rebuild]
+#   ios-rn-build.sh --udid <UDID> --bundle-id <co.example.app> [--port <n>] [--force-rebuild] [--skip-install]
 #
 # Env fallbacks (used when the flag is NOT passed): watcher-spawned sessions get
 # these exported automatically, so the build targets the slot's sim + Metro port
@@ -16,9 +16,15 @@
 # When the resolved port differs from 8081, it is passed to `react-native run-ios`
 # so the app connects to this slot's Metro instance, not the default one.
 #
-# Assumes npm (not yarn). edge-react-gui migrated to npm; this script does NOT
-# fall back to yarn. If a future repo uses yarn, add a detection branch or use
-# the top-level install-deps.sh which auto-detects.
+# Package manager is auto-detected from the lockfile via the shared dispatcher
+# ~/.cursor/skills/pm.sh (package-lock.json -> npm, yarn.lock -> yarn). Do not
+# hardcode npm or yarn here; repos migrate between them.
+#
+# --skip-install skips `<pm> install` (still runs prepare/prepare.ios). Use it
+# when node_modules was just provisioned (e.g. APFS-cloned by
+# setup-task-workspace.sh) and the branch has no dependency changes — a
+# re-install on a near-identical tree wastes minutes and, across npm/yarn
+# migrations, can corrupt an otherwise-usable tree.
 #
 # Exit codes:
 #   0 = installed/launched successfully
@@ -27,10 +33,18 @@
 
 set -euo pipefail
 
+# CocoaPods (pod install via prepare.ios) requires a UTF-8 locale; headless
+# agent shells often have no LANG set, which crashes pod with
+# "Unicode Normalization not appropriate for ASCII-8BIT".
+export LANG="${LANG:-en_US.UTF-8}"
+
+PM_SH="$HOME/.cursor/skills/pm.sh"
+
 UDID=""
 BUNDLE_ID=""
 PORT=""
 FORCE=false
+SKIP_INSTALL=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -38,6 +52,7 @@ while [[ $# -gt 0 ]]; do
     --bundle-id)     BUNDLE_ID="$2"; shift 2 ;;
     --port)          PORT="$2";      shift 2 ;;
     --force-rebuild) FORCE=true;     shift ;;
+    --skip-install)  SKIP_INSTALL=true; shift ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -67,14 +82,19 @@ if ! $FORCE && xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>
 fi
 
 # Full build path
-echo ">> ios-rn-build: npm install" >&2
-npm install --no-audit --no-fund
+PM="$("$PM_SH" detect)"
+if $SKIP_INSTALL && [[ -d node_modules ]]; then
+  echo ">> ios-rn-build: --skip-install (node_modules present; pm=$PM)" >&2
+else
+  echo ">> ios-rn-build: $PM install (via pm.sh)" >&2
+  "$PM_SH" install
+fi
 
-echo ">> ios-rn-build: npm run prepare" >&2
-npm run prepare
+echo ">> ios-rn-build: $PM run prepare (via pm.sh)" >&2
+"$PM_SH" run prepare
 
-echo ">> ios-rn-build: npm run prepare.ios" >&2
-npm run prepare.ios
+echo ">> ios-rn-build: $PM run prepare.ios (via pm.sh)" >&2
+"$PM_SH" run prepare.ios
 
 RUN_ARGS=(--udid "$UDID")
 if [[ "$PORT" != "8081" ]]; then
