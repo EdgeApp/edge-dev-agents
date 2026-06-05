@@ -4,8 +4,9 @@
 # Each parallel agent runs in its own worktree so concurrent sessions never share
 # a working tree. The worktree lives at:
 #     ~/git/.agent-worktrees/<task-gid>/<repo>/
-# on a fresh branch `agent/<task-gid>` based on origin/develop (configurable), with
-# the npm-migration commit cherry-picked on top so RN tooling uses npm not yarn.
+# on a fresh branch `agent/<task-gid>` based on origin/develop (configurable).
+# Works for ANY repo under ~/git (gui or a dependency), so one task can have several
+# co-located worktrees that updot can sibling-link.
 # env.json is COPIED (a real file, NOT a symlink) from the main checkout. A symlink is
 # fragile: the repo's `configure` step (scripts/configure.ts → cleaner-config makeConfig)
 # rewrites env.json, and if the link isn't resolving to a real file when that runs, the
@@ -21,13 +22,11 @@
 # only on files it changes; the session's own `npm install` reconciles just the diff.
 #
 # Usage:
-#   setup-task-workspace.sh --task-gid <gid> --repo <name> [--base <ref>] [--cherry-pick <sha|none>]
+#   setup-task-workspace.sh --task-gid <gid> --repo <name> [--base <ref>]
 #
 #   --task-gid     REQUIRED. Asana task GID; namespaces the worktree + branch.
 #   --repo         REQUIRED. Repo name under ~/git, e.g. edge-react-gui.
 #   --base         Base ref for the new branch (default: origin/develop).
-#   --cherry-pick  Commit to cherry-pick on top, or "none" to skip.
-#                  Default: .watcher.npm_migration_commit from asana-config.json.
 #
 # Idempotent: if the worktree already exists it is reused (env.json copy re-ensured)
 # and its path is returned without re-creating anything.
@@ -37,7 +36,7 @@
 # Exit codes:
 #   0 = worktree ready (path on stdout)
 #   1 = error (missing repo, worktree add failed)
-#   2 = usage error OR cherry-pick conflict (caller should treat as a blocker)
+#   2 = usage error
 
 set -euo pipefail
 
@@ -47,34 +46,41 @@ REPOS_ROOT="$HOME/git"
 
 TASK_GID=""
 REPO=""
-BASE="origin/develop"
-CHERRY_PICK="__from_config__"
+BASE=""   # empty = resolve per-repo below (prefer origin/develop, else the repo's default branch)
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --task-gid)    TASK_GID="$2";    shift 2 ;;
     --repo)        REPO="$2";        shift 2 ;;
     --base)        BASE="$2";        shift 2 ;;
-    --cherry-pick) CHERRY_PICK="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
 [[ -n "$TASK_GID" && -n "$REPO" ]] || {
-  echo "Usage: setup-task-workspace.sh --task-gid <gid> --repo <name> [--base <ref>] [--cherry-pick <sha|none>]" >&2
+  echo "Usage: setup-task-workspace.sh --task-gid <gid> --repo <name> [--base <ref>]" >&2
   exit 2
 }
 
 MAIN_REPO="$REPOS_ROOT/$REPO"
 [[ -d "$MAIN_REPO/.git" ]] || { echo "Repo not found or not a git repo: $MAIN_REPO" >&2; exit 1; }
 
-# Resolve the cherry-pick sha from config unless overridden on the CLI.
-if [[ "$CHERRY_PICK" == "__from_config__" ]]; then
-  if [[ -f "$CONFIG" ]] && command -v jq >/dev/null 2>&1; then
-    CHERRY_PICK=$(jq -r '.watcher.npm_migration_commit // "none"' "$CONFIG")
+# Resolve the base ref when not given on the CLI. Edge convention is `develop`;
+# repos that don't use it (most deps/servers) fall back to their actual default
+# branch (origin/HEAD), then origin/main, then origin/master.
+if [[ -z "$BASE" ]]; then
+  if git -C "$MAIN_REPO" rev-parse --verify --quiet "origin/develop" >/dev/null 2>&1; then
+    BASE="origin/develop"
   else
-    CHERRY_PICK="none"
+    BASE="$(git -C "$MAIN_REPO" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/||')"
+    if [[ -z "$BASE" ]]; then
+      for cand in origin/main origin/master; do
+        git -C "$MAIN_REPO" rev-parse --verify --quiet "$cand" >/dev/null 2>&1 && { BASE="$cand"; break; }
+      done
+    fi
   fi
+  [[ -z "$BASE" ]] && BASE="origin/develop"   # last-resort
+  echo ">> setup-task-workspace: base ref for $REPO → $BASE" >&2
 fi
 
 WT="$WORKTREES_ROOT/$TASK_GID/$REPO"
@@ -159,32 +165,10 @@ if ! git -C "$MAIN_REPO" worktree add -b "$BRANCH" "$WT" "$BASE" >/tmp/setup-wt.
 fi
 cat /tmp/setup-wt.log >&2
 
-# ── Cherry-pick the npm migration commit on top ───────────────────────────────
-if [[ -n "$CHERRY_PICK" && "$CHERRY_PICK" != "none" ]]; then
-  if git -C "$WT" merge-base --is-ancestor "$CHERRY_PICK" HEAD 2>/dev/null; then
-    echo ">> setup-task-workspace: $CHERRY_PICK already present in base; skipping cherry-pick" >&2
-  elif git -C "$WT" cherry-pick "$CHERRY_PICK" >/tmp/setup-cp.log 2>&1; then
-    echo ">> setup-task-workspace: cherry-picked $CHERRY_PICK" >&2
-  else
-    # No staged/unstaged delta → the commit was redundant; finish the cherry-pick cleanly.
-    if git -C "$WT" diff --quiet && git -C "$WT" diff --staged --quiet; then
-      git -C "$WT" cherry-pick --skip 2>/dev/null || git -C "$WT" cherry-pick --quit 2>/dev/null || true
-      echo ">> setup-task-workspace: cherry-pick $CHERRY_PICK was empty (already applied); skipped" >&2
-    else
-      echo "cherry-pick of $CHERRY_PICK conflicted:" >&2
-      cat /tmp/setup-cp.log >&2
-      git -C "$WT" cherry-pick --abort 2>/dev/null || true
-      git -C "$MAIN_REPO" worktree remove --force "$WT" 2>/dev/null || true
-      git -C "$MAIN_REPO" branch -D "$BRANCH" 2>/dev/null || true
-      exit 2
-    fi
-  fi
-fi
-
 # ── Copy env.json from the main checkout (real file; survives `configure`) ─────
 ensure_env_json
 
-# ── Clone node_modules (after cherry-pick so package.json is in its final state) ─
+# ── Clone node_modules from the main checkout ───────────────────────────────────
 clone_node_modules
 
 # ── Surface shared Claude memory in this worktree (non-fatal) ─────────────────
