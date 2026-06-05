@@ -18,6 +18,8 @@ DO_STAGE=false
 DO_COMMIT=false
 COMMIT_MSG=""
 DIRECTION="user-to-repo"
+FORCE_WARN=false       # --force: override blocking deletion/stale-local warnings
+FORCE_BRANCH=false     # --force-branch: override the sync-branch safety check
 
 resolve_default_repo_dir() {
   local cwd remote_url default_repo
@@ -75,6 +77,8 @@ while [[ $# -gt 0 ]]; do
     --commit) DO_COMMIT=true; DO_STAGE=true; shift ;;
     -m) COMMIT_MSG="$2"; shift 2 ;;
     --repo-to-user) DIRECTION="repo-to-user"; shift ;;
+    --force) FORCE_WARN=true; shift ;;
+    --force-branch) FORCE_BRANCH=true; shift ;;
     *) REPO_DIR="$1"; shift ;;
   esac
 done
@@ -99,7 +103,9 @@ fi
 USER_DIR="$HOME/.cursor"
 REPO_CURSOR="$REPO_DIR/.cursor"
 DIRS="skills rules scripts"
-SYNCIGNORE="$USER_DIR/.syncignore"
+# .syncignore is canonical in the repo (#4) so a fresh machine inherits the same
+# excludes; fall back to ~/.cursor only if the repo doesn't carry one.
+if [[ -f "$REPO_CURSOR/.syncignore" ]]; then SYNCIGNORE="$REPO_CURSOR/.syncignore"; else SYNCIGNORE="$USER_DIR/.syncignore"; fi
 USER_README="$USER_DIR/README.md"
 REPO_ROOT_README="$REPO_DIR/README.md"
 LEGACY_REPO_README="$REPO_CURSOR/README.md"
@@ -141,6 +147,29 @@ if [[ "$DO_STAGE" == "true" && "$ORIGIN_AHEAD" -gt 0 ]]; then
   echo "Pull first to integrate remote changes, then re-run convention-sync:" >&2
   echo "  cd $REPO_DIR && git pull --rebase" >&2
   exit 1
+fi
+
+# Branch safety (#1, user-to-repo + stage). The top hazard is a fresh clone sitting
+# on the default branch, where `git push origin HEAD` would bypass the sync PR and
+# push straight to main. Refuse the default branch; if an open sync PR exists,
+# require its head branch. Override with --force-branch.
+if [[ "$DO_STAGE" == "true" && "$DIRECTION" == "user-to-repo" && "$FORCE_BRANCH" != "true" ]]; then
+  cur_branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  def_branch="$(git -C "$REPO_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')"
+  [[ -z "$def_branch" ]] && def_branch="main"
+  sync_branch="$(cd "$REPO_DIR" && gh pr list --state open --json headRefName --jq '.[0].headRefName' 2>/dev/null || true)"
+  if [[ "$cur_branch" == "$def_branch" ]]; then
+    echo "ERROR: refusing to sync onto the default branch '$cur_branch'." >&2
+    echo "convention-sync targets a PR branch, not '$def_branch'." >&2
+    [[ -n "$sync_branch" ]] && echo "  cd $REPO_DIR && git checkout $sync_branch" >&2
+    echo "(override with --force-branch only if you truly mean to commit to '$def_branch')." >&2
+    exit 1
+  fi
+  if [[ -n "$sync_branch" && "$cur_branch" != "$sync_branch" ]]; then
+    echo "ERROR: on branch '$cur_branch' but the open sync PR targets '$sync_branch'." >&2
+    echo "  cd $REPO_DIR && git checkout $sync_branch   (or pass --force-branch)" >&2
+    exit 1
+  fi
 fi
 
 # Load ignore patterns from .syncignore (one glob per line, # comments, blank lines skipped)
@@ -189,6 +218,21 @@ local_path_for() {
   else
     printf '%s\n' "$USER_DIR/$entry"
   fi
+}
+
+home_path_for_extra() {
+  # Map a repo-relative extra path (e.g. "agent-watcher/rc-watchdog.js") back to
+  # its canonical home location via the EXTRA_TREES / EXTRA_FILES mappings (#5).
+  local rp="$1" tree src dest pair sfile rel
+  for tree in "${EXTRA_TREES[@]+"${EXTRA_TREES[@]}"}"; do
+    IFS='|' read -r src dest _ <<< "$tree"
+    if [[ "$rp" == "$dest/"* ]]; then printf '%s\n' "$src/${rp#"$dest"/}"; return 0; fi
+  done
+  for pair in "${EXTRA_FILES[@]+"${EXTRA_FILES[@]}"}"; do
+    IFS='|' read -r sfile rel <<< "$pair"
+    if [[ "$rp" == "$rel" ]]; then printf '%s\n' "$sfile"; return 0; fi
+  done
+  return 1
 }
 
 file_mtime() {
@@ -286,7 +330,7 @@ process_extra() {
     if [[ "$mode" == "stage" ]]; then
       mkdir -p "$destpath"
       # rsync stdout → /dev/null so the script's stdout stays pure JSON.
-      rsync -rlpt --delete "${exargs[@]}" "$src/" "$destpath/" >/dev/null
+      rsync -rlptc --delete "${exargs[@]}" "$src/" "$destpath/" >/dev/null
       # Defensive: guarantee excluded files never land in the repo regardless of
       # rsync-implementation exclude quirks (openrsync and rsync honor some bare
       # filename patterns differently — this is why slots.json once slipped through).
@@ -304,10 +348,10 @@ process_extra() {
       while IFS= read -r line; do
         [[ -z "$line" || "$line" == */ ]] && continue
         case "$line" in
-          "sending "*|"sent "*|"total "*|"created "*|"building "*|"delta"*|"Transfer "*|"transferred "*|"."|"./") continue ;;
+          "sending "*|"sent "*|"total "*|"created "*|"building "*|"delta"*|"Transfer "*|"transferred "*|"deleting "*|"deleting"|"."|"./") continue ;;
         esac
         extra_json=$(echo "$extra_json" | jq --arg f "$dest/$line" '. + [$f]')
-      done < <(rsync -rlpt -n -v --delete "${exargs[@]}" "$src/" "$destpath/" 2>/dev/null)
+      done < <(rsync -rlptc -n -v --delete "${exargs[@]}" "$src/" "$destpath/" 2>/dev/null)
     fi
   done
   for pair in "${EXTRA_FILES[@]+"${EXTRA_FILES[@]}"}"; do
@@ -329,6 +373,75 @@ process_extra() {
   done
 }
 
+# Reverse of process_extra (#5): pull the portable trees repo → home for
+# --repo-to-user, so de-staling a second machine restores extra-tree files (e.g.
+# agent-watcher scripts) — not just ~/.cursor. NO --delete: home-local state/secret
+# files (credentials.json, pool.json, …) are excluded from the repo and must never
+# be removed from home.
+process_extra_reverse() {
+  local mode="$1" tree src dest excludes destpath pair sfile rel rp pat line
+  local exargs expats
+  extra_json="[]"
+  for tree in "${EXTRA_TREES[@]+"${EXTRA_TREES[@]}"}"; do
+    IFS='|' read -r src dest excludes <<< "$tree"
+    destpath="$REPO_DIR/$dest"
+    [[ -d "$destpath" ]] || continue
+    exargs=(); expats=()
+    IFS=',' read -ra expats <<< "$excludes"
+    for pat in "${expats[@]+"${expats[@]}"}"; do [[ -n "$pat" ]] && exargs+=( "--exclude=$pat" ); done
+    if [[ "$mode" == "stage" ]]; then
+      mkdir -p "$src"
+      rsync -rlptc "${exargs[@]}" "$destpath/" "$src/" >/dev/null
+    else
+      while IFS= read -r line; do
+        [[ -z "$line" || "$line" == */ ]] && continue
+        case "$line" in
+          "sending "*|"sent "*|"total "*|"created "*|"building "*|"delta"*|"Transfer "*|"transferred "*|"deleting "*|"deleting"|"."|"./") continue ;;
+        esac
+        extra_json=$(echo "$extra_json" | jq --arg f "$dest/$line" '. + [$f]')
+      done < <(rsync -rlptc -n -v "${exargs[@]}" "$destpath/" "$src/" 2>/dev/null)
+    fi
+  done
+  for pair in "${EXTRA_FILES[@]+"${EXTRA_FILES[@]}"}"; do
+    IFS='|' read -r sfile rel <<< "$pair"
+    rp="$REPO_DIR/$rel"
+    [[ -f "$rp" ]] || continue
+    if [[ "$mode" == "stage" ]]; then
+      mkdir -p "$(dirname "$sfile")"; cp "$rp" "$sfile"
+    else
+      if [[ ! -f "$sfile" ]] || ! diff -q "$rp" "$sfile" >/dev/null 2>&1; then
+        extra_json=$(echo "$extra_json" | jq --arg f "$rel" '. + [$f]')
+      fi
+    fi
+  done
+}
+
+extra_deletion_warnings() {
+  # Flag repo extra-tree files MISSING from home (#5): a user→repo sync would
+  # --delete them. Mirrors compare_dirs' deletion protection for the portable
+  # trees, so a stale/incomplete machine can't silently remove another machine's
+  # extra-tree work. Honors each tree's excludes.
+  local tree src dest excludes destpath rel pat skip expats
+  for tree in "${EXTRA_TREES[@]+"${EXTRA_TREES[@]}"}"; do
+    IFS='|' read -r src dest excludes <<< "$tree"
+    destpath="$REPO_DIR/$dest"
+    [[ -d "$destpath" ]] || continue
+    expats=(); IFS=',' read -ra expats <<< "$excludes"
+    while IFS= read -r rel; do
+      [[ -z "$rel" ]] && continue
+      skip=false
+      for pat in "${expats[@]+"${expats[@]}"}"; do
+        [[ -z "$pat" ]] && continue
+        # shellcheck disable=SC2053
+        if [[ "$rel" == $pat || "$(basename "$rel")" == $pat || "$rel" == $pat/* ]]; then skip=true; break; fi
+      done
+      $skip && continue
+      [[ -e "$src/$rel" ]] && continue
+      add_warning "$dest/$rel" "deletion" "$(last_commit_short "$dest/$rel")"
+    done < <(cd "$destpath" && find . -type f ! -name '.DS_Store' | sed 's|^\./||')
+  done
+}
+
 extra_total=0
 if [[ "$DIRECTION" == "user-to-repo" ]]; then
   compare_readme "$USER_README" "$REPO_ROOT_README"
@@ -340,9 +453,30 @@ if [[ "$DIRECTION" == "user-to-repo" ]]; then
 
   process_extra "dryrun"
   extra_total=$(echo "$extra_json" | jq 'length')
+
+  # Extra-tree staleness warnings (#5): give the portable trees the same
+  # protection as ~/.cursor. For each differing extra file, if the repo's last
+  # commit is newer than the local copy, flag stale-local so the safety gate
+  # above catches it before it can clobber another machine's work.
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    home_p="$(home_path_for_extra "$entry")" || continue
+    commit_ts="$(last_commit_ts "$entry")"
+    [[ -z "$commit_ts" ]] && continue
+    home_mtime="$(file_mtime "$home_p")"
+    [[ -z "$home_mtime" ]] && continue
+    if [[ "$commit_ts" -gt "$home_mtime" ]]; then
+      add_warning "$entry" "stale-local" "$(last_commit_short "$entry")"
+    fi
+  done < <(echo "$extra_json" | jq -r '.[]')
+
+  extra_deletion_warnings            # #5: flag repo extra files home would --delete
 else
   compare_readme "$REPO_ROOT_README" "$USER_README"
   compare_dirs "$REPO_CURSOR" "$USER_DIR"
+
+  process_extra_reverse "dryrun"            # #5: reverse-sync the portable trees too
+  extra_total=$(echo "$extra_json" | jq 'length')
 fi
 
 total=$(echo "$new_json $mod_json $del_json" | jq -s '.[0] + .[1] + .[2] | length')
@@ -408,6 +542,27 @@ fi
 # Regenerate ~/.claude/CLAUDE.md from alwaysApply rules
 if [[ -x "$SCRIPT_DIR/generate-claude-md.sh" ]]; then
   "$SCRIPT_DIR/generate-claude-md.sh" >/dev/null
+fi
+
+# Safety gate (#2/#3/#6): refuse a staging run that would DELETE or overwrite
+# canonical files with stale local copies. These warnings used to be advisory —
+# that was the exact hole that let a stale/incomplete machine clobber another
+# machine's work. Block by default; override with --force.
+if [[ "$DO_STAGE" == "true" && "$DIRECTION" == "user-to-repo" && "$FORCE_WARN" != "true" ]]; then
+  blocking=$(echo "$warnings_json" | jq '[.[] | select(.kind=="deletion" or .kind=="stale-local" or .kind=="re-adding-deleted")] | length')
+  if [[ "$blocking" -gt 0 ]]; then
+    echo "ERROR: $blocking blocking warning(s) — this sync would delete or revert canonical files:" >&2
+    echo "$warnings_json" | jq -r '.[] | select(.kind=="deletion" or .kind=="stale-local" or .kind=="re-adding-deleted") | "  [\(.kind)] \(.file)  (\(.lastCommit))"' >&2
+    outgoing=$(echo "$new_json" | jq 'length')
+    if [[ "$outgoing" -gt 0 ]]; then
+      echo "Bidirectional divergence: also $outgoing local-only addition(s) to push." >&2
+      echo "Fix order: 'convention-sync --repo-to-user --stage' (de-stale this machine), then re-run to push." >&2
+    else
+      echo "This machine is stale — run 'convention-sync --repo-to-user --stage' to update it instead of overwriting upstream." >&2
+    fi
+    echo "To overwrite upstream anyway: re-run with --force." >&2
+    exit 1
+  fi
 fi
 
 if [[ "$DO_STAGE" == true ]] && (( total + extra_total > 0 )); then
@@ -478,6 +633,9 @@ if [[ "$DO_STAGE" == true ]] && (( total + extra_total > 0 )); then
       [[ -z "$f" ]] && continue
       rm -f "$USER_DIR/$f"
     done <<< "$all_del"
+
+    process_extra_reverse "stage"           # #5: restore portable trees to home
+    extra_total=$(echo "$extra_json" | jq 'length')
   fi
 fi
 
