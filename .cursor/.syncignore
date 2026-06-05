@@ -4,3 +4,15 @@
 # WIP commands
 commands/hudl.md
 commands/github-pr-hudl.sh
+
+# --- Maestro flows -----------------------------------------------------------
+# The build-and-test harness ships ONE canonical, reusable flow a fresh machine
+# needs — capture-buy-quote.sh defaults to skills/build-and-test/maestro/
+# buy-quote-input.yaml — so buy-quote*.yaml MUST keep syncing.
+#
+# Task/feature-specific flows an agent authors mid-run (e.g. the Maya swap-*
+# flows) are GUI dev artifacts, NOT agent conventions. Keep them LOCALLY for
+# reuse, but never push them to the agent repo. Until the orchestration
+# "where do per-task yamls live" strategy is finalized, list those task-flow
+# families here so the leak can't recur.
+skills/build-and-test/maestro/swap-*.yaml
