@@ -46,19 +46,21 @@ REPOS_ROOT="$HOME/git"
 
 TASK_GID=""
 REPO=""
-BASE=""   # empty = resolve per-repo below (prefer origin/develop, else the repo's default branch)
+BASE=""        # empty = resolve per-repo below (prefer origin/develop, else the repo's default branch)
+BRANCH_ARG=""  # explicit branch name; default is "$GIT_BRANCH_PREFIX/<gid>" (see below)
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --task-gid)    TASK_GID="$2";    shift 2 ;;
     --repo)        REPO="$2";        shift 2 ;;
     --base)        BASE="$2";        shift 2 ;;
+    --branch)      BRANCH_ARG="$2";  shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
 [[ -n "$TASK_GID" && -n "$REPO" ]] || {
-  echo "Usage: setup-task-workspace.sh --task-gid <gid> --repo <name> [--base <ref>]" >&2
+  echo "Usage: setup-task-workspace.sh --task-gid <gid> --repo <name> [--base <ref>] [--branch <name>]" >&2
   exit 2
 }
 
@@ -84,7 +86,10 @@ if [[ -z "$BASE" ]]; then
 fi
 
 WT="$WORKTREES_ROOT/$TASK_GID/$REPO"
-BRANCH="agent/$TASK_GID"
+# Branch: explicit --branch wins (one-shot passes "$GIT_BRANCH_PREFIX/<short-name>");
+# otherwise default to "$GIT_BRANCH_PREFIX/<gid>" (prefix defaults to "jon"), matching
+# the /im convention instead of the opaque agent/<gid>.
+BRANCH="${BRANCH_ARG:-${GIT_BRANCH_PREFIX:-jon}/$TASK_GID}"
 
 # ── APFS clone of node_modules from the main checkout ─────────────────────────
 # Uses cp -c (clonefile) so it's instant and copy-on-write. Both paths live under

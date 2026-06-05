@@ -44,7 +44,7 @@ Optional flags:
 
 **Per-task worktrees (you create them).** When the agent-watcher spawns this session as a parallel slot, the working directory is `~/git` — NOT a pre-made worktree. Once the plan (step 2) identifies the target repo(s), create a dedicated, co-located worktree for each repo this task will modify:
 
-`~/.config/agent-watcher/setup-task-workspace.sh --task-gid <gid> --repo <name>` → prints the worktree path.
+`~/.config/agent-watcher/setup-task-workspace.sh --task-gid <gid> --repo <name> --branch "${GIT_BRANCH_PREFIX:-jon}/<short-name>"` → prints the worktree path. Derive `<short-name>` as a short kebab-case slug from the task title (same convention as `/im`'s `$GIT_BRANCH_PREFIX/<short-description>`, e.g. `upgrade-piratechain-sdks`) — descriptive, NOT the opaque task GID. Use the SAME `<short-name>` branch across every repo of this task.
 
 They land together under `~/git/.agent-worktrees/<task-gid>/<repo>/` on branch `agent/<task-gid>` off `origin/develop`, with `env.json` copied in and `node_modules` APFS-cloned, so tooling + secrets work without extra setup. `cd` into the PRIMARY repo's worktree and do all build/test/commit/push there. (Manual, non-watcher runs already sit in a normal `~/git/<repo>` checkout — skip this provisioning.)
 
@@ -96,11 +96,11 @@ Honor `yolo-stop-at-pr` strictly: never merge, never tag, never deploy. The only
 <step id="7" name="Report (attach run report, then Complete)">
 Build the run report and attach it, THEN mark Complete. Per `report-as-attachment`, this attachment (not comments) is how the run is documented.
 
-1. Copy `~/.cursor/skills/one-shot/templates/agent-run-report.md` to a scratch path (e.g. `/tmp/agent-run-report-<gid>.md`). Fill the frontmatter (`outcome: complete`, `verified`, `verify_blockers`, repo/branch/pr, started/ended, `skills_used`) and every section. Use `_None observed._` for empty sections; keep it dense (bullets, signal over prose). Map content to sections:
+1. Copy `~/.cursor/skills/one-shot/templates/agent-run-report.md` to a scratch path named with BOTH the GID and the task short-name: `/tmp/agent-run-report-<gid>-<short-name>.md`. Fill the frontmatter — set `agent_session_uuid` from `$AGENT_SESSION_UUID` (the orchestration session that ran this), plus `outcome: complete`, `verified`, `verify_blockers`, repo/branch/pr, started/ended, `skills_used` — and every section. Use `_None observed._` for empty sections; keep it dense (bullets, signal over prose). Map content to sections:
    - phases that ran (`/asana-plan`, `/im`, `/pr-create`, `/build-and-test`) + watch-loop iteration counts → **Summary**.
    - in `--yolo`, every auto-deferred decision (question, default chosen, reversibility) → **Decisions**.
    - build/test/debug learnings → **Dev Notes & Gotchas** (inline-tagged). Harness friction → **Orchestration**. Skill defects → **Skill Gaps**. Missing/weak task inputs → **Task-Drafting Feedback**.
-2. Attach it: `asana-task-update.sh --task <gid> --attach-file /tmp/agent-run-report-<gid>.md --attach-name agent-run-report.md`. (Optionally one pointer comment.) Skip if no task GID (ad-hoc task) and report in chat only.
+2. Attach it: `asana-task-update.sh --task <gid> --attach-file /tmp/agent-run-report-<gid>-<short-name>.md --attach-name agent-run-report-<short-name>.md`. (Optionally one pointer comment.) Skip if no task GID (ad-hoc task) and report in chat only.
 3. Set agent_status=Complete — ONLY after `finalize-gate` reports all-green.
 4. Return a short chat summary + PR URL + phases ran.
 

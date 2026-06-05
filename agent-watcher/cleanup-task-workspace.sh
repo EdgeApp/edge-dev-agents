@@ -38,7 +38,11 @@ done
 
 MAIN_REPO="$REPOS_ROOT/$REPO"
 WT="$WORKTREES_ROOT/$TASK_GID/$REPO"
-BRANCH="agent/$TASK_GID"
+# The branch is no longer the opaque agent/<gid> — setup may have named it
+# "$GIT_BRANCH_PREFIX/<short-name>". Read the worktree's actual HEAD branch BEFORE
+# we remove the worktree; fall back to the legacy name if the worktree is gone.
+BRANCH="$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+[[ -z "$BRANCH" || "$BRANCH" == "HEAD" ]] && BRANCH="agent/$TASK_GID"
 
 # Delete the env.json copy first so we scrub the plaintext secrets even if the
 # worktree-remove below fails and the dir lingers. (-e: it's now a real file, not
@@ -56,11 +60,17 @@ if [[ -d "$MAIN_REPO/.git" ]]; then
     git -C "$MAIN_REPO" worktree prune 2>/dev/null || true
   fi
 
-  # Delete the agent branch — safe because it matches our own naming convention.
-  if git -C "$MAIN_REPO" show-ref --verify --quiet "refs/heads/$BRANCH"; then
-    git -C "$MAIN_REPO" branch -D "$BRANCH" >/dev/null 2>&1 \
-      && echo ">> cleanup-task-workspace: deleted branch $BRANCH" >&2 \
-      || echo ">> cleanup-task-workspace: WARN — could not delete branch $BRANCH" >&2
+  # Delete the branch — but ONLY if it matches one of our agent naming conventions
+  # (agent/* or "$GIT_BRANCH_PREFIX/*"). NEVER delete a shared branch (develop/main/…).
+  PREFIX="${GIT_BRANCH_PREFIX:-jon}"
+  if [[ "$BRANCH" == agent/* || "$BRANCH" == "$PREFIX"/* ]]; then
+    if git -C "$MAIN_REPO" show-ref --verify --quiet "refs/heads/$BRANCH"; then
+      git -C "$MAIN_REPO" branch -D "$BRANCH" >/dev/null 2>&1 \
+        && echo ">> cleanup-task-workspace: deleted branch $BRANCH" >&2 \
+        || echo ">> cleanup-task-workspace: WARN — could not delete branch $BRANCH" >&2
+    fi
+  else
+    echo ">> cleanup-task-workspace: WARN — branch '$BRANCH' isn't agent/* or $PREFIX/*; NOT deleting (safety)" >&2
   fi
 else
   echo ">> cleanup-task-workspace: WARN — main repo $MAIN_REPO missing; skipping git teardown" >&2

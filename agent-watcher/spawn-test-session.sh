@@ -82,6 +82,15 @@ fi
 
 # Build the per-slot env exports (empty in legacy mode).
 ENV_EXPORTS=""
+# A stable UUID for this agent run, exported so the agent can stamp it into the
+# plan + run-report docs for traceability. Logged here so the watcher records the
+# task→session-uuid mapping.
+AGENT_SESSION_UUID="$(uuidgen 2>/dev/null || true)"
+if [[ -n "$AGENT_SESSION_UUID" ]]; then
+  ENV_EXPORTS+="export AGENT_SESSION_UUID=\"$AGENT_SESSION_UUID\"
+"
+  echo ">> spawn-test-session: agent session uuid $AGENT_SESSION_UUID (task ${TASK_GID:-?})" >&2
+fi
 if [[ -n "$SLOT_INDEX" ]]; then
   [[ -n "$SIM_UDID" ]]   && ENV_EXPORTS+="export AGENT_SIM_UDID=\"$SIM_UDID\"
 "

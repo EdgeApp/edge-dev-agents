@@ -1,6 +1,7 @@
 ---
 task_gid: ""
 task_name: ""
+agent_session_uuid: ""   # $AGENT_SESSION_UUID — the orchestration session that produced this run
 repo: ""
 branch: ""
 base: origin/develop

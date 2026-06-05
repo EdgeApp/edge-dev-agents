@@ -11,7 +11,7 @@ metadata:
 <rules description="Non-negotiable constraints.">
 <rule id="task-review-for-asana">If input is an Asana task URL, read and follow `~/.cursor/skills/task-review/SKILL.md` steps 1-3 before planning.</rule>
 <rule id="no-impl-before-confirm">Do not start implementation while in this skill. End by asking for confirmation.</rule>
-<rule id="create-plan-required">Use Cursor's plan tool to output the plan document to the normal planning location.</rule>
+<rule id="create-plan-required">Output the plan document to the normal planning location. Name the plan file with BOTH the Asana task GID and a short kebab-case title (e.g. `plan-<gid>-<short-title>.md`), never the GID alone — opaque names are hard to scan. Stamp the orchestration session into the plan: when `$AGENT_SESSION_UUID` is set, record it in the plan's header (e.g. an `agent_session_uuid:` frontmatter line), so the plan is traceable to the session that produced it. In Cursor, use the plan tool; in headless/orchestration runs, write the plan to that named file.</rule>
 </rules>
 
 <step id="1" name="Resolve input mode">

@@ -22,7 +22,7 @@ Verify the active repo builds cleanly before /one-shot marks a task complete. Re
 <rule id="testid-backfill-commit">Scoped exception to `no-mutation`, test-infrastructure only. When the maestro flow had to fall back to coordinate-based taps because a component it drives lacks a `testID` prop, add `testID`s to those component(s) so the selector can target them stably, then commit JUST those testID additions as a SEPARATE commit — message `test: add missing testIDs for maestro selectors` — distinct from the feature commit, so PR history stays clean and future runs are faster and less brittle. Constraints: only when a real coordinate-fallback actually occurred (testIDs genuinely missing); change ONLY `testID` props, never component logic; update the corresponding maestro selector(s) to use the new testID. If no coordinate fallback was needed, do nothing.</rule>
 <rule id="single-asset-plugin-trim">OPTIMIZATION (optional, LOCAL-ONLY — never committed). When the task targets a SINGLE asset and the maestro test needs to drive that asset's wallet, you MAY temporarily comment out the unrelated currency plugins in the gui worktree's `src/util/corePlugins.ts` (the `currencyPlugins` map) — keeping the plugin(s) the task needs — to cut app load/init time (fewer plugins to spin up). This is a test-harness speedup ONLY: it must NEVER land in a commit or PR. Revert it before any commit, or rely on it living only in the throwaway test build; if you commit after trimming, verify `git status`/`git diff` does NOT include `corePlugins.ts`. Skip entirely for multi-asset tasks or tasks that don't drive a wallet.</rule>
 <rule id="scripts-over-inline">Deterministic operations (sim selection, RN build, capture loop) MUST run via the companion scripts under `~/.cursor/skills/build-and-test/scripts/`. Do not inline their logic as raw bash blocks in this SKILL.md or in agent reasoning.</rule>
-<rule id="npm-only-for-edge-react-gui">edge-react-gui uses npm (package-lock.json present, no yarn.lock). All scripts in this skill use npm. Never invoke `yarn` against edge-react-gui.</rule>
+<rule id="lockfile-driven-pm">Never assume a repo's package manager — repos migrate between npm and yarn (edge-react-gui is currently yarn-locked; package-lock.json was removed upstream). All install/run/pack operations go through the shared dispatcher `~/.cursor/skills/pm.sh`, which detects the lockfile (`package-lock.json`→npm, `yarn.lock`→yarn, both/neither→npm). Companion scripts in this skill already dispatch through it; do not hand-write `npm ...`/`yarn ...` against a repo without checking `pm.sh detect`.</rule>
 <rule id="gui-dependency-integration">A change to an EdgeApp gui DEPENDENCY is NOT fully tested until it runs in the app — its own `tsc`/jest passing is necessary but NOT sufficient. Gui dependencies = the Edge-owned repos `edge-react-gui` consumes: `edge-core-js`, `edge-currency-accountbased`, `edge-currency-plugins`, `edge-exchange-plugins`, `edge-login-ui-rn`, `edge-currency-monero`, `react-native-piratechain`, `react-native-zcash`, `react-native-zano`. When the repo under test is one of these, after its own checks you MUST also run the gui integration test, autonomously (NO prompting):
 1. **Co-located gui worktree:** ensure one exists — create via `~/.config/agent-watcher/setup-task-workspace.sh --task-gid <gid> --repo edge-react-gui` if absent (sibling of the dep worktree under `~/git/.agent-worktrees/<gid>/`, so updot can find it).
 2. **Link the MODIFIED dep into the app — the mechanism, and whether you flip any `DEBUG_*` flag, is YOUR per-task call** (depends on what the task changed and how you want to verify it; it is NOT a fixed per-dep rule). Run repo scripts with each repo's package manager (lockfile: `yarn.lock`→yarn, `package-lock.json`→npm; **yarn is being phased out — check, don't assume**). The toolbox:
@@ -104,7 +104,7 @@ Return success exit only on PASS.
 Run, in order:
 
 ```bash
-[ -d node_modules ] || npm install --no-audit --no-fund
+[ -d node_modules ] || ~/.cursor/skills/pm.sh install
 npx tsc --noEmit
 ```
 
@@ -122,8 +122,8 @@ build-and-test: FAIL — <command> exit <code>
 
 <step id="2" name="Node path (no TypeScript)">
 ```bash
-[ -d node_modules ] || npm install --no-audit --no-fund
-npm test
+[ -d node_modules ] || ~/.cursor/skills/pm.sh install
+~/.cursor/skills/pm.sh run test
 ```
 
 Same PASS/FAIL contract as step 1.
