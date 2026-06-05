@@ -40,7 +40,13 @@ Optional flags:
 - `--asana-attach` (opt-in to the Asana ↔ GitHub widget attach step — requires the integration to be enabled at the workspace and `ASANA_GITHUB_SECRET` to be set; off by default per `no-attach-default`)
 - `--yolo` (hands-off mode: defer soft questions to a final summary, only block on true-blockers — see `yolo-hands-off-mode` and `yolo-true-blockers` rules)
 
-**Per-task worktree:** when the agent-watcher spawns this session as a parallel slot, the working directory is a dedicated git worktree under `~/git/.agent-worktrees/<task-gid>/<repo>/`, not the main `~/git/<repo>` checkout. Treat it as a normal checkout — build, test, commit, and push from there exactly as usual. The branch (`agent/<task-gid>`) is pre-created off `origin/develop` with the npm-migration commit cherry-picked on top when the repo needs it, and `env.json` is copied in from the main checkout, so npm tooling and secrets work without extra setup.
+**Per-task worktrees (you create them).** When the agent-watcher spawns this session as a parallel slot, the working directory is `~/git` — NOT a pre-made worktree. Once the plan (step 2) identifies the target repo(s), create a dedicated, co-located worktree for each repo this task will modify:
+
+`~/.config/agent-watcher/setup-task-workspace.sh --task-gid <gid> --repo <name>` → prints the worktree path.
+
+They land together under `~/git/.agent-worktrees/<task-gid>/<repo>/` on branch `agent/<task-gid>` off `origin/develop`, with `env.json` copied in and `node_modules` APFS-cloned, so tooling + secrets work without extra setup. `cd` into the PRIMARY repo's worktree and do all build/test/commit/push there. (Manual, non-watcher runs already sit in a normal `~/git/<repo>` checkout — skip this provisioning.)
+
+**Editing an EdgeApp gui dependency (edge-core-js, edge-currency-accountbased, edge-exchange-plugins, edge-currency-plugins, edge-login-ui-rn, …).** If the task changes `edge-react-gui` AND a dependency repo, create a co-located worktree for BOTH — because they're siblings under the same `<task-gid>/` dir, `updot` finds the *modified* dep. In the gui worktree, run the repo's updot to build the dep and copy it into the gui worktree's `node_modules` (currently `yarn updot <dep> && yarn prepare`; add `yarn prepare.ios` when the dep is `edge-core-js`). Leave ALL `DEBUG_*` env.json flags FALSE — those switch the app to a localhost plugin dev-server that isn't running in a headless slot; `updot` is the headless linking mechanism.
 </step>
 
 <step id="2" name="Plan/context phase">
@@ -53,7 +59,7 @@ If `--yolo` is active, do NOT wait for user confirmation — accept the plan and
 </step>
 
 <step id="3" name="Implementation phase">
-Set agent_status=Developing. Then run `/im` using the approved `/asana-plan` output.
+First provision the workspace (per **Per-task worktrees** above): from the plan, create a co-located worktree for the target repo — plus any gui-dependency repos the task modifies, then `updot`-link them into the gui worktree — and `cd` into the primary repo's worktree. (Skip on manual non-watcher runs already inside a normal checkout.) Then set agent_status=Developing and run `/im` using the approved `/asana-plan` output.
 </step>
 
 <step id="4" name="PR phase">

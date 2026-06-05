@@ -172,11 +172,11 @@ function waitRcReadyAndSendPrompt(sessionName, prompt) {
 // Full per-task spawn: Planning → worktree → sim clone → slot allocate → tmux session.
 function spawnForTask(task, cfg) {
   const sessionName = `${SESSION_PREFIX}${task.gid}`
-  const repo = cfg.watcher?.default_repo || 'edge-react-gui'
   const label = `Asana: ${task.name}`.slice(0, 120)
   const taskUrl = `https://app.asana.com/0/${cfg.project_gid}/${task.gid}`
+  const reposRoot = path.join(HOME, 'git')   // spawn cwd: the agent picks/creates the repo worktree(s) itself
 
-  log(`Spawning slot for: ${task.name} (gid=${task.gid}, repo=${repo})`)
+  log(`Spawning slot for: ${task.name} (gid=${task.gid}, cwd=${reposRoot})`)
 
   if (tmuxSessionExists(sessionName)) {
     log(`  session ${sessionName} already exists — refusing to spawn over it. Skipping.`)
@@ -184,20 +184,17 @@ function spawnForTask(task, cfg) {
   }
 
   if (DRY_RUN) {
-    log(`  (dry-run) would: Planning → setup-task-workspace → clone-ios-sim → allocate slot → spawn`)
+    log(`  (dry-run) would: Planning → allocate slot/sim → spawn in ${reposRoot} (agent creates per-repo worktrees)`)
     log(`  (dry-run) would send-keys: /one-shot --yolo ${taskUrl}`)
     return true
   }
 
   setStatusPlanning(task.gid)
 
-  let worktreePath
-  try {
-    worktreePath = shCapture(`${DIR}/setup-task-workspace.sh --task-gid ${task.gid} --repo ${repo}`).split('\n').pop()
-  } catch (e) {
-    log(`  setup-task-workspace failed (${e.status ?? '?'}) — skipping spawn for ${task.gid}`)
-    return false
-  }
+  // No eager worktree: the agent reads the task, determines the target repo(s), and
+  // creates co-located per-task worktrees itself (one-shot skill → setup-task-workspace).
+  // cwd is ~/git; cleanup/gc scan ~/git/.agent-worktrees/<gid>/ for whatever it created.
+  const worktreesParent = path.join(reposRoot, '.agent-worktrees', task.gid)
 
   let simUdid
   try {
@@ -207,7 +204,7 @@ function spawnForTask(task, cfg) {
     return false
   }
 
-  const slot = slots.allocate({ task_gid: task.gid, worktree_path: worktreePath, sim_udid: simUdid })
+  const slot = slots.allocate({ task_gid: task.gid, worktree_path: worktreesParent, sim_udid: simUdid })
   log(`  slot ${slot.slot_index}: metro ${slot.metro_port}, sim ${simUdid}`)
 
   const r = spawnSync(`${DIR}/spawn-test-session.sh`, [
@@ -216,7 +213,7 @@ function spawnForTask(task, cfg) {
     '--task-gid', task.gid,
     '--sim-udid', simUdid,
     '--metro-port', String(slot.metro_port),
-    '--worktree-path', worktreePath,
+    '--worktree-path', reposRoot,
     '--label', label,
   ], { stdio: 'inherit' })
   if (r.status !== 0) {
