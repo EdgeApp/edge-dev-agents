@@ -93,7 +93,10 @@ function guardrailThresholds(cfg) {
 function countActiveSessions() {
   const out = sh('tmux list-sessions -F "#{session_name}"')
   if (!out) return 0
-  return out.split('\n').filter((s) => s.startsWith(SESSION_PREFIX)).length
+  // Count ONLY real task slots: `claude-asana-<numeric-gid>`. Excludes non-task
+  // sessions that share the prefix (e.g. an interactive `claude-asana-main`),
+  // which would otherwise eat a concurrency slot and block task pickup.
+  return out.split('\n').filter((s) => s.startsWith(SESSION_PREFIX) && /^\d+$/.test(s.slice(SESSION_PREFIX.length))).length
 }
 
 function getLoadAvg() {
