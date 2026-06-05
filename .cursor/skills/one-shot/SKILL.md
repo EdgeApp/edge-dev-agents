@@ -16,7 +16,7 @@ metadata:
 <rule id="pr-body-owned-by-pr-create">Do not draft alternate PR markdown formats inside this workflow. `/pr-create` owns PR body generation and template compliance.</rule>
 <rule id="ignore-watchdog-revive-ping">If the user message is literally `<watchdog-revive-ping>` (and nothing else), respond with a single word `pong` and continue normal operations. Do NOT treat it as input to any pending question, do NOT advance or change plans, do NOT bind to any prior prompt. This is a watchdog-injected wake message used to revive a dead Remote Control bridge; it carries no user intent.</rule>
 <rule id="ignore-refired-one-shot">If you receive a `/one-shot …` invocation for a task you are ALREADY running in THIS session (same task GID, or its worktree/branch is already provisioned and `agent_status` is past `Pending`), treat it as a wake/continue nudge — NOT a fresh start. Do NOT restart from Planning, do NOT re-run phases already completed, do NOT re-create the plan/branch/PR. Resume from the current phase. A re-fired initial prompt is a scheduler/wake artifact (e.g. a `ScheduleWakeup` that carried the original prompt verbatim), not a request to start over. Prevention lives in `never-self-respawn` — don't schedule such wakes in the first place.</rule>
-<rule id="agent-status-on-pending-task">When a task GID is available (from URL or `--asana-task`) AND that task has an `agent_status` custom field, update `agent_status` at each step boundary via `~/.config/agent-watcher/update-status.sh <task_gid> <Status>`. Status names: `Planning` (step 2), `Developing` (step 3), `Reviewing` (step 4), `Testing` (step 5, stays through step 6 watch loop), `Complete` (step 7 only — set ONLY when the watch loop reports all-green). If the task has no `agent_status` field (ordinary non-agent task), silently skip the updates — do not fail.</rule>
+<rule id="agent-status-on-pending-task">When a task GID is available (from URL or `--asana-task`) AND that task has an `agent_status` custom field, update `agent_status` at each step boundary via `~/.config/agent-watcher/update-status.sh <task_gid> <Status>`. Status names: `Planning` (step 2), `Developing` (step 3, incl. step-4 local verification), `Reviewing` (step 5), `Testing` (step 6 watch loop), `Complete` (step 7 only — set ONLY when the watch loop reports all-green per `finalize-gate`). If the task has no `agent_status` field (ordinary non-agent task), silently skip the updates — do not fail.</rule>
 <rule id="yolo-hands-off-mode">When the `--yolo` flag is passed, run hands-off: do NOT pause for user confirmation of `/asana-plan` output, do NOT ask clarifying questions on uncertain choices, pick a defensible default and proceed. Record each deferred decision (question, chosen default, reversibility) under a "Deferred Decisions" section in the final report. Soft uncertainty (naming choices, code-style options, whether to add tests) is always deferrable.</rule>
 <rule id="yolo-single-turn-execution">In `--yolo` mode, run ALL phases (Planning → Developing → Reviewing → Testing → Complete) within ONE agent turn. Invoke each delegated skill (`/asana-plan`, `/im`, `/pr-create`, `/build-and-test`) by reading its SKILL.md from `~/.cursor/skills/<name>/SKILL.md` and executing its logic inline, OR via the Skill tool — but do NOT end your turn between phases or write phase-completion messages that imply a hand-off back to the user. The only acceptable mid-task turn end is when (a) `agent_status` reaches `Complete` and the final report has been delivered, or (b) `blocked = Yes` is being set due to a true-blocker condition.</rule>
 <rule id="yolo-true-blockers">Even in `--yolo`, STILL pause and set `blocked = Yes` on Asana when any of these apply: (a) destructive op with no recovery path (force push outside a PR branch, git history rewrite on shared branch, file deletion outside scratch/build dirs); (b) user-only credential needed (2FA, password, OAuth re-auth, signing key passphrase); (c) no defensible default exists (genuine ambiguity that could flip task outcome wholesale); (d) risk of overwriting unstaged user work (dirty working tree on a non-agent-created branch). When `blocked = Yes` is set, do NOT attach a run-report doc (per `report-as-attachment`, docs are produced only at `Complete`). Set the `blocked` field and add at most ONE brief one-line Asana comment naming the blocker so a human knows what input is needed to unblock. The full run report is produced once, when the task ultimately reaches `Complete`.</rule>
@@ -64,22 +64,18 @@ If `--yolo` is active, do NOT wait for user confirmation — accept the plan and
 First provision the workspace (per **Per-task worktrees** above): from the plan, create a co-located worktree for the target repo — plus any gui-dependency repos the task modifies, then `updot`-link them into the gui worktree — and `cd` into the primary repo's worktree. (Skip on manual non-watcher runs already inside a normal checkout.) Then set agent_status=Developing and run `/im` using the approved `/asana-plan` output.
 </step>
 
-<step id="4" name="PR phase">
-Set agent_status=Reviewing. Then run `/pr-create` — always pass `--asana-task <gid>` (so the Asana link gets embedded in the PR body, per `task-gid-for-pr-body-link`), and pass `--asana-attach` ONLY if the user explicitly opted in (per `no-attach-default`). Never pass `--asana-assign`.
-
-Task GID source priority:
-
-1. explicit `--asana-task <gid>`
-2. Asana task URL from step 1
-3. chat context from prior steps
+<step id="4" name="Local verification — orchestration only">
+**`--yolo` (orchestration) only — SKIP this step entirely on manual runs.** A human running `/one-shot` by hand verifies as they see fit; do NOT run `/build-and-test` for them. In `--yolo`: run `/build-and-test` on the implemented branch BEFORE opening the PR, so the PR opens already-verified. Status stays `Developing` (no PR exists yet — fixes amend the local commit, no force-push). If it fails, amend HEAD with the fix (`git commit --amend --no-edit`) and re-run; repeat up to 2 times. If still failing after 2 attempts, set `blocked = Yes` with the reason and stop — do NOT open a PR on red local verification.
 </step>
 
-<step id="5" name="Build and test phase">
-Set agent_status=Testing. Run `/build-and-test` for local verification. If it fails, amend HEAD with the fix (`git commit --amend --no-edit`), `git push --force-with-lease`, and re-run `/build-and-test`. Repeat up to 2 times. If still failing after 2 attempts, set `blocked = Yes` with reason and stop — the watch loop is not entered.
+<step id="5" name="PR phase">
+Set agent_status=Reviewing. Then run `/pr-create` — always pass `--asana-task <gid>` (so the Asana link is embedded in the PR body, per `task-gid-for-pr-body-link`), pass `--asana-attach` ONLY if the user explicitly opted in (per `no-attach-default`), and never pass `--asana-assign`.
+
+Task GID source priority: (1) explicit `--asana-task <gid>`; (2) Asana task URL from step 1; (3) chat context from prior steps.
 </step>
 
 <step id="6" name="PR watch (gate to Complete)">
-Wait for external green signals before marking `Complete`. Budget: 30 minutes total wall-clock. Status stays at `Testing` throughout. Do the waiting per `pr-watch-bounded-poll` and `never-self-respawn` — one blocking `gh pr checks` call, never a self-respawning loop.
+Set agent_status=Testing (the PR now enters external verification). Wait for external green signals before marking `Complete`. Budget: 30 minutes total wall-clock. Status stays at `Testing` throughout. Do the waiting per `pr-watch-bounded-poll` and `never-self-respawn` — one blocking `gh pr checks` call, never a self-respawning loop.
 
 Compute the deadline once at the start (`now + 30 min`). Then iterate, re-entering the bounded watch with the remaining budget, until all-green or the deadline:
 
@@ -87,6 +83,7 @@ Compute the deadline once at the start (`now + 30 min`). Then iterate, re-enteri
    - exit 0 (all pass) → CI is green
    - non-zero (a check failed) → read the failing job's log via `gh run view --log-failed`, apply a fix, then amend + force-push per `pr-watch-loop-amend-pattern`, then re-enter the bounded watch with the remaining budget
 2. **Reviewer bots**: handled as part of the watch per `bugbot-in-watch` + `reviewer-bots`. `gh pr checks --watch` blocks until every allowlisted reviewer's check-run completes on HEAD; when it returns, if any is red or has unresolved threads, fix it (`/bugbot`'s scan/fix for `cursor[bot]`, inline for others), amend + force-push (re-triggers them), then re-enter the watch. Also apply the semantic-catch for non-allowlisted bots per `reviewer-bots`. Never arm bugbot's cron.
+3. **Re-test after a fix (semantic)**: after applying ANY fix in this loop, reason about whether the change could affect behavior that `/build-and-test` covers. If it could (logic/UI/build changes) AND this is a `--yolo` run, re-run `/build-and-test` before re-entering the watch. For non-behavioral fixes (lint, comments, docs, pure config), skip the re-test. Don't blindly re-test every fix; don't skip it for real behavioral changes.
 
 Exit conditions:
 - **All green** (per `finalize-gate`: CI checks pass + every `reviewer-bots` check-run completed-clean on HEAD + no unresolved threads from any of them): proceed to step 7.

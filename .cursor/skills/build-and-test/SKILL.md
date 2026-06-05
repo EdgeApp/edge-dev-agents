@@ -12,15 +12,21 @@ Verify the active repo builds cleanly before /one-shot marks a task complete. Re
 <rules description="Non-negotiable constraints.">
 <rule id="autodetect-repo-shape">Inspect the current working directory to decide what to run:
 1. If `package.json` `name` is `edge-react-gui` → iOS UI test (maestro) path (step 0). Check this first.
-2. Else if `package.json` exists and a `tsconfig.json` exists → Node + TypeScript path (step 1).
-3. Else if `package.json` exists with a `test` script but no tsconfig → Node path (step 2).
-4. If `Cargo.toml` exists → not implemented yet, fall through to placeholder.
-5. Otherwise → placeholder mode (step 3).</rule>
+2. Else if the repo is an EdgeApp gui DEPENDENCY (per `gui-dependency-integration`) → run its own checks (the TS/Node path below) AND the gui integration test. A dep change is NOT done until it runs in the app.
+3. Else if `package.json` exists and a `tsconfig.json` exists → Node + TypeScript path (step 1).
+4. Else if `package.json` exists with a `test` script but no tsconfig → Node path (step 2).
+5. If `Cargo.toml` exists → not implemented yet, fall through to placeholder.
+6. Otherwise → placeholder mode (step 3).</rule>
 <rule id="report-failures-actionable">On FAIL, surface the exact command, exit code, and last 30 lines of output. Do not try to fix anything inside this skill — the caller decides whether to amend or block.</rule>
 <rule id="no-mutation">This skill does NOT edit source code, commit, push, or change Asana state — it runs verification and reports results only. The SOLE exception is `testid-backfill-commit` below (test-infra only: adding missing `testID` props in their own dedicated commit).</rule>
 <rule id="testid-backfill-commit">Scoped exception to `no-mutation`, test-infrastructure only. When the maestro flow had to fall back to coordinate-based taps because a component it drives lacks a `testID` prop, add `testID`s to those component(s) so the selector can target them stably, then commit JUST those testID additions as a SEPARATE commit — message `test: add missing testIDs for maestro selectors` — distinct from the feature commit, so PR history stays clean and future runs are faster and less brittle. Constraints: only when a real coordinate-fallback actually occurred (testIDs genuinely missing); change ONLY `testID` props, never component logic; update the corresponding maestro selector(s) to use the new testID. If no coordinate fallback was needed, do nothing.</rule>
 <rule id="scripts-over-inline">Deterministic operations (sim selection, RN build, capture loop) MUST run via the companion scripts under `~/.cursor/skills/build-and-test/scripts/`. Do not inline their logic as raw bash blocks in this SKILL.md or in agent reasoning.</rule>
 <rule id="npm-only-for-edge-react-gui">edge-react-gui uses npm (package-lock.json present, no yarn.lock). All scripts in this skill use npm. Never invoke `yarn` against edge-react-gui.</rule>
+<rule id="gui-dependency-integration">A change to an EdgeApp gui DEPENDENCY is NOT fully tested until it runs in the app — its own `tsc`/jest passing is necessary but NOT sufficient. Gui dependencies = the Edge-owned repos `edge-react-gui` consumes (any repo in its `package.json` dependencies): `edge-core-js`, `edge-currency-accountbased`, `edge-currency-plugins`, `edge-exchange-plugins`, `edge-login-ui-rn`, `edge-currency-monero`, `react-native-piratechain`, `react-native-zcash`, `react-native-zano`. When the repo under test is one of these, after its own checks you MUST also run the gui integration test, autonomously (NO prompting):
+1. Ensure a co-located `edge-react-gui` worktree exists — create it via `~/.config/agent-watcher/setup-task-workspace.sh --task-gid <gid> --repo edge-react-gui` if absent (it lands as a sibling of the dep worktree under `~/git/.agent-worktrees/<gid>/`, so updot can find the modified dep).
+2. Link the MODIFIED dep into that gui worktree via the gui's `updot` — `updot <dep>` then the gui's `prepare` (currently `yarn updot <dep> && yarn prepare`, following the gui repo's package manager; add `prepare.ios` when the dep is `edge-core-js`). updot bakes the dep's built output into the gui's `node_modules`. Leave `DEBUG_*` env.json flags false (those load from a localhost dev-server, not used in a headless run).
+3. Run the gui maestro path (step 0) against that build. If the dep change needs gui-side adjustments to work in-app, make them and commit on the gui worktree's branch — autonomously, do NOT prompt.
+PASS requires the maestro app test to pass with the dep change linked. A dep whose unit checks pass but that breaks or doesn't function in the app is a FAIL.</rule>
 </rules>
 
 <step id="0" name="iOS UI test (maestro) — edge-react-gui only">
