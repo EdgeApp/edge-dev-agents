@@ -65,6 +65,9 @@
     "sim_pool": {
       "size": 2
     },
-    "keep_completed_worktrees": 5
+    "keep_completed_worktrees": 5,
+    "reviewer_bots": [
+      "cursor[bot]"
+    ]
   }
 }

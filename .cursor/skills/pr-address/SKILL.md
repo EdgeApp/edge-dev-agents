@@ -20,6 +20,7 @@ metadata:
 <rule id="reply-before-resolve">ALWAYS reply explaining how a comment was addressed BEFORE resolving or marking it. No silent resolutions.</rule>
 <rule id="non-owner-reply-only">If you do NOT author the PR (`isOwner: false` in `fetch` output — i.e. `currentUser !== prAuthor`), you may reply to threads and push fixups, but you must NEVER resolve threads (`resolve-thread`) or post `mark-addressed` markers. Resolving/marking mutates the owner's PR state; leave every thread unresolved for the owner. This pairs with the finalize ownership guard (non-owner ⇒ `preserve` mode, never autosquash) — on a PR you don't own: push fixups + reply, never rewrite history, never resolve.</rule>
 <rule id="resolution-source-of-truth">Only explicitly resolved threads (`isResolved: true`) or `<!-- addressed:... -->` markers count as resolved. Recency (commits after a comment) does NOT mean resolved.</rule>
+<rule id="never-sets-completion">`/pr-address` is a ONE-OFF: it addresses the review comments present right now and stops. It must NEVER set `agent_status=Complete` or otherwise declare the task done — automated reviews (bugbot, CI, other reviewer bots) can land AFTER it finishes, so a one-off can't know the PR is finally green. Completion is owned by the continuous monitor (one-shot's step-6 watch, or `/bugbot`'s `finalize-gate` when invoked with a task GID). pr-address addresses comments and exits.</rule>
 </rules>
 
 <step id="0" name="Ensure correct branch">
