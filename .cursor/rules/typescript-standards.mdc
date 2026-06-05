@@ -130,6 +130,16 @@ Exception: Empty handlers are acceptable ONLY when the rejection is an expected 
 Exception: Auto-load effects where infinite retry on persistent failure is undesirable — keep `== null` there and allow retry only via explicit user action.
 </standard>
 
+<standard id="react-list-keys">Never build React list keys solely from optional fields — when those fields are absent, every such row collapses to the same key (e.g. `"undefinedundefined"`) and list updates render incorrectly. Include the array index or a required unique field in the key.
+❌ `key={String(item.timestamp) + String(item.dollarValue)}` (both optional)
+✅ `key={`${String(item.date)}-${index}`}` (required field + index)
+</standard>
+
+<standard id="guard-date-query-params">Guard HTTP query params before `new Date(...)`: treat missing, empty, and unparseable values as unset. `new Date('')` and `new Date('garbage')` yield Invalid Date, whose `valueOf()` is `NaN` — it silently corrupts range queries (e.g. CouchDB view keys) instead of throwing.
+❌ `typeof startDate === 'string' ? new Date(startDate) : defaultDate` (empty string passes)
+✅ Use a helper: `if (typeof value !== 'string' || value === '') return fallback; const d = new Date(value); return isNaN(d.valueOf()) ? fallback : d`
+</standard>
+
 <standard id="file-structure">Component files (`.tsx`) and utility files (`.ts`) follow a consistent section ordering.
 
 **File-level ordering:**
