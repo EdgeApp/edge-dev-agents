@@ -2,7 +2,7 @@
 // rc-watchdog.js — Watchdog for claude-asana-* tmux sessions.
 //
 // Variants handled:
-//  - Variant 1 (RC bridge dead, claude alive): heuristic — pane content unchanged for IDLE_THRESHOLD_MS → send a wake message, wait, then `/remote-control`. This is keystroke-only; it never spawns a new claude.
+//  - Variant 1 (RC bridge dead, claude alive): the pane footer ("Remote Control active") is the source of truth for the bridge. Absent + idle past IDLE_THRESHOLD_MS → revive (wake message, wait, `/remote-control`, then Esc to dismiss the modal). Present → do NOT ping on idleness; only a slow RC_HALFOPEN_BACKSTOP_MS re-register clears a half-open bridge the indicator can't see. Keystroke-only; never spawns a new claude.
 //  - Completion sweep: if Asana agent_status is Complete for a session's task GID, kill the tmux session to free resources.
 //
 // REMOVED 2026-05-28 — Variant 2 (process-death auto-resume):
@@ -30,6 +30,8 @@ const STATE_FILE = path.join(slots.STATE_DIR, 'watchdog-state.json')
 const CRED_FILE = path.join(HOME, '.config/agent-watcher/credentials.json')
 const CFG_FILE = path.join(HOME, '.config/agent-watcher/asana-config.json')
 const IDLE_THRESHOLD_MS = 20 * 60 * 1000
+const RC_ACTIVE_MARKER = 'Remote Control active'        // pane footer present iff the RC bridge is up (near-end view)
+const RC_HALFOPEN_BACKSTOP_MS = 3 * 60 * 60 * 1000      // re-register even when "up", to clear a half-open bridge the indicator can't see
 const SESSION_PREFIX = 'claude-asana-'
 const WORKTREES_ROOT = path.join(HOME, 'git/.agent-worktrees')
 const DEFAULT_KEEP_COMPLETED = 5
@@ -136,7 +138,7 @@ function saveState(state) {
 }
 
 function attemptRcRevive(session) {
-  log(`[${session}] Variant 1 candidate: pane idle ${Math.round(IDLE_THRESHOLD_MS / 60000)}+ min. Sending wake + /remote-control.`)
+  log(`[${session}] RC revive: wake ping + /remote-control + Esc-dismiss.`)
   sh(`tmux send-keys -t "${session}" "<watchdog-revive-ping>" Enter`)
   sh('sleep 8')
   sh(`tmux send-keys -t "${session}" "/remote-control" Enter`)
@@ -255,13 +257,26 @@ function main() {
     }
 
     const content = capturePane(session)
+    const rcUp = content.includes(RC_ACTIVE_MARKER)   // near-end belief about the RC bridge
     const prior = state.sessions[session]
     if (!prior || prior.lastContent !== content) {
       state.sessions[session] = { lastContent: content, lastChange: now }
-    } else if (now - prior.lastChange > IDLE_THRESHOLD_MS) {
-      attemptRcRevive(session)
-      // Reset so we don't re-fire until the pane settles again
-      state.sessions[session] = { lastContent: content, lastChange: now }
+    } else {
+      // Indicator-as-source-of-truth: the pane footer reports whether the RC
+      // bridge is up. If it's DOWN, revive on the normal idle window. If it's UP,
+      // do NOT ping on mere idleness (that was the spurious-ping/modal-wedge bug) —
+      // but keep a slow backstop re-register, because "up" is only the near-end's
+      // view and can't detect a half-open bridge a remote machine can't attach to.
+      const idle = now - prior.lastChange
+      if (!rcUp && idle > IDLE_THRESHOLD_MS) {
+        log(`[${session}] RC indicator ABSENT + idle ${Math.round(idle / 60000)}m → reviving.`)
+        attemptRcRevive(session)
+        state.sessions[session] = { lastContent: content, lastChange: now } // reset so we don't re-fire until the pane settles
+      } else if (rcUp && idle > RC_HALFOPEN_BACKSTOP_MS) {
+        log(`[${session}] RC indicator present but idle ${Math.round(idle / 60000)}m → backstop re-register (half-open guard).`)
+        attemptRcRevive(session)
+        state.sessions[session] = { lastContent: content, lastChange: now }
+      }
     }
   }
 
