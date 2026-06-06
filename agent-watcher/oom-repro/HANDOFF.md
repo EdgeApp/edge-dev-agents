@@ -131,7 +131,7 @@ The persistent logger is **loaded and running**. Survives reboots. Confirm with:
 |---|---|---|
 | `com.jontz.memory-monitor` | Jon's existing alerting monitor — modal on critical, audio on warn, log-only on recovery | Loaded. Thresholds too lenient (see "what we know"). Logs to `/tmp/memory-monitor.log`. |
 | `com.jontz.asana-watcher` | Polls Asana for Pending agent tasks, spawns tmux sessions to run them | Loaded, idle. Not contributing to OOM. |
-| `com.jontz.rc-watchdog` | Watches `claude-asana-*` tmux sessions for liveness | Loaded, idle. Not contributing to OOM. |
+| `com.jontz.session-watchdog` | Watches `claude-asana-*` tmux sessions for liveness | Loaded, idle. Not contributing to OOM. |
 | `com.jontz.config-watch` | Watches security-sensitive config files (Cursor settings, .zshrc, etc.) for drift | Loaded, last exit 1 (= drift detected, expected). Not contributing to OOM. |
 | `com.jontz.mem-trace` | **NEW** — the persistent OOM trace logger | Loaded. |
 | `com.jontz.runaway-guard` | **NEW (2026-05-28)** — kills runaway `cli` fork-chain process groups (≥50 cli/PGID) via atomic `kill -9 -PGID`. 60s launchd interval, 3s inner cadence. The backstop against recursive claude-spawn OOMs. | Loaded. Logs to `~/.config/agent-watcher/runaway-guard.log` (only writes on a kill). |

@@ -14,7 +14,7 @@
 // stale-lock steal — and every write is atomic (tmpfile in the same dir + rename).
 // Two concurrent writers therefore serialize and can never produce a torn file.
 //
-// Used as a library (require) by asana-watcher.js / rc-watchdog.js, AND as a CLI
+// Used as a library (require) by asana-watcher.js / session-watchdog.js, AND as a CLI
 // by the shell helpers (setup/cleanup/gc/resume):
 //   node lib/slots.js list
 //   node lib/slots.js get        --task-gid <gid>
