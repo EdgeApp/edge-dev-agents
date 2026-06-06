@@ -18,9 +18,9 @@ launchd ──tick──▶ asana-watcher.js ──┐
                                      │    clone-ios-sim.sh         → sim clone
                                      │    lib/slots.js allocate     → slot + Metro port
                                      │    spawn-test-session.sh     → tmux: claude --rc
-launchd ──tick──▶ rc-watchdog.js ────┘
+launchd ──tick──▶ session-watchdog.js ────┘
                     └─ on agent_status=Complete:
-                         kill tmux ▸ delete-ios-sim.sh ▸ cleanup-task-workspace.sh ▸ slots release
+                         retire tmux (rename→done-asana-<gid>, claude kept alive) ▸ delete-ios-sim.sh ▸ slots release ▸ worktree retained
 ```
 
 ### Slot model
@@ -46,8 +46,16 @@ task that is blocked-or-in-flight in Asana but whose tmux session has died does
    session. The session's wrapper bash exports `$AGENT_SIM_UDID` and
    `$AGENT_METRO_PORT` so build-and-test and debugger inherit them transparently.
 2. **Run**: the spawned `claude` runs `/one-shot --yolo <task-url>` in its worktree.
-3. **Reap** (`rc-watchdog.js`): when Asana shows `agent_status=Complete`, kill the
-   tmux session, delete the cloned sim, remove the worktree + branch, drop the slot.
+3. **Retire** (`session-watchdog.js`): when Asana shows `agent_status=Complete`, RETIRE the
+   session — rename `claude-asana-<gid>` → `done-asana-<gid>` (so it no longer holds a slot)
+   while leaving `claude` alive for inspection / remote re-engagement — kill its Metro, delete
+   the cloned sim, drop the slot, and retain the worktree. The oldest retired sessions beyond
+   `keep_completed_sessions` (default 3) and worktrees beyond `keep_completed_worktrees`
+   (default 5) are pruned. Set either to 0 for the old hard-kill/destroy behavior.
+4. **Shed-on-block** (`session-watchdog.js`): when a session's task has `blocked=Yes`, free its
+   heavy resources (sim + Metro) so it stops squatting while it waits on a human, but keep the
+   session + slot alive so it can resume on unblock. Done once and re-armed when unblocked.
+   (A resumed task re-provisions its sim/Metro via build-and-test, since the sim returns to the pool.)
 
 ## Configuration knobs (`asana-config.json` → `.watcher`)
 
@@ -130,7 +138,7 @@ name/runtime, Metro defaults to 8081.
 | file | role |
 |------|------|
 | `asana-watcher.js` | spawner (multi-pick, cap, guardrail) |
-| `rc-watchdog.js` | liveness + completion sweep (slot reaper) |
+| `session-watchdog.js` | liveness + completion sweep (slot reaper) |
 | `spawn-test-session.sh` | start a `claude --rc` tmux session (slot mode + legacy mode) |
 | `setup-task-workspace.sh` / `cleanup-task-workspace.sh` | worktree create / teardown |
 | `clone-ios-sim.sh` / `delete-ios-sim.sh` | per-slot sim clone / delete |
@@ -154,9 +162,11 @@ name/runtime, Metro defaults to 8081.
   the snapshot reflects the master's state at clone time. If the master is mid-PIN
   entry the clone inherits that; clone from a settled master.
 - **Metro port reuse**: ports are derived from `slot_index`, which is reused after
-  a slot frees. If a dead session left Metro bound to its port, the next slot on
-  that index can collide. The watchdog kills the tmux session (and thus Metro)
-  before freeing the slot, so this only bites if Metro was orphaned out-of-band.
+  a slot frees. If a session left Metro bound to its port, the next slot on that
+  index can collide. On retirement the watchdog explicitly kills the listener on the
+  slot's Metro port (`freeMetroPort`) before/while freeing the slot — claude stays
+  alive but its Metro does not — so this only bites if Metro was orphaned
+  out-of-band. (Re-engaging a retired session means restarting Metro yourself.)
 - **Guardrail is a snapshot**: load/RAM are read once per tick. Two lanes spawned
   in the same tick both see pre-spawn headroom; the cap (not the guardrail) is the
   real backstop against oversubscription.

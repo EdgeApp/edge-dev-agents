@@ -9,7 +9,7 @@
 #
 # RETENTION CAP: orphan candidates are NOT all reaped. The newest --keep of them
 # (by worktree mtime) are retained for inspection/resume; only the older ones are
-# reaped. This mirrors the rc-watchdog retention policy so a manual run won't
+# reaped. This mirrors the session-watchdog retention policy so a manual run won't
 # silently destroy worktrees the watchdog is deliberately keeping. --keep defaults
 # to .watcher.keep_completed_worktrees from asana-config.json (fallback 5). Pass
 # --all to reap every orphan (keep=0, the pre-retention behavior).

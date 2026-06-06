@@ -124,7 +124,7 @@ Everything below this line is for Claude, not you.
 >    the node path is `$HOME/.nvm/versions/node/v24.15.0/bin/node` and resolves (you pinned
 >    that version in step 2); `PATH` includes `$(brew --prefix)/bin` (Apple Silicon =
 >    `/opt/homebrew`; if this is an Intel mac, fix to `/usr/local`). `plutil -lint` each. For a
->    dedicated box bootstrap `asana-watcher`, `rc-watchdog`, `runaway-guard`;
+>    dedicated box bootstrap `asana-watcher`, `session-watchdog`, `runaway-guard`;
 >    `mem-trace`/`memory-monitor`/`config-watch` are optional — skip unless I ask.
 > 6. **Fresh machine state.** `rm -f ~/.config/agent-watcher/{pool.json,pool.lock,watchdog-state.json}`
 >    and `rm -f "${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/slots.json"`. Then

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # delete-ios-sim.sh — Shut down and delete a per-slot iOS simulator clone.
 #
-# The simctl-delete helper rc-watchdog.js uses during its completion sweep (it
+# The simctl-delete helper session-watchdog.js uses during its completion sweep (it
 # must NOT inline simctl calls — DRY). Pairs with clone-ios-sim.sh.
 #
 # Usage:

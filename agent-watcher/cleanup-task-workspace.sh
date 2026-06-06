@@ -3,7 +3,7 @@
 #
 # Removes a per-task worktree, deletes its env.json copy, and deletes the
 # agent branch if it's safe (the branch matches our `agent/<gid>` convention).
-# Used by rc-watchdog.js during the completion sweep and by gc-worktrees.sh.
+# Used by session-watchdog.js during the completion sweep and by gc-worktrees.sh.
 #
 # Usage:
 #   cleanup-task-workspace.sh --task-gid <gid> --repo <name>

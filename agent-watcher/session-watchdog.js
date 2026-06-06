@@ -1,9 +1,13 @@
 #!/usr/bin/env node
-// rc-watchdog.js — Watchdog for claude-asana-* tmux sessions.
+// session-watchdog.js — Watchdog tending live claude-asana-* tmux sessions.
+// (Formerly rc-watchdog.js; renamed because it does more than RC.) Three jobs:
+// RC-bridge revive, completion sweep (agent_status=Complete → teardown), and
+// worktree-retention GC. RC revive is just one of them.
 //
 // Variants handled:
 //  - Variant 1 (RC bridge dead, claude alive): the pane footer ("Remote Control active") is the source of truth. Absent + idle past IDLE_THRESHOLD_MS → revive (wake message, wait, `/remote-control`, then Esc to dismiss the modal). Present → do NOT ping at all (a half-open bridge is left for the operator to reconnect on next attach). Keystroke-only; never spawns a new claude.
-//  - Completion sweep: if Asana agent_status is Complete for a session's task GID, kill the tmux session to free resources.
+//  - Completion sweep: if Asana agent_status is Complete for a session's task GID, RETIRE the session — rename claude-asana-<gid> → done-asana-<gid> and free the sim+Metro+slot, but leave claude alive so it stays attachable / re-engageable. Retired sessions no longer count toward the concurrency cap; the oldest beyond keep_completed_sessions are killed to bound memory.
+//  - Blocked sweep: if a session's task has blocked=Yes, shed its heavy resources (sim + Metro) so it stops squatting while it waits on a human — but keep the session + slot alive so it can resume on unblock (done once, re-armed when unblocked).
 //
 // REMOVED 2026-05-28 — Variant 2 (process-death auto-resume):
 //   It detected "claude dead" and injected `claude --resume` into the pane. Two defects made it
@@ -33,8 +37,14 @@ const IDLE_THRESHOLD_MS = 20 * 60 * 1000
 const RC_ACTIVE_MARKER = 'Remote Control active'        // pane footer present iff the RC bridge is up (near-end view)
 const RC_HALFOPEN_BACKSTOP_MS = 3 * 60 * 60 * 1000      // DISABLED 2026-06-05 (backstop removed to eval zero-ping-on-healthy); kept for easy revert
 const SESSION_PREFIX = 'claude-asana-'
+// Completed sessions are RENAMED to this prefix instead of being killed, so the
+// watcher (which counts a slot only for `claude-asana-<digits>`) stops counting
+// them — freeing capacity — while the session stays alive and attachable for
+// inspection / remote re-engagement. pruneRetiredSessions() caps how many linger.
+const RETIRED_PREFIX = 'done-asana-'
 const WORKTREES_ROOT = path.join(HOME, 'git/.agent-worktrees')
 const DEFAULT_KEEP_COMPLETED = 5
+const DEFAULT_KEEP_COMPLETED_SESSIONS = 3
 
 // Cache: token + status field GID + retention cap read once per process run.
 let _token = null
@@ -56,6 +66,15 @@ function getStatusFieldGid() {
   } catch { _statusFieldGid = '' }
   return _statusFieldGid
 }
+let _blockedFieldGid = null
+function getBlockedFieldGid() {
+  if (_blockedFieldGid !== null) return _blockedFieldGid
+  try {
+    const cfg = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8'))
+    _blockedFieldGid = cfg.custom_fields?.blocked?.gid || ''
+  } catch { _blockedFieldGid = '' }
+  return _blockedFieldGid
+}
 // How many completed worktrees to retain on disk before pruning the oldest.
 function getKeepCompletedWorktrees() {
   if (_keepCompleted !== null) return _keepCompleted
@@ -66,18 +85,34 @@ function getKeepCompletedWorktrees() {
   } catch { _keepCompleted = DEFAULT_KEEP_COMPLETED }
   return _keepCompleted
 }
+// How many retired (completed-but-kept-alive) sessions to keep before killing the
+// oldest. Each holds a live claude, so this bounds memory.
+let _keepCompletedSessions = null
+function getKeepCompletedSessions() {
+  if (_keepCompletedSessions !== null) return _keepCompletedSessions
+  try {
+    const cfg = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8'))
+    const n = cfg.watcher?.keep_completed_sessions
+    _keepCompletedSessions = Number.isFinite(n) && n >= 0 ? n : DEFAULT_KEEP_COMPLETED_SESSIONS
+  } catch { _keepCompletedSessions = DEFAULT_KEEP_COMPLETED_SESSIONS }
+  return _keepCompletedSessions
+}
 
-function fetchAgentStatus(taskGid) {
+// One fetch → both agent_status and blocked (both enum custom fields).
+function fetchTaskState(taskGid) {
   const token = getAsanaToken()
-  const fieldGid = getStatusFieldGid()
-  if (!token || !fieldGid) return null
+  const statusGid = getStatusFieldGid()
+  if (!token || !statusGid) return { agentStatus: null, blocked: null }
+  const blockedGid = getBlockedFieldGid()
   const out = sh(`curl -sS -H "Authorization: Bearer ${token}" "https://app.asana.com/api/1.0/tasks/${taskGid}?opt_fields=custom_fields.gid,custom_fields.enum_value.name"`)
-  if (!out) return null
+  if (!out) return { agentStatus: null, blocked: null }
   try {
     const parsed = JSON.parse(out)
-    const field = parsed.data?.custom_fields?.find((f) => f.gid === fieldGid)
-    return field?.enum_value?.name || null
-  } catch { return null }
+    const cfs = parsed.data?.custom_fields || []
+    const agentStatus = cfs.find((f) => f.gid === statusGid)?.enum_value?.name || null
+    const blocked = blockedGid ? (cfs.find((f) => f.gid === blockedGid)?.enum_value?.name || null) : null
+    return { agentStatus, blocked }
+  } catch { return { agentStatus: null, blocked: null } }
 }
 
 function sh(cmd) {
@@ -172,6 +207,35 @@ function releaseSimAndSlot(taskGid) {
   catch (e) { log(`  [${taskGid}] slot release failed: ${e.message}`) }
 }
 
+// Kill whatever is LISTENing on a Metro port. Slot Metro ports are reused by the
+// next task on the same slot_index, so a retired session's lingering Metro would
+// collide — free the port explicitly. The old hard-kill freed it by killing the
+// whole session; we kill only Metro and keep claude alive (also sheds Metro's RAM,
+// the heaviest process). No-op if nothing is bound.
+function freeMetroPort(port) {
+  if (!port) return
+  const pids = sh(`lsof -ti tcp:${port} -sTCP:LISTEN`).split('\n').filter(Boolean)
+  if (pids.length) {
+    sh(`kill ${pids.join(' ')}`)
+    log(`  [metro] freed port ${port} (killed Metro pid ${pids.join(',')})`)
+  }
+}
+
+// Shed the heavy per-task resources (sim + Metro) WITHOUT freeing the slot or
+// touching the tmux session. Used when a task is blocked (waiting on a human): it
+// stops squatting on a booted sim and a Metro server while idle, but the session +
+// slot stay so it can resume on unblock. NOTE: the sim returns to the pool and may
+// be recycled, so a resumed task re-provisions its sim/Metro via build-and-test.
+function freeSimAndMetro(taskGid) {
+  let slot = null
+  try { slot = slots.get(taskGid) } catch { /* slots.json unreadable */ }
+  if (slot?.sim_udid) {
+    log(`  [${taskGid}] releasing sim ${slot.sim_udid}`)
+    sh(`"${DIR}/release-pool-entry.sh" --task-gid "${taskGid}"`)
+  }
+  freeMetroPort(slot?.metro_port ?? null)
+}
+
 // Full teardown of one retained worktree: remove the worktree + branch (and any
 // lingering sim/slot, though those were freed at completion). Used only by the prune.
 function removeWorktree(taskGid, repo) {
@@ -181,15 +245,68 @@ function removeWorktree(taskGid, repo) {
   try { slots.release(taskGid) } catch { /* already gone */ }
 }
 
-// Enforce the retention cap. A worktree whose task still has a LIVE tmux session is
-// never touched (and does not count against the cap). Among the rest — "retired"
-// worktrees: completed, or whose session is gone — keep the newest
-// keep_completed_worktrees by directory mtime and prune the older ones.
+// Retired sessions (completed, renamed out of the slot-counted namespace, claude
+// left alive so they stay attachable). Returned newest-first by tmux creation time.
+function listRetiredSessions() {
+  const out = sh('tmux list-sessions -F "#{session_name} #{session_created}"')
+  if (!out) return []
+  return out.split('\n').filter(Boolean)
+    .map((line) => { const [name, created] = line.split(' '); return { name, gid: name.slice(RETIRED_PREFIX.length), created: parseInt(created, 10) || 0 } })
+    .filter((s) => s.name.startsWith(RETIRED_PREFIX))
+    .sort((a, b) => b.created - a.created)
+}
+
+// Retire a completed session instead of killing it: rename it out of the
+// slot-counted `claude-asana-<gid>` namespace (so the watcher stops counting it and
+// can spawn the next task) while KEEPING the claude process alive — the session
+// stays attachable and re-engageable via RC. Sim + slot are freed; worktree is
+// retained. Old retirements are bounded by pruneRetiredSessions().
+function retireSession(session, taskGid) {
+  const dest = `${RETIRED_PREFIX}${taskGid}`
+  // rename-session can't clobber; drop a prior retirement of the same task first.
+  if (sh(`tmux has-session -t "${dest}" 2>/dev/null && echo yes`) === 'yes') {
+    sh(`tmux kill-session -t "${dest}"`)
+  }
+  // Read the slot's Metro port BEFORE releasing the slot, so we can free that port
+  // after (the next task on this slot_index reuses it). claude stays alive.
+  let metroPort = null
+  try { metroPort = slots.get(taskGid)?.metro_port ?? null } catch { /* slots.json unreadable */ }
+  sh(`tmux rename-session -t "${session}" "${dest}"`)
+  releaseSimAndSlot(taskGid)
+  freeMetroPort(metroPort)
+  log(`[${session}] agent_status=Complete → RETIRED as ${dest} (claude kept alive; Metro+sim+slot freed; worktree retained)`)
+}
+
+// Cap retired sessions kept alive (each holds a live claude → memory bound). Keep
+// the newest keep_completed_sessions; kill the older ones outright.
+function pruneRetiredSessions() {
+  const keep = getKeepCompletedSessions()
+  const retired = listRetiredSessions()
+  if (retired.length <= keep) {
+    if (retired.length > 0) log(`Retired sessions: ${retired.length}/${keep} kept; none pruned`)
+    return
+  }
+  const toPrune = retired.slice(keep) // oldest beyond the cap
+  log(`Retired sessions: ${retired.length} > cap ${keep} → killing ${toPrune.length} oldest`)
+  for (const s of toPrune) {
+    sh(`tmux kill-session -t "${s.name}"`)
+    log(`[${s.name}] retired beyond cap → killed`)
+  }
+}
+
+// Enforce the retention cap. A worktree whose task still has a LIVE tmux session —
+// including a RETIRED (kept-alive) one — is never touched (and does not count
+// against the cap). Among the rest — "retired" worktrees: completed with the
+// session already gone — keep the newest keep_completed_worktrees by directory
+// mtime and prune the older ones.
 function pruneRetainedWorktrees(liveSessions) {
   const keep = getKeepCompletedWorktrees()
   let gidDirs
   try { gidDirs = fs.readdirSync(WORKTREES_ROOT) } catch { return } // no worktrees root yet
-  const activeGids = new Set(liveSessions.map((s) => s.slice(SESSION_PREFIX.length)))
+  const activeGids = new Set([
+    ...liveSessions.map((s) => s.slice(SESSION_PREFIX.length)),
+    ...listRetiredSessions().map((s) => s.gid), // retired-but-alive sessions keep their worktree
+  ])
   const retired = []
   for (const gid of gidDirs) {
     if (activeGids.has(gid)) continue // task still running → keep, don't count
@@ -231,13 +348,14 @@ function main() {
   const now = Date.now()
 
   for (const session of sessions) {
-    // Completion sweep: if Asana shows agent_status=Complete, kill the session.
+    // Completion sweep: if Asana shows agent_status=Complete, retire the session.
     const taskGid = session.slice(SESSION_PREFIX.length)
-    const agentStatus = fetchAgentStatus(taskGid)
+    const { agentStatus, blocked } = fetchTaskState(taskGid)
     if (agentStatus === 'Complete') {
-      log(`[${session}] Asana agent_status=Complete → killing session, freeing sim+slot, RETAINING worktree`)
-      sh(`tmux kill-session -t "${session}"`)
-      releaseSimAndSlot(taskGid)
+      // Retire (rename + keep claude alive), NOT hard-kill — so the session stays
+      // attachable / re-engageable. Capacity is freed because the renamed session
+      // no longer matches the slot-counted `claude-asana-<digits>` pattern.
+      retireSession(session, taskGid)
       delete state.sessions[session]
       continue
     }
@@ -259,22 +377,37 @@ function main() {
     const content = capturePane(session)
     const rcUp = content.includes(RC_ACTIVE_MARKER)   // near-end belief about the RC bridge
     const prior = state.sessions[session]
-    if (!prior || prior.lastContent !== content) {
-      state.sessions[session] = { lastContent: content, lastChange: now }
-    } else if (!rcUp && now - prior.lastChange > IDLE_THRESHOLD_MS) {
+    const isBlocked = /^yes$/i.test(blocked || '')
+
+    // Blocked → shed heavy resources (sim + Metro) ONCE, but keep the session + slot
+    // alive so a human can unblock and resume. `heavyFreed` prevents re-freeing every
+    // tick; it's cleared automatically once the task is no longer blocked, so a later
+    // block re-arms the cleanup.
+    if (isBlocked && !prior?.heavyFreed) {
+      log(`[${session}] blocked=Yes → freeing sim + Metro (session kept alive for unblock)`)
+      freeSimAndMetro(taskGid)
+    }
+
+    const changed = !prior || prior.lastContent !== content
+    let lastChange = changed ? now : prior.lastChange
+    if (!changed && !rcUp && now - prior.lastChange > IDLE_THRESHOLD_MS) {
       // Pure indicator: revive ONLY when the pane reports the RC bridge is DOWN and
       // the session has been idle past the threshold. When the indicator says UP,
       // NEVER ping — a half-open bridge (indicator up but actually unreachable) is
       // left for the operator to reconnect on their next attach (the real ground-
       // truth test anyway). [Backstop re-register removed 2026-06-05 to evaluate
       // zero-ping-on-healthy; to revert, re-add an
-      // `else if (rcUp && idle > RC_HALFOPEN_BACKSTOP_MS)` branch here.]
+      // `rcUp && idle > RC_HALFOPEN_BACKSTOP_MS` branch here.]
       const idle = now - prior.lastChange
       log(`[${session}] RC indicator ABSENT + idle ${Math.round(idle / 60000)}m → reviving.`)
       attemptRcRevive(session)
-      state.sessions[session] = { lastContent: content, lastChange: now } // reset so we don't re-fire until the pane settles
+      lastChange = now // reset so we don't re-fire until the pane settles
     }
+    state.sessions[session] = { lastContent: content, lastChange, heavyFreed: isBlocked }
   }
+
+  // Cap retired (completed-but-kept-alive) sessions so they don't accumulate in memory.
+  pruneRetiredSessions()
 
   // Enforce the worktree retention cap (keep newest N completed/retired worktrees).
   pruneRetainedWorktrees(sessions)

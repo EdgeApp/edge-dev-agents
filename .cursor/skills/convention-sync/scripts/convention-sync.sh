@@ -221,7 +221,7 @@ local_path_for() {
 }
 
 home_path_for_extra() {
-  # Map a repo-relative extra path (e.g. "agent-watcher/rc-watchdog.js") back to
+  # Map a repo-relative extra path (e.g. "agent-watcher/session-watchdog.js") back to
   # its canonical home location via the EXTRA_TREES / EXTRA_FILES mappings (#5).
   local rp="$1" tree src dest pair sfile rel
   for tree in "${EXTRA_TREES[@]+"${EXTRA_TREES[@]}"}"; do
