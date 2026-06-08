@@ -16,6 +16,13 @@
 #      spawn-test-session.sh [--yolo] [session-id] [initial-prompt]
 #    cwd is ~/git, no per-slot env. Preserved so existing manual workflows still work.
 #
+# --resume <session-id>: re-attach an EXISTING claude session instead of starting
+#    fresh (no initial prompt). Compose with SLOT MODE to give the resumed session
+#    the slot's sim + Metro env — exactly what a bare `claude --resume` lacks:
+#      spawn-test-session.sh --yolo --slot-index <N> --task-gid <gid> \
+#        --sim-udid <udid> --metro-port <port> --worktree-path ~/git --resume <session-id>
+#    CWD must match the session's original launch dir (orch sessions launch in ~/git).
+#
 # Exit codes: 0 = session spawned, 1 = error (session exists, missing tooling).
 
 set -euo pipefail
@@ -27,6 +34,7 @@ SIM_UDID=""
 METRO_PORT=""
 WORKTREE_PATH=""
 LABEL=""
+RESUME_ID=""
 POSITIONAL=()
 
 while [[ $# -gt 0 ]]; do
@@ -38,6 +46,7 @@ while [[ $# -gt 0 ]]; do
     --metro-port)     METRO_PORT="$2";     shift 2 ;;
     --worktree-path)  WORKTREE_PATH="$2";  shift 2 ;;
     --label)          LABEL="$2";          shift 2 ;;
+    --resume)         RESUME_ID="$2";      shift 2 ;;
     *) POSITIONAL+=("$1"); shift ;;
   esac
 done
@@ -74,10 +83,18 @@ ESC_PROMPT="${ESC_PROMPT//\"/\\\"}" # double quote
 ESC_PROMPT="${ESC_PROMPT//\$/\\\$}" # dollar (prevent var expansion in heredoc)
 ESC_PROMPT="${ESC_PROMPT//\`/\\\`}" # backtick (prevent command substitution)
 
-if [[ "$YOLO" == true ]]; then
-  CLAUDE_INVOKE="claude --dangerously-skip-permissions --rc \"$ESC_PROMPT\""
+YOLO_FLAG=""
+[[ "$YOLO" == true ]] && YOLO_FLAG="--dangerously-skip-permissions "
+if [[ -n "$RESUME_ID" ]]; then
+  # RESUME MODE: re-attach an existing claude session instead of starting fresh.
+  # No initial prompt — the restored conversation IS the state. Composes with slot
+  # mode, so the resumed session inherits AGENT_SIM_UDID/AGENT_METRO_PORT (the env a
+  # bare `claude --resume` would lack). CWD must match the session's original launch
+  # dir for --resume to resolve it; slot mode already sets CWD from --worktree-path
+  # (the watcher passes ~/git), which is where orch sessions launch.
+  CLAUDE_INVOKE="claude ${YOLO_FLAG}--rc --resume $RESUME_ID"
 else
-  CLAUDE_INVOKE="claude --rc \"$ESC_PROMPT\""
+  CLAUDE_INVOKE="claude ${YOLO_FLAG}--rc \"$ESC_PROMPT\""
 fi
 
 # Build the per-slot env exports (empty in legacy mode).
