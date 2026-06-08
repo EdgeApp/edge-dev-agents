@@ -38,7 +38,7 @@
   "watcher": {
     "_doc": {
       "max_concurrent": "Max parallel agent sessions. Slot accounting is by LIVE tmux sessions, not Asana state. Env override: AGENT_WATCHER_MAX_CONCURRENT.",
-      "metro_base_port": "Slot N gets Metro port (metro_base_port + N). Slot 0 = 8081 (RN default).",
+      "metro_base_port": "Slot N gets Metro port (metro_base_port + N). 8181 (NOT 8081) keeps slot Metro ports out of the hardcoded DEBUG_<dep> dev-server range (8080/8082/8083/8084/8101) so a slot's Metro never collides with a DEBUG_<dep> webpack dev-server. Env override: AGENT_METRO_BASE_PORT.",
       "master_sim": "The iOS 18 iPhone 16 Pro Max sim holding the test account; cloned per slot. Resolved by device+runtime unless a UDID is hardcoded.",
       "resource_guardrail": "Pre-spawn safety gate. Skip spawning this tick if 1-min load avg > max_load_avg OR free RAM < min_free_ram_gb. Env overrides: AGENT_WATCHER_MAX_LOAD_AVG, AGENT_WATCHER_MIN_FREE_RAM_GB.",
       "npm_migration_commit": "Commit cherry-picked onto each fresh agent worktree so RN tooling uses npm not yarn.",
@@ -50,8 +50,8 @@
       "keep_completed_sessions": "How many COMPLETED tmux sessions to keep alive for inspection / remote re-engagement before the watchdog kills the oldest. On completion a session is RETIRED — renamed claude-asana-<gid> → done-asana-<gid> so it no longer holds a concurrency slot — but its claude is left running so you can attach to it. Each retired session holds a live claude, so this bounds memory. Default 3; set 0 to hard-kill on completion (old behavior)."
     },
     "default_repo": "edge-react-gui",
-    "max_concurrent": 3,
-    "metro_base_port": 8081,
+    "max_concurrent": 5,
+    "metro_base_port": 8181,
     "master_sim": {
       "device": "iPhone 16 Pro Max",
       "runtime": "iOS 18"
@@ -64,7 +64,7 @@
     "worktrees_root": "~/git/.agent-worktrees",
     "repos_root": "~/git",
     "sim_pool": {
-      "size": 3
+      "size": 5
     },
     "keep_completed_worktrees": 5,
     "keep_completed_sessions": 3,

@@ -37,7 +37,7 @@ const STATE_DIR = process.env.XDG_STATE_HOME
   : path.join(HOME, '.local/state/agent-watcher')
 const SLOTS_PATH = process.env.AGENT_SLOTS_PATH || path.join(STATE_DIR, 'slots.json')
 const LOCK_PATH = `${SLOTS_PATH}.lock`
-const METRO_BASE_PORT = parseInt(process.env.AGENT_METRO_BASE_PORT || '8081', 10)
+const CFG_PATH = path.join(DIR, 'asana-config.json')
 const LOCK_TIMEOUT_MS = 10_000
 const LOCK_STALE_MS = 30_000
 
@@ -113,8 +113,23 @@ function get(taskGid) {
   return readSlotsRaw().slots.find((s) => s.task_gid === taskGid) || null
 }
 
+// Base Metro port: env override → asana-config `.watcher.metro_base_port` → 8181.
+// 8181 (NOT the RN-default 8081) keeps slot Metro ports (8181, 8182, 8183, …) OUT
+// of the hardcoded DEBUG_<dep> dev-server range (8080/8082/8083/8084/8101), so a
+// slot's Metro can never collide with a DEBUG_<dep> webpack dev-server. Read lazily
+// so a config edit takes effect regardless of module require-order.
+function metroBasePort() {
+  const env = parseInt(process.env.AGENT_METRO_BASE_PORT || '', 10)
+  if (Number.isFinite(env)) return env
+  try {
+    const n = JSON.parse(fs.readFileSync(CFG_PATH, 'utf8'))?.watcher?.metro_base_port
+    if (Number.isFinite(n)) return n
+  } catch { /* fall through to default */ }
+  return 8181
+}
+
 function metroPortForIndex(slotIndex) {
-  return METRO_BASE_PORT + slotIndex
+  return metroBasePort() + slotIndex
 }
 
 // Lowest non-negative integer not already in use.
