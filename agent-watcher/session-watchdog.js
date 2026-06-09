@@ -294,6 +294,22 @@ function unretireFollowups() {
     if (sh(`tmux has-session -t "${dest}" 2>/dev/null && echo yes`) === 'yes') continue // a live slot already owns the name
     sh(`tmux rename-session -t "${r.name}" "${dest}"`)
     log(`[${r.name}] agent_status=${agentStatus} (followup on a completed task) → UN-RETIRED as ${dest}; re-occupies a slot`)
+    // Re-reserve the resources this still-running session is ACTUALLY using, read
+    // from its live env, so slots.json reflects reality and the watcher won't hand its
+    // Metro port to another task. (ensure-sim-pool separately RECLAIMS the sim from
+    // recycling once it's referenced by this now-active session.)
+    const cpid = parseInt((sh(`pgrep -P ${ppid}`).split('\n')[0] || '').trim(), 10)
+    if (Number.isFinite(cpid)) {
+      const env = sh(`ps eww -p ${cpid}`)
+      const simUdid = (env.match(/AGENT_SIM_UDID=([0-9A-Fa-f-]{36})/) || [])[1]
+      const metroPort = parseInt((env.match(/AGENT_METRO_PORT=(\d+)/) || [])[1] || '', 10)
+      if (simUdid) {
+        try {
+          slots.allocate({ task_gid: r.gid, worktree_path: path.join(WORKTREES_ROOT, r.gid), sim_udid: simUdid, metro_port: Number.isFinite(metroPort) ? metroPort : undefined })
+          log(`  [${r.gid}] re-reserved slot (sim ${simUdid}, metro ${Number.isFinite(metroPort) ? metroPort : 'auto'})`)
+        } catch (e) { log(`  [${r.gid}] re-reserve failed: ${e.message}`) }
+      }
+    }
   }
 }
 

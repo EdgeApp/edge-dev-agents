@@ -52,6 +52,26 @@ fi
 
 log() { echo ">> ensure-sim-pool: $*" >&2; }
 
+# Returns the task GID of a LIVE active session (claude-asana-<digits>) currently
+# running on this sim UDID (its claude process exports AGENT_SIM_UDID), or empty.
+# Used to RECLAIM (not recycle) a sim that got marked dirty but is still in active
+# use — e.g. an un-retired followup session. Retired (done-asana-*) sessions are
+# intentionally NOT matched, so their sims remain recyclable.
+sim_live_owner() {
+  local want="$1" sess gid ppid cpid envudid
+  while IFS= read -r sess; do
+    gid="${sess#claude-asana-}"
+    [[ "$gid" =~ ^[0-9]+$ ]] || continue
+    ppid="$(tmux list-panes -t "$sess" -F '#{pane_pid}' 2>/dev/null | head -1)"
+    [[ -n "$ppid" ]] || continue
+    cpid="$(pgrep -P "$ppid" 2>/dev/null | head -1)"
+    [[ -n "$cpid" ]] || continue
+    envudid="$(ps eww -p "$cpid" 2>/dev/null | tr ' ' '\n' | sed -n 's/^AGENT_SIM_UDID=//p' | head -1)"
+    if [[ "$envudid" == "$want" ]]; then echo "$gid"; return 0; fi
+  done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^claude-asana-')
+  return 0
+}
+
 # Atomic JSON update via lock + tmpfile.
 acquire_lock() {
   local i=0
@@ -120,7 +140,18 @@ for (( slot = 0; slot < SIZE; slot++ )); do
     continue
   fi
 
+  # Guard: never recycle a sim a LIVE active session is still running on (a dirty
+  # entry whose UDID is in a claude-asana-<digits> session's env — e.g. an un-retired
+  # followup). Reclaim it as in_use instead of deleting it out from under the agent.
   if [[ -n "$UDID" && "$UDID" != "null" ]]; then
+    OWNER="$(sim_live_owner "$UDID")"
+    if [[ -n "$OWNER" ]]; then
+      log "slot $slot dirty but sim $UDID is IN USE by live session claude-asana-$OWNER → reclaiming (not recycling)"
+      POOL_JSON=$(jq --arg s "$slot" --arg g "$OWNER" \
+        '(.pool[] | select(.slot == ($s | tonumber))) |= (.state = "in_use" | .task_gid = $g)' <<<"$POOL_JSON")
+      write_pool "$POOL_JSON"
+      continue
+    fi
     log "slot $slot dirty — deleting stale sim $UDID"
     "$DIR/delete-ios-sim.sh" --udid "$UDID" 2>&1 | sed 's/^/   /' >&2 || true
   fi

@@ -108,6 +108,9 @@ ENV_EXPORTS=""
 # otherwise lack because it isn't a login shell that sources the full profile.
 #   - ASANA_TOKEN: spawned shells didn't get it, so asana-get-context/asana-task-update
 #     used to fail on first call; export it from credentials.json up front.
+#   - ASANA_GITHUB_SECRET: the Asana↔GitHub widget secret used by asana-task-update
+#     --attach-pr. The .zshrc loader only reaches interactive shells, not this exec
+#     bash, so export it here too — else agents fall back to a comment, never attach.
 #   - LANG: headless shells often have no locale → CocoaPods `pod install` crashes
 #     with "Unicode Normalization not appropriate for ASCII-8BIT". Pin UTF-8.
 #   - PATH: ensure nvm node + maestro resolve even without an interactive profile.
@@ -115,6 +118,9 @@ _AW_CRED="$HOME/.config/agent-watcher/credentials.json"
 if [[ -f "$_AW_CRED" ]]; then
   _AW_TOKEN="$(jq -r '.asana_token // empty' "$_AW_CRED" 2>/dev/null)"
   [[ -n "$_AW_TOKEN" ]] && ENV_EXPORTS+="export ASANA_TOKEN=\"$_AW_TOKEN\"
+"
+  _AW_GHSEC="$(jq -r '.asana_github_secret // empty' "$_AW_CRED" 2>/dev/null)"
+  [[ -n "$_AW_GHSEC" ]] && ENV_EXPORTS+="export ASANA_GITHUB_SECRET=\"$_AW_GHSEC\"
 "
 fi
 ENV_EXPORTS+="export LANG=\"\${LANG:-en_US.UTF-8}\"

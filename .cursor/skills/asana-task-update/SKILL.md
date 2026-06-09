@@ -11,7 +11,8 @@ metadata:
 <rules description="Non-negotiable constraints.">
 <rule id="use-companion-script">Use `~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh` for all Asana task mutations. Do not call raw Asana APIs directly from skills that can delegate here.</rule>
 <rule id="task-required">Every operation requires `--task <task_gid>`.</rule>
-<rule id="attach-graceful-without-secret">`--attach-pr` uses the Asana ↔ GitHub widget integration. If `ASANA_GITHUB_SECRET` is unset, or if the integration endpoint returns 401/403/404 (integration disabled at the workspace level), the script warns once and skips the widget call with exit 0 — it does NOT fail the workflow. The PR body's Asana link (injected by `/pr-create`) remains the canonical Asana ↔ PR link consumed by downstream skills. Other operations (`--set-status`, `--set-board-state`, `--assign`, etc.) require `ASANA_TOKEN`.</rule>
+<rule id="attach-graceful-without-secret">`--attach-pr` uses the Asana ↔ GitHub widget integration. The secret is resolved from `$ASANA_GITHUB_SECRET`, else falls back to `credentials.json` (`.asana_github_secret`) — so it works in spawned agent shells that lack the env var. If it's still unset, or if the integration endpoint returns 401/403/404 (integration disabled at the workspace level), the script warns once and skips the widget call with exit 0 — it does NOT fail the workflow. `ASANA_TOKEN` is resolved the same way (env, else `credentials.json` `.asana_token`).</rule>
+<rule id="create-subtask">`--create-subtask --subtask-name "<name>"` creates a subtask under `--task` and re-points the rest of the invocation at the new subtask, so a SINGLE call can create the per-PR subtask AND `--attach-pr` its PR. Prints `>> subtask created: <gid>`. Used by `/one-shot`'s `multi-repo-subtasks` to give each repo's PR its own subtask under the umbrella task.</rule>
 <rule id="prompt-codes">If the script exits code 2 with `PROMPT_REVIEWER` or `PROMPT_IMPLEMENTOR`, ask the user and re-run with explicit `--reviewer` or `--implementor`. Hands-off callers may instead pass `--skip-assign-if-missing` to convert missing-reviewer assignment into a non-blocking skip.</rule>
 <rule id="script-timeouts">Asana updates can take time. Use `block_until_ms: 120000` for script calls.</rule>
 </rules>
@@ -44,6 +45,13 @@ metadata:
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
   --task <task_gid> \
   --attach-file /tmp/agent-run-report.md --attach-name agent-run-report.md
+
+# Multi-repo: create a per-PR SUBTASK under the main task AND attach its PR (one call).
+# --create-subtask makes the subtask under --task, then re-points the attach at it.
+~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
+  --task <main_task_gid> \
+  --create-subtask --subtask-name "<repo> #<num>: <title>" \
+  --attach-pr --pr-url <url> --pr-title "<title>" --pr-number <num>
 ```
 </usage>
 
