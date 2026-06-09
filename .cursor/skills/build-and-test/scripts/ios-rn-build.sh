@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # ios-rn-build.sh — Build + install + launch a React-Native iOS app on a sim.
 #
-# Detects whether the app is already installed and skips the full RN build path
-# (which can take 30-60 min on cold cache). Pass --force-rebuild to always
-# rebuild from scratch.
+# Detects whether the app is already installed and skips the full RN build path.
+# A real build here is usually only a FEW MINUTES — the Hermes prebuilt tarball is
+# prefetched below, which avoids the slow (~40 min) build-from-source; warm Xcode +
+# APFS-cloned node_modules keep the rest fast. Pass --force-rebuild to always rebuild.
 #
 # Usage:
 #   ios-rn-build.sh --udid <UDID> --bundle-id <co.example.app> [--port <n>] [--force-rebuild] [--skip-install]
@@ -70,7 +71,7 @@ PORT="${PORT:-${AGENT_METRO_PORT:-8081}}"
 # Confirm sim is booted. (get_app_container returns a false negative on a SHUT or
 # never-booted clone — even though the clone DOES inherit the app from the master
 # via APFS copy-on-write — so we MUST boot before checking, or we'd trigger a
-# needless 30-60 min rebuild that also wipes the cloned login state.)
+# needless rebuild (minutes) that also wipes the cloned login state.)
 if ! xcrun simctl bootstatus "$UDID" -b >/dev/null 2>&1; then
   echo ">> ios-rn-build: simulator $UDID is not booted; run select-ios-sim.sh --boot first" >&2
   exit 2
@@ -150,7 +151,7 @@ if [[ "$PORT" != "8081" ]]; then
   RUN_ARGS+=(--port "$PORT")
   echo ">> ios-rn-build: using non-default Metro port $PORT" >&2
 fi
-echo ">> ios-rn-build: npx react-native run-ios ${RUN_ARGS[*]}  (cold build: 30-60 min)" >&2
+echo ">> ios-rn-build: npx react-native run-ios ${RUN_ARGS[*]}  (usually a few minutes)" >&2
 npx react-native run-ios "${RUN_ARGS[@]}"
 
 # run-ios can exit 0 without installing (e.g. after an interactive prompt is
