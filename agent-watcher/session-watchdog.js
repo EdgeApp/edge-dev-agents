@@ -236,6 +236,27 @@ function freeSimAndMetro(taskGid) {
   freeMetroPort(slot?.metro_port ?? null)
 }
 
+// Reap orphan Metro bundlers: a Metro whose cwd is an .agent-worktrees/<gid> dir
+// that no longer exists (the slot was torn down but its Metro lingered, squatting a
+// port the next slot reuses → the "foreign Metro on my port" failures). Only kills
+// Metros whose cwd is under the worktrees root AND gone; spares live-worktree Metros
+// and any Metro outside the worktrees root (e.g. a manual one in ~/git/<repo>).
+function reapOrphanMetros() {
+  const out = sh('pgrep -fl "react-native.*start|node_modules/metro"')
+  if (!out) return
+  for (const line of out.split('\n').filter(Boolean)) {
+    const pid = parseInt(line.trim().split(/\s+/)[0], 10)
+    if (!Number.isFinite(pid)) continue
+    const cwdRaw = sh(`lsof -a -p ${pid} -d cwd -Fn`).split('\n').map((s) => s.replace(/^n/, '')).filter(Boolean).pop() || ''
+    const cwd = cwdRaw.replace(/ \(deleted\)$/, '')
+    if (!cwd || !cwd.startsWith(WORKTREES_ROOT)) continue // only worktree Metros
+    if (!fs.existsSync(cwd)) {
+      sh(`kill ${pid}`)
+      log(`[reaper] killed orphan Metro pid ${pid} (worktree gone: ${cwd})`)
+    }
+  }
+}
+
 // Full teardown of one retained worktree: remove the worktree + branch (and any
 // lingering sim/slot, though those were freed at completion). Used only by the prune.
 function removeWorktree(taskGid, repo) {
@@ -254,6 +275,26 @@ function listRetiredSessions() {
     .map((line) => { const [name, created] = line.split(' '); return { name, gid: name.slice(RETIRED_PREFIX.length), created: parseInt(created, 10) || 0 } })
     .filter((s) => s.name.startsWith(RETIRED_PREFIX))
     .sort((a, b) => b.created - a.created)
+}
+
+// Un-retire sweep (symmetric to the completion sweep): a retired done-asana-<gid>
+// session whose task is NO LONGER Complete means a human re-engaged a finished task
+// for followup work (and, per one-shot's `followup-reopens-status`, the agent moved
+// agent_status off Complete). Rename it BACK to claude-asana-<gid> so it re-occupies
+// a concurrency slot — otherwise the followup runs off-the-books and the watcher can
+// oversubscribe. Only for still-alive sessions with a real, non-Complete status; the
+// session re-provisions its own sim/Metro as the work proceeds.
+function unretireFollowups() {
+  for (const r of listRetiredSessions()) {
+    const { agentStatus } = fetchTaskState(r.gid)
+    if (!agentStatus || agentStatus === 'Complete') continue
+    const ppid = getPanePid(r.name)
+    if (ppid === null || !claudeRunningUnder(ppid)) continue // only re-occupy for a live session
+    const dest = `${SESSION_PREFIX}${r.gid}`
+    if (sh(`tmux has-session -t "${dest}" 2>/dev/null && echo yes`) === 'yes') continue // a live slot already owns the name
+    sh(`tmux rename-session -t "${r.name}" "${dest}"`)
+    log(`[${r.name}] agent_status=${agentStatus} (followup on a completed task) → UN-RETIRED as ${dest}; re-occupies a slot`)
+  }
 }
 
 // Retire a completed session instead of killing it: rename it out of the
@@ -406,8 +447,15 @@ function main() {
     state.sessions[session] = { lastContent: content, lastChange, heavyFreed: isBlocked }
   }
 
+  // Un-retire any completed session a human re-engaged for followup (status moved off
+  // Complete) so it re-occupies a slot. Runs BEFORE the retired-cap prune.
+  unretireFollowups()
+
   // Cap retired (completed-but-kept-alive) sessions so they don't accumulate in memory.
   pruneRetiredSessions()
+
+  // Kill Metro bundlers whose worktree was torn down (orphans squatting slot ports).
+  reapOrphanMetros()
 
   // Enforce the worktree retention cap (keep newest N completed/retired worktrees).
   pruneRetainedWorktrees(sessions)

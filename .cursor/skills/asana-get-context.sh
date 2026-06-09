@@ -64,8 +64,14 @@ else
   echo "Error: could not extract task GID from: $RAW_INPUT" >&2
   exit 1
 fi
+# Token: prefer $ASANA_TOKEN, else fall back to credentials.json (.asana_token),
+# the same source update-status.sh uses — spawned agent shells lack the env var.
 if [[ -z "${ASANA_TOKEN:-}" ]]; then
-  echo "Error: ASANA_TOKEN not set" >&2
+  CRED="$HOME/.config/agent-watcher/credentials.json"
+  [[ -f "$CRED" ]] && ASANA_TOKEN="$(jq -r '.asana_token // empty' "$CRED" 2>/dev/null)"
+fi
+if [[ -z "${ASANA_TOKEN:-}" ]]; then
+  echo "Error: ASANA_TOKEN not set and not found in credentials.json (.asana_token)" >&2
   exit 1
 fi
 
