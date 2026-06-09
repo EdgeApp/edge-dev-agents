@@ -31,9 +31,14 @@ SET_PRIORITY_GID=""
 SET_PLANNED_GID=""
 AUTO_EST_REVIEW=false
 
+CREATE_SUBTASK=false
+SUBTASK_NAME=""
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --task) TASK_GID="$2"; shift 2 ;;
+    --create-subtask) CREATE_SUBTASK=true; shift ;;
+    --subtask-name) SUBTASK_NAME="$2"; shift 2 ;;
     --attach-pr) DO_ATTACH=true; shift ;;
     --pr-url) PR_URL="$2"; shift 2 ;;
     --pr-title) PR_TITLE="$2"; shift 2 ;;
@@ -67,7 +72,7 @@ if [[ -z "$TASK_GID" ]]; then
   exit 1
 fi
 
-if ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_STATUS" ]] && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_REVIEWER_GID" ]] && [[ -z "$SET_IMPLEMENTOR_GID" ]] && [[ -z "$SET_PRIORITY_GID" ]] && [[ -z "$SET_PLANNED_GID" ]] && ! $AUTO_EST_REVIEW; then
+if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_STATUS" ]] && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_REVIEWER_GID" ]] && [[ -z "$SET_IMPLEMENTOR_GID" ]] && [[ -z "$SET_PRIORITY_GID" ]] && [[ -z "$SET_PLANNED_GID" ]] && ! $AUTO_EST_REVIEW; then
   echo "Error: No operations specified" >&2
   exit 1
 fi
@@ -84,10 +89,16 @@ if [[ -z "${ASANA_TOKEN:-}" ]]; then
   exit 1
 fi
 
+# Widget secret: prefer $ASANA_GITHUB_SECRET, else fall back to credentials.json
+# (mirrors the token fallback — spawned shells may not have it exported).
+if [[ -z "${ASANA_GITHUB_SECRET:-}" ]]; then
+  CRED="$HOME/.config/agent-watcher/credentials.json"
+  [[ -f "$CRED" ]] && ASANA_GITHUB_SECRET="$(jq -r '.asana_github_secret // empty' "$CRED" 2>/dev/null)"
+fi
 # --attach-pr is OPTIONAL on a workspace where the Asana ↔ GitHub widget
-# integration is disabled. If the secret is missing, skip the widget call with
-# a warning rather than failing — the canonical Asana ↔ PR link lives in the PR
-# body (injected by /pr-create) and downstream skills do not need the widget.
+# integration is disabled. If the secret is still missing, skip the widget call
+# with a warning rather than failing — the canonical Asana ↔ PR link lives in the
+# PR body (injected by /pr-create) and downstream skills do not need the widget.
 if $DO_ATTACH && [[ -z "${ASANA_GITHUB_SECRET:-}" ]]; then
   echo ">> PR attach: skipped (ASANA_GITHUB_SECRET not set; widget integration not configured)" >&2
   DO_ATTACH=false
@@ -95,6 +106,20 @@ fi
 
 ASANA_API="https://app.asana.com/api/1.0"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# --create-subtask: create a subtask under --task, print its gid, and re-point
+# TASK_GID to it so any --attach-pr/--set-status in the SAME invocation lands on
+# the new subtask (one call: make the per-PR subtask AND attach its PR).
+if $CREATE_SUBTASK; then
+  [[ -n "$SUBTASK_NAME" ]] || { echo "Error: --create-subtask requires --subtask-name" >&2; exit 1; }
+  SUB_GID="$(curl -sS -X POST "$ASANA_API/tasks/$TASK_GID/subtasks" \
+    -H "Authorization: Bearer $ASANA_TOKEN" -H "Content-Type: application/json" \
+    -d "{\"data\":{\"name\":$(jq -Rn --arg v "$SUBTASK_NAME" '$v')}}" \
+    | jq -r '.data.gid // empty')"
+  [[ -n "$SUB_GID" ]] || { echo "Error: failed to create subtask under $TASK_GID" >&2; exit 1; }
+  echo ">> subtask created: $SUB_GID ($SUBTASK_NAME)"
+  TASK_GID="$SUB_GID"
+fi
 
 # Airbitz.co workspace field GIDs
 STATUS_FIELD="1190660107346181"
