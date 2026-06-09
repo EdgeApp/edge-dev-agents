@@ -74,6 +74,15 @@ fi
 GEN="$HOME/.cursor/skills/convention-sync/scripts/generate-claude-md.sh"
 [[ -x "$GEN" ]] && { say "Regenerating ~/.claude/CLAUDE.md"; "$GEN" >/dev/null || warn "generate-claude-md.sh failed (non-fatal)"; }
 
+# 5b. Portable `timeout` on PATH: macOS has no timeout/gtimeout, but the skills
+# prescribe `timeout <s> <cmd>` to bound waits. Symlink the committed shim.
+if [[ -f "$HOME/.cursor/skills/timeout.sh" ]] && ! command -v timeout >/dev/null 2>&1; then
+  mkdir -p "$HOME/.local/bin"
+  chmod +x "$HOME/.cursor/skills/timeout.sh"
+  ln -sf "$HOME/.cursor/skills/timeout.sh" "$HOME/.local/bin/timeout"
+  say "Linked ~/.local/bin/timeout -> ~/.cursor/skills/timeout.sh (portable timeout shim)"
+fi
+
 # 6. Link shared memory into the standard entry points
 if [[ -x "$HOME/.claude/link-shared-memory.sh" ]]; then
   for d in "$HOME" "$HOME/git"; do

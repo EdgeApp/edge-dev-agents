@@ -67,17 +67,42 @@ PORT="${PORT:-${AGENT_METRO_PORT:-8081}}"
   exit 1
 }
 
-# Confirm sim is booted
+# Confirm sim is booted. (get_app_container returns a false negative on a SHUT or
+# never-booted clone — even though the clone DOES inherit the app from the master
+# via APFS copy-on-write — so we MUST boot before checking, or we'd trigger a
+# needless 30-60 min rebuild that also wipes the cloned login state.)
 if ! xcrun simctl bootstatus "$UDID" -b >/dev/null 2>&1; then
   echo ">> ios-rn-build: simulator $UDID is not booted; run select-ios-sim.sh --boot first" >&2
   exit 2
 fi
 
-# Already installed?
+# Foreign-Metro guard: if $PORT is already LISTENed by a process from a DIFFERENT
+# directory (a stale/foreign Metro from another slot or a dead session), the app
+# would silently bundle from the WRONG repo's Metro (red "No script URL" screen, or
+# worse, another task's code). Fail loudly so the caller frees the port. Used by
+# BOTH the cached-launch and the full-build paths.
+assert_metro_port_free_or_ours() {
+  local pid cwd
+  pid="$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)"
+  [[ -z "$pid" ]] && return 0
+  cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)"
+  if [[ "$cwd" != "$PWD" ]]; then
+    echo ">> ios-rn-build: FAIL — Metro port $PORT is held by PID $pid (cwd: ${cwd:-unknown}), not this repo. Free it or pass a free --port." >&2
+    exit 1
+  fi
+  echo ">> ios-rn-build: reusing Metro already running on port $PORT for this repo" >&2
+}
+
+# Already installed? (sim is booted now, so this is an accurate check.)
 if ! $FORCE && xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>&1; then
-  echo ">> ios-rn-build: $BUNDLE_ID already installed on $UDID; launching only" >&2
+  echo ">> ios-rn-build: $BUNDLE_ID already installed on $UDID; launching only (port $PORT)" >&2
+  # The cached app was baked for some default packager host; on a non-8081 slot it
+  # would connect to the wrong/foreign Metro. Guard the port and PIN the app to THIS
+  # slot's Metro before launching, so it bundles from the right place.
+  assert_metro_port_free_or_ours
+  xcrun simctl spawn "$UDID" defaults write "$BUNDLE_ID" RCT_jsLocation "localhost:$PORT" 2>/dev/null || true
   xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
-  echo ">> ios-rn-build: PASS (cached install, launched)"
+  echo ">> ios-rn-build: PASS (cached install, launched on Metro port $PORT)"
   exit 0
 fi
 
@@ -116,19 +141,9 @@ fi
 echo ">> ios-rn-build: $PM run prepare.ios (via pm.sh)" >&2
 "$PM_SH" run prepare.ios
 
-# Refuse to race a foreign Metro: if the slot port is already LISTENed by a
-# process running from a DIFFERENT directory (stale Metro from a dead agent
-# session), `react-native run-ios` hangs on an interactive "use another port?"
-# prompt and can exit 0 without building. Fail loudly instead.
-PORT_PID="$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)"
-if [[ -n "$PORT_PID" ]]; then
-  PORT_CWD="$(lsof -a -p "$PORT_PID" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)"
-  if [[ "$PORT_CWD" != "$PWD" ]]; then
-    echo ">> ios-rn-build: FAIL — port $PORT is held by PID $PORT_PID (cwd: ${PORT_CWD:-unknown}), not this repo. Kill the stale Metro or pass a free --port." >&2
-    exit 1
-  fi
-  echo ">> ios-rn-build: reusing Metro already running on port $PORT for this repo" >&2
-fi
+# Refuse to race a foreign Metro before the (long) build: otherwise run-ios hangs on
+# an interactive "use another port?" prompt and can exit 0 without building.
+assert_metro_port_free_or_ours
 
 RUN_ARGS=(--udid "$UDID")
 if [[ "$PORT" != "8081" ]]; then

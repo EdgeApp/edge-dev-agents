@@ -72,8 +72,15 @@ if ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z 
   exit 1
 fi
 
+# Token: prefer $ASANA_TOKEN, else fall back to credentials.json (the lowercase
+# `asana_token` key — same source update-status.sh uses). Spawned agent shells
+# don't get ASANA_TOKEN exported, so this fallback is what makes attaches work.
 if [[ -z "${ASANA_TOKEN:-}" ]]; then
-  echo "Error: ASANA_TOKEN not set" >&2
+  CRED="$HOME/.config/agent-watcher/credentials.json"
+  [[ -f "$CRED" ]] && ASANA_TOKEN="$(jq -r '.asana_token // empty' "$CRED" 2>/dev/null)"
+fi
+if [[ -z "${ASANA_TOKEN:-}" ]]; then
+  echo "Error: ASANA_TOKEN not set and not found in credentials.json (.asana_token)" >&2
   exit 1
 fi
 

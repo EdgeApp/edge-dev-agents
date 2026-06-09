@@ -85,6 +85,10 @@ ESC_PROMPT="${ESC_PROMPT//\`/\\\`}" # backtick (prevent command substitution)
 
 YOLO_FLAG=""
 [[ "$YOLO" == true ]] && YOLO_FLAG="--dangerously-skip-permissions "
+# --chrome enables the "Claude in Chrome" integration so spawned agents can drive the
+# Chrome extension (off by default; the agent box must have Chrome + the extension
+# running for it to actually connect).
+CHROME_FLAG="--chrome "
 if [[ -n "$RESUME_ID" ]]; then
   # RESUME MODE: re-attach an existing claude session instead of starting fresh.
   # No initial prompt — the restored conversation IS the state. Composes with slot
@@ -92,13 +96,30 @@ if [[ -n "$RESUME_ID" ]]; then
   # bare `claude --resume` would lack). CWD must match the session's original launch
   # dir for --resume to resolve it; slot mode already sets CWD from --worktree-path
   # (the watcher passes ~/git), which is where orch sessions launch.
-  CLAUDE_INVOKE="claude ${YOLO_FLAG}--rc --resume $RESUME_ID"
+  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}--rc --resume $RESUME_ID"
 else
-  CLAUDE_INVOKE="claude ${YOLO_FLAG}--rc \"$ESC_PROMPT\""
+  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}--rc \"$ESC_PROMPT\""
 fi
 
 # Build the per-slot env exports (empty in legacy mode).
 ENV_EXPORTS=""
+
+# Session hygiene (always, both modes): things the inner `exec bash` shell would
+# otherwise lack because it isn't a login shell that sources the full profile.
+#   - ASANA_TOKEN: spawned shells didn't get it, so asana-get-context/asana-task-update
+#     used to fail on first call; export it from credentials.json up front.
+#   - LANG: headless shells often have no locale → CocoaPods `pod install` crashes
+#     with "Unicode Normalization not appropriate for ASCII-8BIT". Pin UTF-8.
+#   - PATH: ensure nvm node + maestro resolve even without an interactive profile.
+_AW_CRED="$HOME/.config/agent-watcher/credentials.json"
+if [[ -f "$_AW_CRED" ]]; then
+  _AW_TOKEN="$(jq -r '.asana_token // empty' "$_AW_CRED" 2>/dev/null)"
+  [[ -n "$_AW_TOKEN" ]] && ENV_EXPORTS+="export ASANA_TOKEN=\"$_AW_TOKEN\"
+"
+fi
+ENV_EXPORTS+="export LANG=\"\${LANG:-en_US.UTF-8}\"
+export PATH=\"\$HOME/.maestro/bin:\$PATH\"
+"
 # A stable UUID for this agent run, exported so the agent can stamp it into the
 # plan + run-report docs for traceability. Logged here so the watcher records the
 # task→session-uuid mapping.

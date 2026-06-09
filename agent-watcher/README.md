@@ -56,6 +56,16 @@ task that is blocked-or-in-flight in Asana but whose tmux session has died does
    heavy resources (sim + Metro) so it stops squatting while it waits on a human, but keep the
    session + slot alive so it can resume on unblock. Done once and re-armed when unblocked.
    (A resumed task re-provisions its sim/Metro via build-and-test, since the sim returns to the pool.)
+5. **Un-retire** (`session-watchdog.js`): if a `done-asana-<gid>` (retired/Complete) session's task
+   is moved back OFF `Complete` (a human re-engaged it for followup; the agent does this per
+   one-shot `followup-reopens-status`), the watchdog renames it back to `claude-asana-<gid>` so it
+   re-occupies a slot. This fixes ACCOUNTING only — it cannot refresh the running process's stale
+   `AGENT_SIM_UDID`/`AGENT_METRO_PORT` (freed + recycled at completion).
+6. **Re-provision + resume** (`resume-task.sh`): the operator tool for followup that must BUILD/TEST.
+   `resume-task.sh --task-gid <gid> [--status <Phase>]` resolves the task's claude session from its
+   transcript, tears down the stale session, allocates a FRESH slot+sim+Metro port, sets
+   `agent_status` off Complete, and relaunches via `spawn-test-session.sh --resume` with working env.
+   (Operator-only — it kills+respawns the session, so it refuses to run from inside the target's tmux.)
 
 ## Configuration knobs (`asana-config.json` → `.watcher`)
 

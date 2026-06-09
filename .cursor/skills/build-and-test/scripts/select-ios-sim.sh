@@ -28,6 +28,7 @@ RUNTIME=""
 DEVICE=""
 ACCEPT_UDID=""
 BOOT=false
+ALLOW_MASTER=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -35,9 +36,28 @@ while [[ $# -gt 0 ]]; do
     --device)      DEVICE="$2";      shift 2 ;;
     --accept-udid) ACCEPT_UDID="$2"; shift 2 ;;
     --boot)        BOOT=true;        shift ;;
+    --allow-master) ALLOW_MASTER=true; shift ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
+
+# ── Slot-mode MASTER guardrail ────────────────────────────────────────────────
+# When the watcher provisioned a per-slot clone, it exports $AGENT_SIM_UDID. In that
+# case the agent MUST target that clone and MUST NOT resolve a sim by name: the
+# by-name device "iPhone 16 Pro Max" IS the shared MASTER (clones are renamed
+# agent-sim-pool-*), and running maestro/builds on the master pollutes the golden
+# image that every future clone is cut from. Refuse anything but the slot clone.
+# (--allow-master overrides, e.g. for deliberate one-offs.)
+if [[ -n "${AGENT_SIM_UDID:-}" && "$ALLOW_MASTER" != true ]]; then
+  if [[ -n "$ACCEPT_UDID" && "$ACCEPT_UDID" != "$AGENT_SIM_UDID" ]]; then
+    echo "select-ios-sim: in a slot, --accept-udid must be the slot clone \$AGENT_SIM_UDID ($AGENT_SIM_UDID), not '$ACCEPT_UDID'. Refusing (pass --allow-master to override)." >&2
+    exit 1
+  fi
+  if [[ -z "$ACCEPT_UDID" && ( -n "$RUNTIME" || -n "$DEVICE" ) ]]; then
+    echo "select-ios-sim: in a slot (\$AGENT_SIM_UDID set), resolve your clone with --accept-udid \"\$AGENT_SIM_UDID\". By-name resolution targets the SHARED MASTER sim and would pollute the golden image. Refusing (pass --allow-master to override)." >&2
+    exit 1
+  fi
+fi
 
 # --accept-udid short-circuit: trust a caller-supplied UDID, just verify + (boot).
 if [[ -n "$ACCEPT_UDID" ]]; then
