@@ -89,6 +89,19 @@ YOLO_FLAG=""
 # Chrome extension (off by default; the agent box must have Chrome + the extension
 # running for it to actually connect).
 CHROME_FLAG="--chrome "
+# Maestro MCP: gives agents interactive sim-driving tools (tap/swipe/hierarchy/
+# screenshot) on a PERSISTENT driver — no ~2-min `maestro test` startup per probe.
+# Exploration goes through these tools; the repeatable proof run stays a yaml flow.
+# Agents must select the device matching $AGENT_SIM_UDID via the MCP device tools.
+MCP_FLAG=""
+[[ -f "$HOME/.config/agent-watcher/maestro-mcp.json" ]] && \
+  MCP_FLAG="--mcp-config $HOME/.config/agent-watcher/maestro-mcp.json "
+# Model pin: config .watcher.agent_model forces what spawned sessions START on
+# (e.g. claude-opus-4-8[1m] = Opus 4.8 with 1M context). Empty/absent = the
+# server-side default alias. Quoted in the invoke — [1m] is a glob class.
+AGENT_MODEL="$(jq -r '.watcher.agent_model // empty' "$HOME/.config/agent-watcher/asana-config.json" 2>/dev/null)"
+MODEL_FLAG=""
+[[ -n "$AGENT_MODEL" ]] && MODEL_FLAG="--model \"$AGENT_MODEL\" "
 if [[ -n "$RESUME_ID" ]]; then
   # RESUME MODE: re-attach an existing claude session instead of starting fresh.
   # No initial prompt — the restored conversation IS the state. Composes with slot
@@ -96,9 +109,9 @@ if [[ -n "$RESUME_ID" ]]; then
   # bare `claude --resume` would lack). CWD must match the session's original launch
   # dir for --resume to resolve it; slot mode already sets CWD from --worktree-path
   # (the watcher passes ~/git), which is where orch sessions launch.
-  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}--rc --resume $RESUME_ID"
+  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}${MCP_FLAG}${MODEL_FLAG}--rc --resume $RESUME_ID"
 else
-  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}--rc \"$ESC_PROMPT\""
+  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}${MCP_FLAG}${MODEL_FLAG}--rc \"$ESC_PROMPT\""
 fi
 
 # Build the per-slot env exports (empty in legacy mode).

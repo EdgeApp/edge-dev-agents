@@ -73,7 +73,7 @@ First provision the workspace (per **Per-task worktrees** above): from the plan,
 </step>
 
 <step id="5" name="PR phase">
-Set agent_status=Reviewing. Then run `/pr-create` — always pass `--asana-task <gid>` (so the Asana link is embedded in the PR body, per `task-gid-for-pr-body-link`) AND `--asana-attach` (attach the PR to the task via the GitHub widget, per `attach-prs-by-default`), and never pass `--asana-assign`. If the run produced PRs in MORE THAN ONE repo, instead build the subtask-per-PR structure per `multi-repo-subtasks` (and `dep-pr-draft-vs-bump` for dependency PRs).
+Set agent_status=Reviewing. Then run `/pr-create` — always pass `--asana-task <gid>` (so the Asana link is embedded in the PR body, per `task-gid-for-pr-body-link`) AND `--asana-attach` (attach the PR to the task via the GitHub widget, per `attach-prs-by-default`), and never pass `--asana-assign`. If the run produced PRs in MORE THAN ONE repo, instead build the subtask-per-PR structure per `multi-repo-subtasks` (and `dep-pr-draft-vs-bump` for dependency PRs). The step-4 test run saved proof screenshots (`/tmp/agent-proof-<gid>-NN-<slug>.png`, per build-and-test's `proof-screenshots-for-pr`); `/pr-create` step 4b attaches them to the PR as the test-evidence comment — verify that happened (every gui-tested PR should carry its screenshots).
 
 Task GID source priority: (1) explicit `--asana-task <gid>`; (2) Asana task URL from step 1; (3) chat context from prior steps.
 </step>
@@ -87,7 +87,7 @@ Compute the deadline once at the start (`now + 30 min`). Then iterate, re-enteri
    - exit 0 (all pass) → CI is green
    - non-zero (a check failed) → read the failing job's log via `gh run view --log-failed`, apply a fix, then amend + force-push per `pr-watch-loop-amend-pattern`, then re-enter the bounded watch with the remaining budget
 2. **Reviewer bots**: handled as part of the watch per `bugbot-in-watch` + `reviewer-bots`. `gh pr checks --watch` blocks until every allowlisted reviewer's check-run completes on HEAD; when it returns, if any is red or has unresolved threads, fix it (`/bugbot`'s scan/fix for `cursor[bot]`, inline for others), amend + force-push (re-triggers them), then re-enter the watch. Also apply the semantic-catch for non-allowlisted bots per `reviewer-bots`. Never arm bugbot's cron.
-3. **Re-test after a fix (semantic)**: after applying ANY fix in this loop, reason about whether the change could affect behavior that `/build-and-test` covers. If it could (logic/UI/build changes) AND this is a `--yolo` run, re-run `/build-and-test` before re-entering the watch. For non-behavioral fixes (lint, comments, docs, pure config), skip the re-test. Don't blindly re-test every fix; don't skip it for real behavioral changes.
+3. **Re-test after a fix (semantic)**: after applying ANY fix in this loop, reason about whether the change could affect behavior that `/build-and-test` covers. If it could (logic/UI/build changes) AND this is a `--yolo` run, re-run `/build-and-test` before re-entering the watch. For non-behavioral fixes (lint, comments, docs, pure config), skip the re-test. Don't blindly re-test every fix; don't skip it for real behavioral changes. When a re-test produced NEW proof screenshots, attach them to the PR via `pr-attach-screenshots.sh --title "Test evidence (after fix)"` so the evidence on the PR matches the current HEAD.
 
 Exit conditions:
 - **All green** (per `finalize-gate`: CI checks pass + every `reviewer-bots` check-run completed-clean on HEAD + no unresolved threads from any of them): proceed to step 7.

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "maestro": {
+      "command": "/Users/eddy/.maestro/bin/maestro",
+      "args": ["mcp", "--no-viewer"]
+    }
+  }
+}

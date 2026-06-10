@@ -19,6 +19,7 @@ metadata:
 <rule id="flag-contract">`--asana-attach` only runs when a task GID is available from chat context or explicit `--asana-task <gid>`. If no task GID is available, fail fast and skip the attach.</rule>
 <rule id="script-timeouts">Asana updates can take up to 90s. Use `block_until_ms: 120000` for `asana-task-update.sh` calls.</rule>
 <rule id="repo-template-required">If the repo has `.github/PULL_REQUEST_TEMPLATE.md`, the PR body must preserve that template's section headings. Do NOT substitute generic sections like `Summary` or `Test plan`.</rule>
+<rule id="attach-test-evidence">When proof screenshots of the change exist (an orchestrated run's `/build-and-test` saves them as `/tmp/agent-proof-<task-gid>-NN-<slug>.png`, or the caller names files), attach them to the PR after creation via `~/.cursor/skills/pr-create/scripts/pr-attach-screenshots.sh --repo <owner/repo> --pr <num> <png...>` — it uploads them to the public assets branch (`edge-dev-agents@agent-pr-assets`) and posts ONE comment embedding the images inline (filename slug → caption; argument order → display order). GitHub has NO API for uploading images directly into comments — do NOT inline base64, commit images onto the PR branch, or link local paths. If no proof screenshots exist, skip silently (not every PR is app-testable).</rule>
 </rules>
 
 <step id="1" name="Push branch">
@@ -65,6 +66,19 @@ Write body to `/tmp/pr-body.md`, then run:
 ```
 
 The companion script validates body files against the repo template and rejects generic fallback sections on templated repos. Capture PR URL and number from JSON output.
+</step>
+
+<step id="4b" name="Attach test-evidence screenshots">
+Per `attach-test-evidence`: if proof screenshots exist for this change (`ls /tmp/agent-proof-<task-gid>-*.png`, or caller-provided files), attach them now:
+
+```bash
+~/.cursor/skills/pr-create/scripts/pr-attach-screenshots.sh \
+  --repo <owner/repo> --pr <pr-number> \
+  --title "Test evidence" \
+  /tmp/agent-proof-<task-gid>-01-<slug>.png [more...]
+```
+
+Pass them in narrative order (NN prefix). No screenshots → skip silently.
 </step>
 
 <step id="5" name="Optional Asana PR attach">

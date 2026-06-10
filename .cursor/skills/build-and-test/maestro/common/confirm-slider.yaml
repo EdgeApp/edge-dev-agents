@@ -1,0 +1,28 @@
+# common/confirm-slider.yaml — drive the SafeSlider confirm control and wait for
+# the success scene. THE slider is the single most re-derived interaction; use
+# this instead of re-solving it.
+# PARAMS:
+#   SUCCESS_TEXT — terminal success marker to wait for (default "Congratulations!")
+# HOW IT WORKS: the slider thumb carries testID `confirmSliderThumb` (backfilled
+# via testid-backfill-commit); an id-anchored swipe drives it. If the id is NOT
+# present on this branch (selector resolves nothing), fall back to:
+#   `maestro hierarchy` → find the slider node's bounds → absolute-coordinate
+#   swipe from thumb-center to the left edge (duration ~1500ms). And then ADD the
+#   missing testID per testid-backfill-commit so the next run doesn't fall back.
+# NOTE: swipe direction is LEFT (thumb starts at right edge in this design).
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  SUCCESS_TEXT: "Congratulations!"
+---
+- extendedWaitUntil:
+    visible: "Slide to Confirm"
+    timeout: 15000
+- swipe:
+    from:
+      id: "confirmSliderThumb"
+    direction: LEFT
+    duration: 1500
+- extendedWaitUntil:
+    visible: ${SUCCESS_TEXT}
+    timeout: 120000

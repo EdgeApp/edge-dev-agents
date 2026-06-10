@@ -1,0 +1,76 @@
+# common/select-swap-pair.yaml — Exchange tab → pick source/receiving wallets →
+# enter fiat amount → Next → wait for a quote → optionally force a provider.
+# Assumes logged-in app (compose login-if-needed + dismiss-startup-modals first).
+# PARAMS:
+#   SRC_WALLET / DST_WALLET — regex matched in the wallet pickers (e.g. ".*Bitcoin.*")
+#   FIAT_AMOUNT             — fiat number typed into the amount field
+#   PROVIDER                — exact provider name to force (e.g. "Maya Protocol").
+#                             Forcing works by SELECTING it in the provider sheet;
+#                             note Preferred/preferPluginId do NOT pin — engine
+#                             reverts to best-rate ~60s. For a hard pin, disable
+#                             competitors in Settings > Exchange first.
+# GOTCHA: amount field retains prior text — eraseText before input.
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  SRC_WALLET: ".*Bitcoin.*"
+  DST_WALLET: ".*Ethereum.*"
+  FIAT_AMOUNT: "16"
+  PROVIDER: ""
+---
+- extendedWaitUntil:
+    visible: "Exchange"
+    timeout: 30000
+- tapOn: "Exchange"
+- runFlow:
+    when:
+      visible: "Select Source Wallet"
+    commands:
+      - tapOn: "Select Source Wallet"
+      - extendedWaitUntil:
+          visible: ${SRC_WALLET}
+          timeout: 15000
+      - tapOn:
+          text: ${SRC_WALLET}
+          index: 0
+- runFlow:
+    when:
+      visible: "Select Receiving Wallet"
+    commands:
+      - tapOn: "Select Receiving Wallet"
+      - extendedWaitUntil:
+          visible: ${DST_WALLET}
+          timeout: 15000
+      - tapOn:
+          text: ${DST_WALLET}
+          index: 0
+- extendedWaitUntil:
+    visible: "Tap to edit"
+    timeout: 15000
+- tapOn:
+    text: "Tap to edit"
+    index: 0
+- eraseText
+- inputText: ${FIAT_AMOUNT}
+- tapOn: "Next"
+- extendedWaitUntil:
+    visible: "Powered by .*"
+    timeout: 45000
+- runFlow:
+    when:
+      true: ${PROVIDER != ''}
+    commands:
+      - runFlow:
+          when:
+            notVisible: ${PROVIDER}
+          commands:
+            - tapOn:
+                text: "Powered by .*"
+            - extendedWaitUntil:
+                visible: "Select Swap Provider"
+                timeout: 10000
+            - tapOn:
+                text: ${PROVIDER}
+            - extendedWaitUntil:
+                visible: "Powered by .*"
+                timeout: 45000
