@@ -19,6 +19,33 @@ skills_used: []          # e.g. [asana-plan, im, pr-create, build-and-test, debu
 <!-- 3-6 lines: what was asked, what shipped, final state, links. -->
 _None observed._
 
+## Testing
+<!-- cat: testing -->
+<!-- HOW this run actually verified the change — concrete and reproducible, so a
+     reviewer can see what was exercised and trust (or challenge) the `verified`
+     frontmatter. This is the visibility surface for test completeness: NEVER leave
+     it thin. Fill it even when verification was static-only or blocked (say which).
+     Draw from the /build-and-test run. Cover, in order:
+       - What was exercised: the real end-to-end user action driven to its TERMINAL
+         success state (per build-and-test `test-drives-the-real-action`), e.g.
+         "BTC->AVAX SideShift swap executed to the order-submitted scene." If it
+         stopped short, name the exact step reached and why.
+       - Method: static checks run WITH results (tsc / jest / eslint / verify-repo);
+         sim build flavor; the maestro flow(s) run (path) and whether driven via MCP
+         exploration or a single yaml proof run; any /debugger breakpoints used.
+       - Environment: sim UDID + slot, roster account used and any mid-test switch
+         (via env.json), funding (asset + amount, any swap-to-fund a major), and any
+         provider forced + whether reverted.
+       - Evidence: the proof screenshot paths (`/tmp/agent-proof-<gid>-NN-slug.png`)
+         and confirmation they are attached to the PR; name the success-scene frame.
+       - Fallback (ONLY if in-app execution was blocked): the gated direct
+         verification used (live-API / boot-time plugin-init) per the sim-testing
+         playbook Fabric-SIGABRT entry, and a note that it followed a GENUINE funded
+         attempt that hit the crash, not a first resort.
+       - Not tested / preconditions: what could NOT be verified here and why (mirror
+         `verify_blockers`), so the residual risk is explicit. -->
+_None observed._
+
 ## Decisions
 <!-- cat: decisions -->
 <!-- Consequential / non-obvious choices only. Each: the decision, the rejected
