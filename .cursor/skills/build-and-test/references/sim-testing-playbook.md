@@ -19,9 +19,43 @@ entry (the human audits and prunes it periodically — keep entries dense).
   mid-test is normal and expected** — check them for the asset you need before
   acquiring it, and BEFORE creating a new wallet ("no account holds X" is not a
   valid conclusion until each ROSTER account was actually checked).
+- **HOW to switch accounts: edit env.json, do NOT drive the UI.** The canonical
+  switch is: set `YOLO_USERNAME`/`YOLO_PIN` in the WORKTREE's `env.json` (a
+  local-only, gitignored copy) to the target roster account, then
+  `xcrun simctl terminate <udid> co.edgesecure.app` + `launch` — YOLO auto-login
+  lands you in that account on startup. Seconds, deterministic, no side-menu /
+  account-dropdown churn (an agent burned 20+ min fumbling that dropdown).
+  Drive the in-app account switcher ONLY when you must preserve live in-app
+  state across the switch (rare).
+- **PIN space:** every roster PIN is one of `0000` / `1111` (exact mapping in
+  the roster above). If you're ever at a PIN prompt unsure which: prefer looking
+  it up; at most try the two, ONCE each — wrong-PIN retries trigger exponential
+  lockout (465s → 914s → …), so never brute-force, and back off immediately on
+  "Account locked".
 - **Avoid new-wallet creation on debug builds when an existing funded wallet
   exists anywhere** — wallet creation has hit a native SQLite crash on debug
   builds (HyperEVM run); an existing wallet on another account sidesteps it.
+- **Debug builds crash to springboard (RN Fabric SIGABRT) on two reliable
+  triggers: rapid settings-row toggling, and swap-amount keypad entry.** Seen
+  repeatedly on the SideShift run. Do NOT keep relaunching to grind through it —
+  you'll burn the slot. **The direct-verification fallback below is GATED: it is
+  legitimate ONLY after you have actually funded and driven a REAL, available
+  swap to the point where THIS crash interrupts execution. It is NOT a substitute
+  for an executable swap you already hold.** If a funded, provider-supported pair
+  is in hand (both wallets present, e.g. BTC→FTM), you must drive THAT pair to
+  completion first (see the `executable-pair-must-complete` rule) — abandoning it
+  for a slower/riskier path and then citing "the build crashes" is the exact
+  miss this gate exists to prevent. Only once a genuine funded attempt is
+  interrupted by the Fabric crash do you switch to **direct verification of the
+  code path** as primary proof and treat the in-app run as partial evidence:
+  (1) `tsc` clean, (2) boot-time plugin/env validation (the app re-initializing
+  the plugin on your new bundle proves the changed init path), (3) hit the real
+  provider endpoint yourself (e.g. `curl` the exact request the plugin makes) to
+  confirm the behavior the change produces. Capture whatever in-app state you DID
+  reach (e.g. a fully-configured swap with source+receiving wallets selected) as
+  a proof screenshot before the crash. THAT combination — genuine funded attempt
+  + crash + direct proof — is a legitimate PASS; bailing to direct proof BEFORE a
+  real funded attempt is not.
 - **High-value wallets are sanctioned funding sources.** BTC / ETH / USDC and
   similar majors (which nearly every swap provider supports) MAY be swapped FROM
   to fund the asset a test needs. You are allowed to spend them for testing;
