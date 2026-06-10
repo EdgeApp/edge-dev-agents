@@ -1,6 +1,6 @@
 ---
 name: debugger
-description: Set a breakpoint at a file:line in a React Native / Hermes app running under Metro, then capture the call stack, local variables, and arbitrary expressions at that point. Use when an agent needs to inspect runtime state — values of variables, what code path is taken, why a check evaluates to false, etc. — in a real running RN app. NOT for static code analysis; use grep/read for that.
+description: Inspect runtime state in a running React Native app (variable values, which code path ran, why a check is false). Two methods. (1) Hermes CDP breakpoints via Metro for main-thread JS. (2) inject-and-capture for code inside edge-core-js's plugin WebView (swap/currency/accountbased plugins under DEBUG_*), which Hermes CDP CANNOT reach. NOT for static code analysis; use grep/read for that.
 metadata:
   author: j0ntz
 ---
@@ -8,10 +8,11 @@ metadata:
 <goal>Attach to a running React Native / Hermes JS VM via Metro's Chrome DevTools Protocol (CDP) inspector, set a precise file:line breakpoint, and capture runtime state when it fires.</goal>
 
 <rules description="Non-negotiable constraints.">
-<rule id="preflight-required">Always run `~/.cursor/skills/debugger/scripts/check-metro.sh` FIRST. If it exits 1 (Metro not reachable) or 2 (no Hermes target), surface the script's stderr verbatim and STOP. Do not try to start Metro yourself unless the user explicitly asks — Metro startup involves the project's own dev server and is the user's call.</rule>
+<rule id="pick-the-right-method">FIRST decide which method fits. Hermes CDP (steps 1-4) reaches only MAIN-THREAD JS (the Metro/Hermes VM). Code inside edge-core-js's plugin WebView (the swap/currency/accountbased plugins loaded via `DEBUG_*` dev-servers, e.g. `edge-exchange-plugins` on `DEBUG_EXCHANGES`:8083) runs in a separate WKWebView VM that Hermes CDP CANNOT see (`setBreakpointByUrl` resolves 0 locations; the script isn't in the target). For that code use the **inject-and-capture** method (step 5). `ios-webkit-debug-proxy` / Safari do NOT rescue this on modern iOS sims: iwdp 1.9.2 returns no `webinspectord` device on the iOS 18.6 simulator. See `[[rango-sonic-and-webview-debugging]]`.</rule>
+<rule id="preflight-required">For the Hermes-CDP method, always run `~/.cursor/skills/debugger/scripts/check-metro.sh` FIRST. If it exits 1 (Metro not reachable) or 2 (no Hermes target), surface the script's stderr verbatim and STOP. Do not try to start Metro yourself unless the user explicitly asks — Metro startup involves the project's own dev server and is the user's call.</rule>
 <rule id="use-script">All CDP interaction MUST go through `~/.cursor/skills/debugger/scripts/cdp-attach.js`. Do NOT open raw WebSockets, do NOT shell out to `chrome-devtools-frontend`, do NOT use any other CDP harness inline.</rule>
 <rule id="line-numbers-are-1-based">User-facing line numbers are 1-based (matches what editors and humans use). `cdp-attach.js` handles the CDP 0-based conversion internally. Always pass the line as you would see it in an editor.</rule>
-<rule id="no-mutation">This skill does NOT edit source code, install npm packages into the target repo, commit, push, or change Asana state. It reads runtime state through CDP and reports it.</rule>
+<rule id="no-mutation">The Hermes-CDP method (steps 1-4) does NOT edit source code, install npm packages, commit, push, or change Asana state; it reads runtime state through CDP and reports it. The ONE exception is the inject-and-capture method (step 5), which TEMPORARILY edits the dep source served by its `DEBUG_*` dev-server to add diagnostic POSTs. That instrumentation is local-only (never committed) and MUST be reverted when done (step 5e).</rule>
 <rule id="one-breakpoint-per-invocation">Each `cdp-attach.js` invocation sets ONE breakpoint and reports ONE pause. For multi-breakpoint investigations, run multiple invocations (composable, predictable). Do NOT try to multiplex breakpoints in a single call — the report becomes ambiguous.</rule>
 <rule id="report-is-stdout-json">`cdp-attach.js` writes a structured JSON report to stdout and status to stderr. When parsing for the caller (e.g. /one-shot), read stdout; show stderr only on failure or when diagnostic info is helpful.</rule>
 </rules>
@@ -100,6 +101,78 @@ node ~/.cursor/skills/debugger/scripts/cdp-attach.js \
 On exit 2 (timeout, no hit), the envelope is `{ "error": "timeout", "breakpoint": {...} }` — the location may not have been on the executed code path, the user may not have driven the app to the relevant scene, or `--condition` filtered out every hit.
 
 Use the report to answer the original question (why this value, what code path, etc.). For follow-up breakpoints, run another invocation — do NOT try to keep one process alive across multiple pauses.
+
+</step>
+
+<step id="5" name="Inject-and-capture (code inside the core WebView)">
+
+Use this when the target runs in edge-core-js's plugin WebView (per `pick-the-right-method`); Hermes CDP can't reach it. You instrument the dep's source (served by its `DEBUG_*` webpack dev-server, which hot-reloads), have it POST runtime data to a tiny local server, then drive the app and read the captured log. Confirmed in the Rango/Sonic investigation: it revealed Edge's swap engine never calls the plugin's `fetchSwapQuote` at all (only the factory-load diag fired, never the public-method-entry diag), proving the plugin was filtered upstream rather than a bug in the plugin.
+
+Prerequisite: the dep must be linked via its `DEBUG_*` dev-server (e.g. `DEBUG_EXCHANGES=true` in the gui `env.json` + the dep's `yarn start` on :8083) so your source edits are what the WebView loads. See `/build-and-test`'s `gui-dependency-integration` and `[[dep-linking-debug-flags]]`.
+
+### 5a. Start the capture server (per-slot port + paths — parallel-agent safe)
+
+The capture port and file paths MUST be unique per slot, or concurrent agents collide (EADDRINUSE, interleaved logs, truncating/killing each other's capture). Derive everything from the slot's Metro port:
+
+```bash
+DIAG_PORT=$(( ${AGENT_METRO_PORT:-8081} + 900 ))   # slot-unique: metro 8181→9081, 8182→9082…; manual 8981
+DIAG_LOG="/tmp/diag-$DIAG_PORT.log"
+DIAG_SRV="/tmp/diag-server-$DIAG_PORT.js"
+```
+
+Write `$DIAG_SRV` (substitute the literal values of `$DIAG_PORT`/`$DIAG_LOG`):
+
+```js
+const http = require('http'); const fs = require('fs')
+http.createServer((req, res) => {
+  let b = ''; req.on('data', c => (b += c))
+  req.on('end', () => {
+    fs.appendFileSync('<DIAG_LOG>', `[${new Date().toISOString()}] ${b}\n`)
+    res.writeHead(200, { 'Access-Control-Allow-Origin': '*' }); res.end('ok')
+  })
+}).listen(<DIAG_PORT>, '127.0.0.1')
+```
+
+Run it backgrounded: `node "$DIAG_SRV" &`. Verify: `curl -X POST localhost:$DIAG_PORT --data test && cat "$DIAG_LOG"`.
+
+### 5b. Add a diag helper to the dep source
+
+In the plugin factory where the bridged fetch is in scope (e.g. `edge-exchange-plugins/src/swap/defi/rango.ts`, where `const { fetchCors = io.fetch } = io`), add:
+
+```ts
+const __diag = (label: string, data: unknown): void => {
+  try {
+    const p: any = fetchCors('http://localhost:<DIAG_PORT>/d', {
+      method: 'POST', body: JSON.stringify({ label, data })
+    })
+    if (p != null && typeof p.catch === 'function') p.catch(() => {})
+  } catch (e) {}
+}
+```
+
+Hardcode YOUR computed `$DIAG_PORT` literal into the helper (the WebView bundle can't read your shell env; the instrumentation is temporary and reverted anyway). Never reuse another slot's port.
+
+CRITICAL: use the plugin's BRIDGED fetch (`fetchCors` / `io.fetch`), NOT `globalThis.fetch`. Global fetch is unavailable in the core WebView and silently no-ops (this wasted a cycle). A plain string `body` defaults to `text/plain` (a CORS "simple request", so no preflight; the POST reaches the server even though the response is CORS-blocked from being read; fire-and-forget with `.catch`). Keep the helper type-clean: a TS or syntax error breaks the WHOLE plugin bundle and every swap silently fails.
+
+### 5c. Place diag calls at decision points
+
+Capture, in order of value: the factory body (fires on plugin load, proving the bundle reloaded AND the server is reachable), the PUBLIC method entry, each early gate/throw, the outbound API request, and the response/error. Instrument the PUBLIC entry SEPARATELY from inner helpers: if the factory-load diag fires but `public.entry` never does, the engine never called your plugin (it was filtered upstream), which is itself the answer.
+
+### 5d. Reload the app, then drive it
+
+The WebView loads the bundle at context creation, so you MUST relaunch to pick up edits:
+
+```bash
+xcrun simctl terminate "$AGENT_SIM_UDID" co.edgesecure.app
+: > "$DIAG_LOG"
+xcrun simctl launch "$AGENT_SIM_UDID" co.edgesecure.app
+```
+
+Confirm the dev-server recompiled cleanly first: `curl -s localhost:8083/edge-exchange-plugins.js | grep -c <your-label>` (expect ≥ 1). Then drive the app to the code path with maestro and read `$DIAG_LOG`. The factory-load line should appear first; if it never does, the WebView didn't reload the instrumented bundle (recheck the dev-server compile and the relaunch). (Remember the dep dev-server itself is a SINGLE-OCCUPANT host resource — see `/build-and-test`'s parallel-slot port rule; if another slot holds the dep's port, this method isn't available concurrently.)
+
+### 5e. Clean up (MANDATORY)
+
+Revert ALL injected `__diag` helper and calls from the dep source (`git checkout -- <file>`, or remove by hand) and stop YOUR server only — `pkill -f "diag-server-$DIAG_PORT"` (NEVER a bare `pkill -f diag-server`, which kills other slots' capture servers too). Remove `$DIAG_SRV` and `$DIAG_LOG`. The instrumentation is local-only and is never committed.
 
 </step>
 

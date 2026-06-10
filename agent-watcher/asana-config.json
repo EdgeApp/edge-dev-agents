@@ -47,7 +47,8 @@
       "default_repo": "Repo a spawned agent works in (worktree + sim are provisioned for it).",
       "sim_pool": "Pre-cloned iOS sims kept ready so per-task spawn is fast (no inline simctl clone). Size defaults to max_concurrent. Lifecycle: free → in_use (on allocate) → dirty (on watchdog reap) → free (next ensure-sim-pool refresh). Refresh deletes the stale sim and clones from master.",
       "keep_completed_worktrees": "How many completed/retired worktrees to keep on disk for inspection/resume before the watchdog prunes the oldest. On completion the sim + slot are freed immediately; the worktree is retained. Worktrees whose session is still alive (incl. a RETIRED session) are never counted or pruned. Default 5; set 0 to destroy on completion (old behavior).",
-      "keep_completed_sessions": "How many COMPLETED tmux sessions to keep alive for inspection / remote re-engagement before the watchdog kills the oldest. On completion a session is RETIRED — renamed claude-asana-<gid> → done-asana-<gid> so it no longer holds a concurrency slot — but its claude is left running so you can attach to it. Each retired session holds a live claude, so this bounds memory. Default 3; set 0 to hard-kill on completion (old behavior)."
+      "keep_completed_sessions": "How many COMPLETED tmux sessions to keep alive for inspection / remote re-engagement before the watchdog kills the oldest. On completion a session is RETIRED — renamed claude-asana-<gid> → done-asana-<gid> so it no longer holds a concurrency slot — but its claude is left running so you can attach to it. Each retired session holds a live claude, so this bounds memory. Default 3; set 0 to hard-kill on completion (old behavior).",
+      "agent_model": "Model forced onto spawned agent sessions via `claude --model <value>`. Empty/absent = the server-side default alias (resolved per turn; can change when Anthropic promotes a new default). Set to an exact ID to pin fleet behavior — e.g. claude-opus-4-8[1m] for Opus 4.8 with 1M context. A human can still flip a LIVE session's model per-turn via the desktop/RC picker; this only sets what sessions START on."
     },
     "default_repo": "edge-react-gui",
     "max_concurrent": 5,
@@ -68,6 +69,7 @@
     },
     "keep_completed_worktrees": 5,
     "keep_completed_sessions": 3,
+    "agent_model": "claude-opus-4-8[1m]",
     "reviewer_bots": [
       "cursor[bot]"
     ]

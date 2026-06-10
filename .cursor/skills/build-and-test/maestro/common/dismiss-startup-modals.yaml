@@ -1,0 +1,22 @@
+# common/dismiss-startup-modals.yaml — clear the post-login modal gauntlet.
+# Each block is conditional, so this is safe to run any time modals MIGHT appear
+# (after login, after relaunch). Compose via:  - runFlow: common/dismiss-startup-modals.yaml
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+---
+- runFlow:
+    when:
+      visible: "Security is Our Priority"
+    commands:
+      - tapOn: "Cancel"
+- runFlow:
+    when:
+      visible: "How Did You Discover Edge?"
+    commands:
+      - tapOn: "Dismiss"
+- runFlow:
+    when:
+      visible: "Claim Your Web3 Handle"
+    commands:
+      - tapOn: "Not Now"

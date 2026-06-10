@@ -166,10 +166,28 @@ function waitRcReadyAndSendPrompt(sessionName, prompt) {
   if (!ready) log(`  WARNING: RC ready marker not seen after ${RC_READY_TIMEOUT_MS}ms; sending prompt anyway`)
 
   // Send text then Enter separately — a single send-keys sometimes drops the Enter.
-  execSync(`tmux send-keys -t "${sessionName}" ${JSON.stringify(prompt)}`, { stdio: 'inherit' })
-  execSync('sleep 1')
-  execSync(`tmux send-keys -t "${sessionName}" Enter`, { stdio: 'inherit' })
-  log(`  prompt sent: ${prompt}`)
+  // Then VERIFY the prompt actually took (input cleared / claude working) and retry:
+  // startup-time sends can be silently eaten while claude is still initializing
+  // (slow MCP server JVM, model resolution, trust dialogs) even after the RC marker
+  // shows — the Exolix spawn lost its prompt exactly this way.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    execSync(`tmux send-keys -t "${sessionName}" ${JSON.stringify(prompt)}`, { stdio: 'inherit' })
+    execSync('sleep 1')
+    execSync(`tmux send-keys -t "${sessionName}" Enter`, { stdio: 'inherit' })
+    execSync('sleep 8')
+    const pane = sh(`tmux capture-pane -t "${sessionName}" -p`)
+    // Submitted = the raw prompt text is NO LONGER sitting in the input line.
+    // (After submit it renders as a message/working state, not as editable input.)
+    const inputLine = pane.split('\n').filter((l) => l.trimStart().startsWith('❯')).pop() || ''
+    if (!inputLine.includes('/one-shot')) {
+      log(`  prompt sent (attempt ${attempt}): ${prompt}`)
+      return
+    }
+    log(`  prompt still in input box after attempt ${attempt}; clearing + retrying`)
+    execSync(`tmux send-keys -t "${sessionName}" C-u`, { stdio: 'inherit' })
+    execSync('sleep 5')
+  }
+  log(`  WARNING: prompt did not submit after 3 attempts — session ${sessionName} needs a manual poke`)
 }
 
 // Full per-task spawn: Planning → worktree → sim clone → slot allocate → tmux session.

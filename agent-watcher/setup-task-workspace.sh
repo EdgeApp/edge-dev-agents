@@ -127,6 +127,17 @@ ensure_env_json() {
     rm -f "$WT/env.json"
     cp "$MAIN_REPO/env.json" "$WT/env.json"
     echo ">> setup-task-workspace: copied env.json ← $MAIN_REPO/env.json" >&2
+    # Enforce the standard agent login: every new run starts on edge-funds (the
+    # funded account), regardless of master env.json drift. YOLO auto-login
+    # re-asserts this account on every app relaunch.
+    node -e '
+      const fs = require("fs"); const p = process.argv[1];
+      const env = JSON.parse(fs.readFileSync(p, "utf8"));
+      env.YOLO_USERNAME = "edge-funds"; env.YOLO_PIN = "0000";
+      fs.writeFileSync(p, JSON.stringify(env, null, 2) + "\n");
+    ' "$WT/env.json" 2>/dev/null \
+      && echo ">> setup-task-workspace: env.json YOLO login pinned to edge-funds" >&2 \
+      || echo ">> setup-task-workspace: WARN — could not pin YOLO login (env.json left as copied)" >&2
   else
     echo ">> setup-task-workspace: WARN — $MAIN_REPO/env.json not found; worktree has NO secrets" >&2
   fi

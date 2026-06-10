@@ -1,0 +1,29 @@
+# common/login-if-needed.yaml — PIN-login ONLY when the PIN screen is showing.
+# Safe under YOLO auto-login (app usually lands already logged in: the gate makes
+# this a no-op) and after a relaunch that returns to the PIN screen.
+# PARAMS: PIN_DIGIT (single digit tapped 4x; all roster PINs are repeated digits:
+#   0000 → "0" [edge-funds/test-funds — edge-funds is the default YOLO login],
+#   1111 → "1" [edge-rjqa2/edge-rjqa3]).
+# GOTCHA: taps MUST stay spaced (waitToSettleTimeoutMs) — fast taps drop digits →
+# wrong PIN → exponential lockout. Never tighten these.
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  PIN_DIGIT: "0"
+---
+- runFlow:
+    when:
+      visible: "Exit PIN"
+    commands:
+      - tapOn:
+          text: ${PIN_DIGIT}
+          waitToSettleTimeoutMs: 900
+      - tapOn:
+          text: ${PIN_DIGIT}
+          waitToSettleTimeoutMs: 900
+      - tapOn:
+          text: ${PIN_DIGIT}
+          waitToSettleTimeoutMs: 900
+      - tapOn:
+          text: ${PIN_DIGIT}
+          waitToSettleTimeoutMs: 1500
