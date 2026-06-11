@@ -89,6 +89,7 @@ A sentence must carry a claim, not an evaluation or preview of the claim you're 
 - No forward references: "here's the precise failure:", "here's what matters:", "the key thing is this:".
 - No structure announcements: "Summary, in three parts.", "Three things:", "Let me break this down." Just write the parts.
 - No pre-verdicts the next sentence restates: "it's the opposite of a penalty" followed by the terms that show that.
+- No per-item self-grading in lists: "Cheapest item on the list.", "The easy one.", "Most important of these." If ordering matters, the list header states the principle once ("in rough order of effort, smallest first", "by impact", "no particular order") and the items carry only content.
 
 Certainty belongs inside the claim, marked tersely: "Unverified: X." / "By the published terms, X." A hedge that changes what the reader should do is information; a sentence that grades your own prose is not.
 
@@ -96,6 +97,17 @@ Leading with a real answer is still required (see writing-style). The verdict se
 
 Bad: "The support article is clear, and it's the opposite of a penalty. On June 15, usage moves to a separate credit."
 Good: "On June 15, Agent SDK and -p usage moves to a separate monthly credit and stops counting against plan limits."
+
+## 15. No courtesy enders in external communications
+
+In emails, PR comments, issue replies, proposals, and anything else leaving the team, do not close with an offer or pleasantry that carries no information:
+
+- "We can file these as issues with repro steps if that helps tracking."
+- "Happy to split this out / adjust / help however we can."
+- "Let me know if you have any questions."
+- "Hope this helps." / "Feel free to reach out."
+
+The recipient knows they can reply. End on the last substantive sentence. If a follow-up action genuinely needs offering, make it a concrete item in the body ("If you want these as issues, say so and we'll file them with repro steps" belongs in the list, not as a sign-off), or leave it out.
 
 ## Examples
 

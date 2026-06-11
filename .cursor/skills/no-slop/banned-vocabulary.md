@@ -81,6 +81,12 @@ These words and phrases are statistically overrepresented in AI-generated text. 
 - "good question" / "fair point" / "your concern is fair" as openers
 - "you're right to push"
 - "is clear, and" (evidence-grading preamble)
+- "cheapest/easiest/most important item on the list" (per-item self-grading; state order in the list header instead)
+- "happy to help / happy to adjust / happy to split this out" as a closer
+- "let me know if you have any questions"
+- "hope this helps"
+- "feel free to"
+- "if that helps tracking" (and similar no-op closing offers)
 
 ## Conditional Bans
 
