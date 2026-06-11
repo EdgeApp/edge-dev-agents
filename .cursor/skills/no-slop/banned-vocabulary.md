@@ -87,6 +87,9 @@ These words and phrases are statistically overrepresented in AI-generated text. 
 - "hope this helps"
 - "feel free to"
 - "if that helps tracking" (and similar no-op closing offers)
+- "say the word" / "just say the word"
+- "let me know if you'd like" / "let me know if you want"
+- "if you want, I can" as a closer (state the open decision and its default instead)
 
 ## Conditional Bans
 

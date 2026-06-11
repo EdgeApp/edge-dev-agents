@@ -90,6 +90,7 @@ A sentence must carry a claim, not an evaluation or preview of the claim you're 
 - No structure announcements: "Summary, in three parts.", "Three things:", "Let me break this down." Just write the parts.
 - No pre-verdicts the next sentence restates: "it's the opposite of a penalty" followed by the terms that show that.
 - No per-item self-grading in lists: "Cheapest item on the list.", "The easy one.", "Most important of these." If ordering matters, the list header states the principle once ("in rough order of effort, smallest first", "by impact", "no particular order") and the items carry only content.
+- No "say the word" closers. When a decision is genuinely open, end with the decision stated directly: the current state plus a direct question ("Em-dash ban now also covers Asana comments. Keep it?") or the default plus the cost of changing it ("Default: included. Excluding it is a one-line change."). Banned framings: "say the word", "just say the word", "let me know if you'd like", "if you want, I can...". If no decision is open, end on the last substantive sentence.
 
 Certainty belongs inside the claim, marked tersely: "Unverified: X." / "By the published terms, X." A hedge that changes what the reader should do is information; a sentence that grades your own prose is not.
 
