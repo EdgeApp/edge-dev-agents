@@ -74,6 +74,13 @@ These words and phrases are statistically overrepresented in AI-generated text. 
 - "a beacon of"
 - "sends a strong message"
 - "it remains to be seen"
+- "Summary, in three parts" (and any "in N parts" structure announcement)
+- "let me break this down"
+- "here's what matters" / "here's the key" / "the key thing is"
+- "here's the [adjective] [noun]:" as a forward reference ("here's the precise failure:")
+- "good question" / "fair point" / "your concern is fair" as openers
+- "you're right to push"
+- "is clear, and" (evidence-grading preamble)
 
 ## Conditional Bans
 
