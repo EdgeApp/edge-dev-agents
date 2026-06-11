@@ -155,6 +155,8 @@ if [[ -n "$AGENT_SESSION_UUID" ]]; then
   echo ">> spawn-test-session: agent session uuid $AGENT_SESSION_UUID (task ${TASK_GID:-?})" >&2
 fi
 if [[ -n "$SLOT_INDEX" ]]; then
+  [[ -n "$TASK_GID" ]]   && ENV_EXPORTS+="export AGENT_TASK_GID=\"$TASK_GID\"
+"
   [[ -n "$SIM_UDID" ]]   && ENV_EXPORTS+="export AGENT_SIM_UDID=\"$SIM_UDID\"
 "
   [[ -n "$METRO_PORT" ]] && ENV_EXPORTS+="export AGENT_METRO_PORT=\"$METRO_PORT\"
