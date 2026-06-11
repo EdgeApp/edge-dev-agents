@@ -163,3 +163,18 @@ Commits are then distinguishable by which machine's signing key signed them — 
 Until signed commits are required, attribution is implicit (source watcher is off, so
 anything new came from this machine). Note: auth/push stays on HTTPS + the gh token; the
 signing key is only for signatures.
+
+## Claude Code hooks (manual step — settings.json is not synced)
+
+Agent sessions are gated by two PreToolUse hooks in `~/.claude/settings.json`
+(scripts live in this repo's `agent-watcher/hooks/`, installed to
+`~/.config/agent-watcher/hooks/` by bootstrap). Both no-op unless
+`AGENT_TASK_GID` is set, so interactive sessions are unaffected. Add to the
+`hooks.PreToolUse` block (matcher `Bash`):
+
+    { "type": "command", "command": "~/.config/agent-watcher/hooks/block-raw-git-commit.sh", "timeout": 10 },
+    { "type": "command", "command": "~/.config/agent-watcher/hooks/require-test-evidence-before-pr.sh", "timeout": 10 }
+
+block-raw-git-commit: commits must go through lint-commit.sh (--amend allowed, --no-verify never).
+require-test-evidence-before-pr: pr-create.sh is blocked until a proof screenshot
+(/tmp/agent-proof-<gid>-*.png) or a justified blocker note (/tmp/agent-test-blocker-<gid>.md) exists.
