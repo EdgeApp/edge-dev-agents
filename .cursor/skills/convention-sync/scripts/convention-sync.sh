@@ -13,6 +13,21 @@
 
 set -euo pipefail
 
+# Self-stabilization: re-exec from a temp copy before doing anything else.
+# In --repo-to-user mode the .cursor rsync replaces THIS file on disk mid-run;
+# bash reads scripts lazily, so the running process misaligns on the new bytes
+# and crashes with spurious errors (seen 2026-06-11: "destpath: unbound
+# variable" on a line containing no destpath). CONVENTION_SYNC_HOME preserves
+# the real script dir for sibling-script lookups (generate-claude-md.sh).
+if [[ -z "${CONVENTION_SYNC_STABLE:-}" ]]; then
+  _stable_copy="$(mktemp /tmp/convention-sync-run.XXXXXX)"
+  cp "${BASH_SOURCE[0]}" "$_stable_copy"
+  CONVENTION_SYNC_STABLE=1 \
+  CONVENTION_SYNC_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" \
+    exec bash "$_stable_copy" "$@"
+fi
+trap 'rm -f "$0"' EXIT
+
 REPO_DIR=""
 DO_STAGE=false
 DO_COMMIT=false
@@ -524,7 +539,7 @@ if [[ "$DIRECTION" == "user-to-repo" ]]; then
   done < <(echo "$del_json" | jq -r '.[]')
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="${CONVENTION_SYNC_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 # Ensure ~/.claude/skills symlink points to ~/.cursor/skills
 CLAUDE_SKILLS="$HOME/.claude/skills"

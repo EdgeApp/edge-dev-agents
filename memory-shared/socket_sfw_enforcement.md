@@ -8,6 +8,7 @@ metadata:
 Jon's machines wrap every `npm`/`npx`/`pnpm`/`yarn` call through **sfw (Socket Firewall Free)**, not the `socket` CLI (migrated 2026-06-02). Three pieces, all rooted at `$HOME` so they are user-agnostic:
 
 - **PATH shims** at `~/.agent-shims/{npm,npx,pnpm,yarn}` — each strips `~/.agent-shims` from PATH, then `exec sfw <tool>`. The shim dir is prepended to PATH in `.zshenv`/`.zprofile` and (last, after nvm init) in `.zshrc`.
+- **sfw install location**: installed to a stable, nvm-independent prefix `~/.agent-tools/sfw-cli` (via `npm i -g sfw --prefix …`), and that `bin` is on PATH via `.zshenv`. A plain `npm i -g sfw` only lands in ONE nvm node's bin, so switching node versions gives `exec: sfw: not found`. sfw declares `engines: node >=20` but runs fine on older node at runtime; the wrapped package manager still runs under the active node. nvm default here is currently v16, so this matters. There's also a `nvm` wrapper in `.zshrc` that re-prepends the shim dir after `nvm use`.
 - **Agent hooks**: `~/.claude/settings.json` PreToolUse(Bash) and `~/.cursor/hooks.json` beforeShellExecution both run `~/.agent-tools/socket-guard.mjs`, which denies bare npm/npx/pnpm/yarn and tells the agent to use `sfw npm` instead.
 - **`~/.npmrc` hardenings**: `ignore-scripts=true`, `fund=false`. `min-release-age` is intentionally DISABLED (commented out) due to a bug — do not re-enable without asking.
 

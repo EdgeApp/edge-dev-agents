@@ -45,6 +45,14 @@ After the script completes, read the processed files based on the output:
 <sub-step name="No attachments case">
 If `ATTACHMENTS: (none)` appears in script output, do **not** probe `/tmp/asana-task-<task_gid>/`. Treat missing `/tmp` paths as expected in this case and continue to Step 2.
 </sub-step>
+
+<sub-step name="Relationship pointers">
+The script reports related tasks as pointers only: `PARENT:`, `SUBTASKS:`, `DEPENDENCIES:`, `DEPENDENTS:`, each row `<gid> [open|done] <name>`. Lines are omitted when empty. Decide what to walk by priority:
+
+1. `PARENT:` present → also run `asana-get-context.sh <parent_gid>`. Requirements for split subtasks usually live on the parent. Walk up ONE level only; ignore the parent's own pointers.
+2. `SUBTASKS:` / `DEPENDENCIES:` / `DEPENDENTS:` present → list them in the Step 3 summary as-is. Fetch one ONLY when the task description or comments reference it as required context.
+3. Never bulk-fetch all pointers. Related-task content is opt-in per task; pulling every linked task pollutes context.
+</sub-step>
 </step>
 
 <step id="2" name="Determine target repo">

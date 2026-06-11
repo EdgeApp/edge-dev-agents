@@ -165,6 +165,18 @@ ensure_env_json() {
   fi
 }
 
+# ── Copy testconfig.json from the main checkout (same rm-then-copy pattern) ───
+# edge-exchange-plugins keeps swap-partner API creds in gitignored testconfig.json;
+# worktrees don't inherit gitignored files, so exch agents otherwise spawn with no
+# creds. No-op for repos without one.
+ensure_testconfig_json() {
+  if [[ -f "$MAIN_REPO/testconfig.json" ]]; then
+    rm -f "$WT/testconfig.json"
+    cp "$MAIN_REPO/testconfig.json" "$WT/testconfig.json"
+    echo ">> setup-task-workspace: copied testconfig.json ← $MAIN_REPO/testconfig.json" >&2
+  fi
+}
+
 link_shared_memory() {
   # Surface shared Claude memory (orchestration + user context) for this task so
   # the spawned agent sees it. A worktree session reads auto-memory from the MAIN
@@ -181,6 +193,7 @@ link_shared_memory() {
 if git -C "$MAIN_REPO" worktree list --porcelain | grep -qxF "worktree $WT"; then
   echo ">> setup-task-workspace: worktree already exists, reusing $WT" >&2
   ensure_env_json
+  ensure_testconfig_json
   clone_node_modules
   ensure_husky_runtime
   link_shared_memory
@@ -206,6 +219,9 @@ cat /tmp/setup-wt.log >&2
 
 # ── Copy env.json from the main checkout (real file; survives `configure`) ─────
 ensure_env_json
+
+# ── Copy testconfig.json (swap-partner API creds) when the repo has one ────────
+ensure_testconfig_json
 
 # ── Clone node_modules from the main checkout ───────────────────────────────────
 clone_node_modules
