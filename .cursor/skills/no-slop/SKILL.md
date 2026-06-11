@@ -110,6 +110,10 @@ Scope: the external destinations defined in `~/.cursor/rules/writing-style.mdc` 
 
 The recipient knows they can reply. End on the last substantive sentence. If a follow-up action genuinely needs offering, make it a concrete item in the body ("If you want these as issues, say so and we'll file them with repro steps" belongs in the list, not as a sign-off), or leave it out.
 
+## 16. Copy-paste drafts go in a plaintext block
+
+When the user asks for a draft they will copy somewhere (a PR comment, an email, an issue reply, an Asana comment), deliver the draft inside a fenced plaintext block containing exactly the text to paste — nothing else in the block, no chat commentary mixed in. The block's content is formatted for its destination, not for chat: if the destination renders markdown poorly or at all unknown, keep the draft bare (numbered lists and blank lines only). Commentary about the draft goes outside the block.
+
 ## Examples
 
 For concrete before/after examples showing these rules applied, see [examples/bad-examples.md](examples/bad-examples.md) and [examples/good-examples.md](examples/good-examples.md).
