@@ -139,6 +139,12 @@ fi
 ENV_EXPORTS+="export LANG=\"\${LANG:-en_US.UTF-8}\"
 export PATH=\"\$HOME/.maestro/bin:\$PATH\"
 "
+# Heap bump for every node process in the agent shell: lint-staged/eslint in the
+# (now-working) husky pre-commit hook SIGABRTs on default heap under parallel
+# slots (seen on the Wallet/Seed-Import run, 2026-06-10). 8GB per node process is
+# comfortable on the 128GB box at 4 concurrent slots.
+ENV_EXPORTS+="export NODE_OPTIONS=\"\${NODE_OPTIONS:---max-old-space-size=8192}\"
+"
 # A stable UUID for this agent run, exported so the agent can stamp it into the
 # plan + run-report docs for traceability. Logged here so the watcher records the
 # task→session-uuid mapping.

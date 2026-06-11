@@ -51,7 +51,7 @@
       "agent_model": "Model forced onto spawned agent sessions via `claude --model <value>`. Empty/absent = the server-side default alias (resolved per turn; can change when Anthropic promotes a new default). Set to an exact ID to pin fleet behavior — e.g. claude-opus-4-8[1m] for Opus 4.8 with 1M context. A human can still flip a LIVE session's model per-turn via the desktop/RC picker; this only sets what sessions START on."
     },
     "default_repo": "edge-react-gui",
-    "max_concurrent": 5,
+    "max_concurrent": 4,
     "metro_base_port": 8181,
     "master_sim": {
       "device": "iPhone 16 Pro Max",
@@ -65,7 +65,7 @@
     "worktrees_root": "~/git/.agent-worktrees",
     "repos_root": "~/git",
     "sim_pool": {
-      "size": 5
+      "size": 4
     },
     "keep_completed_worktrees": 5,
     "keep_completed_sessions": 3,
