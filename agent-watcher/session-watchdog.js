@@ -324,14 +324,36 @@ function retireSession(session, taskGid) {
   if (sh(`tmux has-session -t "${dest}" 2>/dev/null && echo yes`) === 'yes') {
     sh(`tmux kill-session -t "${dest}"`)
   }
-  // Read the slot's Metro port BEFORE releasing the slot, so we can free that port
-  // after (the next task on this slot_index reuses it). claude stays alive.
-  let metroPort = null
-  try { metroPort = slots.get(taskGid)?.metro_port ?? null } catch { /* slots.json unreadable */ }
+  // Read the FULL slot BEFORE releasing it: the Metro port must be freed after the
+  // slot release (next task on this slot_index reuses it), and the release receipt
+  // needs the slot's identity after slots.json forgets it. claude stays alive.
+  let slot = null
+  try { slot = slots.get(taskGid) } catch { /* slots.json unreadable */ }
+  const metroPort = slot?.metro_port ?? null
   sh(`tmux rename-session -t "${session}" "${dest}"`)
   releaseSimAndSlot(taskGid)
   freeMetroPort(metroPort)
+  writeReleaseReceipt(taskGid, slot, metroPort)
   log(`[${session}] agent_status=Complete → RETIRED as ${dest} (claude kept alive; Metro+sim+slot freed; worktree retained)`)
+}
+
+// Durable release receipt: slots.json/pool.json forget a run seconds after retirement,
+// so post-hoc evals (orch-eval O1/O6) cannot otherwise verify clean resource release.
+// One small JSON per gid under STATE_DIR/releases; best-effort, never wedges the sweep.
+function writeReleaseReceipt(taskGid, slot, metroPort) {
+  try {
+    const dir = path.join(slots.STATE_DIR, 'releases')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, `${taskGid}.json`), JSON.stringify({
+      gid: taskGid,
+      retired_at: new Date().toISOString(),
+      slot_index: slot?.slot_index ?? null,
+      sim_udid: slot?.sim_udid ?? null,
+      metro_port: metroPort,
+      released: { sim: Boolean(slot?.sim_udid), slot: Boolean(slot), metro: metroPort != null },
+    }, null, 2) + '\n')
+    log(`  [${taskGid}] release receipt written`)
+  } catch (e) { log(`  [${taskGid}] release receipt failed: ${e.message}`) }
 }
 
 // Cap retired sessions kept alive (each holds a live claude → memory bound). Keep
