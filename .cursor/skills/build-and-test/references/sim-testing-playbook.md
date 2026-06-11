@@ -35,11 +35,29 @@ entry (the human audits and prunes it periodically — keep entries dense).
 - **Wallet creation is a SUPPORTED test path — not to be avoided.** Prefer an
   existing funded wallet when the task doesn't involve creation (faster, no
   setup), but create wallets freely when the task targets creation behavior or
-  no account holds the needed asset. KNOWN ISSUE being fixed (Asana task
-  1215619633542395): debug builds have hit a native SQLite crash on wallet
-  creation (HyperEVM run). If you hit it: capture the crash log, record it in
-  the run report as a harness blocker, and fall back to an existing wallet for
-  the REST of this test — do not let it cancel in-app testing wholesale.
+  no account holds the needed asset.
+- **The "SQLite crash on wallet creation" is a PRODUCT bug, not an environment
+  one, and is NOT actually caused by creating a wallet** (diagnosed in Asana
+  1215619633542395, 2026-06-11; the env fix it hoped for does not exist). Root
+  cause: the OLD `react-native-piratechain` module (a ZcashLightClientKit fork,
+  `piratelc_*` Rust FFI, `PirateSdk_mainnet…pirate_data.db`) opens TWO SQLite
+  connections on the same `data.db` — a Swift SQLite.swift reader and a Rust
+  `rusqlite` writer — with no shared locking. When the Rust scanner holds the DB
+  (`processNewBlocks` → `block_height_extrema` / balance) while the Swift
+  `CompactBlockProcessor.resolveMempools` mempool consumer reads via
+  `TransactionSQLDAO.find(rawID:)`, the read gets `SQLITE_BUSY`, SQLite.swift
+  throws, and the async mempool task does not catch it → `swift_unexpectedError`
+  / `EXC_BREAKPOINT`. It fires from the edge-funds account's BACKGROUND ARRR/ZEC
+  sync at any time (it crash-looped 15× on 2026-06-09/10), independent of your
+  actions, account (edge-funds + test-funds both), and JS diff. The DB is NOT
+  corrupt and disk is NOT full — neither resetting the sim data container nor
+  re-cloning the master fixes it (the race re-arms on every re-sync), which is
+  why this is left to the in-flight Piratechain SDK rewrite (Asana
+  1214721783909451 / accountbased #1055 / gui #6021) that REPLACES this module.
+  Practical handling: it's intermittent, so just relaunch and continue — the app
+  usually runs fine for long stretches; capture the `Edge-*.ips` crash log if it
+  recurs, note it as a known product blocker (link 1215619633542395), and fall
+  back to an existing wallet. Do NOT spend the slot trying to "fix the sim."
 - **Debug builds crash to springboard (RN Fabric SIGABRT) on two reliable
   triggers: rapid settings-row toggling, and swap-amount keypad entry.** Seen
   repeatedly on the SideShift run. Do NOT keep relaunching to grind through it —
