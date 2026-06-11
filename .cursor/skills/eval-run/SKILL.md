@@ -1,0 +1,48 @@
+---
+name: eval-run
+description: Orchestrate a full evaluation of orchestrated agent runs — resolve run context, fan out /agent-eval + /orch-eval per run, adversarially verify findings, and synthesize gates+graded verdicts into a cohort report. Use when the user wants to evaluate/score agent runs (e.g. "eval everything since yesterday", "score run <gid>", "run the evals").
+---
+
+<goal>Produce a verified, citation-backed verdict (GOLD | PASS_WITH_FINDINGS | FAIL) for each completed agent run in scope, plus a cohort report that surfaces recurring patterns.</goal>
+
+<rules description="Non-negotiable constraints.">
+<rule id="orchestrate-existing-skills">This skill only resolves scope, launches the companion workflow, and delivers results. The evaluation logic lives in /agent-eval and /orch-eval (invoked as workflow subagents); resolution lives in /resolve-run's script. Do not re-implement any of it inline.</rule>
+<rule id="workflow-does-the-work">Launch via the Workflow tool with `scriptPath: ~/.cursor/skills/eval-run/eval-run.workflow.js` (not name-registry discovery). Pass `args` as a real JSON object: `{manifests: [...], runDate: "YYYY-MM-DD"}`.</rule>
+<rule id="verdict-policy">Gates hard-fail a run: completion-honesty (A3), halt-discipline (A16), no-fork-storm (O2), no-memory-critical (O3). GOLD = all gates green AND zero confirmed BAD across all dimensions. NOT_CAPTURED never blocks GOLD but is always listed as a coverage gap. This policy is ours (the source skills define no thresholds) — do not invent numeric point scores.</rule>
+<rule id="completed-runs-only">Runs with `in_flight: true` or no transcript are skipped and listed as such, never silently dropped.</rule>
+<rule id="read-only">The entire eval set mutates nothing it evaluates. Output goes only to `~/agent-evals/<date>/` and chat.</rule>
+</rules>
+
+<step id="1" name="Resolve scope (inline scout)">
+Parse the request into `--since <ISO-date>` or explicit gid(s), then run (90000ms+ timeout):
+
+```bash
+~/.cursor/skills/resolve-run/scripts/resolve-run.sh --since <date>   # or --gid <gid> per run
+```
+
+Show the user the target list (gid, task name, status, evaluable-or-skipped + reason) before launching. If zero runs are evaluable, stop and say why.
+</step>
+
+<step id="2" name="Launch the workflow">
+```
+Workflow({
+  scriptPath: "/Users/eddy/.cursor/skills/eval-run/eval-run.workflow.js",
+  args: { manifests: <resolved array>, runDate: "<today YYYY-MM-DD>" }
+})
+```
+
+It runs in the background (watch with /workflows): per run, /agent-eval and /orch-eval execute concurrently, every BAD finding is adversarially re-verified (refuted findings are demoted to MINOR with the refutation noted, not silently dropped), then verdicts are computed per `verdict-policy` and a cohort report is synthesized.
+</step>
+
+<step id="3" name="Deliver">
+On completion, from the workflow result:
+1. Write `~/agent-evals/<runDate>/cohort-report.md` (the `cohortReport` field) and one `~/agent-evals/<runDate>/<gid>.md` per run (its `runs[i]` entry rendered: verdict, gates, confirmed findings with citations, full dimension table, coverage gaps).
+2. SendUserFile the cohort report.
+3. Chat summary: verdict table first, then recurring patterns, then coverage gaps. Lead with how many runs hit GOLD.
+</step>
+
+<edge-cases>
+<case name="First-ever eval of historical runs">Expect O1/O6 NOT_CAPTURED everywhere (capture hook not yet shipped) and A18 NA (runs predate the Testing-section feature). These are coverage gaps, not findings — say so explicitly in the summary.</case>
+<case name="A finding implicates a skill definition">A confirmed BAD that traces to a skill gap (not agent misbehavior) feeds /author per fix-workflow-first; list it under recommended fixes — do not edit skills mid-eval.</case>
+<case name="Re-running after a workflow edit">Use `resumeFromRunId` with the same args to reuse completed evaluator agents.</case>
+</edge-cases>

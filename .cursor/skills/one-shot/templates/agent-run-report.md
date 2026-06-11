@@ -12,6 +12,9 @@ verify_blockers: []      # any of: precondition | harness | code | task-drafting
 started: ""              # ISO 8601
 ended: ""                # ISO 8601
 skills_used: []          # e.g. [asana-plan, im, pr-create, build-and-test, debugger]
+slot_index: null         # from `node ~/.config/agent-watcher/lib/slots.js get --task-gid <gid>`
+metro_port: null         # $AGENT_METRO_PORT
+sim_udid: ""             # $AGENT_SIM_UDID
 ---
 
 ## Summary

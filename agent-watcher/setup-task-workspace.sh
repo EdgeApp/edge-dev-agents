@@ -119,6 +119,28 @@ clone_node_modules() {
   fi
 }
 
+# ── Materialize husky's generated runtime (.husky/_) from the main checkout ───
+# node_modules is APFS-cloned but `husky install` never runs in the worktree, so
+# .husky/_/husky.sh is missing and EVERY `git commit` fails (hooks resolve via the
+# shared core.hooksPath=.husky against the worktree's checkout). That broken hook
+# induced --no-verify workarounds in 6/8 failed agent-run evals on 2026-06-10.
+# Best-effort: repos without husky (no .husky in main checkout) are skipped.
+ensure_husky_runtime() {
+  local src="$MAIN_REPO/.husky/_"
+  local dst="$WT/.husky/_"
+  [[ -d "$WT/.husky" ]] || return 0          # repo doesn't use husky
+  [[ -d "$dst" ]] && return 0                # already materialized
+  if [[ -d "$src" ]]; then
+    if cp -cR "$src" "$dst" 2>/dev/null || cp -R "$src" "$dst" 2>/dev/null; then
+      echo ">> setup-task-workspace: materialized .husky/_ from main checkout" >&2
+    else
+      echo ">> setup-task-workspace: WARN — .husky/_ copy failed; commits may need husky install" >&2
+    fi
+  else
+    echo ">> setup-task-workspace: WARN — $src missing (husky not installed in main checkout?); commits will fail the pre-commit hook" >&2
+  fi
+}
+
 # ── Copy env.json from the main checkout (durable real file, NOT a symlink) ───
 # rm first so we never write *through* an existing symlink into the shared main
 # env.json. See the header comment for why a copy beats a symlink here.
@@ -160,6 +182,7 @@ if git -C "$MAIN_REPO" worktree list --porcelain | grep -qxF "worktree $WT"; the
   echo ">> setup-task-workspace: worktree already exists, reusing $WT" >&2
   ensure_env_json
   clone_node_modules
+  ensure_husky_runtime
   link_shared_memory
   echo "$WT"
   exit 0
@@ -186,6 +209,9 @@ ensure_env_json
 
 # ── Clone node_modules from the main checkout ───────────────────────────────────
 clone_node_modules
+
+# ── Materialize husky runtime so worktree commits don't fail the pre-commit hook ─
+ensure_husky_runtime
 
 # ── Surface shared Claude memory in this worktree (non-fatal) ─────────────────
 link_shared_memory
