@@ -100,7 +100,7 @@ Good: "On June 15, Agent SDK and -p usage moves to a separate monthly credit and
 
 ## 15. No courtesy enders in external communications
 
-Scope: the external destinations defined in `~/.cursor/rules/writing-style.mdc` (its em-dash-free list — PR titles/descriptions/comments, commit messages, changelogs, release notes, docs, emails, proposals). Do not close with an offer or pleasantry that carries no information:
+Scope: the external destinations defined in `~/.cursor/rules/writing-style.mdc` (its em-dash-free list — PR titles/descriptions/comments, commit messages, changelogs, release notes, Asana tasks/comments, agent run reports, review/issue comments, docs, emails, proposals). Do not close with an offer or pleasantry that carries no information:
 
 - "We can file these as issues with repro steps if that helps tracking."
 - "Happy to split this out / adjust / help however we can."
