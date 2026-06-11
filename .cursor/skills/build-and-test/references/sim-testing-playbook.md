@@ -83,6 +83,18 @@ entry (the human audits and prunes it periodically — keep entries dense).
   similar majors (which nearly every swap provider supports) MAY be swapped FROM
   to fund the asset a test needs. You are allowed to spend them for testing;
   prefer the smallest amount that clears the ~$10 floor with margin.
+- **Fee/slippage budget: $15 equivalent per run.** Network fees, swap fees, and
+  slippage incurred while testing are budgeted operating costs, NOT losses. Spend
+  up to ~$15 equivalent per task run on them without hesitation; pick swap
+  amounts so the whole test fits the budget. A TRUE LOSS is different and is the
+  ONLY funds-related blocker: an attempted swap/send that FAILED and the
+  principal did not arrive and is not recoverable. Fees and slippage never count
+  as a loss.
+- **Blocked-ness is established by ATTEMPTING, never predicted.** No funds-related
+  blocker exists until an actual attempted swap/send produced a TRUE loss (or a
+  documented build crash interrupted a genuine funded attempt). "Prototype",
+  "unvetted code", "might lose funds" are anticipated risks, not blockers — run
+  the test.
 
 ## Investigate cheap before driving the UI
 - **Crawl the code and run `/debugger` EARLY**, not as a last resort. A grinding
