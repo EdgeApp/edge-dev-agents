@@ -187,7 +187,7 @@ The script appends `<!-- addressed:review:ID -->` or `<!-- addressed:comment:ID 
 <sub-step name="Reply guidelines">
 - **Addressed**: State what was fixed. Factual, 1 sentence.
 - **Invalid/false-positive**: Brief evidence citing code paths or logic. 1-3 sentences.
-- No pleasantries. Factual tone only.
+- No pleasantries, no courtesy enders. Factual tone only. (Full external-prose standard: /no-slop, per writing-style.)
 </sub-step>
 </step>
 
