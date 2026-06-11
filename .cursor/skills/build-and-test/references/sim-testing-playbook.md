@@ -32,9 +32,14 @@ entry (the human audits and prunes it periodically — keep entries dense).
   it up; at most try the two, ONCE each — wrong-PIN retries trigger exponential
   lockout (465s → 914s → …), so never brute-force, and back off immediately on
   "Account locked".
-- **Avoid new-wallet creation on debug builds when an existing funded wallet
-  exists anywhere** — wallet creation has hit a native SQLite crash on debug
-  builds (HyperEVM run); an existing wallet on another account sidesteps it.
+- **Wallet creation is a SUPPORTED test path — not to be avoided.** Prefer an
+  existing funded wallet when the task doesn't involve creation (faster, no
+  setup), but create wallets freely when the task targets creation behavior or
+  no account holds the needed asset. KNOWN ISSUE being fixed (Asana task
+  1215619633542395): debug builds have hit a native SQLite crash on wallet
+  creation (HyperEVM run). If you hit it: capture the crash log, record it in
+  the run report as a harness blocker, and fall back to an existing wallet for
+  the REST of this test — do not let it cancel in-app testing wholesale.
 - **Debug builds crash to springboard (RN Fabric SIGABRT) on two reliable
   triggers: rapid settings-row toggling, and swap-amount keypad entry.** Seen
   repeatedly on the SideShift run. Do NOT keep relaunching to grind through it —
