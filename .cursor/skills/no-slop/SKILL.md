@@ -80,6 +80,23 @@ Never apologize for gaps, say "as of my last update," or speculate about missing
 - Be specific over general. Numbers over adjectives. Evidence over claims.
 - It's OK to be blunt, dry, or even terse. Humans are.
 
+## 14. State findings, don't grade or announce them
+
+A sentence must carry a claim, not an evaluation or preview of the claim you're about to make. Strip the sentence and check: if nothing is lost, cut it.
+
+- No evidence-grading: "the article is clear," "the data is unambiguous," "the answer is straightforward."
+- No stance-validation preambles: "your concern is fair," "good question," "you're right to push on this." When the reader is right, the confirmation is the fact itself: "Confirmed: the rules were in force; 4 of 7 runs violated them."
+- No forward references: "here's the precise failure:", "here's what matters:", "the key thing is this:".
+- No structure announcements: "Summary, in three parts.", "Three things:", "Let me break this down." Just write the parts.
+- No pre-verdicts the next sentence restates: "it's the opposite of a penalty" followed by the terms that show that.
+
+Certainty belongs inside the claim, marked tersely: "Unverified: X." / "By the published terms, X." A hedge that changes what the reader should do is information; a sentence that grades your own prose is not.
+
+Leading with a real answer is still required (see writing-style). The verdict sentence must carry the verdict's substance — "Your fleet is unaffected: it runs interactive sessions, which the change excludes" — not just its polarity ("it's good news").
+
+Bad: "The support article is clear, and it's the opposite of a penalty. On June 15, usage moves to a separate credit."
+Good: "On June 15, Agent SDK and -p usage moves to a separate monthly credit and stops counting against plan limits."
+
 ## Examples
 
 For concrete before/after examples showing these rules applied, see [examples/bad-examples.md](examples/bad-examples.md) and [examples/good-examples.md](examples/good-examples.md).
