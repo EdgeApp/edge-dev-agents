@@ -21,6 +21,9 @@
 #   IMPLEMENTOR: <name>
 #   REVIEWER: <name>
 #   COMMENTS: (most recent 5, one per block)
+#   PARENT: <gid> <name>                           [if task has a parent]
+#   SUBTASKS: <count>                              [if any; then one "<gid> [open|done] <name>" line each]
+#   DEPENDENCIES: / DEPENDENTS:                    [if any; same per-line format]
 #   ATTACHMENTS: <count> files
 #   DOWNLOADED: <count> files to <dir>
 #   UNPACKED: <zip> -> <dir> (<count> files)     [if ZIPs present]
@@ -78,9 +81,13 @@ fi
 API="https://app.asana.com/api/1.0"
 AUTH="Authorization: Bearer $ASANA_TOKEN"
 
-# Fetch task + custom fields
-curl -s "$API/tasks/$TASK_GID?opt_fields=name,notes,custom_fields.gid,custom_fields.name,custom_fields.display_value" \
-  -H "$AUTH" | python3 -c "
+# Fetch task + custom fields + relationship pointers. Parent/dependencies/
+# dependents ride the same call. Pointers are gid + state + name ONLY — this
+# script never fetches related-task content and never recurses; the calling
+# skill decides what (if anything) to walk.
+TASK_JSON=$(curl -s "$API/tasks/$TASK_GID?opt_fields=name,notes,num_subtasks,parent.name,dependencies.name,dependencies.completed,dependents.name,dependents.completed,custom_fields.gid,custom_fields.name,custom_fields.display_value" \
+  -H "$AUTH")
+printf '%s' "$TASK_JSON" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)['data']
 
@@ -102,7 +109,35 @@ for f in data.get('custom_fields', []):
     if label:
         val = f.get('display_value') or '(not set)'
         print(f'{label}: {val}')
+
+# Relationship pointers — lines omitted entirely when empty so the common
+# single-task case adds zero output.
+parent = data.get('parent')
+if parent:
+    print(f\"PARENT: {parent['gid']} {(parent.get('name') or '')[:80]}\")
+for label, key in (('DEPENDENCIES', 'dependencies'), ('DEPENDENTS', 'dependents')):
+    rows = data.get(key) or []
+    if rows:
+        print(f'{label}:')
+        for t in rows:
+            state = 'done' if t.get('completed') else 'open'
+            print(f\"  {t['gid']} [{state}] {(t.get('name') or '')[:80]}\")
 "
+
+# Subtask pointers (separate endpoint). Skipped entirely when the task has none.
+SUBTASK_COUNT=$(printf '%s' "$TASK_JSON" | python3 -c "import sys, json; print(json.load(sys.stdin)['data'].get('num_subtasks') or 0)")
+if [[ "$SUBTASK_COUNT" -gt 0 ]]; then
+  curl -s "$API/tasks/$TASK_GID/subtasks?opt_fields=name,completed" \
+    -H "$AUTH" | python3 -c "
+import sys, json
+rows = json.load(sys.stdin)['data']
+if rows:
+    print(f'SUBTASKS: {len(rows)}')
+    for t in rows:
+        state = 'done' if t.get('completed') else 'open'
+        print(f\"  {t['gid']} [{state}] {(t.get('name') or '')[:80]}\")
+"
+fi
 
 # Fetch project memberships — look for version project (e.g. "4.44.0")
 curl -s "$API/tasks/$TASK_GID?opt_fields=memberships.project.name" \
