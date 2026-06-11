@@ -6,7 +6,7 @@ alwaysApply: true
 # Writing Style
 
 - Em-dashes (`—`, U+2014) are scoped by destination, not banned outright:
-  - **Em-dash-free (hard rule):** committed code and code comments, commit messages, PR titles/descriptions, changelogs, release notes, and external communications (public docs, emails, proposals, anything that leaves the team). Use a period, comma, colon, semicolon, or parentheses instead, whichever reads best.
+  - **Em-dash-free (hard rule):** committed code and code comments, commit messages, PR titles/descriptions, changelogs, release notes, Asana tasks and comments (any task-tracker writing), agent run reports, review/issue comments, and external communications (public docs, emails, proposals, anything that leaves the team). Use a period, comma, colon, semicolon, or parentheses instead, whichever reads best.
   - **Em-dashes fine:** internal tooling that never ships to a product repo or external audience (`~/.cursor/skills/*`, `~/.cursor/rules/*`, local scratch files) and chat responses.
   - Hyphens (`-`) and en-dashes (`–`) are always fine everywhere.
 - **External-destination prose follows /no-slop.** Anything matching the em-dash-free destination list above (PR titles/descriptions/comments, commit messages, changelogs, release notes, docs, emails, proposals) must also follow `~/.cursor/skills/no-slop/SKILL.md` — banned vocabulary, no courtesy enders, no self-grading sentences, the full rule set. That skill is the single source for external prose patterns; do not restate its rules in other skills, reference them (one-line inline guardrails in a skill are fine, e.g. "no pleasantries").

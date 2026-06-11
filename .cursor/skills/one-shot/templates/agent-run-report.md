@@ -19,7 +19,9 @@ sim_udid: ""             # $AGENT_SIM_UDID
 
 ## Summary
 <!-- cat: summary -->
-<!-- 3-6 lines: what was asked, what shipped, final state, links. -->
+<!-- 3-6 lines: what was asked, what shipped, final state, links.
+     ALL prose in this report follows /no-slop (~/.cursor/skills/no-slop/SKILL.md):
+     no em-dashes, no courtesy enders, no self-grading or announcement sentences. -->
 _None observed._
 
 ## Testing
