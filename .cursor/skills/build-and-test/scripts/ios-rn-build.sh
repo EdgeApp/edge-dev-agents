@@ -101,6 +101,25 @@ if ! $FORCE && xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>
   # would connect to the wrong/foreign Metro. Guard the port and PIN the app to THIS
   # slot's Metro before launching, so it bundles from the right place.
   assert_metro_port_free_or_ours
+  # The full-build path gets Metro implicitly from run-ios; the cached path got NOTHING —
+  # the app launched pinned to a port nobody was listening on ("No script URL" hang).
+  # Start one if the port is free, with a bounded readiness probe against the real port.
+  if [[ -z "$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)" ]]; then
+    echo ">> ios-rn-build: no Metro on port $PORT; starting one for the cached launch (log: /tmp/metro-$PORT.log)" >&2
+    nohup npx react-native start --port "$PORT" >/tmp/metro-"$PORT".log 2>&1 &
+    METRO_READY=false
+    for _ in $(seq 1 60); do
+      if curl -fsS --max-time 2 "http://localhost:$PORT/status" 2>/dev/null | grep -q "packager-status:running"; then
+        METRO_READY=true; break
+      fi
+      sleep 2
+    done
+    if ! $METRO_READY; then
+      echo ">> ios-rn-build: FAIL — Metro did not become ready on port $PORT within 120s (see /tmp/metro-$PORT.log)" >&2
+      exit 1
+    fi
+    echo ">> ios-rn-build: Metro ready on port $PORT" >&2
+  fi
   xcrun simctl spawn "$UDID" defaults write "$BUNDLE_ID" RCT_jsLocation "localhost:$PORT" 2>/dev/null || true
   xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
   echo ">> ios-rn-build: PASS (cached install, launched on Metro port $PORT)"
