@@ -1,10 +1,17 @@
 #!/usr/bin/env node
 // verify-repo.sh
 // Runs full verification: CHANGELOG + code verification (prepare, tsc, lint, test)
-// Usage: ./verify-repo.sh [repo-dir] [--base <upstream-ref>] [--skip-install]
+// Usage: ./verify-repo.sh [repo-dir] [--base <upstream-ref>] [--skip-install] [--result-json <path>]
 // If repo-dir not provided, uses current directory
 // If --base is provided, lint is scoped to files changed vs that ref
+// CHANGELOG structure accommodates both EdgeApp formats: the Unreleased/staging
+//   convention, and the legacy versions-only format (file starts at `## x.y.z`),
+//   whose TOPMOST section is validated as the active one
+// If --require-changelog is provided (with --base), the branch's diff MUST
+//   touch CHANGELOG.md — format-agnostic "was the changelog updated" gate
 // If --skip-install is provided, skips the initial `yarn` dependency install
+// If --result-json is provided, writes {success, stage, failedStep, logPath}
+//   there so batch callers (pr-land-prepare.sh) can attribute failures
 //
 // Exit codes:
 //   0 = All verification passed
@@ -26,6 +33,7 @@ let repoDir = process.cwd();
 let baseRef = null;
 let requireChangelog = false;
 let skipInstall = false;
+let resultJsonPath = null;
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--base" && i + 1 < args.length) {
@@ -34,9 +42,21 @@ for (let i = 0; i < args.length; i++) {
     requireChangelog = true;
   } else if (args[i] === "--skip-install") {
     skipInstall = true;
+  } else if (args[i] === "--result-json" && i + 1 < args.length) {
+    resultJsonPath = args[++i];
   } else if (!args[i].startsWith("--")) {
     repoDir = args[i];
   }
+}
+
+// Optional machine-readable result for callers (e.g. pr-land-prepare.sh): a small
+// JSON file with the failing step + log path so batch runs are attributable
+// without re-running verification. Best-effort — never fails the run.
+function writeResultJson(obj) {
+  if (resultJsonPath == null) return;
+  try {
+    writeFileSync(resultJsonPath, JSON.stringify(obj, null, 2));
+  } catch {}
 }
 
 const packageJsonPath = path.join(repoDir, "package.json");
@@ -62,7 +82,8 @@ function shimFreePath() {
 }
 
 function runCommandWithLog(command, label, repoDir, extraEnv = {}) {
-  const safeLabel = sanitizeLabel(label || command);
+  // Repo basename in the log name so batch runs (N repos) stay attributable.
+  const safeLabel = sanitizeLabel(`${path.basename(repoDir)}-${label || command}`);
   const logPath = path.join(os.tmpdir(), `verify-${safeLabel}-${Date.now()}-${Math.random().toString(36).slice(2)}.log`);
   try {
     const output = execSync(command, {
@@ -114,6 +135,27 @@ function verifyChangelog() {
   let hasStagingSection = false;
   let hasUnreleasedSection = false;
 
+  // EdgeApp repos use two CHANGELOG formats — both valid:
+  //   convention: an `## Unreleased` (or `## x.y.z (staging)`) section holds
+  //               pending entries (most repos; GUI adds the staging variant).
+  //   legacy:     versions-only — the file starts directly at `## x.y.z`
+  //               headings (e.g. older react-native-* repos); new entries go
+  //               under the TOPMOST heading, which we validate as the active
+  //               section in place of Unreleased.
+  // Pre-scan headings to classify, so the main loop knows which sections are
+  // "active" (validated) for this repo's format.
+  let format = "none";
+  for (const line of lines) {
+    if (/^## Unreleased/i.test(line) || /^## .+\(staging\)/i.test(line)) {
+      format = "convention";
+      break;
+    }
+    if (/^## \d+\.\d+\.\d+/.test(line) && format === "none") {
+      format = "legacy";
+    }
+  }
+  let sectionCount = 0;
+
   const TYPE_ORDER = ["added", "changed", "deprecated", "fixed", "removed", "security"];
 
   function entryType(line) {
@@ -127,16 +169,22 @@ function verifyChangelog() {
 
   function validateSection() {
     if (currentSection == null) return;
-    const isActive = currentSection === "unreleased" || currentSection === "staging";
+    const isActive =
+      currentSection === "unreleased" ||
+      currentSection === "staging" ||
+      currentSection === "legacy-top";
     if (!isActive) return;
 
     // Empty section check removed — emptiness is validated per-PR via --require-changelog
+
+    const sectionLabel =
+      currentSection === "legacy-top" ? "topmost section" : currentSection;
 
     const seen = new Set();
     for (const { text, lineNum } of sectionEntries) {
       const normalized = text.replace(/\s+/g, " ").trim();
       if (seen.has(normalized)) {
-        errors.push(`Line ${lineNum}: Duplicate entry in ${currentSection}: "${text.slice(0, 60)}..."`);
+        errors.push(`Line ${lineNum}: Duplicate entry in ${sectionLabel}: "${text.slice(0, 60)}..."`);
       }
       seen.add(normalized);
     }
@@ -149,7 +197,7 @@ function verifyChangelog() {
       if (idx === -1) continue;
       if (idx < lastTypeIdx) {
         const expected = TYPE_ORDER[lastTypeIdx];
-        errors.push(`Line ${lineNum}: "${type}" entry after "${expected}" in ${currentSection} — expected order: ${TYPE_ORDER.join(", ")}`);
+        errors.push(`Line ${lineNum}: "${type}" entry after "${expected}" in ${sectionLabel} — expected order: ${TYPE_ORDER.join(", ")}`);
       }
       lastTypeIdx = idx;
     }
@@ -178,14 +226,21 @@ function verifyChangelog() {
       sectionStartLine = lineNum;
     } else if (line.match(/^## \d+\.\d+\.\d+/)) {
       validateSection();
-      currentSection = "released";
+      sectionCount++;
+      // Legacy format: the topmost version heading is the active section
+      // (where new entries land) — validate it like Unreleased.
+      currentSection =
+        format === "legacy" && sectionCount === 1 ? "legacy-top" : "released";
       sectionEntries = [];
       sectionStartLine = lineNum;
     }
 
     if (currentSection != null && line.startsWith("- ")) {
       sectionEntries.push({ text: line, lineNum });
-      const isActive = currentSection === "unreleased" || currentSection === "staging";
+      const isActive =
+        currentSection === "unreleased" ||
+        currentSection === "staging" ||
+        currentSection === "legacy-top";
       if (isActive && !line.match(/^- (added|changed|fixed|deprecated|removed|security):/i)) {
         warnings.push(`Line ${lineNum}: Entry may not follow "- type: description" format`);
       }
@@ -200,8 +255,15 @@ function verifyChangelog() {
   }
   validateSection();
 
-  if (!hasUnreleasedSection && !hasStagingSection) {
-    errors.push("No '## Unreleased' or staging section found");
+  // Both EdgeApp formats are valid; only a file with NO recognizable sections
+  // at all is malformed. Legacy (versions-only) repos are validated via their
+  // topmost section above instead of requiring an Unreleased section.
+  if (format === "none") {
+    errors.push(
+      "No recognizable CHANGELOG sections found (expected '## Unreleased', '## x.y.z (staging)', or '## x.y.z' version headings)"
+    );
+  } else if (format === "legacy") {
+    console.log("   ℹ  Legacy format (versions-only): topmost section validated as active");
   }
 
   if (errors.length > 0) {
@@ -366,6 +428,12 @@ function verifyCode() {
 const changelogResult = verifyChangelog();
 if (!changelogResult.success) {
   console.error("\n=== Verification FAILED (CHANGELOG) ===");
+  writeResultJson({
+    success: false,
+    stage: "changelog",
+    failedStep: "CHANGELOG verification",
+    errors: changelogResult.errors || [changelogResult.error],
+  });
   process.exit(2);
 }
 
@@ -378,11 +446,22 @@ if (requireChangelog && baseRef) {
     if (diff.length === 0) {
       console.error("✗  No CHANGELOG.md changes found but PR requires a changelog entry");
       console.error("\n=== Verification FAILED (CHANGELOG) ===");
+      writeResultJson({
+        success: false,
+        stage: "changelog",
+        failedStep: "CHANGELOG entry existence check",
+      });
       process.exit(2);
     }
     console.log("✓  CHANGELOG entry exists in diff");
   } catch (e) {
     console.error(`✗  Failed to check CHANGELOG diff: ${e.message}`);
+    writeResultJson({
+      success: false,
+      stage: "changelog",
+      failedStep: "CHANGELOG diff check",
+      errors: [e.message],
+    });
     process.exit(2);
   }
 }
@@ -391,8 +470,16 @@ const codeResult = verifyCode();
 if (!codeResult.success) {
   console.error("\n=== Verification FAILED (Code) ===");
   console.error(`Failed step: ${codeResult.failedStep || codeResult.error}`);
+  if (codeResult.logPath) console.error(`Log: ${codeResult.logPath}`);
+  writeResultJson({
+    success: false,
+    stage: "code",
+    failedStep: codeResult.failedStep || codeResult.error,
+    logPath: codeResult.logPath,
+  });
   process.exit(1);
 }
 
 console.log("\n=== Verification PASSED ===");
+writeResultJson({ success: true });
 process.exit(0);

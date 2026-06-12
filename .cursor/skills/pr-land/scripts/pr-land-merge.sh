@@ -119,7 +119,7 @@ if (!["merge", "squash", "rebase"].includes(mergeMethod)) {
  * On all other failures, the rebase is aborted to leave the repo clean.
  */
 function rebaseOntoUpstream(repoDir, branch, repo) {
-  const upstream = getUpstreamBranch(repo);
+  const upstream = getUpstreamBranch(repo, repoDir);
 
   runGit(["fetch", "origin"], repoDir);
 
@@ -365,7 +365,7 @@ async function main() {
 
     // STEP 3: Run local verification (MANDATORY — no bypass)
     console.error("Running local verification (MANDATORY)...");
-    const verification = runVerification(repoDir, getUpstreamBranch(repo), {
+    const verification = runVerification(repoDir, getUpstreamBranch(repo, repoDir), {
       skipInstall: true,
     });
 

@@ -54,7 +54,7 @@ Arguments are classified automatically:
 | `pr-land-comments.sh` | Check for recent unaddressed feedback (inline threads, review bodies, top-level comments) |
 | `git-branch-ops.sh` | Shared autosquash / push helper for explicit git branch actions |
 | `pr-land-prepare.sh` | Rebase + conflict detection + verification |
-| `verify-repo.sh` | Verification (CHANGELOG + code; lint scoped to changed files when `--base` given) |
+| `verify-repo.sh` | Verification (CHANGELOG + code; lint scoped to changed files when `--base` given; accommodates both Unreleased-style and legacy versions-only CHANGELOG formats; prepare invokes it with `--require-changelog`, so every landed PR must include a CHANGELOG entry) |
 | `pr-land-merge.sh` | Rebase + verify + merge via GitHub API |
 | `pr-land-publish.sh` | Version bump, changelog update, commit + tag (no push) |
 | `staging-cherry-pick.sh` | Cherry-pick merged PR commits onto staging (see `/staging-cherry-pick` skill) |
@@ -73,6 +73,22 @@ Arguments are classified automatically:
 | `asana-task-update.sh` | Success | Error | Needs user input | - | - |
 
 **Any exit code not in this table = STOP immediately and report to user.**
+
+<prepare-statuses description="Per-PR `status` values in pr-land-prepare.sh's JSON output, and the prescribed action for each. The script exits 0 if ANY branch is ready or has a resolvable CHANGELOG conflict — always read per-PR statuses, not just the exit code.">
+
+| `status` | Meaning | Prescribed action |
+|----------|---------|-------------------|
+| `ready` | Prepared + verified | Proceed to push (step 4). Check `placementWarnings` first. |
+| `changelog_conflict` | CHANGELOG-only rebase conflict, left in progress | Resolve semantically, `git add CHANGELOG.md && GIT_EDITOR=true git rebase --continue`, re-run prepare. |
+| `code_conflict` | Code-file rebase conflict, rebase aborted | SKIP this PR; report `conflictFiles` to user. Do not resolve code conflicts autonomously. |
+| `verification_failed` | verify-repo.sh failed | Read `failedStep` + `logPath` from the JSON; inspect the log tail (`tail -40 <logPath>`); fix only if trivially in-scope, else report. Special case `failedStep: "CHANGELOG entry existence check"` — prepare REQUIRES every landed PR to have updated CHANGELOG.md: add a correctly-formatted entry for the PR's change (under `## Unreleased`, or the topmost version section in legacy versions-only repos), amend it onto the branch, and re-run prepare. Only if an entry is genuinely unwarranted (e.g. CI-only change), ask the user whether to land without one. |
+| `install_failed` | Dependency install failed | Report; usually environmental. Do not retry blindly. |
+| `autosquash_failed` | Fixup autosquash rebase failed (aborted) | Report; branch likely needs manual history repair. |
+| `checkout_failed` | Fetch/checkout failed | Report the git error. Note: dirty trees no longer cause this — they are auto-stashed (see `dirty-tree-policy`). |
+| `clone_failed` | Initial clone failed | Report; check repo name/access. |
+
+**Dirty-tree policy (`dirty-tree-policy`):** prepare operates on the PRIMARY checkout at `~/git/<repo>` (or a worktree already holding the branch) — NOT a scratch clone — so it can collide with in-progress local work. If the tree is dirty at checkout, prepare auto-stashes it (including untracked) under a labeled stash `pr-land-autostash <ISO-date> (was on <branch>)` and reports it in the per-PR JSON (`autostash`) and the summary. ALWAYS surface auto-stashes to the user in your final report — the stash is their uncommitted work; recovery is `git stash list | grep pr-land-autostash` then `git stash pop <ref>`.
+</prepare-statuses>
 </scripts>
 
 <step id="1" name="Discovery">
@@ -143,7 +159,7 @@ ONE tool call per batch:
 echo '[{"repo":"...","branch":"<prefix>/feature"}]' | ~/.cursor/skills/pr-land/scripts/pr-land-prepare.sh
 ```
 
-The prepare script handles: clone/checkout, autosquash fixups, rebase onto upstream, conflict detection, and verification.
+The prepare script handles: clone/checkout, autosquash fixups, rebase onto upstream (the repo's actual default branch via origin/HEAD; `origin/develop` for the GUI), conflict detection, and verification. It operates on the PRIMARY checkout at `~/git/<repo>` — not a scratch clone — so in-progress local work there is auto-stashed per `dirty-tree-policy`. Per-PR outcomes are the `status` values in `<prepare-statuses>`; act on each as prescribed there.
 
 **Exit codes:**
 - `0` = At least one PR ready to push (skipped PRs reported in JSON output)
