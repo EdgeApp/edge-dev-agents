@@ -189,3 +189,7 @@ require-plan-before-developing: the Planning-to-Developing status transition is 
 until /tmp/plan-<gid>-*.md exists (asana-plan then attaches it to the task).
 block-raw-thread-resolve: raw resolveReviewThread graphql is blocked; threads resolve
 through pr-address/bugbot companion scripts, which reply in-thread first.
+    { "type": "command", "command": "~/.config/agent-watcher/hooks/require-maestro-device.sh", "timeout": 10 },
+
+require-maestro-device: maestro test/record without --device is blocked in slot
+sessions (multiple booted sims make the default driver attachment ambiguous).

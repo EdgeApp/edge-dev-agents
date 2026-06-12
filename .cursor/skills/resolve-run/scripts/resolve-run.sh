@@ -167,6 +167,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     --arg run_report "$run_report" --argjson revive "$revive_pings" --argjson operator "$operator_msgs" --argjson wd "$watchdog_mentions" \
     --argjson release_receipt "$release_receipt" \
     --argjson forensics "$forensics" --arg state_dir "$STATE_DIR" --arg watchdog_log "$WATCHDOG_LOG" --arg watcher_log "$WATCHER_LOG" \
+    --argjson runaway_log_exists "$([ -f "$STATE_DIR/runaway-guard.log" ] && echo true || echo false)" \
     '{
       gid: $gid,
       task_name: ($asana.name // (if $name_hint == "" then null else $name_hint end)),
@@ -187,6 +188,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       signals: { revive_pings_in_transcript: $revive, operator_messages: $operator, watchdog_log_mentions: $wd, forensics_files: $forensics },
       logs: { watcher: $watcher_log, watchdog: $watchdog_log,
               runaway_guard: ($state_dir + "/runaway-guard.log"),
+              runaway_log_exists: $runaway_log_exists,
               memory_monitor: "/tmp/memory-monitor.log",
               mem_trace_dir: ($state_dir + "/oom-repro/logs"),
               forensics_dir: ($state_dir + "/forensics") }

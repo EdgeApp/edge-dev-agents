@@ -171,12 +171,39 @@ if [[ "$PORT" != "8081" ]]; then
   echo ">> ios-rn-build: using non-default Metro port $PORT" >&2
 fi
 echo ">> ios-rn-build: npx react-native run-ios ${RUN_ARGS[*]}  (usually a few minutes)" >&2
-npx react-native run-ios "${RUN_ARGS[@]}"
+RUN_LOG="/tmp/ios-rn-build-runios-$$.log"
+RUN_EXIT=0
+npx react-native run-ios "${RUN_ARGS[@]}" 2>&1 | tee "$RUN_LOG" || RUN_EXIT=$?
+
+# run-ios sometimes fails (exit 65) as a wrapper artifact while xcodebuild itself
+# would succeed. Fall back ONCE to direct xcodebuild + simctl install/launch with
+# real diagnostics, so the agent never needs to improvise this bypass by hand.
+if [[ $RUN_EXIT -ne 0 ]]; then
+  echo ">> ios-rn-build: run-ios FAILED (exit $RUN_EXIT). Last errors:" >&2
+  grep -iE "error:|fatal|BUILD FAILED" "$RUN_LOG" | tail -8 >&2 || tail -8 "$RUN_LOG" >&2
+  WORKSPACE=$(ls -d ios/*.xcworkspace 2>/dev/null | head -1)
+  SCHEME=$(basename "${WORKSPACE%.xcworkspace}")
+  if [[ -n "$WORKSPACE" ]]; then
+    echo ">> ios-rn-build: falling back to direct xcodebuild ($WORKSPACE, scheme $SCHEME)" >&2
+    DD="/tmp/ios-rn-build-dd-$$"
+    if xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Debug \
+         -destination "id=$UDID" -derivedDataPath "$DD" build > "$RUN_LOG.xcb" 2>&1; then
+      APP=$(find "$DD/Build/Products" -maxdepth 2 -name "*.app" -type d | head -1)
+      [[ -n "$APP" ]] && xcrun simctl install "$UDID" "$APP" && xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null \
+        && echo ">> ios-rn-build: fallback build installed + launched" >&2
+    else
+      echo ">> ios-rn-build: FAIL — direct xcodebuild also failed. Last errors:" >&2
+      grep -iE "error:|fatal|BUILD FAILED" "$RUN_LOG.xcb" | tail -8 >&2 || tail -8 "$RUN_LOG.xcb" >&2
+      echo ">> ios-rn-build: full logs: $RUN_LOG $RUN_LOG.xcb" >&2
+      exit 1
+    fi
+  fi
+fi
 
 # run-ios can exit 0 without installing (e.g. after an interactive prompt is
 # EOF'd in a headless shell). PASS only if the app container actually exists.
 if ! xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>&1; then
-  echo ">> ios-rn-build: FAIL — run-ios exited 0 but $BUNDLE_ID is not installed on $UDID" >&2
+  echo ">> ios-rn-build: FAIL — build completed but $BUNDLE_ID is not installed on $UDID" >&2
   exit 1
 fi
 
