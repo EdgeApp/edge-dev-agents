@@ -127,6 +127,13 @@ entry (the human audits and prunes it periodically — keep entries dense).
   documented build crash interrupted a genuine funded attempt). "Prototype",
   "unvetted code", "might lose funds" are anticipated risks, not blockers — run
   the test.
+- **SideShift is US-geo-blocked from this host's egress IP** (found 2026-06-12,
+  Asana 1214800712844381): in-app quotes and the confirm slider render, but
+  shift CREATION is denied at ANY amount — the denial is geographic, not a
+  floor/funding problem, so do not burn the slot retrying amounts or pairs. An
+  executed SideShift shift needs non-US egress (VPN/proxy), which the slot does
+  not have; verify via direct API + quote/slider proof, document the geo-block
+  as the external precondition, and move on.
 
 ## Investigate cheap before driving the UI
 - **Crawl the code and run `/debugger` EARLY**, not as a last resort. A grinding
