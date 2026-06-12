@@ -105,7 +105,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
   fi
 
   local transcript; transcript=$(find_transcript "$gid")
-  local win_start="" win_end="" prs="[]" revive_pings=0
+  local win_start="" win_end="" prs="[]" revive_pings=0 operator_msgs=0
   if [ -n "$transcript" ]; then
     # first/last lines are often timestamp-less meta records (mode, bridge-session);
     # take the first and last lines that carry a timestamp
@@ -118,6 +118,10 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     # transcript — that must not count, so anchor on the JSON key boundary
     revive_pings=$(grep -cE '"(content|text)":"<watchdog-revive-ping>' "$transcript" 2>/dev/null || true)
     revive_pings=${revive_pings:-0}
+    # mid-run human nudges: operator messages are prefixed "Operator:" by convention
+    # (same JSON key anchoring as above)
+    operator_msgs=$(grep -cE '"(content|text)":"Operator:' "$transcript" 2>/dev/null || true)
+    operator_msgs=${operator_msgs:-0}
   fi
 
   local asana; asana=$(asana_fetch "$gid" || true)
@@ -160,7 +164,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     --arg transcript "$transcript" --arg ws "$win_start" --arg we "$win_end" \
     --arg worktree "$worktree" --arg repo "$repo" --arg branch "$branch" \
     --argjson prs "$prs" --argjson asana "$asana" --argjson slot "$slot" --argjson pool "$pool_entry" \
-    --arg run_report "$run_report" --argjson revive "$revive_pings" --argjson wd "$watchdog_mentions" \
+    --arg run_report "$run_report" --argjson revive "$revive_pings" --argjson operator "$operator_msgs" --argjson wd "$watchdog_mentions" \
     --argjson release_receipt "$release_receipt" \
     --argjson forensics "$forensics" --arg state_dir "$STATE_DIR" --arg watchdog_log "$WATCHDOG_LOG" --arg watcher_log "$WATCHER_LOG" \
     '{
@@ -180,7 +184,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       pool_entry: $pool,
       run_report: $run_report,
       release_receipt: $release_receipt,
-      signals: { revive_pings_in_transcript: $revive, watchdog_log_mentions: $wd, forensics_files: $forensics },
+      signals: { revive_pings_in_transcript: $revive, operator_messages: $operator, watchdog_log_mentions: $wd, forensics_files: $forensics },
       logs: { watcher: $watcher_log, watchdog: $watchdog_log,
               runaway_guard: ($state_dir + "/runaway-guard.log"),
               memory_monitor: "/tmp/memory-monitor.log",
