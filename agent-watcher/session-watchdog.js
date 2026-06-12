@@ -260,10 +260,29 @@ function reapOrphanMetros() {
 // Full teardown of one retained worktree: remove the worktree + branch (and any
 // lingering sim/slot, though those were freed at completion). Used only by the prune.
 function removeWorktree(taskGid, repo) {
+  // Re-check session liveness at PRUNE TIME, under BOTH prefixes. The caller's
+  // sparing logic uses lists captured earlier in the tick; an un-retire renames
+  // done-asana → claude-asana mid-tick, leaving the gid in neither stale list —
+  // the prune then destroys the just-resurrected session's worktree and slot.
+  const liveNow = sh(`tmux has-session -t "${SESSION_PREFIX}${taskGid}" 2>/dev/null && echo yes`) === 'yes'
+    || sh(`tmux has-session -t "${RETIRED_PREFIX}${taskGid}" 2>/dev/null && echo yes`) === 'yes'
+  if (liveNow) {
+    log(`  [${taskGid}] prune SKIPPED: a session exists for this gid (re-checked live)`)
+    return
+  }
   log(`  [${taskGid}] pruning retained worktree (repo ${repo})`)
   try { const s = slots.get(taskGid); if (s?.sim_udid) sh(`"${DIR}/release-pool-entry.sh" --task-gid "${taskGid}"`) } catch { /* none */ }
   sh(`"${DIR}/cleanup-task-workspace.sh" --task-gid "${taskGid}" --repo "${repo}"`)
   try { slots.release(taskGid) } catch { /* already gone */ }
+  // cleanup-task-workspace is best-effort and exits 0 even when removal fails
+  // (e.g. a non-git dir), which previously made the prune retry the same gid
+  // every tick forever. Escalate: force-remove what the gated cleanup left.
+  const dir = path.join(WORKTREES_ROOT, taskGid)
+  if (fs.existsSync(dir)) {
+    log(`  [${taskGid}] cleanup left the worktree dir behind — force-removing ${dir}`)
+    try { fs.rmSync(dir, { recursive: true, force: true }) }
+    catch (e) { log(`  [${taskGid}] force-remove failed: ${e.message}`) }
+  }
 }
 
 // Retired sessions (completed, renamed out of the slot-counted namespace, claude
