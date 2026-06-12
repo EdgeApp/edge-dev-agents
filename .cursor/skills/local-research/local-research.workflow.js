@@ -31,7 +31,16 @@ export const meta = {
 }
 
 // ── args ───────────────────────────────────────────────────────────────────────
-const A = (typeof args === 'string') ? { question: args } : (args || {})
+// The harness may deliver `args` JSON-stringified. Parse it first: a string that
+// parses to an object IS the args object (not a question); a string that doesn't
+// parse is a bare question. (Without this, a stringified {question,roots,…} put the
+// whole JSON blob in .question and silently fell back to default roots/breadth.)
+let A = args
+if (typeof A === 'string') {
+  try { const p = JSON.parse(A); A = (p && typeof p === 'object') ? p : { question: A } }
+  catch (e) { A = { question: A } }
+}
+A = A || {}
 const QUESTION = (A.question || '').trim()
 if (!QUESTION) throw new Error('local-research: args.question is required (pass a string, or { question, roots, breadth, style })')
 const ROOTS = (Array.isArray(A.roots) && A.roots.length) ? A.roots : ['.']
