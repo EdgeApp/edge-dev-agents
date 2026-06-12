@@ -90,6 +90,11 @@ entry (the human audits and prunes it periodically — keep entries dense).
   ONLY funds-related blocker: an attempted swap/send that FAILED and the
   principal did not arrive and is not recoverable. Fees and slippage never count
   as a loss.
+- **The device-local account stash is UNRECOVERABLE without the account
+  password.** PIN login only unlocks an account the device already knows;
+  bootstrap requires a password login. NEVER uninstall the Edge app or wipe a
+  sim data container without copying the data container aside first - the
+  snapshot costs seconds and the stash cannot be recreated from PIN alone.
 - **Blocked-ness is established by ATTEMPTING, never predicted.** No funds-related
   blocker exists until an actual attempted swap/send produced a TRUE loss (or a
   documented build crash interrupted a genuine funded attempt). "Prototype",
