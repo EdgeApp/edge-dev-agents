@@ -19,8 +19,33 @@ function getRepoDir(repo) {
   return path.join(homeDir, "git", repo);
 }
 
-function getUpstreamBranch(repo) {
-  return repo === "edge-react-gui" ? "origin/develop" : "origin/master";
+// Resolve the upstream ref a branch should rebase onto / merge into.
+// edge-react-gui follows the Edge develop convention; every other repo uses its
+// ACTUAL default branch (repos vary: master, main, …). Resolution order:
+//   1. origin/HEAD symbolic ref (set by clone; authoritative)
+//   2. probe origin/master, then origin/main (origin/HEAD can be unset on old clones)
+//   3. fall back to origin/master (pre-clone: no repo dir to inspect yet)
+// `repoDir` is optional for backward compatibility; defaults to getRepoDir(repo).
+function getUpstreamBranch(repo, repoDir) {
+  if (repo === "edge-react-gui") return "origin/develop";
+  const dir = repoDir || getRepoDir(repo);
+  if (existsSync(path.join(dir, ".git"))) {
+    const head = runGit(
+      ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"],
+      dir,
+      { allowFailure: true }
+    );
+    if (head.success && head.stdout.startsWith("refs/remotes/")) {
+      return head.stdout.replace("refs/remotes/", "");
+    }
+    for (const cand of ["origin/master", "origin/main"]) {
+      const probe = runGit(["rev-parse", "--verify", "--quiet", cand], dir, {
+        allowFailure: true,
+      });
+      if (probe.success) return cand;
+    }
+  }
+  return "origin/master";
 }
 
 function runGit(args, cwd, options = {}) {
@@ -73,14 +98,27 @@ function runVerification(repoDir, baseRef, options = {}) {
   const baseArg = baseRef != null ? ` --base "${baseRef}"` : "";
   const changelogArg = options.requireChangelog ? " --require-changelog" : "";
   const skipInstallArg = options.skipInstall ? " --skip-install" : "";
+  // Structured result side-channel: verify-repo.sh writes {failedStep, logPath, …}
+  // here so callers can attribute failures without re-running verification.
+  const resultJsonPath = path.join(
+    os.tmpdir(),
+    `verify-result-${path.basename(repoDir)}-${Date.now()}.json`
+  );
+  const readResultJson = () => {
+    try {
+      return JSON.parse(require("fs").readFileSync(resultJsonPath, "utf8"));
+    } catch {
+      return {};
+    }
+  };
   try {
     execSync(
-      `node "${verifyScript}" "${repoDir}"${baseArg}${changelogArg}${skipInstallArg}`,
+      `node "${verifyScript}" "${repoDir}"${baseArg}${changelogArg}${skipInstallArg} --result-json "${resultJsonPath}"`,
       { stdio: "inherit", encoding: "utf8" }
     );
-    return { success: true };
+    return { success: true, ...readResultJson() };
   } catch (e) {
-    return { success: false, exitCode: e.status };
+    return { success: false, exitCode: e.status, ...readResultJson() };
   }
 }
 

@@ -8,7 +8,7 @@
 // For each branch:
 //   1. Checkout + fetch
 //   2. Autosquash fixup commits
-//   3. Rebase onto upstream (origin/master or origin/develop for GUI)
+//   3. Rebase onto upstream (repo's default branch via origin/HEAD; origin/develop for GUI)
 //   4. Detect conflicts: code files = SKIP, CHANGELOG-only = report
 //   5. Run full verification (CHANGELOG + code)
 //
@@ -156,7 +156,6 @@ function describeBranchState(repoDir, branch) {
 
 async function prepareBranch(repo, branch) {
   const canonicalDir = getRepoDir(repo);
-  const upstream = getUpstreamBranch(repo);
   let repoDir = canonicalDir;
   const result = {
     repo,
@@ -194,9 +193,30 @@ async function prepareBranch(repo, branch) {
   }
   console.error(`Directory: ${repoDir}`);
 
-  // Step 2: Fetch and checkout
+  // Resolve upstream AFTER clone + worktree resolution so the repo's actual
+  // default branch (origin/HEAD: master, main, …) can be inspected on disk.
+  const upstream = getUpstreamBranch(repo, repoDir);
+  console.error(`Upstream: ${upstream}`);
+
+  // Step 2: Fetch and checkout.
+  // Dirty-tree policy: prepare operates on the user's primary checkout, which
+  // may hold in-progress local work. Auto-stash it under a labeled stash so
+  // checkout can proceed, and surface the stash in the JSON so it is never
+  // silently lost (recover: `git stash list | grep pr-land-autostash`).
   console.error(`Fetching and checking out ${branch}...`);
   try {
+    const dirty = runGit(["status", "--porcelain"], repoDir, {
+      allowFailure: true,
+    });
+    if (dirty.success && dirty.stdout.trim().length > 0) {
+      const onBranch = runGit(["rev-parse", "--abbrev-ref", "HEAD"], repoDir, {
+        allowFailure: true,
+      });
+      const stashMsg = `pr-land-autostash ${new Date().toISOString()} (was on ${onBranch.stdout || "unknown"})`;
+      runGit(["stash", "push", "--include-untracked", "-m", stashMsg], repoDir);
+      console.error(`⚠ Dirty working tree — auto-stashed: "${stashMsg}"`);
+      result.autostash = stashMsg;
+    }
     runGit(["fetch", "origin"], repoDir);
     runGit(["fetch", "origin", branch], repoDir, { allowFailure: true });
     runGit(["checkout", branch], repoDir);
@@ -270,17 +290,25 @@ async function prepareBranch(repo, branch) {
     return result;
   }
 
-  // Step 6: Run verification (lint scoped to files changed vs upstream)
+  // Step 6: Run verification (lint scoped to files changed vs upstream).
+  // requireChangelog: every landed PR must have updated CHANGELOG.md — the
+  // diff-based existence check is format-agnostic (works for Unreleased-style
+  // AND legacy versions-only CHANGELOGs).
   console.error("\nRunning verification...");
   const verifyResult = runVerification(repoDir, upstream, {
     skipInstall: true,
+    requireChangelog: true,
   });
 
   if (!verifyResult.success) {
     console.error("Branch state:");
     console.error(describeBranchState(repoDir, branch));
     result.status = "verification_failed";
-    result.message = `Verification failed (exit code ${verifyResult.exitCode})`;
+    result.failedStep = verifyResult.failedStep;
+    result.logPath = verifyResult.logPath;
+    result.message = `Verification failed (exit code ${verifyResult.exitCode})${
+      verifyResult.failedStep ? ` at step: ${verifyResult.failedStep}` : ""
+    }${verifyResult.logPath ? ` — log: ${verifyResult.logPath}` : ""}`;
     return result;
   }
 
@@ -372,6 +400,19 @@ async function main() {
     console.error(`\nFailed (${results.failed.length}):`);
     for (const r of results.failed) {
       console.error(`  ✗ ${r.repo}/${r.branch}: ${r.message}`);
+    }
+  }
+
+  const autostashed = [
+    ...results.prepared,
+    ...results.skipped,
+    ...results.changelogConflicts,
+    ...results.failed,
+  ].filter((r) => r.autostash);
+  if (autostashed.length > 0) {
+    console.error(`\nAuto-stashed dirty trees (${autostashed.length}) — recover with \`git stash list | grep pr-land-autostash\`:`);
+    for (const r of autostashed) {
+      console.error(`  ⚠ ${r.repo}: "${r.autostash}"`);
     }
   }
 

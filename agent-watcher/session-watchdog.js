@@ -301,12 +301,14 @@ function listRetiredSessions() {
 // for followup work (and, per one-shot's `followup-reopens-status`, the agent moved
 // agent_status off Complete). Rename it BACK to claude-asana-<gid> so it re-occupies
 // a concurrency slot — otherwise the followup runs off-the-books and the watcher can
-// oversubscribe. Only for still-alive sessions with a real, non-Complete status; the
-// session re-provisions its own sim/Metro as the work proceeds.
+// oversubscribe. Only for still-alive sessions with a real, non-terminal status; the
+// session re-provisions its own sim/Metro as the work proceeds. 'Archived' is a
+// terminal status like 'Complete' (operator shelved the task to narrow focus, not a
+// followup request) — never un-retire for it.
 function unretireFollowups() {
   for (const r of listRetiredSessions()) {
     const { agentStatus } = fetchTaskState(r.gid)
-    if (!agentStatus || agentStatus === 'Complete') continue
+    if (!agentStatus || agentStatus === 'Complete' || agentStatus === 'Archived') continue
     const ppid = getPanePid(r.name)
     if (ppid === null || !claudeRunningUnder(ppid)) continue // only re-occupy for a live session
     const dest = `${SESSION_PREFIX}${r.gid}`
@@ -337,7 +339,7 @@ function unretireFollowups() {
 // can spawn the next task) while KEEPING the claude process alive — the session
 // stays attachable and re-engageable via RC. Sim + slot are freed; worktree is
 // retained. Old retirements are bounded by pruneRetiredSessions().
-function retireSession(session, taskGid) {
+function retireSession(session, taskGid, agentStatus = 'Complete') {
   const dest = `${RETIRED_PREFIX}${taskGid}`
   // rename-session can't clobber; drop a prior retirement of the same task first.
   if (sh(`tmux has-session -t "${dest}" 2>/dev/null && echo yes`) === 'yes') {
@@ -353,7 +355,7 @@ function retireSession(session, taskGid) {
   releaseSimAndSlot(taskGid)
   freeMetroPort(metroPort)
   writeReleaseReceipt(taskGid, slot, metroPort)
-  log(`[${session}] agent_status=Complete → RETIRED as ${dest} (claude kept alive; Metro+sim+slot freed; worktree retained)`)
+  log(`[${session}] agent_status=${agentStatus} → RETIRED as ${dest} (claude kept alive; Metro+sim+slot freed; worktree retained)`)
 }
 
 // Monitor-liveness heartbeat check: memory-monitor logs every 30s tick; a stale
@@ -457,14 +459,15 @@ function main() {
   const now = Date.now()
 
   for (const session of sessions) {
-    // Completion sweep: if Asana shows agent_status=Complete, retire the session.
+    // Completion sweep: if Asana shows a terminal agent_status (Complete, or the
+    // operator-only Archived), retire the session.
     const taskGid = session.slice(SESSION_PREFIX.length)
     const { agentStatus, blocked } = fetchTaskState(taskGid)
-    if (agentStatus === 'Complete') {
+    if (agentStatus === 'Complete' || agentStatus === 'Archived') {
       // Retire (rename + keep claude alive), NOT hard-kill — so the session stays
       // attachable / re-engageable. Capacity is freed because the renamed session
       // no longer matches the slot-counted `claude-asana-<digits>` pattern.
-      retireSession(session, taskGid)
+      retireSession(session, taskGid, agentStatus)
       delete state.sessions[session]
       continue
     }

@@ -54,10 +54,26 @@ entry (the human audits and prunes it periodically — keep entries dense).
   re-cloning the master fixes it (the race re-arms on every re-sync), which is
   why this is left to the in-flight Piratechain SDK rewrite (Asana
   1214721783909451 / accountbased #1055 / gui #6021) that REPLACES this module.
-  Practical handling: it's intermittent, so just relaunch and continue — the app
-  usually runs fine for long stretches; capture the `Edge-*.ips` crash log if it
-  recurs, note it as a known product blocker (link 1215619633542395), and fall
-  back to an existing wallet. Do NOT spend the slot trying to "fix the sim."
+  Practical handling, in order:
+  1. **PRESCRIBED mitigation when the task is NOT piratechain/zcash-related and
+     the test needs wallet creation/import (or the crash recurs): disable
+     piratechain locally.** In the gui worktree edit
+     `src/util/corePlugins.ts` → `piratechain: false` (it is hardcoded `true`,
+     not ENV-gated), then relaunch the app — JS-only, Metro reload picks it up,
+     no native rebuild. Core never initializes the plugin, the background ARRR
+     scanner never starts, and the race cannot fire, while you keep edge-funds
+     and all its funding. REVERT IMMEDIATELY after the test
+     (`git checkout -- src/util/corePlugins.ts`); never commit the flip. Off
+     limits when the task under test IS piratechain/zcash (e.g. the SDK rewrite
+     chain) — there the module must run.
+  2. Lighter alternative when you don't need edge-funds' balances: switch to a
+     roster account with NO ARRR wallet — the crash fires from the logged-in
+     account's background ARRR sync, so no ARRR wallet means no trigger.
+  3. Otherwise: it's intermittent, so relaunch and continue — the app usually
+     runs fine for long stretches; capture the `Edge-*.ips` crash log if it
+     recurs, note it as a known product blocker (link 1215619633542395), and
+     fall back to an existing wallet. Do NOT spend the slot trying to "fix the
+     sim."
 - **Debug builds crash to springboard (RN Fabric SIGABRT) on two reliable
   triggers: rapid settings-row toggling, and swap-amount keypad entry.** Seen
   repeatedly on the SideShift run. Do NOT keep relaunching to grind through it —
@@ -81,8 +97,19 @@ entry (the human audits and prunes it periodically — keep entries dense).
   real funded attempt is not.
 - **High-value wallets are sanctioned funding sources.** BTC / ETH / USDC and
   similar majors (which nearly every swap provider supports) MAY be swapped FROM
-  to fund the asset a test needs. You are allowed to spend them for testing;
-  prefer the smallest amount that clears the ~$10 floor with margin.
+  to fund the asset a test needs. You are allowed to spend them for testing.
+- **Minimum-viable amounts: discover the floor FIRST, then size just above it.**
+  Applies to EVERY value-moving action — swaps, sends, sweeps. Before picking an
+  amount, find the binding floor: the provider's pair minimum (query its public
+  pair/quote endpoint, or read it out of the in-app below-limit error), the
+  network dust limit, and fee viability. Then use the smallest amount that
+  clears that floor with a 10-20% buffer for rate drift (a $10 provider floor →
+  an $11-12 test swap, NOT $20). Never start from a round convenience number —
+  discovery comes first. For sends, the bar is one confirmable transaction at
+  the minimum spendable amount; sending more proves nothing extra. One
+  value-moving action per claim being proven: do not repeat a successful
+  swap/send for extra screenshots or "to be sure". The goal is the fewest and
+  smallest balance changes that still prove the path end-to-end.
 - **Fee/slippage budget: $15 equivalent per run.** Network fees, swap fees, and
   slippage incurred while testing are budgeted operating costs, NOT losses. Spend
   up to ~$15 equivalent per task run on them without hesitation; pick swap
