@@ -439,6 +439,26 @@ function main() {
       continue
     }
 
+    if (agentStatus === 'Pending') {
+      // Operator restart: Pending on a task that still has a live session is a
+      // contradiction — Pending means "spawn fresh", and this session's existence
+      // is exactly what blocks the watcher from doing so (name collision + cap).
+      // Hard-kill (not retire: a fresh start wants the name freed), release
+      // sim/slot/Metro, and remove the worktree so the respawn starts clean.
+      log(`[${session}] agent_status=Pending with live session → operator restart; killing session and releasing resources`)
+      let slot = null
+      try { slot = slots.get(taskGid) } catch { /* slots.json unreadable */ }
+      const metroPort = slot?.metro_port ?? null
+      sh(`tmux kill-session -t "${session}"`)
+      releaseSimAndSlot(taskGid)
+      freeMetroPort(metroPort)
+      const wtRepo = fs.existsSync(path.join(WORKTREES_ROOT, taskGid))
+        ? (fs.readdirSync(path.join(WORKTREES_ROOT, taskGid))[0] || null) : null
+      if (wtRepo) sh(`"${DIR}/cleanup-task-workspace.sh" --task-gid "${taskGid}" --repo "${wtRepo}"`)
+      delete state.sessions[session]
+      continue
+    }
+
     const panePid = getPanePid(session)
     if (panePid === null) {
       log(`[${session}] could not read pane PID; skipping`)
