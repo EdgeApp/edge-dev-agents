@@ -182,3 +182,10 @@ require-test-evidence-before-pr: pr-create.sh is blocked until a proof screensho
 
 block-simctl-booted: in slot sessions (AGENT_SIM_UDID set), `simctl ... booted` is
 blocked — concurrent runs boot multiple sims and `booted` resolves arbitrarily.
+    { "type": "command", "command": "~/.config/agent-watcher/hooks/require-plan-before-developing.sh", "timeout": 10 },
+    { "type": "command", "command": "~/.config/agent-watcher/hooks/block-raw-thread-resolve.sh", "timeout": 10 },
+
+require-plan-before-developing: the Planning-to-Developing status transition is blocked
+until /tmp/plan-<gid>-*.md exists (asana-plan then attaches it to the task).
+block-raw-thread-resolve: raw resolveReviewThread graphql is blocked; threads resolve
+through pr-address/bugbot companion scripts, which reply in-thread first.

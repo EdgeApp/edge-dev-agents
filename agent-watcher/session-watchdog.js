@@ -337,6 +337,17 @@ function retireSession(session, taskGid) {
   log(`[${session}] agent_status=Complete → RETIRED as ${dest} (claude kept alive; Metro+sim+slot freed; worktree retained)`)
 }
 
+// Monitor-liveness heartbeat check: memory-monitor logs every 30s tick; a stale
+// log means the box's memory gate is blind (it once died silently for 11 hours
+// on a parse error while exiting 0). Detection only — repair is the operator's.
+function checkMonitorHeartbeat() {
+  try {
+    const st = fs.statSync('/tmp/memory-monitor.log')
+    const ageMin = (Date.now() - st.mtimeMs) / 60000
+    if (ageMin > 10) log(`[infra] memory-monitor log STALE ${Math.round(ageMin)}min — the memory gate is blind; check /tmp/memory-monitor.err`)
+  } catch { log('[infra] memory-monitor log MISSING — the memory gate is blind') }
+}
+
 // Durable release receipt: slots.json/pool.json forget a run seconds after retirement,
 // so post-hoc evals (orch-eval O1/O6) cannot otherwise verify clean resource release.
 // One small JSON per gid under STATE_DIR/releases; best-effort, never wedges the sweep.
@@ -517,6 +528,9 @@ function main() {
 
   // Enforce the worktree retention cap (keep newest N completed/retired worktrees).
   pruneRetainedWorktrees(sessions)
+
+  // Surface silent death of the memory gate (detection only).
+  checkMonitorHeartbeat()
 
   // Garbage-collect state for sessions that no longer exist
   for (const key of Object.keys(state.sessions)) {
