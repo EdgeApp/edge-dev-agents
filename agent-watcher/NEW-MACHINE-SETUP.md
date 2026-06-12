@@ -178,3 +178,7 @@ Agent sessions are gated by two PreToolUse hooks in `~/.claude/settings.json`
 block-raw-git-commit: commits must go through lint-commit.sh (--amend allowed, --no-verify never).
 require-test-evidence-before-pr: pr-create.sh is blocked until a proof screenshot
 (/tmp/agent-proof-<gid>-*.png) or a justified blocker note (/tmp/agent-test-blocker-<gid>.md) exists.
+    { "type": "command", "command": "~/.config/agent-watcher/hooks/block-simctl-booted.sh", "timeout": 10 },
+
+block-simctl-booted: in slot sessions (AGENT_SIM_UDID set), `simctl ... booted` is
+blocked — concurrent runs boot multiple sims and `booted` resolves arbitrarily.
