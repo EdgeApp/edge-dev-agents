@@ -3,12 +3,13 @@
 # this instead of re-solving it.
 # PARAMS:
 #   SUCCESS_TEXT — terminal success marker to wait for (default "Congratulations!")
-# HOW IT WORKS: the slider thumb carries testID `confirmSliderThumb` (backfilled
-# via testid-backfill-commit); an id-anchored swipe drives it. If the id is NOT
-# present on this branch (selector resolves nothing), fall back to:
+# HOW IT WORKS: the slider thumb carries testID `confirmSliderThumb` (added
+# via testids-over-coordinates); an id-anchored swipe drives it. If the id is NOT
+# present on this branch (selector resolves nothing), FIRST add the missing
+# testID per testids-over-coordinates (JS-only, Metro reload) and re-run the
+# id-anchored swipe. Only if the component is genuinely uneditable: fall back to
 #   `maestro hierarchy` → find the slider node's bounds → absolute-coordinate
-#   swipe from thumb-center to the left edge (duration ~1500ms). And then ADD the
-#   missing testID per testid-backfill-commit so the next run doesn't fall back.
+#   swipe from thumb-center to the left edge (duration ~1500ms).
 # NOTE: swipe direction is LEFT (thumb starts at right edge in this design).
 appId: ${APP_ID}
 env:
