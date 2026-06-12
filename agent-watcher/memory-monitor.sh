@@ -41,14 +41,17 @@ FREE_B=$(vmstat_pages "Pages free")
 COMPRESSOR_B=$(vmstat_pages "Pages occupied by compressor")
 PURGEABLE_B=$(vmstat_pages "Pages purgeable")
 
-# Parse swap "used = 0.00M" → bytes
+# Parse swap "used = 0.00M" → bytes. printf %.0f, NOT print: awk's default OFMT
+# renders large non-integers in e-notation (1.26G → 1.26261e+09), which bash
+# arithmetic cannot parse — that silently killed every tick for 11 hours once
+# swap crossed 1G.
 SWAP_USED_B=$(sysctl -n vm.swapusage | awk -F'used = ' '{print $2}' | awk '{
   v = $1; unit = substr(v, length(v))
   num = substr(v, 1, length(v)-1) + 0
-  if (unit == "M") print num * 1024 * 1024
-  else if (unit == "G") print num * 1024 * 1024 * 1024
-  else if (unit == "K") print num * 1024
-  else print num
+  if (unit == "M") printf "%.0f", num * 1024 * 1024
+  else if (unit == "G") printf "%.0f", num * 1024 * 1024 * 1024
+  else if (unit == "K") printf "%.0f", num * 1024
+  else printf "%.0f", num
 }')
 
 AVAIL_B=$(( FREE_B + PURGEABLE_B ))
@@ -65,12 +68,16 @@ WARN_COMP=2500
 
 LEVEL="green"
 REASON=""
-if [[ "$AVAIL_P" -lt "$CRIT_AVAIL" ]] || [[ "$COMP_P" -gt "$CRIT_COMP" ]] || [[ "$SWAP_USED_B" -gt 0 ]]; then
+# Swap-in-use alone is a WARN signal, not critical: the box held "critical" for
+# hours with 57-70GB available because 1.3GB of swap lingered. Critical requires
+# genuinely low availability or a swamped compressor; swap escalates to critical
+# only when availability is ALSO below the warn floor.
+if [[ "$AVAIL_P" -lt "$CRIT_AVAIL" ]] || [[ "$COMP_P" -gt "$CRIT_COMP" ]] || { [[ "$SWAP_USED_B" -gt 0 ]] && [[ "$AVAIL_P" -lt "$WARN_AVAIL" ]]; }; then
   LEVEL="critical"
   REASON="avail=$((AVAIL_B/1024/1024/1024))GB comp=$((COMPRESSOR_B/1024/1024/1024))GB swap=$((SWAP_USED_B/1024/1024))MB"
-elif [[ "$AVAIL_P" -lt "$WARN_AVAIL" ]] || [[ "$COMP_P" -gt "$WARN_COMP" ]]; then
+elif [[ "$AVAIL_P" -lt "$WARN_AVAIL" ]] || [[ "$COMP_P" -gt "$WARN_COMP" ]] || [[ "$SWAP_USED_B" -gt 0 ]]; then
   LEVEL="warn"
-  REASON="avail=$((AVAIL_B/1024/1024/1024))GB comp=$((COMPRESSOR_B/1024/1024/1024))GB"
+  REASON="avail=$((AVAIL_B/1024/1024/1024))GB comp=$((COMPRESSOR_B/1024/1024/1024))GB swap=$((SWAP_USED_B/1024/1024))MB"
 fi
 
 # Top 3 RSS consumers — useful for both alerts and the log
