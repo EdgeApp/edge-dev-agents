@@ -249,7 +249,7 @@ if (
   templateSectionCounts.description > 1
 ) {
   console.error(
-    "ERROR: PR body contains duplicated template sections. Regenerate /tmp/pr-body.md and retry."
+    "ERROR: PR body contains duplicated template sections. Regenerate your body file and retry."
   );
   console.error(JSON.stringify(templateSectionCounts));
   process.exit(1);

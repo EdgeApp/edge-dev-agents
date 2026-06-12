@@ -56,12 +56,12 @@ If Asana context is available from chat or fetched via `--asana-task`, add it in
 </step>
 
 <step id="4" name="Create PR">
-Write body to `/tmp/pr-body.md`, then run:
+Write body to `/tmp/pr-body-<task-gid>.md` (gid-scoped — a shared `/tmp/pr-body.md` was clobbered by a concurrent slot mid-run; use the PID if no gid exists), then run:
 
 ```bash
 ~/.cursor/skills/pr-create/scripts/pr-create.sh \
   --title "<title>" \
-  --body-file /tmp/pr-body.md \
+  --body-file /tmp/pr-body-<task-gid>.md \
   [--asana-task <task_gid>]
 ```
 

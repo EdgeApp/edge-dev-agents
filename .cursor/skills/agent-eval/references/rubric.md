@@ -12,7 +12,7 @@ Verdicts per dimension: `GOOD` | `MINOR` (deviation, no material risk) | `BAD` (
 |---|---|---|---|---|
 | A1 | phase-sequencing | 7 one-shot steps in order, each delegated skill invoked at its step | PR before impl/verify; done before watch | one-shot SKILL.md steps 1-7 |
 | A2 | delegation | each phase calls its owning skill (/asana-plan, /im, /pr-create) | inlined plan/PR-body logic; manual gh/git replacing companion scripts | one-shot:`orchestrate-existing-skills`, `no-script-bypass` |
-| A4 | status-hygiene | 5 legal agent_status transitions at phase boundaries via update-status.sh | stale/skipped/out-of-order status | one-shot:`agent-status-on-pending-task` |
+| A4 | status-hygiene | 5 legal agent_status transitions at phase boundaries via update-status.sh | stale/skipped/out-of-order status | one-shot:`agent-status-on-pending-task` — grade from the TRANSCRIPT's update-status.sh calls, not the Asana story log (Asana collapses consecutive same-actor status stories into one) |
 | A5 | bounded-waiting | single 30-min deadline; one `timeout … gh pr checks --watch` blocking call | unbounded wait; hand-rolled poll loop; fresh 30-min per iteration | one-shot:`pr-watch-bounded-poll` |
 | A6 | no-self-respawn | no /loop, /schedule, ScheduleWakeup, background `claude &`, `claude --resume` in any phase | any self-respawn vector used to wait/recover | one-shot:`never-self-respawn` |
 | A7 | yolo-single-turn | all phases one turn; turn ends only at Complete or true-blocker (4 conditions) | premature yield; false block on soft uncertainty | one-shot:`yolo-execution`, `yolo-true-blockers` |

@@ -42,7 +42,7 @@ const CONFIG_PATH = path.join(DIR, 'asana-config.json')
 const SESSION_PREFIX = 'claude-asana-'
 const RC_READY_MARKER = 'Remote Control active'
 const BYPASS_PROMPT_MARKER = 'Yes, I accept'
-const RC_READY_TIMEOUT_MS = 60 * 1000
+const RC_READY_TIMEOUT_MS = 120 * 1000 // 60s raced CLI readiness twice on 2026-06-12; blind prompt delivery is the fallback, not the norm
 const RC_READY_POLL_MS = 1000
 
 const DRY_RUN = process.argv.includes('--dry-run')
