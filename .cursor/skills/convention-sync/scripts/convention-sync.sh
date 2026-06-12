@@ -263,6 +263,22 @@ last_commit_short() {
   git -C "$REPO_DIR" log -1 --format='%h %s' -- "$1" 2>/dev/null || true
 }
 
+# repo-to-user newer-local protection: true when the LOCAL copy was modified
+# after the repo file's last commit — copying (or deleting) would clobber
+# unpushed local work. mtime-vs-mtime is wrong here (a fresh `git pull` stamps
+# repo files with checkout time), so compare local mtime vs repo COMMIT time.
+# --force disables the protection. Skipped files are reported in skippedNewer.
+skipped_newer_json="[]"
+local_is_newer() {  # $1 = local abs path, $2 = repo path relative to REPO_DIR
+  [[ "$FORCE_WARN" == true ]] && return 1
+  [[ -f "$1" ]] || return 1
+  local lts cts
+  lts=$(stat -f %m "$1" 2>/dev/null || echo 0)
+  cts="$(last_commit_ts "$2")"
+  [[ -n "$cts" ]] || cts=0
+  (( lts > cts ))
+}
+
 add_warning() {
   warnings_json=$(echo "$warnings_json" | jq \
     --arg f "$1" --arg k "$2" --arg c "$3" \
@@ -406,6 +422,18 @@ process_extra_reverse() {
     for pat in "${expats[@]+"${expats[@]}"}"; do [[ -n "$pat" ]] && exargs+=( "--exclude=$pat" ); done
     if [[ "$mode" == "stage" ]]; then
       mkdir -p "$src"
+      # newer-local protection (see local_is_newer): exclude files whose local
+      # copy postdates the repo file's last commit, report them in skippedNewer.
+      while IFS= read -r line; do
+        [[ -z "$line" || "$line" == */ ]] && continue
+        case "$line" in
+          "sending "*|"sent "*|"total "*|"created "*|"building "*|"delta"*|"Transfer "*|"transferred "*|"deleting "*|"deleting"|"."|"./") continue ;;
+        esac
+        if local_is_newer "$src/$line" "$dest/$line"; then
+          exargs+=( "--exclude=/$line" )
+          skipped_newer_json=$(echo "$skipped_newer_json" | jq --arg f "$dest/$line" '. + [$f]')
+        fi
+      done < <(rsync -rlptc -n -v "${exargs[@]}" "$destpath/" "$src/" 2>/dev/null)
       rsync -rlptc "${exargs[@]}" "$destpath/" "$src/" >/dev/null
     else
       while IFS= read -r line; do
@@ -637,8 +665,14 @@ if [[ "$DO_STAGE" == true ]] && (( total + extra_total > 0 )); then
     while IFS= read -r f; do
       [[ -z "$f" ]] && continue
       if [[ "$f" == "README.md" ]]; then
+        if local_is_newer "$USER_DIR/$f" "$f"; then
+          skipped_newer_json=$(echo "$skipped_newer_json" | jq --arg f "$f" '. + [$f]'); continue
+        fi
         cp "$REPO_DIR/$f" "$USER_DIR/$f"
       else
+        if local_is_newer "$USER_DIR/$f" ".cursor/$f"; then
+          skipped_newer_json=$(echo "$skipped_newer_json" | jq --arg f "$f" '. + [$f]'); continue
+        fi
         mkdir -p "$(dirname "$USER_DIR/$f")"
         cp "$REPO_CURSOR/$f" "$USER_DIR/$f"
       fi
@@ -646,6 +680,9 @@ if [[ "$DO_STAGE" == true ]] && (( total + extra_total > 0 )); then
 
     while IFS= read -r f; do
       [[ -z "$f" ]] && continue
+      if local_is_newer "$USER_DIR/$f" ".cursor/$f"; then
+        skipped_newer_json=$(echo "$skipped_newer_json" | jq --arg f "$f" '. + [$f]'); continue
+      fi
       rm -f "$USER_DIR/$f"
     done <<< "$all_del"
 
@@ -666,6 +703,7 @@ jq -n \
   --argjson extraTotal "${extra_total:-0}" \
   --argjson originAhead "$ORIGIN_AHEAD" \
   --arg originBranch "$ORIGIN_BRANCH" \
+  --argjson skippedNewer "$skipped_newer_json" \
   --arg staged "$DO_STAGE" \
   --arg committed "$DO_COMMIT" \
-  '{repoDir: $repoDir, originBranch: $originBranch, originAhead: $originAhead, total: $total, new: $new, modified: $modified, deleted: $deleted, ignored: $ignored, warnings: $warnings, extra: $extra, extraTotal: $extraTotal, staged: ($staged == "true"), committed: ($committed == "true")}'
+  '{repoDir: $repoDir, originBranch: $originBranch, originAhead: $originAhead, total: $total, new: $new, modified: $modified, deleted: $deleted, ignored: $ignored, warnings: $warnings, extra: $extra, extraTotal: $extraTotal, skippedNewer: $skippedNewer, staged: ($staged == "true"), committed: ($committed == "true")}'
