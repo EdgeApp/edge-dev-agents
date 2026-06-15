@@ -14,6 +14,13 @@
 # Exit codes mirror coreutils: 124 on timeout, else the command's own exit code.
 set -uo pipefail
 
+# Guard against being SOURCED (meant to be exec'd on PATH as `timeout`). A sourced
+# `exit` would abort the caller's interactive/script shell; if sourced, no-op out.
+if (return 0 2>/dev/null); then
+  echo "timeout.sh: source-d, not exec'd — run it as a command ('timeout <s> <cmd>'); ignoring." >&2
+  return 0 2>/dev/null || true
+fi
+
 # Prefer a real implementation if one is on PATH (but never recurse into ourselves).
 self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 for real in gtimeout timeout; do

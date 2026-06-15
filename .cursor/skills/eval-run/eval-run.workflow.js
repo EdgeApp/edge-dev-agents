@@ -17,6 +17,10 @@ if (typeof input === 'string') { try { input = JSON.parse(input) } catch (e) { i
 const sharedLogs = (input && input.logs) || null
 const manifests = ((input && input.manifests) || []).map(m => ({ ...m, logs: m.logs || sharedLogs }))
 const runDate = (input && input.runDate) || 'unknown-date'
+// optional model override for all evaluator/verifier/synthesis agents (e.g. 'opus');
+// omitted → agents inherit the session model
+const MODEL = ['sonnet', 'opus', 'haiku', 'fable'].includes(input && input.model) ? input.model : undefined
+const MOPT = MODEL ? { model: MODEL } : {}
 if (!manifests.length) return { error: 'no manifests passed in args.manifests' }
 
 const evaluable = manifests.filter(m => !m.in_flight && m.transcript)
@@ -43,6 +47,7 @@ const FINDINGS_SCHEMA = {
       },
     },
     infra_issues: { type: 'array', items: { type: 'string' } },
+    playbook_proposals: { type: 'array', items: { type: 'string' } },
     notes: { type: 'string' },
   },
 }
@@ -67,8 +72,8 @@ const evalPrompt = (skill, m) =>
 const results = await pipeline(
   evaluable,
   m => parallel([
-    () => agent(evalPrompt('agent-eval', m), { label: `agent-eval:${m.gid}`, phase: 'Evaluate', schema: FINDINGS_SCHEMA }),
-    () => agent(evalPrompt('orch-eval', m), { label: `orch-eval:${m.gid}`, phase: 'Evaluate', schema: FINDINGS_SCHEMA }),
+    () => agent(evalPrompt('agent-eval', m), { label: `agent-eval:${m.gid}`, phase: 'Evaluate', schema: FINDINGS_SCHEMA, ...MOPT }),
+    () => agent(evalPrompt('orch-eval', m), { label: `orch-eval:${m.gid}`, phase: 'Evaluate', schema: FINDINGS_SCHEMA, ...MOPT }),
   ]),
   async (pair, m) => {
     const [agentF, orchF] = pair
@@ -80,7 +85,7 @@ const results = await pipeline(
         `Re-open the citation yourself and try to REFUTE it. Default to refuted=true if the evidence does not hold up ` +
         `or the citation cannot be opened.\nDimension: ${b.id}\nClaim: ${b.evidence}\nCitation: ${b.citation || 'none given'}\n` +
         `Manifest: ${JSON.stringify(m)}`,
-        { label: `verify:${m.gid}:${b.id}`, phase: 'Verify', schema: VERDICT_SCHEMA }
+        { label: `verify:${m.gid}:${b.id}`, phase: 'Verify', schema: VERDICT_SCHEMA, ...MOPT }
       ).then(v => ({ ...b, refuted: v ? v.refuted : true, verify_reason: v ? v.reason : 'verifier died' }))
     ))
     const confirmed = verified.filter(Boolean).filter(v => !v.refuted)
@@ -101,6 +106,7 @@ const results = await pipeline(
       dimensions: finalDims,
       not_captured: notCaptured,
       infra_issues: [...((agentF && agentF.infra_issues) || []), ...((orchF && orchF.infra_issues) || [])],
+      playbook_proposals: [...((agentF && agentF.playbook_proposals) || []), ...((orchF && orchF.playbook_proposals) || [])],
       notes: [agentF && agentF.notes, orchF && orchF.notes].filter(Boolean).join(' | '),
     }
   }
@@ -116,8 +122,14 @@ const cohort = await agent(
   `Structure: 1) verdict summary table (gid, task, verdict, gate failures, confirmed-BAD count, coverage gaps); ` +
   `2) confirmed findings grouped by dimension WITH citations, so recurring patterns across runs are visible; ` +
   `3) infra issues (substrate, not per-run); 4) coverage gaps (NOT_CAPTURED patterns — note O1/O6 expected until capture hook ships); ` +
-  `5) recommended skill/infra fixes ranked by recurrence. Return ONLY the markdown.`,
-  { label: 'cohort-report', phase: 'Synthesize' }
+  `5) recommended skill/infra fixes ranked by recurrence; ` +
+  `6) "## Actions" — EVERY finding that admits a concrete remediation, as a checklist of typed, ready-to-execute DRAFTS the operator can approve row-by-row (the eval itself mutates nothing). Types and required content: ` +
+  `[field-correction] the exact \`~/.config/agent-watcher/set-tested.sh <gid> "<Option>" ...\` command with the evidence line justifying it; ` +
+  `[re-run] the task gid + the specific DoD gap and terminal bar for its followup comment (the operator stamps it from eval-run references/followup-comment-template.md) + \`~/.config/agent-watcher/update-status.sh <gid> Pending\`; ` +
+  `[playbook-proposal] each collected playbook_proposals bullet verbatim with its source run, ready for operator promotion to the sim-testing playbook; ` +
+  `[skill-gap] the target skill/rule and one-line fix for /author; [infra-fix] the component and change. ` +
+  `Derive actions ONLY from findings present above (no inventions); omit types with no instances. Return ONLY the markdown.`,
+  { label: 'cohort-report', phase: 'Synthesize', ...MOPT }
 )
 
 return { runDate, runs, skipped, cohortReport: cohort }

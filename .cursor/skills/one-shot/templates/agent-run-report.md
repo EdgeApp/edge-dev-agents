@@ -65,7 +65,17 @@ _None observed._
        [build]  how to build/prepare/install for this work, what was actually needed
        [test]   how to verify this area, preconditions, what a real test run requires
        [debug]  debugging method that worked (e.g. CDP/debugger usage)
-       [gotcha] surprising behavior, footgun, non-obvious constraint -->
+       [gotcha] surprising behavior, footgun, non-obvious constraint
+       [playbook] PROPOSED sim-testing-playbook entry. SCOPE TIGHTLY (per
+                build-and-test maestro-flows-are-shortcuts): only SIM-TESTING
+                working knowledge (how to drive/fund/enable/verify a change in the
+                running app) that is a stable external fact AND parallel-safe (no
+                fixed-port/shared-resource recipe — propose the slot-safe variant or
+                a warning). NOT for orchestration/watchdog/eval-tooling concerns or
+                one-off specifics — those go in Orchestration Issues / Skill Gaps.
+                Write the entry text ready to promote. NEVER edit the playbook
+                directly; the operator reviews and promotes (collected by
+                /agent-eval). -->
 _None observed._
 
 ## Orchestration Issues

@@ -32,7 +32,7 @@ Arguments are classified automatically:
 <rules description="Non-negotiable constraints.">
 <rule id="scripts-only">All GitHub API calls go through companion scripts that use `gh` CLI internally. Do NOT call `gh` or `curl` directly for GitHub operations — use the scripts.</rule>
 <rule id="gh-auth">If a script exits code 2 with `PROMPT_GH_AUTH`, prompt the user to run `gh auth login`.</rule>
-<rule id="code-conflicts">Code conflicts → Skip PR. Abort the rebase to leave the repo clean, continue with remaining PRs. Report all skipped PRs at the end.</rule>
+<rule id="code-conflicts">Code (non-CHANGELOG) conflicts → ATTEMPT semantic resolution when confidently determinable; the prepare/merge scripts leave the rebase IN PROGRESS (no auto-abort) so you resolve in place. "Confidently determinable" = the two sides have independent intent you can preserve without guessing: dependency/version bumps, lockfile regeneration, accepting an upstream file deletion, non-overlapping edits. To resolve: read each conflicted file, edit to keep BOTH sides' intent (the upstream change AND our change), regenerate lockfiles via the repo's package manager if deps changed (`npm install` or `yarn install` per the repo's lockfile), `git add <files> && GIT_EDITOR=true git rebase --continue`, then re-run the script to verify (re-verification catches any follow-on issue, e.g. a formatting fix needed via `eslint --fix`). SKIP only when resolution is NOT confidently determinable — overlapping logic in the same function, unclear semantic intent, or you would be guessing: `git rebase --abort`, continue with remaining PRs, report. Never guess at a merge. CHANGELOG conflicts keep their `changelog-conflicts` handling.</rule>
 <rule id="stale-prs">Stale PRs → Skip and report. Old PRs with multiple conflicts should be skipped like code conflicts. Don't block the flow.</rule>
 <rule id="changelog-conflicts">CHANGELOG conflicts (any section, including staging): Agent resolves semantically, scripts verify the result.</rule>
 <rule id="verification">Verification is mandatory. Built into scripts, no bypass.</rule>
@@ -67,7 +67,7 @@ Arguments are classified automatically:
 | `git-branch-ops.sh` | Success | Error | - | - | - |
 | `pr-land-prepare.sh` | Ready | All failed | - | - | - |
 | `verify-repo.sh` | Pass | Code fail | CHANGELOG fail | - | - |
-| `pr-land-merge.sh` | Merged | Verify fail | - | - | CHANGELOG conflict |
+| `pr-land-merge.sh` | Merged | Verify fail | - | - | Conflict needs resolution (CHANGELOG or code) |
 | `staging-cherry-pick.sh` | All cherry-picked | Error | Auth needed | CHANGELOG conflict | - |
 | `pr-land-publish.sh` | Ready (needs push) | Verify fail | No unreleased | - | - |
 | `asana-task-update.sh` | Success | Error | Needs user input | - | - |
@@ -80,7 +80,7 @@ Arguments are classified automatically:
 |----------|---------|-------------------|
 | `ready` | Prepared + verified | Proceed to push (step 4). Check `placementWarnings` first. |
 | `changelog_conflict` | CHANGELOG-only rebase conflict, left in progress | Resolve semantically, `git add CHANGELOG.md && GIT_EDITOR=true git rebase --continue`, re-run prepare. |
-| `code_conflict` | Code-file rebase conflict, rebase aborted | SKIP this PR; report `conflictFiles` to user. Do not resolve code conflicts autonomously. |
+| `code_conflict` | Code-file rebase conflict, rebase LEFT IN PROGRESS | Resolve semantically in place when confidently determinable (dep/version bumps, lockfile regen, accept upstream deletion, non-overlapping edits): keep both sides' intent, regenerate lockfiles if deps changed, `git add` + `GIT_EDITOR=true git rebase --continue`, re-run prepare. `git rebase --abort` + skip ONLY if not confidently resolvable. See `code-conflicts`. |
 | `verification_failed` | verify-repo.sh failed | Read `failedStep` + `logPath` from the JSON; inspect the log tail (`tail -40 <logPath>`); fix only if trivially in-scope, else report. Special case `failedStep: "CHANGELOG entry existence check"` — prepare REQUIRES every landed PR to have updated CHANGELOG.md: add a correctly-formatted entry for the PR's change (under `## Unreleased`, or the topmost version section in legacy versions-only repos), amend it onto the branch, and re-run prepare. Only if an entry is genuinely unwarranted (e.g. CI-only change), ask the user whether to land without one. |
 | `install_failed` | Dependency install failed | Report; usually environmental. Do not retry blindly. |
 | `autosquash_failed` | Fixup autosquash rebase failed (aborted) | Report; branch likely needs manual history repair. |
@@ -162,10 +162,10 @@ echo '[{"repo":"...","branch":"<prefix>/feature"}]' | ~/.cursor/skills/pr-land/s
 The prepare script handles: clone/checkout, autosquash fixups, rebase onto upstream (the repo's actual default branch via origin/HEAD; `origin/develop` for the GUI), conflict detection, and verification. It operates on the PRIMARY checkout at `~/git/<repo>` — not a scratch clone — so in-progress local work there is auto-stashed per `dirty-tree-policy`. Per-PR outcomes are the `status` values in `<prepare-statuses>`; act on each as prescribed there.
 
 **Exit codes:**
-- `0` = At least one PR ready to push (skipped PRs reported in JSON output)
-- `1` = All PRs failed (verification or other errors, none ready)
+- `0` = At least one PR ready to push, OR a resolvable conflict (code/CHANGELOG) was left in progress (reported in `codeConflicts` / `changelogConflicts`)
+- `1` = All PRs failed (verification or other errors, none ready or resolvable)
 
-<sub-step name="On code conflict">PR is skipped and reported in the `skipped` array. Rebase is aborted to leave repo clean. Other PRs continue.</sub-step>
+<sub-step name="On code conflict">The rebase is LEFT IN PROGRESS (status `code_conflict`, reported in `codeConflicts`). Resolve per the `code-conflicts` rule: if confidently determinable, edit each conflicted file to keep both sides' intent, regenerate lockfiles if deps changed, `git add` + `GIT_EDITOR=true git rebase --continue`, then re-run prepare to verify. If NOT confidently resolvable, `git rebase --abort` and skip, continuing with other PRs.</sub-step>
 
 <sub-step name="On CHANGELOG conflict">Agent resolves semantically (upstream entries first, then ours), then re-runs prepare.</sub-step>
 
@@ -219,9 +219,9 @@ The merge script processes PRs **sequentially** with automatic rebase-before-mer
 **Exit codes:**
 - `0` = All (non-skipped) PRs merged
 - `1` = Verification failed
-- `4` = CHANGELOG-only conflict (agent resolves, re-runs)
+- `4` = Conflict needs resolution (rebase left in progress) — CHANGELOG-only OR code
 
-**On exit 4:** Agent resolves semantically, pushes, re-runs merge. Script detects already-merged PRs and skips them.
+**On exit 4:** Resolve per the conflict type (CHANGELOG → `changelog-conflicts`; code → `code-conflicts`, only if confidently determinable, else `git rebase --abort` and skip), push `--force-with-lease`, re-run merge. Script detects already-merged PRs and skips them.
 </step>
 
 <step id="6" name="Publish">
@@ -423,7 +423,7 @@ Not published (outstanding PRs):
 
 | Conflict Type | Script Behavior | Agent Action |
 |---|---|---|
-| Code files | Skip PR, abort rebase, continue | Report to user at end |
+| Code files | Rebase left in progress | Resolve semantically when determinable (keep both sides, regen lockfiles), `git rebase --continue`, re-run; `git rebase --abort` + skip only if not determinable |
 | CHANGELOG only (prepare) | Report conflict | Resolve semantically, re-run prepare |
 | CHANGELOG only (merge) | **exit 4** with instructions | Resolve semantically, push, re-run merge |
 
@@ -469,8 +469,21 @@ Both prepare and merge scripts can detect CHANGELOG-only conflicts. In either ca
 Verification checks: no conflict markers remaining, proper entry format (`- type: description`), no malformed entries. If verification fails after resolution, the script prompts the user.
 </changelog-resolution>
 
+<code-conflict-resolution description="How the agent resolves a code (non-CHANGELOG) conflict left in progress by prepare/merge. Governed by the `code-conflicts` rule: resolve only when confidently determinable, else abort + skip.">
+The rebase is paused with markers in the conflicted files. Decide FIRST whether the conflict is confidently resolvable (both sides have independent intent you can preserve) or a guess (overlapping logic in the same function). If a guess → `git -C <repoDir> rebase --abort` and skip the PR.
+
+If resolvable, for EACH conflicted file:
+1. Read it and resolve the markers so BOTH sides' intent survives. Common determinable shapes:
+   - **Dependency / version bump vs our removal/edit**: take the upstream version pin AND apply our add/remove. (e.g. keep upstream's bumped `rollup`, drop the package our branch removed.)
+   - **Upstream deleted a file we modified** (or vice versa): take the deletion when it is intentional upstream (e.g. a lockfile dropped in a yarn→npm conversion) — `git rm <file>`.
+   - **Non-overlapping edits in the same file**: keep both hunks.
+2. If `package.json` dependencies changed, regenerate the lockfile so it matches: `npm install` (npm repos) or `yarn install` (yarn repos) — never hand-merge a lockfile. Stage the regenerated lockfile.
+3. `git -C <repoDir> add <files> && GIT_EDITOR=true git -C <repoDir> rebase --continue`
+4. Re-run the script (`pr-land-prepare.sh` / `pr-land-merge.sh`). Re-verification is mandatory and catches follow-on issues a resolution can introduce (e.g. a removed import leaving a formatting violation → fix with `eslint --fix` on the file, amend, re-run).
+</code-conflict-resolution>
+
 <safety-guarantees>
-1. Code conflicts skip cleanly — scripts abort rebase and skip, no dirty state
+1. Code conflicts resolve or skip cleanly — scripts leave the rebase in progress for semantic resolution when determinable; the agent aborts + skips (no dirty state) only when not confidently resolvable
 2. CHANGELOG conflicts are scripted — agent resolves semantically (any section including staging), verification validates
 3. Verification is mandatory — built into merge script, physically blocks merge on failure
 4. Pre-merge is safe — can force-push as many times as needed

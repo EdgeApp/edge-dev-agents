@@ -81,11 +81,14 @@ check_once() {
     fi
   done <<< "$counts"
 
-  # Brief settle, then report residual so a persistent seed shows up across ticks.
+  # Brief settle, then ALWAYS report residual (including total=0) — this heartbeat is
+  # O2's primary evidence that the guard RAN and saw the process tree under cap. The
+  # old `> 0`-only line meant a clean box wrote nothing, so the log never existed and
+  # orch-eval had no positive liveness signal (the 2026-06-15 audit blanked O2).
   sleep 1
   local remaining
   remaining=$(ps -axo comm 2>/dev/null | grep -c '^cli$')
-  (( remaining > 0 )) && echo "$(ts) post-tick cli total=$remaining" >> "$LOG"
+  echo "$(ts) post-tick cli total=$remaining (cap=$THRESHOLD)" >> "$LOG"
 }
 
 if [[ "${1:-}" == "--once" ]]; then

@@ -29,6 +29,12 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$PR" ] || { echo "usage: watch-pr.sh --pr <num> ..." >&2; exit 2; }
 command -v gh >/dev/null || { echo "ERROR: gh not found" >&2; exit 2; }
+# Without --repo, gh resolves the repo from cwd; from ~/git (not a repo) it prints
+# "fatal: not a git repository" and the watch silently no-ops. Fail loudly instead.
+if [ -z "$REPO" ] && ! git -C "$PWD" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "ERROR: not in a git repo and no --repo given — pass --repo <owner/name> or run from the PR's worktree" >&2
+  exit 2
+fi
 command -v timeout >/dev/null || { echo "ERROR: timeout not on PATH (shim: ~/.cursor/skills/timeout.sh)" >&2; exit 2; }
 
 # Deadline is per task (falls back to per PR for ad-hoc use), shared across calls.

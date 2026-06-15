@@ -98,21 +98,27 @@ function getKeepCompletedSessions() {
   return _keepCompletedSessions
 }
 
-// One fetch → both agent_status and blocked (both enum custom fields).
+// One fetch → both agent_status and blocked (both enum custom fields). `ok`
+// distinguishes a CONFIRMED read from a transient failure: a failed fetch
+// returns blocked:null, which is indistinguishable from "not blocked" and would
+// otherwise let the revive guard ping a session that is actually blocked/parked
+// (observed 2026-06-13/15: a blocked task got revived on the tick its fetch
+// blipped to null, then re-froze the next tick). Callers that take a HARMFUL
+// action on the absence of a state (revive) MUST gate on `ok`.
 function fetchTaskState(taskGid) {
   const token = getAsanaToken()
   const statusGid = getStatusFieldGid()
-  if (!token || !statusGid) return { agentStatus: null, blocked: null }
+  if (!token || !statusGid) return { agentStatus: null, blocked: null, ok: false }
   const blockedGid = getBlockedFieldGid()
   const out = sh(`curl -sS -H "Authorization: Bearer ${token}" "https://app.asana.com/api/1.0/tasks/${taskGid}?opt_fields=custom_fields.gid,custom_fields.enum_value.name"`)
-  if (!out) return { agentStatus: null, blocked: null }
+  if (!out) return { agentStatus: null, blocked: null, ok: false }
   try {
     const parsed = JSON.parse(out)
     const cfs = parsed.data?.custom_fields || []
     const agentStatus = cfs.find((f) => f.gid === statusGid)?.enum_value?.name || null
     const blocked = blockedGid ? (cfs.find((f) => f.gid === blockedGid)?.enum_value?.name || null) : null
-    return { agentStatus, blocked }
-  } catch { return { agentStatus: null, blocked: null } }
+    return { agentStatus, blocked, ok: true }
+  } catch { return { agentStatus: null, blocked: null, ok: false } }
 }
 
 function sh(cmd) {
@@ -134,6 +140,18 @@ function listTargetSessions() {
 
 function capturePane(session) {
   return sh(`tmux capture-pane -t "${session}" -p`)
+}
+
+// True when the pane is parked at an interactive prompt awaiting a human CHOICE
+// (permission/tool-approval dialog, trust prompt, numbered selection menu). Such a
+// prompt makes the pane go STATIC — indistinguishable from "hung" by the idle
+// heuristic — but reviving it is harmful: the revive keystrokes (ping+Enter,
+// /remote-control+Enter, Esc) answer the dialog blindly. The normal idle composer
+// ("❯ " with an empty input line) is NOT a choice prompt and must not match here.
+function paneAwaitingChoice(content) {
+  return /❯\s+\d+\.\s/.test(content)                                  // selected numbered menu option (❯ 1. …)
+    || /\bNo, and tell Claude\b/i.test(content)                       // distinctive permission-prompt option text
+    || /\bDo you want to (proceed|continue|create|trust|allow|make)\b/i.test(content) // dialog header
 }
 
 function getPanePid(session) {
@@ -462,7 +480,7 @@ function main() {
     // Completion sweep: if Asana shows a terminal agent_status (Complete, or the
     // operator-only Archived), retire the session.
     const taskGid = session.slice(SESSION_PREFIX.length)
-    const { agentStatus, blocked } = fetchTaskState(taskGid)
+    const { agentStatus, blocked, ok: stateOk } = fetchTaskState(taskGid)
     if (agentStatus === 'Complete' || agentStatus === 'Archived') {
       // Retire (rename + keep claude alive), NOT hard-kill — so the session stays
       // attachable / re-engageable. Capacity is freed because the renamed session
@@ -522,7 +540,18 @@ function main() {
 
     const changed = !prior || prior.lastContent !== content
     let lastChange = changed ? now : prior.lastChange
-    if (!changed && !rcUp && now - prior.lastChange > IDLE_THRESHOLD_MS) {
+    // Never revive a session that is DELIBERATELY idle waiting on a human: a blocked
+    // task, or one parked at an interactive choice prompt. The revive keystrokes
+    // (ping + /remote-control + Esc) would answer the dialog blindly. Both make the
+    // pane static, so the idle heuristic alone cannot tell them from a hang.
+    const awaitingChoice = paneAwaitingChoice(content)
+    if (awaitingChoice && !changed && now - (prior?.lastChange ?? now) > IDLE_THRESHOLD_MS) {
+      log(`[${session}] parked at an interactive prompt — NOT reviving (needs a human choice).`)
+    }
+    if (stateOk && !isBlocked && !awaitingChoice && !changed && !rcUp && now - prior.lastChange > IDLE_THRESHOLD_MS) {
+      // Require stateOk: never revive on an UNCONFIRMED status. A transient Asana
+      // fetch failure returns blocked:null (=> isBlocked false); without this gate a
+      // blocked/parked session gets pinged on the blip tick (the 2026-06-15 regression).
       // Pure indicator: revive ONLY when the pane reports the RC bridge is DOWN and
       // the session has been idle past the threshold. When the indicator says UP,
       // NEVER ping — a half-open bridge (indicator up but actually unreachable) is
@@ -535,7 +564,9 @@ function main() {
       attemptRcRevive(session)
       lastChange = now // reset so we don't re-fire until the pane settles
     }
-    state.sessions[session] = { lastContent: content, lastChange, heavyFreed: isBlocked }
+    // On an unconfirmed fetch, preserve the prior heavyFreed rather than letting a
+    // null-blocked blip reset it to false and re-free next tick.
+    state.sessions[session] = { lastContent: content, lastChange, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false) }
   }
 
   // Un-retire any completed session a human re-engaged for followup (status moved off

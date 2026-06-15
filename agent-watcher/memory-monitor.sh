@@ -87,7 +87,10 @@ TOP3=$(ps -axro rss,comm 2>/dev/null | sort -k1 -nr | head -3 | awk '{
 }' | tr '\n' ' ')
 
 PREV_LEVEL=$(cat "$STATE_FILE" 2>/dev/null || echo "green")
-TS=$(date '+%H:%M:%S')
+# UTC ISO-8601: self-dating (the old HH:MM:SS-only line was unrecoverable post-hoc
+# once the window aged out) AND UTC, so eval correlation no longer needs a manual
+# PDT→UTC offset against the watchdog/manifest timestamps.
+TS=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 echo "$TS level=$LEVEL avail=$((AVAIL_B/1024/1024/1024))GB comp=$((COMPRESSOR_B/1024/1024/1024))GB swap=$((SWAP_USED_B/1024/1024))MB top3=[$TOP3]" >> "$LOG_FILE"
 

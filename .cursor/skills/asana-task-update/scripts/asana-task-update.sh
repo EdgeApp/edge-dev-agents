@@ -215,6 +215,15 @@ if $DO_ATTACH_FILE; then
     echo "Error: --attach-file path not found: $ATTACH_FILE_PATH" >&2
     exit 1
   fi
+  # Dedupe: a double-invoke (or a retry) must not create a duplicate attachment.
+  # If an attachment with the same name already exists on the task, skip the upload.
+  DEDUPE_NAME="${ATTACH_FILE_NAME:-$(basename "$ATTACH_FILE_PATH")}"
+  EXISTING_ATTACH=$(curl -sf "$ASANA_API/tasks/$TASK_GID/attachments?opt_fields=name" \
+      -H "Authorization: Bearer $ASANA_TOKEN" 2>/dev/null \
+      | jq -r --arg n "$DEDUPE_NAME" '.data[]? | select(.name == $n) | .name' 2>/dev/null | head -1)
+  if [[ -n "$EXISTING_ATTACH" ]]; then
+    echo ">> File attach: skipped — '$DEDUPE_NAME' already attached to task $TASK_GID (dedupe)"
+  else
   FORM_SPEC="file=@${ATTACH_FILE_PATH};type=text/markdown"
   [[ -n "$ATTACH_FILE_NAME" ]] && FORM_SPEC="${FORM_SPEC};filename=${ATTACH_FILE_NAME}"
   if FILE_ATTACH_OUT=$(curl -sf -X POST "$ASANA_API/tasks/$TASK_GID/attachments" \
@@ -224,6 +233,7 @@ if $DO_ATTACH_FILE; then
   else
     echo ">> File attach: FAILED ($ATTACH_FILE_PATH)" >&2
     exit 1
+  fi
   fi
 fi
 
