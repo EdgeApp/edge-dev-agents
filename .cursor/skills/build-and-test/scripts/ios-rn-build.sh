@@ -94,33 +94,38 @@ assert_metro_port_free_or_ours() {
   echo ">> ios-rn-build: reusing Metro already running on port $PORT for this repo" >&2
 }
 
-# Already installed? (sim is booted now, so this is an accurate check.)
-if ! $FORCE && xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>&1; then
-  echo ">> ios-rn-build: $BUNDLE_ID already installed on $UDID; launching only (port $PORT)" >&2
-  # The cached app was baked for some default packager host; on a non-8081 slot it
-  # would connect to the wrong/foreign Metro. Guard the port and PIN the app to THIS
-  # slot's Metro before launching, so it bundles from the right place.
+# Ensure a Metro bundler is serving THIS repo on $PORT and PIN the app to it, so a
+# `simctl launch` bundles from the right place instead of showing the red
+# "No script URL provided (null)" screen. Used by BOTH the cached-launch path and
+# the run-ios fallback (the fallback used to launch unpinned — the ZEC fake-proof).
+ensure_metro_ready_and_pin() {
   assert_metro_port_free_or_ours
-  # The full-build path gets Metro implicitly from run-ios; the cached path got NOTHING —
-  # the app launched pinned to a port nobody was listening on ("No script URL" hang).
-  # Start one if the port is free, with a bounded readiness probe against the real port.
   if [[ -z "$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)" ]]; then
-    echo ">> ios-rn-build: no Metro on port $PORT; starting one for the cached launch (log: /tmp/metro-$PORT.log)" >&2
+    echo ">> ios-rn-build: no Metro on port $PORT; starting one (log: /tmp/metro-$PORT.log)" >&2
     nohup npx react-native start --port "$PORT" >/tmp/metro-"$PORT".log 2>&1 &
-    METRO_READY=false
+    local ready=false
     for _ in $(seq 1 60); do
       if curl -fsS --max-time 2 "http://localhost:$PORT/status" 2>/dev/null | grep -q "packager-status:running"; then
-        METRO_READY=true; break
+        ready=true; break
       fi
       sleep 2
     done
-    if ! $METRO_READY; then
+    if ! $ready; then
       echo ">> ios-rn-build: FAIL — Metro did not become ready on port $PORT within 120s (see /tmp/metro-$PORT.log)" >&2
       exit 1
     fi
     echo ">> ios-rn-build: Metro ready on port $PORT" >&2
   fi
   xcrun simctl spawn "$UDID" defaults write "$BUNDLE_ID" RCT_jsLocation "localhost:$PORT" 2>/dev/null || true
+}
+
+# Already installed? (sim is booted now, so this is an accurate check.)
+if ! $FORCE && xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>&1; then
+  echo ">> ios-rn-build: $BUNDLE_ID already installed on $UDID; launching only (port $PORT)" >&2
+  # The cached app was baked for some default packager host; on a non-8081 slot it
+  # would connect to the wrong/foreign Metro. Guard the port and PIN the app to THIS
+  # slot's Metro before launching, so it bundles from the right place.
+  ensure_metro_ready_and_pin
   xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
   echo ">> ios-rn-build: PASS (cached install, launched on Metro port $PORT)"
   exit 0
@@ -189,8 +194,11 @@ if [[ $RUN_EXIT -ne 0 ]]; then
     if xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Debug \
          -destination "id=$UDID" -derivedDataPath "$DD" build > "$RUN_LOG.xcb" 2>&1; then
       APP=$(find "$DD/Build/Products" -maxdepth 2 -name "*.app" -type d | head -1)
-      [[ -n "$APP" ]] && xcrun simctl install "$UDID" "$APP" && xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null \
-        && echo ">> ios-rn-build: fallback build installed + launched" >&2
+      # Pin the app to THIS slot's Metro before launching — the direct-xcodebuild
+      # path, unlike run-ios, does NOT wire the packager host, so an unpinned launch
+      # shows "No script URL provided (null)" (the ZEC red-screen fake-proof).
+      [[ -n "$APP" ]] && xcrun simctl install "$UDID" "$APP" && ensure_metro_ready_and_pin && xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null \
+        && echo ">> ios-rn-build: fallback build installed + launched (pinned to Metro port $PORT)" >&2
     else
       echo ">> ios-rn-build: FAIL — direct xcodebuild also failed. Last errors:" >&2
       grep -iE "error:|fatal|BUILD FAILED" "$RUN_LOG.xcb" | tail -8 >&2 || tail -8 "$RUN_LOG.xcb" >&2

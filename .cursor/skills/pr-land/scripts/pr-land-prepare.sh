@@ -9,7 +9,8 @@
 //   1. Checkout + fetch
 //   2. Autosquash fixup commits
 //   3. Rebase onto upstream (repo's default branch via origin/HEAD; origin/develop for GUI)
-//   4. Detect conflicts: code files = SKIP, CHANGELOG-only = report
+//   4. Detect conflicts: code OR CHANGELOG = rebase left IN PROGRESS for the
+//      agent to resolve semantically (abort + skip only if not resolvable)
 //   5. Run full verification (CHANGELOG + code)
 //
 // Exit codes:
@@ -256,13 +257,18 @@ async function prepareBranch(repo, branch) {
     console.error(`Conflict detected in: ${conflictFiles.join(", ")}`);
 
     if (conflictFiles.some((f) => !f.includes("CHANGELOG"))) {
-      console.error("\n=== Skipping: Code conflict detected ===");
+      // Leave the rebase IN PROGRESS (do NOT abort) so the agent can resolve
+      // code conflicts semantically when confidently determinable, then
+      // `git add` + `git rebase --continue` (regenerating lockfiles if deps
+      // changed) and re-run prepare. The agent aborts + skips only when the
+      // resolution is not confidently determinable. Mirrors CHANGELOG conflicts.
+      console.error("\n=== Code conflict — rebase left IN PROGRESS for resolution ===");
       for (const f of conflictFiles) {
         console.error(`  - ${f}`);
       }
-      runGit(["rebase", "--abort"], repoDir, { allowFailure: true });
       result.status = "code_conflict";
-      result.message = "Code conflict — skipped";
+      result.message =
+        "Code conflict — resolve in place (git add + GIT_EDITOR=true git rebase --continue, regenerate lockfiles if deps changed), then re-run prepare; or `git rebase --abort` and skip if not confidently resolvable";
       result.conflictFiles = conflictFiles;
       return result;
     }
@@ -343,6 +349,7 @@ async function main() {
     prepared: [],
     failed: [],
     skipped: [],
+    codeConflicts: [],
     changelogConflicts: [],
   };
 
@@ -356,7 +363,7 @@ async function main() {
         results.prepared.push(result);
         break;
       case "code_conflict":
-        results.skipped.push(result);
+        results.codeConflicts.push(result);
         break;
       case "changelog_conflict":
         results.changelogConflicts.push(result);
@@ -378,11 +385,21 @@ async function main() {
       console.error(`  ✓ ${r.repo}/${r.branch}${warn}`);
     }
   }
-  if (results.skipped.length > 0) {
-    console.error(`\nSkipped — code conflicts (${results.skipped.length}):`);
-    for (const r of results.skipped) {
+  if (results.codeConflicts.length > 0) {
+    console.error(
+      `\nCode conflicts — rebase left in progress, resolve in place then re-run (${results.codeConflicts.length}):`
+    );
+    for (const r of results.codeConflicts) {
       console.error(
         `  ⚠ ${r.repo}/${r.branch}: ${r.conflictFiles?.join(", ")}`
+      );
+    }
+  }
+  if (results.skipped.length > 0) {
+    console.error(`\nSkipped (${results.skipped.length}):`);
+    for (const r of results.skipped) {
+      console.error(
+        `  ⚠ ${r.repo}/${r.branch}: ${r.conflictFiles?.join(", ") || r.message}`
       );
     }
   }
@@ -406,6 +423,7 @@ async function main() {
   const autostashed = [
     ...results.prepared,
     ...results.skipped,
+    ...results.codeConflicts,
     ...results.changelogConflicts,
     ...results.failed,
   ].filter((r) => r.autostash);
@@ -419,6 +437,7 @@ async function main() {
   if (
     results.prepared.length === 0 &&
     results.changelogConflicts.length === 0 &&
+    results.codeConflicts.length === 0 &&
     exitCode === 0
   ) {
     exitCode = 1;

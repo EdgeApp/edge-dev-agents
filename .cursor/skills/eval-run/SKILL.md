@@ -3,7 +3,7 @@ name: eval-run
 description: Orchestrate a full evaluation of orchestrated agent runs — resolve run context, fan out /agent-eval + /orch-eval per run, adversarially verify findings, and synthesize gates+graded verdicts into a cohort report. Use when the user wants to evaluate/score agent runs (e.g. "eval everything since yesterday", "score run <gid>", "run the evals").
 ---
 
-<goal>Produce a verified, citation-backed verdict (GOLD | PASS_WITH_FINDINGS | FAIL) for each completed agent run in scope, plus a cohort report that surfaces recurring patterns.</goal>
+<goal>Produce a verified, citation-backed verdict (GOLD | PASS_WITH_FINDINGS | FAIL) for each completed agent run in scope, plus a cohort report that surfaces recurring patterns and an Actions checklist of ready-to-execute remediation drafts (field corrections, re-run followups, playbook proposals, skill gaps) for operator approval.</goal>
 
 <rules description="Non-negotiable constraints.">
 <rule id="orchestrate-existing-skills">This skill only resolves scope, launches the companion workflow, and delivers results. The evaluation logic lives in /agent-eval and /orch-eval (invoked as workflow subagents); resolution lives in /resolve-run's script. Do not re-implement any of it inline.</rule>
@@ -11,6 +11,7 @@ description: Orchestrate a full evaluation of orchestrated agent runs — resolv
 <rule id="verdict-policy">Gates hard-fail a run: completion-honesty (A3), halt-discipline (A16), no-fork-storm (O2), no-memory-critical (O3). GOLD = all gates green AND zero confirmed BAD across all dimensions. NOT_CAPTURED never blocks GOLD but is always listed as a coverage gap. This policy is ours (the source skills define no thresholds) — do not invent numeric point scores.</rule>
 <rule id="completed-runs-only">Runs with `in_flight: true` or no transcript are skipped and listed as such, never silently dropped.</rule>
 <rule id="read-only">The entire eval set mutates nothing it evaluates. Output goes only to `~/agent-evals/<date>/` and chat.</rule>
+<rule id="actions-are-drafts">The cohort report's `## Actions` section contains typed remediation DRAFTS, never executed work — the eval surfaces, the operator approves, the main session executes with existing primitives (set-tested.sh, update-status.sh + the followup template, playbook promotion, /author). Present the Actions as a checklist the user can approve row-by-row; execute ONLY approved rows. Re-run followup comments are stamped from `references/followup-comment-template.md` (gap + bar per the action item; the standing-policy block comes from the template, do not hand-write it).</rule>
 </rules>
 
 <step id="1" name="Resolve scope (inline scout)">
@@ -39,6 +40,7 @@ On completion, from the workflow result:
 1. Write `~/agent-evals/<runDate>/cohort-report.md` (the `cohortReport` field) and one `~/agent-evals/<runDate>/<gid>.md` per run (its `runs[i]` entry rendered: verdict, gates, confirmed findings with citations, full dimension table, coverage gaps).
 2. SendUserFile the cohort report.
 3. Chat summary: verdict table first, then recurring patterns, then coverage gaps. Lead with how many runs hit GOLD.
+4. Present the report's `## Actions` section as an approval checklist (type, task, evidence, the draft). For each row the user approves, execute it per `actions-are-drafts`: run the drafted set-tested.sh / update-status.sh commands, post followup comments stamped from `references/followup-comment-template.md`, apply approved playbook promotions, route skill-gap items to /author. Unapproved rows stay in the report untouched.
 </step>
 
 <edge-cases>

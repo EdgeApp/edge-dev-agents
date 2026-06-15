@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "maestro": {
-      "command": "/Users/eddy/.maestro/bin/maestro",
-      "args": ["mcp", "--no-viewer"]
+      "command": "/Users/eddy/.config/agent-watcher/maestro-mcp-wrapper.sh",
+      "args": []
     }
   }
 }

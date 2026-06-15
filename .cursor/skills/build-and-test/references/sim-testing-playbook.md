@@ -134,6 +134,24 @@ entry (the human audits and prunes it periodically — keep entries dense).
   executed SideShift shift needs non-US egress (VPN/proxy), which the slot does
   not have; verify via direct API + quote/slider proof, document the geo-block
   as the external precondition, and move on.
+- **NYM swap is testnet-only and EXECUTABLE today.** One side must be the `nym`
+  asset (chainNetwork `sandbox`); the counter-asset comes from {bitcoin,
+  litecoin, dash, zcash, cardano, sepolia}. The reliable in-sim pair is
+  **Sepolia ETH → NYM**. Needs (a) the NYM testnet `x-api-key` in `env.json`
+  `NYM_SWAP_INIT.apiKey`, and (b) Sepolia testnet ETH funded into the app's My
+  Sepolia wallet (no in-app faucet — fund the wallet's receive address from a
+  pre-funded Sepolia key via a public Sepolia RPC). Live floor 0.005 ETH; a
+  ~0.0066 ETH swap clears it.
+- **Breez Spark Lightning sends: the Spark balance is SEPARATE from the BTC
+  wallet's on-chain UTXOs and starts at 0.** To test a send you must fund the
+  Spark wallet first: send on-chain BTC to its `bc1p` Taproot deposit address,
+  wait 1 block, Spark auto-claims on sync. The Taproot deposit needs the
+  edge-currency-plugins eager-`initEccLib` fix (PR #450) — link it the
+  PARALLEL-SAFE way (`updot`/build into the worktree's `node_modules`), NOT the
+  fixed-port debug dev-server (see the slot-safety caveat under "Driving the
+  app"). Size sends ≤ ~60 sats from a single freshly-claimed leaf
+  (leaf-headroom). Mint the receive invoice and verify receipt out-of-band with
+  the `@breeztech/breez-sdk-spark` node SDK.
 
 ## Investigate cheap before driving the UI
 - **Crawl the code and run `/debugger` EARLY**, not as a last resort. A grinding
@@ -151,6 +169,14 @@ entry (the human audits and prunes it periodically — keep entries dense).
 - If you changed provider/exchange settings on an account to force routing,
   **revert them when the test is done** — the next run (or human) inherits that
   account state.
+- **Stake-plugin label/display changes are verifiable FUND-FREE on the Earn
+  scene.** Home → Earn Crypto → Discover → search the asset code: the pool-card
+  title comes from `stakeAssets[].displayName ?? currencyCode` in plugin config,
+  so no wallet, funding, or RPC is needed to prove a label/display fix. Stop at
+  the Discover card for label proofs. Drilling INTO the pool (wallet selector /
+  StakeOptions) does need an Optimism wallet + working RPC and can hit a
+  debug-build SIGSEGV, so do not go deeper than the card unless the change is in
+  the pool flow itself.
 
 ## Driving the app (mechanics)
 - **Compose, don't re-derive.** Reusable subflows live in this skill's
@@ -168,3 +194,19 @@ entry (the human audits and prunes it periodically — keep entries dense).
   screenshots for the PR.
 - Modal gauntlet, eraseText-before-inputText, spaced PIN taps: all encoded in the
   `common/` flows — use them instead of remembering.
+- **Fixed-port debug dev-servers are NOT slot-safe — use `updot` instead.** The
+  dep debug bundles are served from HARDCODED host ports: edge-currency-plugins
+  `localhost:8084` (its `debugUri`), edge-core-js `localhost:8101`. Every slot's
+  simulator resolves `localhost` to the shared host loopback, so in a parallel
+  slot all apps hit the SAME port and whichever slot's dev-server bound it first
+  serves ITS bundle to EVERY slot's app — your app silently runs another slot's
+  dep code and the test result is false (same wrong-source class as the maestro
+  MCP device-pinning bug). For ANY dep runtime change, link it the parallel-safe
+  way: `updot` (build the dep, copy the built artifact into THIS worktree's
+  `node_modules`), per `gui-dependency-integration`. Reserve the debug dev-server
+  for genuinely single-slot, interactive local work only.
+- **The iOS clipboard-permission dialog ("Edge would like to paste") stalls
+  maestro.** It repeatedly wedges the XCUITest view-hierarchy fetch
+  (`XCTPerformOnMainRunLoop timed out 60s`). Tap "Allow Paste" with a
+  hierarchy-free point tap, or feed the value through a debug override instead of
+  the system clipboard.

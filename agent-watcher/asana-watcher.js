@@ -210,23 +210,33 @@ function spawnForTask(task, cfg) {
     return true
   }
 
-  setStatusPlanning(task.gid)
-
   // No eager worktree: the agent reads the task, determines the target repo(s), and
   // creates co-located per-task worktrees itself (one-shot skill → setup-task-workspace).
   // cwd is ~/git; cleanup/gc scan ~/git/.agent-worktrees/<gid>/ for whatever it created.
   const worktreesParent = path.join(reposRoot, '.agent-worktrees', task.gid)
 
+  // Allocate resources BEFORE touching agent_status: a Planning task with no
+  // session is invisible to every sweep (the watcher only spawns Pending), so a
+  // failed allocation must leave the task at Pending for the next tick.
   let simUdid
   try {
     simUdid = shCapture(`${DIR}/allocate-from-pool.sh --task-gid ${task.gid}`).split('\n').pop()
   } catch (e) {
-    log(`  allocate-from-pool failed (${e.status ?? '?'}) — skipping spawn for ${task.gid}`)
+    log(`  allocate-from-pool failed (${e.status ?? '?'}) — skipping spawn for ${task.gid}; task stays Pending`)
     return false
   }
 
-  const slot = slots.allocate({ task_gid: task.gid, worktree_path: worktreesParent, sim_udid: simUdid })
+  let slot
+  try {
+    slot = slots.allocate({ task_gid: task.gid, worktree_path: worktreesParent, sim_udid: simUdid })
+  } catch (e) {
+    log(`  slot allocation failed (${e.message}) — releasing sim; task stays Pending`)
+    try { execSync(`${DIR}/release-pool-entry.sh --task-gid ${task.gid}`, { stdio: 'inherit' }) } catch { /* best-effort */ }
+    return false
+  }
   log(`  slot ${slot.slot_index}: metro ${slot.metro_port}, sim ${simUdid}`)
+
+  setStatusPlanning(task.gid)
 
   const r = spawnSync(`${DIR}/spawn-test-session.sh`, [
     '--yolo',
@@ -238,7 +248,10 @@ function spawnForTask(task, cfg) {
     '--label', label,
   ], { stdio: 'inherit' })
   if (r.status !== 0) {
-    log(`  spawn helper failed with exit code ${r.status}`)
+    log(`  spawn helper failed with exit code ${r.status} — rolling back to Pending and releasing resources`)
+    try { execSync(`${DIR}/update-status.sh ${task.gid} Pending`, { stdio: 'inherit' }) } catch { /* best-effort */ }
+    try { slots.release(task.gid) } catch { /* best-effort */ }
+    try { execSync(`${DIR}/release-pool-entry.sh --task-gid ${task.gid}`, { stdio: 'inherit' }) } catch { /* best-effort */ }
     return false
   }
 

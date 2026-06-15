@@ -16,7 +16,7 @@
 // SAFETY GUARANTEES:
 //   1. Each PR is rebased onto latest upstream before merge (handles sequential merges)
 //   2. Verification runs before EVERY merge (no bypass)
-//   3. Code conflicts → Skip PR, continue with remaining
+//   3. Code conflicts → rebase left IN PROGRESS for agent resolution (exit 4)
 //   4. CHANGELOG-only conflicts → Agent can resolve, then re-run
 //   5. Already-merged PRs are detected and skipped on re-runs
 //
@@ -115,8 +115,8 @@ if (!["merge", "squash", "rebase"].includes(mergeMethod)) {
  * Returns: { status, conflictFiles? }
  *   status: "success" | "changelog_conflict" | "code_conflict" | "error"
  *
- * On changelog_conflict, the rebase is LEFT IN PROGRESS for agent resolution.
- * On all other failures, the rebase is aborted to leave the repo clean.
+ * On changelog_conflict OR code_conflict, the rebase is LEFT IN PROGRESS for
+ * agent resolution. On error (unknown conflict type), the rebase is aborted.
  */
 function rebaseOntoUpstream(repoDir, branch, repo) {
   const upstream = getUpstreamBranch(repo, repoDir);
@@ -155,7 +155,8 @@ function rebaseOntoUpstream(repoDir, branch, repo) {
   }
 
   if (conflictFiles.some((f) => !f.includes("CHANGELOG"))) {
-    runGit(["rebase", "--abort"], repoDir, { allowFailure: true });
+    // Leave the rebase IN PROGRESS for agent resolution (mirrors changelog_conflict).
+    // The agent resolves semantically when determinable, else aborts + skips.
     return { status: "code_conflict", conflictFiles };
   }
 
@@ -294,19 +295,25 @@ async function main() {
     }
 
     if (rebaseResult.status === "code_conflict") {
-      console.error(`⚠ Code conflict — skipping`);
-      console.error(
-        `  Conflicting files: ${rebaseResult.conflictFiles.join(", ")}`
-      );
-      results.skipped.push({
+      console.error("\n=== Code conflict — agent resolution needed (rebase left IN PROGRESS) ===");
+      console.error(`Files: ${rebaseResult.conflictFiles.join(", ")}`);
+      console.error("\nResolve ONLY when confidently determinable; else `git rebase --abort` and skip:");
+      console.error(`  1. Read each conflicted file in ${repoDir}; resolve preserving BOTH sides' intent`);
+      console.error("  2. Regenerate lockfiles via the repo's package manager if deps changed");
+      console.error("  3. git add <files> && GIT_EDITOR=true git rebase --continue");
+      console.error("  4. git push --force-with-lease");
+      console.error("  5. Re-run merge");
+      results.codeConflict = {
         repo,
         prNumber,
         branch,
         repoDir,
-        reason: "Code conflict",
         conflictFiles: rebaseResult.conflictFiles,
-      });
-      continue;
+      };
+      results.status = "code_conflict_needs_resolution";
+      results.pending = prs.slice(i + 1);
+      exitCode = 4;
+      break;
     }
 
     if (rebaseResult.status !== "success") {

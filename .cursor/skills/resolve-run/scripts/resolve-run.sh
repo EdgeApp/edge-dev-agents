@@ -118,9 +118,34 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     # transcript — that must not count, so anchor on the JSON key boundary
     revive_pings=$(grep -cE '"(content|text)":"<watchdog-revive-ping>' "$transcript" 2>/dev/null || true)
     revive_pings=${revive_pings:-0}
-    # mid-run human nudges: operator messages are prefixed "Operator:" by convention
-    # (same JSON key anchoring as above)
-    operator_msgs=$(grep -cE '"(content|text)":"Operator:' "$transcript" 2>/dev/null || true)
+    # mid-run human nudges: ANY human-authored message counts — the "Operator:"
+    # prefix is a courtesy convention, not required. Two delivery shapes exist
+    # in the transcript (validated 2026-06-12):
+    #   1. idle-composer sends → user records whose text STARTS with a
+    #      "<system-reminder>Message sent at ..." stamp followed by the text
+    #   2. mid-turn sends → queue-operation records; "dequeue" = delivered
+    #      ("enqueue"/"remove" churn is composer editing, not delivery)
+    # Harness artifacts (tool results, slash-command spawn, skill bodies,
+    # revive pings, task notifications) carry no sent-at stamp and don't count.
+    operator_msgs=$(node -e '
+      const fs = require("fs"); const rl = require("readline");
+      (async () => {
+        let n = 0;
+        const r = rl.createInterface({ input: fs.createReadStream(process.argv[1]), crlfDelay: Infinity });
+        for await (const line of r) {
+          let j; try { j = JSON.parse(line) } catch { continue }
+          if (j.type === "queue-operation" && j.operation === "dequeue") { n++; continue }
+          if (j.type !== "user" || !j.message) continue;
+          const c = j.message.content;
+          const texts = typeof c === "string" ? [c] : (Array.isArray(c) ? c.filter(b => b && b.type === "text").map(b => b.text || "") : []);
+          let t = texts.join("\n").trim();
+          if (!/^<system-reminder>Message sent at /.test(t)) continue;
+          t = t.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim();
+          if (t) n++;
+        }
+        console.log(n);
+      })().catch(() => console.log(0));
+    ' "$transcript" 2>/dev/null || echo 0)
     operator_msgs=${operator_msgs:-0}
   fi
 
@@ -173,7 +198,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       task_name: ($asana.name // (if $name_hint == "" then null else $name_hint end)),
       spawned_at: (if $spawned == "" then null else $spawned end),
       asana: { status: $asana.status, blocked: $asana.blocked },
-      in_flight: (($asana.status != null) and ($asana.status != "Complete") and ($session_state == "live")),
+      in_flight: (($asana.status != null) and ($asana.status != "Complete") and ($asana.status != "Archived") and ($asana.blocked != "Yes") and ($session_state == "live")),
       session: { state: $session_state, tmux: (if $tmux_session == "" then null else $tmux_session end) },
       transcript: (if $transcript == "" then null else $transcript end),
       window: { start: (if $ws == "" then null else $ws end), end: (if $we == "" then null else $we end) },
