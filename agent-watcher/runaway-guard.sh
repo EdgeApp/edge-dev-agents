@@ -50,10 +50,15 @@ if [[ -f "$LOG" ]] && [[ $(stat -f%z "$LOG" 2>/dev/null || echo 0) -gt 2097152 ]
 fi
 
 check_once() {
-  # Count cli processes per process group in one ps invocation.
+  # Count agent CLI processes per process group in one ps invocation. Match BOTH
+  # `cli` and `claude` by BASENAME: claude-code's process comm flipped from `cli`
+  # to `claude` (argv rename across versions), and a `cli`-only match left this guard
+  # BLIND to every fork storm on the current build (2026-06-16 audit: 0 `cli` procs,
+  # 5 `claude`). Lowercase only, so the capital-C `Claude` desktop app is excluded.
   local counts
-  counts=$(ps -axo pgid,comm 2>/dev/null | awk '$2=="cli"{c[$1]++} END{for(g in c) print c[g], g}')
-  [[ -z "$counts" ]] && return 0
+  counts=$(ps -axo pgid,comm 2>/dev/null | awk '{n=split($2,a,"/"); nm=a[n]} nm=="cli"||nm=="claude"{c[$1]++} END{for(g in c) print c[g], g}')
+  # NOTE: no early return on empty counts — the heartbeat below must ALWAYS write so
+  # O2 has positive "guard ran, tree under cap" evidence even on a clean box.
 
   local now; now=$(date +%s)
   while read -r count pgid; do
@@ -87,8 +92,8 @@ check_once() {
   # orch-eval had no positive liveness signal (the 2026-06-15 audit blanked O2).
   sleep 1
   local remaining
-  remaining=$(ps -axo comm 2>/dev/null | grep -c '^cli$')
-  echo "$(ts) post-tick cli total=$remaining (cap=$THRESHOLD)" >> "$LOG"
+  remaining=$(ps -axo comm 2>/dev/null | awk '{n=split($1,a,"/"); nm=a[n]} nm=="cli"||nm=="claude"{c++} END{print c+0}')
+  echo "$(ts) post-tick agent-cli total=$remaining (cap=$THRESHOLD)" >> "$LOG"
 }
 
 if [[ "${1:-}" == "--once" ]]; then

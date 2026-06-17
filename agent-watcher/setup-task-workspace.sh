@@ -69,6 +69,15 @@ done
 MAIN_REPO="$REPOS_ROOT/$REPO"
 [[ -d "$MAIN_REPO/.git" ]] || { echo "Repo not found or not a git repo: $MAIN_REPO" >&2; exit 1; }
 
+# Per-repo base overrides: repos whose PUBLISHED default differs from the Edge
+# `develop` convention AND that still carry a stale legacy `develop` we must not
+# branch off. Checked before the develop-first logic below so it wins.
+if [[ -z "$BASE" ]]; then
+  case "$REPO" in
+    edge-info-server) BASE="origin/master" ;;  # publishes from master; develop is stale legacy lineage
+  esac
+fi
+
 # Resolve the base ref when not given on the CLI. Edge convention is `develop`;
 # repos that don't use it (most deps/servers) fall back to their actual default
 # branch (origin/HEAD), then origin/main, then origin/master.
@@ -144,6 +153,33 @@ backfill_gui_generated() {
       echo ">> setup-task-workspace: WARN — could not backfill $rel (worktree may need a prepare run)" >&2
     fi
   done
+}
+
+# Copy the GITIGNORED Android build secrets a fresh edge-react-gui worktree needs to
+# run `./gradlew :app:assembleDebug` (the Android build-verification path). The
+# node_modules clone does not carry these; mirror what env.json does for iOS. The
+# generated local.properties (sdk.dir) is written from ANDROID_HOME/SDK_ROOT here so
+# gradle finds the SDK. Best-effort; skip what's absent (a non-Android task ignores it).
+backfill_android_secrets() {
+  [[ "$REPO" == "edge-react-gui" ]] || return 0
+  local rels=(
+    "android/app/google-services.json"
+    "android/app/src/main/java/co/edgesecure/app/EdgeApiKey.java"
+    "android/app/src/main/assets/edge-core/plugin-bundle.js"
+  )
+  for rel in "${rels[@]}"; do
+    local src="$MAIN_REPO/$rel" dst="$WT/$rel"
+    [[ -e "$src" ]] || continue
+    [[ -e "$dst" ]] && continue
+    mkdir -p "$(dirname "$dst")"
+    cp -cR "$src" "$dst" 2>/dev/null && echo ">> setup-task-workspace: copied android secret $rel" >&2 || true
+  done
+  # Generate android/local.properties so gradle finds the SDK (sdk.dir).
+  local sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+  if [[ -n "$sdk" && ! -f "$WT/android/local.properties" && -d "$WT/android" ]]; then
+    printf 'sdk.dir=%s\n' "$sdk" > "$WT/android/local.properties" 2>/dev/null \
+      && echo ">> setup-task-workspace: wrote android/local.properties (sdk.dir=$sdk)" >&2 || true
+  fi
 }
 
 # ── Materialize husky's generated runtime (.husky/_) from the main checkout ───
@@ -274,6 +310,9 @@ clone_node_modules
 
 # ── Backfill gitignored generated outputs the first Metro bundle needs (gui only) ─
 backfill_gui_generated
+
+# ── Copy Android build secrets + write local.properties (gui only; for Android tasks) ─
+backfill_android_secrets
 
 # ── Materialize husky runtime so worktree commits don't fail the pre-commit hook ─
 ensure_husky_runtime

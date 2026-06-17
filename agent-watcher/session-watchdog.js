@@ -322,11 +322,16 @@ function listRetiredSessions() {
 // oversubscribe. Only for still-alive sessions with a real, non-terminal status; the
 // session re-provisions its own sim/Metro as the work proceeds. 'Archived' is a
 // terminal status like 'Complete' (operator shelved the task to narrow focus, not a
-// followup request) — never un-retire for it.
+// followup request) — never un-retire for it. 'Pending' is NOT a followup-continue:
+// it means "spawn FRESH" (a re-run), so do NOT resurrect the stale retired session —
+// resurrecting it renames done-asana→claude-asana and blocks the watcher's fresh
+// spawn ("session already exists"). Leave a Pending retired session alone: the
+// watcher spawns a fresh claude-asana-<gid> alongside it, and the stale done-asana
+// is reaped on the next completion (retireSession kills a same-gid collision).
 function unretireFollowups() {
   for (const r of listRetiredSessions()) {
-    const { agentStatus } = fetchTaskState(r.gid)
-    if (!agentStatus || agentStatus === 'Complete' || agentStatus === 'Archived') continue
+    const { agentStatus, ok } = fetchTaskState(r.gid)
+    if (!ok || !agentStatus || agentStatus === 'Complete' || agentStatus === 'Archived' || agentStatus === 'Pending') continue
     const ppid = getPanePid(r.name)
     if (ppid === null || !claudeRunningUnder(ppid)) continue // only re-occupy for a live session
     const dest = `${SESSION_PREFIX}${r.gid}`
@@ -390,6 +395,25 @@ function checkMonitorHeartbeat() {
 // Durable release receipt: slots.json/pool.json forget a run seconds after retirement,
 // so post-hoc evals (orch-eval O1/O6) cannot otherwise verify clean resource release.
 // One small JSON per gid under STATE_DIR/releases; best-effort, never wedges the sweep.
+// Box-wide flat-tree snapshot at retirement: agent-cli proc total + the max
+// per-process-group count, matching `claude`/`cli` by basename (the runaway-guard
+// match). Gives orch-eval's no-fork-storm (O2) dimension durable post-retirement
+// evidence — `max_pgid_count` well under `threshold` means no fork storm occurred,
+// which otherwise was NOT_CAPTURED once the live tree was gone.
+function flatTreeSnapshot() {
+  try {
+    const counts = {}
+    for (const line of sh('ps -axo pgid,comm').split('\n')) {
+      const m = line.trim().match(/^(\d+)\s+(.+)$/)
+      if (!m) continue
+      const base = m[2].split('/').pop()
+      if (base === 'cli' || base === 'claude') counts[m[1]] = (counts[m[1]] || 0) + 1
+    }
+    const vals = Object.values(counts)
+    return { cli_total: vals.reduce((a, b) => a + b, 0), max_pgid_count: vals.length ? Math.max(...vals) : 0, threshold: 50 }
+  } catch { return null }
+}
+
 function writeReleaseReceipt(taskGid, slot, metroPort) {
   try {
     const dir = path.join(slots.STATE_DIR, 'releases')
@@ -401,6 +425,7 @@ function writeReleaseReceipt(taskGid, slot, metroPort) {
       sim_udid: slot?.sim_udid ?? null,
       metro_port: metroPort,
       released: { sim: Boolean(slot?.sim_udid), slot: Boolean(slot), metro: metroPort != null },
+      flat_tree: flatTreeSnapshot(),
     }, null, 2) + '\n')
     log(`  [${taskGid}] release receipt written`)
   } catch (e) { log(`  [${taskGid}] release receipt failed: ${e.message}`) }

@@ -37,9 +37,21 @@ if [ -z "$REPO" ] && ! git -C "$PWD" rev-parse --is-inside-work-tree >/dev/null 
 fi
 command -v timeout >/dev/null || { echo "ERROR: timeout not on PATH (shim: ~/.cursor/skills/timeout.sh)" >&2; exit 2; }
 
-# Deadline is per task (falls back to per PR for ad-hoc use), shared across calls.
+# Deadline is per task (falls back to per PR for ad-hoc use), shared across calls
+# WITHIN a run. A prior run of the same task leaves this file behind, so a re-run
+# would inherit a days-old deadline and falsely report "budget exhausted" on its
+# first call. Guard on the file's age: a legitimately live deadline is at most
+# BUDGET seconds old (the first call stamped it now+BUDGET); if the file is older
+# than BUDGET, it is a stale carryover from a prior run — discard and re-stamp.
 DEADLINE_FILE="/tmp/agent-watch-deadline-${TASK_GID:-pr$PR}"
 NOW=$(date +%s)
+if [ -r "$DEADLINE_FILE" ]; then
+  FILE_MTIME=$(stat -f %m "$DEADLINE_FILE" 2>/dev/null || echo 0)
+  if [ $((NOW - FILE_MTIME)) -gt "$BUDGET" ]; then
+    echo ">> watch-pr: stale deadline file ($((NOW - FILE_MTIME))s old > ${BUDGET}s budget) from a prior run — resetting" >&2
+    rm -f "$DEADLINE_FILE"
+  fi
+fi
 if [ -r "$DEADLINE_FILE" ]; then
   DEADLINE=$(cat "$DEADLINE_FILE")
 else

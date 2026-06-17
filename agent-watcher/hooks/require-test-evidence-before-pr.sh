@@ -29,6 +29,13 @@ esac
 if ls /tmp/agent-proof-"$AGENT_TASK_GID"-*.png >/dev/null 2>&1; then
   exit 0
 fi
+# Android build evidence: an assembleDebug log or APK is valid terminal-success
+# evidence for an Android-called-out / build-only task (GitHub CI does not build
+# Android, so this is the only gate that catches those regressions). build-and-test
+# writes the gradle log here on a successful Android build.
+if ls /tmp/agent-android-build-"$AGENT_TASK_GID"*.log >/dev/null 2>&1 || ls /tmp/agent-proof-"$AGENT_TASK_GID"-*.apk >/dev/null 2>&1; then
+  exit 0
+fi
 if [ -s "/tmp/agent-test-blocker-$AGENT_TASK_GID.md" ]; then
   exit 0
 fi

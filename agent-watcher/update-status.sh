@@ -30,8 +30,10 @@ CRED="$HOME/.config/agent-watcher/credentials.json"
 
 usage() {
   cat <<EOF >&2
-Usage: $(basename "$0") <task_gid> <status_name> [--blocked yes|no]
+Usage: $(basename "$0") <task_gid> <status_name> [--blocked yes|no] [--reason "<text>"]
   status_name: Pending | Planning | Developing | Reviewing | Testing | Complete
+  --reason: REQUIRED with --blocked yes — the claimed blocker, judged by the
+            block-validation gate against the true-blocker taxonomy.
 EOF
   exit 2
 }
@@ -41,9 +43,24 @@ STATUS_NAME="${2:-}"
 [[ -n "$TASK_GID" && -n "$STATUS_NAME" ]] || usage
 
 BLOCKED=""
-if [[ "${3:-}" == "--blocked" ]]; then
-  BLOCKED="${4:-}"
-  [[ "$BLOCKED" == "yes" || "$BLOCKED" == "no" ]] || usage
+REASON=""
+shift 2 2>/dev/null || true
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --blocked) BLOCKED="${2:-}"; shift 2 ;;
+    --reason)  REASON="${2:-}";  shift 2 ;;
+    *) shift ;;
+  esac
+done
+[[ -z "$BLOCKED" || "$BLOCKED" == "yes" || "$BLOCKED" == "no" ]] || usage
+
+# Persist the claimed blocker reason (read by the block-validation gate + the eval).
+# The reason is the justification the blocker-validator judges against the
+# true-blocker taxonomy; an empty reason on a --blocked yes is itself suspect.
+if [[ "$BLOCKED" == "yes" ]]; then
+  printf '%s\n' "$REASON" > "/tmp/agent-blocker-reason-$TASK_GID.txt" 2>/dev/null || true
+elif [[ "$BLOCKED" == "no" ]]; then
+  rm -f "/tmp/agent-blocker-reason-$TASK_GID.txt" "/tmp/agent-blocker-verdict-$TASK_GID.json" 2>/dev/null || true
 fi
 
 TOKEN=$(jq -r .asana_token "$CRED")
@@ -91,7 +108,7 @@ if echo "$RESPONSE" | jq -e .errors >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "Updated task $TASK_GID: agent_status=$STATUS_NAME${BLOCKED:+, blocked=$BLOCKED}"
+echo "Updated task $TASK_GID: agent_status=$STATUS_NAME${BLOCKED:+, blocked=$BLOCKED}${REASON:+ (reason: $REASON)}"
 
 # Best-effort section move so a Board view of the kanban reflects the status.
 SECTION_GID=$(jq -r --arg s "$STATUS_NAME" '.custom_fields.agent_status.section_gids[$s] // empty' "$CONFIG")

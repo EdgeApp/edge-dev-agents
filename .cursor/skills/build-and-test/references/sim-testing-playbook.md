@@ -153,6 +153,14 @@ entry (the human audits and prunes it periodically — keep entries dense).
   (leaf-headroom). Mint the receive invoice and verify receipt out-of-band with
   the `@breeztech/breez-sdk-spark` node SDK.
 
+## Navigation
+- **Gift Card Marketplace (EdgeSpend):** reachable in-app from Home → 'Spend
+  Crypto' tile → the EdgeSpend list → 'Purchase New'. Requires a non-light account
+  (edge-funds qualifies) and `ENV.PLUGIN_API_KEYS.phaze.apiKey` set. Real Phaze
+  productIds for a per-brand test come from `GET <phaze baseUrl>/gift-cards/full/US`
+  with header `API-Key: <key>` (the on-disk `brands-us.json` cache is encrypted and
+  unreadable, so hit the API for live ids).
+
 ## Investigate cheap before driving the UI
 - **Crawl the code and run `/debugger` EARLY**, not as a last resort. A grinding
   UI loop is the most expensive probe there is. "Why is X missing/failing" is
