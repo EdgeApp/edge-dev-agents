@@ -139,6 +139,17 @@ fi
 ENV_EXPORTS+="export LANG=\"\${LANG:-en_US.UTF-8}\"
 export PATH=\"\$HOME/.maestro/bin:\$PATH\"
 "
+# Android SDK: export ANDROID_HOME/ANDROID_SDK_ROOT so an Android-called-out task can
+# run `./gradlew :app:assembleDebug` without per-run setup (proposal: 1215776835822945).
+# Auto-detect the installed SDK; only export if a real SDK dir exists.
+for _AW_SDK in "$HOME/Library/Android/sdk" "/opt/homebrew/share/android-commandlinetools" "/usr/local/share/android-commandlinetools"; do
+  if [[ -d "$_AW_SDK/platform-tools" || -d "$_AW_SDK/cmdline-tools" ]]; then
+    ENV_EXPORTS+="export ANDROID_HOME=\"$_AW_SDK\"
+export ANDROID_SDK_ROOT=\"$_AW_SDK\"
+"
+    break
+  fi
+done
 # Heap bump for every node process in the agent shell: lint-staged/eslint in the
 # (now-working) husky pre-commit hook SIGABRTs on default heap under parallel
 # slots (seen on the Wallet/Seed-Import run, 2026-06-10). 8GB per node process is

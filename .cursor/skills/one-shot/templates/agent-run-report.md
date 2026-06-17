@@ -55,7 +55,9 @@ _None observed._
 <!-- cat: decisions -->
 <!-- Consequential / non-obvious choices only. Each: the decision, the rejected
      alternative, and why. In --yolo this also captures auto-deferred decisions
-     (question, default chosen, reversibility). -->
+     (question, default chosen). Do NOT annotate a choice as reversible — that's
+     the default and saying it is noise; note reversibility ONLY when a choice was
+     IRREVERSIBLE. -->
 _None observed._
 
 ## Dev Notes & Gotchas

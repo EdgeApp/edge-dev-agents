@@ -3,7 +3,7 @@ name: orch-eval
 description: Evaluate one orchestrated agent run's infrastructure health (fork-storm, memory pressure, liveness/revive, resource release, slot citizenship, workspace/status contract) against the agent-watcher guardrails. Consumes a /resolve-run manifest, grades against references/rubric.md, returns cited findings. Read-only. Use per-run, or via /eval-run for batches.
 ---
 
-<goal>Grade a single agent run's footprint in the orchestration substrate (dimensions O1-O8), honestly distinguishing verdicts from NOT_CAPTURED where evidence has been pruned.</goal>
+<goal>Grade a single agent run's footprint in the orchestration substrate (dimensions O1-O9), honestly distinguishing verdicts from NOT_CAPTURED where evidence has been pruned.</goal>
 
 <rules description="Non-negotiable constraints.">
 <rule id="read-only">Never mutate infra state: no tmux kills/renames, no slot/pool/worktree changes, no Asana writes. Inspect only.</rule>
@@ -27,7 +27,7 @@ Using `window.start..window.end` from the manifest, in parallel:
 - O8: Asana story log for the status timeline; `git -C <worktree> ...` for branch/base when the worktree survives.
 </step>
 
-<step id="3" name="Grade O1-O8">
+<step id="3" name="Grade O1-O9">
 Apply the rubric's GOOD/BAD anchors per dimension. Specifics:
 - **O6:** manifest `slot`/`pool_entry` non-null on a Complete run = BAD (leak, citable live observation). Null = NOT_CAPTURED unless run-report capture fields (`released:{sim,slot,metro}`) exist.
 - **O7:** NA if the Asana story log shows blocked never went Yes during the window.

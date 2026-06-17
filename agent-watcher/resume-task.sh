@@ -58,28 +58,49 @@ if [[ -n "${TMUX:-}" ]]; then
   fi
 fi
 
-# 1. Resolve the claude session id: newest transcript referencing this task's URL.
-#    Orchestrated sessions launch in ~/git (project dir -Users-eddy-git); worktree-cwd
-#    runs live in a gid-named project dir. Search both, pick newest by mtime.
+# 1. Resolve the claude session id. The resumed session launches from CWD ~/git
+#    (step 6 passes --worktree-path "$HOME/git"), so `claude --resume` resolves
+#    transcripts from the ~/git project namespace (-Users-eddy-git) ONLY. A
+#    transcript that lives in a WORKTREE-cwd namespace
+#    (-Users-eddy-git--agent-worktrees-<gid>-<repo>) is NOT loadable from ~/git —
+#    resuming it drops the session into a bare shell. So resolve only within the
+#    resumable namespace, and fail clearly when the sole match is worktree-bound.
 if [[ -z "$SESSION_ID" ]]; then
+  # Match the session whose OWN one-shot is for this task: the FIRST asana URL in
+  # the transcript is the /one-shot invocation. (A mere later mention of the gid —
+  # cross-task references, watcher output — must NOT match.)
+  first_gid_of() { grep -oE "asana\.com/0/[0-9]+/[0-9]+" "$1" 2>/dev/null | head -1 | grep -oE '[0-9]+$' || true; }
+
+  RESUMABLE_DIR="$PROJECTS/-Users-eddy-git"
   NEWEST=""; NEWEST_MT=0
-  SEARCH_DIRS=("$PROJECTS/-Users-eddy-git")
-  for d in "$PROJECTS"/*"$TASK_GID"*; do [[ -d "$d" ]] && SEARCH_DIRS+=("$d"); done
-  for d in "${SEARCH_DIRS[@]}"; do
-    [[ -d "$d" ]] || continue
-    for f in "$d"/*.jsonl; do
+  if [[ -d "$RESUMABLE_DIR" ]]; then
+    for f in "$RESUMABLE_DIR"/*.jsonl; do
       [[ -f "$f" ]] || continue
-      # Match the session whose OWN one-shot is for this task: the FIRST asana URL in
-      # the transcript is the /one-shot invocation. (A mere later mention of the gid
-      # — cross-task references, watcher output — must NOT match.)
-      FIRST_GID="$(grep -oE "asana\.com/0/[0-9]+/[0-9]+" "$f" 2>/dev/null | head -1 | grep -oE '[0-9]+$' || true)"
-      if [[ "$FIRST_GID" == "$TASK_GID" ]]; then
+      if [[ "$(first_gid_of "$f")" == "$TASK_GID" ]]; then
         MT=$(stat -f %m "$f" 2>/dev/null || echo 0)
         if [[ "$MT" -gt "$NEWEST_MT" ]]; then NEWEST_MT="$MT"; NEWEST="$f"; fi
       fi
     done
-  done
-  [[ -n "$NEWEST" ]] || { echo "resume-task: no transcript referencing task $TASK_GID found; cannot resume (pass --session-id to force)." >&2; exit 2; }
+  fi
+
+  if [[ -z "$NEWEST" ]]; then
+    # No resumable match. Distinguish "only a worktree-cwd session exists" (which
+    # cannot be resumed from ~/git — needs a fresh run) from "nothing at all".
+    WT_MATCH=""
+    for d in "$PROJECTS"/*"$TASK_GID"*; do
+      [[ -d "$d" ]] || continue
+      for f in "$d"/*.jsonl; do
+        [[ -f "$f" ]] || continue
+        [[ "$(first_gid_of "$f")" == "$TASK_GID" ]] && { WT_MATCH="$f"; break 2; }
+      done
+    done
+    if [[ -n "$WT_MATCH" ]]; then
+      echo "resume-task: task $TASK_GID has only a WORKTREE-cwd session ($(basename "$WT_MATCH" .jsonl)), which 'claude --resume' cannot load from ~/git. Start a FRESH session for this task instead of resuming (or pass --session-id to force)." >&2
+      exit 2
+    fi
+    echo "resume-task: no transcript referencing task $TASK_GID found; cannot resume (pass --session-id to force)." >&2
+    exit 2
+  fi
   SESSION_ID="$(basename "$NEWEST" .jsonl)"
 fi
 echo ">> resume-task: resuming claude session $SESSION_ID (task $TASK_GID)" >&2

@@ -1,6 +1,6 @@
 ---
 name: pr-land
-description: Land approved PRs by autosquashing fixups, rebasing onto the default upstream branch, and merging. Use when the user wants to merge/land pull requests.
+description: Land approved PRs. By DEFAULT arms GitHub auto-merge (merge commit) so each PR merges itself when its required CI checks pass; falls back to a local autosquash + rebase + verify + merge only for conflicts, unsupported repos, or an explicit immediate-merge request. Use when the user wants to merge/land pull requests.
 compatibility: Requires git, gh, node, jq. ASANA_TOKEN for Asana updates.
 metadata:
   author: j0ntz
@@ -35,7 +35,7 @@ Arguments are classified automatically:
 <rule id="code-conflicts">Code (non-CHANGELOG) conflicts → ATTEMPT semantic resolution when confidently determinable; the prepare/merge scripts leave the rebase IN PROGRESS (no auto-abort) so you resolve in place. "Confidently determinable" = the two sides have independent intent you can preserve without guessing: dependency/version bumps, lockfile regeneration, accepting an upstream file deletion, non-overlapping edits. To resolve: read each conflicted file, edit to keep BOTH sides' intent (the upstream change AND our change), regenerate lockfiles via the repo's package manager if deps changed (`npm install` or `yarn install` per the repo's lockfile), `git add <files> && GIT_EDITOR=true git rebase --continue`, then re-run the script to verify (re-verification catches any follow-on issue, e.g. a formatting fix needed via `eslint --fix`). SKIP only when resolution is NOT confidently determinable — overlapping logic in the same function, unclear semantic intent, or you would be guessing: `git rebase --abort`, continue with remaining PRs, report. Never guess at a merge. CHANGELOG conflicts keep their `changelog-conflicts` handling.</rule>
 <rule id="stale-prs">Stale PRs → Skip and report. Old PRs with multiple conflicts should be skipped like code conflicts. Don't block the flow.</rule>
 <rule id="changelog-conflicts">CHANGELOG conflicts (any section, including staging): Agent resolves semantically, scripts verify the result.</rule>
-<rule id="verification">Verification is mandatory. Built into scripts, no bypass.</rule>
+<rule id="verification">Verification is mandatory. On the DEFAULT auto-merge path it is GitHub's REQUIRED status checks that gate the merge — auto-merge will not merge until they pass, so do not also merge locally. On the local fallback path, verification is built into `pr-land-merge.sh`, no bypass. Either way a PR never lands without green checks.</rule>
 <rule id="no-force-push">Do NOT force-push without explicit user confirmation.</rule>
 <rule id="no-editors">Never open editors. All git operations must be non-interactive: `GIT_EDITOR=true` for commit messages, `GIT_SEQUENCE_EDITOR=:` for rebase todo lists.</rule>
 <rule id="unexpected-exit">Unexpected exit codes → STOP immediately. If any script returns an exit code not documented in this file, STOP and report to user. Do NOT attempt to interpret, retry, or work around unexpected errors.</rule>
@@ -198,13 +198,21 @@ Use:
 </step>
 
 <step id="5" name="Merge">
-Ask for user confirmation, then:
+**DEFAULT: arm GitHub auto-merge (merge commit).** Instead of rebasing, verifying, and merging locally, the default land path enables GitHub auto-merge so each PR merges itself when its required CI checks go green — GitHub owns the rebase/queue and the green-CI wait, and the agent does not babysit it. After Step 1-2 (discovery + comments addressed/approved), confirm with the user, then:
+
+```bash
+echo '[{"repo":"...","prNumber":123}, ...]' | ~/.cursor/skills/pr-land/scripts/pr-land-automerge.sh
+```
+
+Per-PR result lines: `armed` (auto-merge on; GitHub merges on green), `merged` (already merged), `blocked` (changes requested — resolve first), `unsupported` (repo disallows auto-merge/merge-commit → use the local fallback below), `error`. Exit 0 = all armed/merged. With auto-merge armed, the land task can finalize: report which PRs are merged vs armed-and-waiting-on-CI. Steps 3-4 (local prepare/rebase/push) are NOT needed on this path — GitHub rebases.
+
+**FALLBACK: local rebase + verify + merge.** Use the local path ONLY when auto-merge is `unsupported`/`blocked`, when a rebase CONFLICT needs local resolution (per `code-conflicts`), or when the user explicitly asks for an immediate local merge. Run Steps 3-4 (prepare/push) first, then:
 
 ```bash
 echo '[{"repo":"...","prNumber":123,"branch":"<prefix>/..."}]' | ~/.cursor/skills/pr-land/scripts/pr-land-merge.sh [method]
 ```
 
-The merge script processes PRs **sequentially** with automatic rebase-before-merge:
+The local merge script processes PRs **sequentially** with automatic rebase-before-merge:
 
 1. **Check if already merged** — skip (handles re-runs after CHANGELOG resolution)
 2. **Fetch + rebase onto upstream** — ALWAYS done, even for first PR

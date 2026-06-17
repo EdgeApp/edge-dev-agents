@@ -9,8 +9,11 @@
 #   set-tested.sh <task_gid> ... --dry-run     # print payload, do not PUT
 #
 # Options (multi-select; pass every method that genuinely ran):
-#   Simulator   — the change was driven in-app on the iOS sim (maestro / build +
-#                 simctl launch, real action to terminal success)
+#   iOS Sim     — the change was driven in-app on the iOS sim (maestro / build +
+#                 simctl launch, real action to terminal success). DEFAULT sim
+#                 platform; quote it ("iOS Sim") since it contains a space.
+#   Android Sim — exercised on Android (gradle :app:assembleDebug for a build-only
+#                 fix, or an AVD/maestro in-app drive). Only for Android tasks.
 #   Unit Tests  — jest / mocha / `npm test` ran (verify-repo's test step)
 #   CouchDB     — a CouchDB-backed test ran (sync / server repos: edge-reports-
 #                 server, edge-core-js sync, a couch/pouch integration test)

@@ -44,6 +44,19 @@ WT="$WORKTREES_ROOT/$TASK_GID/$REPO"
 BRANCH="$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 [[ -z "$BRANCH" || "$BRANCH" == "HEAD" ]] && BRANCH="agent/$TASK_GID"
 
+# Kill any dev-server / bundler still rooted in this worktree (metro, webpack
+# serve, `yarn start`, esbuild) BEFORE removing the dir. A leftover single-occupant
+# dev-server (e.g. accountbased DEBUG webpack on a fixed port) survives retirement
+# with no live slot and silently forces the next task onto the heavier rebuild path
+# — and holding the dir open also blocks the worktree remove. Match by working
+# directory under this worktree (robust regardless of port).
+if [[ -d "$WT" ]]; then
+  WT_REAL="$(cd "$WT" 2>/dev/null && pwd -P || echo "$WT")"
+  for pid in $(lsof -a -d cwd -Fpn 2>/dev/null | awk -v wt="$WT_REAL" '/^p/{p=substr($0,2)} /^n/{if (index(substr($0,2), wt)==1) print p}' | sort -u); do
+    kill "$pid" 2>/dev/null && echo ">> cleanup-task-workspace: killed dev-server/proc pid $pid rooted in worktree" >&2
+  done
+fi
+
 # Delete the env.json copy first so we scrub the plaintext secrets even if the
 # worktree-remove below fails and the dir lingers. (-e: it's now a real file, not
 # a symlink; older worktrees may still have a symlink — rm -f handles both.)

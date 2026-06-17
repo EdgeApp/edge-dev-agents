@@ -119,16 +119,46 @@ ensure_metro_ready_and_pin() {
   xcrun simctl spawn "$UDID" defaults write "$BUNDLE_ID" RCT_jsLocation "localhost:$PORT" 2>/dev/null || true
 }
 
+# ── Native-build drift guard ────────────────────────────────────────────────────
+# The cached-install fast path must not launch a prebuilt .app whose NATIVE side
+# (pods: reanimated, new-arch/fabric, any native module) predates the worktree's JS
+# — develop's JS then throws at render on the stale native app (the reanimated-4
+# wall: a slot image built pre-migration vs current-develop JS). `ios/Podfile.lock`
+# is committed and changes ONLY when native pods change (a JS-only diff leaves it
+# byte-identical), so its hash is the precise native-drift signal: rebuild on native
+# change, keep the fast path for JS-only changes. We stamp the hash into the app's
+# DATA container at build time; the stamp clones along with the app via APFS, so a
+# slot clone inherits the master's stamp and a JS-only change still fast-paths.
+native_deps_hash() {
+  if [[ -f ios/Podfile.lock ]]; then shasum -a 256 ios/Podfile.lock | cut -c1-16; else echo "no-podfile-lock"; fi
+}
+app_stamp_path() {
+  local data; data="$(xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" data 2>/dev/null || true)"
+  [[ -n "$data" ]] && printf '%s/.agent-native-build-stamp' "$data"
+}
+write_build_stamp() {
+  local sp want; sp="$(app_stamp_path)"; want="$(native_deps_hash)"
+  [[ -n "$sp" ]] || return 0
+  printf '%s\n' "$want" > "$sp" 2>/dev/null && echo ">> ios-rn-build: wrote native-build stamp ($want)" >&2 || true
+}
+
 # Already installed? (sim is booted now, so this is an accurate check.)
 if ! $FORCE && xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>&1; then
-  echo ">> ios-rn-build: $BUNDLE_ID already installed on $UDID; launching only (port $PORT)" >&2
-  # The cached app was baked for some default packager host; on a non-8081 slot it
-  # would connect to the wrong/foreign Metro. Guard the port and PIN the app to THIS
-  # slot's Metro before launching, so it bundles from the right place.
-  ensure_metro_ready_and_pin
-  xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
-  echo ">> ios-rn-build: PASS (cached install, launched on Metro port $PORT)"
-  exit 0
+  WANT_HASH="$(native_deps_hash)"
+  STAMP_FILE="$(app_stamp_path)"
+  HAVE_HASH=""
+  [[ -n "$STAMP_FILE" && -f "$STAMP_FILE" ]] && HAVE_HASH="$(tr -d '[:space:]' < "$STAMP_FILE" 2>/dev/null || true)"
+  if [[ -n "$HAVE_HASH" && "$HAVE_HASH" == "$WANT_HASH" ]]; then
+    echo ">> ios-rn-build: $BUNDLE_ID installed on $UDID, native stamp matches ($WANT_HASH); launching only (port $PORT)" >&2
+    # Cached app may have been baked for a default packager host; pin it to THIS
+    # slot's Metro before launching so it bundles from the right place.
+    ensure_metro_ready_and_pin
+    xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
+    echo ">> ios-rn-build: PASS (cached install, launched on Metro port $PORT)"
+    exit 0
+  fi
+  echo ">> ios-rn-build: cached app present but native stamp '${HAVE_HASH:-<none>}' != worktree '$WANT_HASH' — pods drifted (reanimated/new-arch/native module) or never stamped; FORCING a full rebuild so develop's JS does not throw on a stale native app" >&2
+  # fall through to the full build path (which restamps on success)
 fi
 
 # Full build path
@@ -214,5 +244,9 @@ if ! xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>&1; then
   echo ">> ios-rn-build: FAIL — build completed but $BUNDLE_ID is not installed on $UDID" >&2
   exit 1
 fi
+
+# Stamp the freshly-built app with the native-deps hash it was built from, so the
+# next cached launch (this sim, or a clone that inherits this image) can trust it.
+write_build_stamp
 
 echo ">> ios-rn-build: PASS (fresh build, installed, launched)"

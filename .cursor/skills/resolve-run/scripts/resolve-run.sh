@@ -176,12 +176,33 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
   run_report=$(find "$WORKTREES_ROOT/$gid" /tmp -maxdepth 3 \( -iname "*run-report*" -o -iname "*report*$gid*" \) -type f 2>/dev/null | head -1 || true)
   [ -z "$run_report" ] && run_report="asana-attachment"
 
-  # durable release receipt written by the watchdog at retirement (O1/O6 evidence)
+  # durable release receipt written by the watchdog at retirement (O1/O6 evidence).
+  # If the gid is LIVE again (re-fired for a followup), any receipt on disk is the
+  # PRIOR incarnation's retirement — surfacing it would let a consumer mis-grade O6
+  # as a clean release of the CURRENT run. Null it out when live, with a flag so the
+  # eval knows a prior receipt exists but does not apply to this run.
   local release_receipt="null"
-  if [ -r "$STATE_DIR/releases/$gid.json" ]; then
+  if [ "$session_state" = "live" ]; then
+    [ -r "$STATE_DIR/releases/$gid.json" ] && release_receipt='{"stale_prior_incarnation":true,"note":"gid is live again; prior retirement receipt suppressed"}'
+  elif [ -r "$STATE_DIR/releases/$gid.json" ]; then
     release_receipt=$(jq -c . "$STATE_DIR/releases/$gid.json" 2>/dev/null || true)
     [ -n "$release_receipt" ] || release_receipt="null"
   fi
+
+  # Block-decision evidence: the attempt-log (authoritative record of value-moving
+  # actions / test-drives, written by log-attempt.sh — agent-location-independent, so
+  # it holds the attempt even when a separate tester subagent performed it), plus the
+  # last blocker reason + the blocker-validator verdict. The eval grades A7 (premature
+  # yield) and the block-gating O-dimension against these instead of transcript prose.
+  local attempt_log="[]"
+  if [ -r "$STATE_DIR/attempts/$gid.jsonl" ]; then
+    attempt_log=$(jq -cs . "$STATE_DIR/attempts/$gid.jsonl" 2>/dev/null || echo "[]")
+    [ -n "$attempt_log" ] || attempt_log="[]"
+  fi
+  local blocker_reason="null"
+  [ -r "/tmp/agent-blocker-reason-$gid.txt" ] && blocker_reason=$(jq -Rs . "/tmp/agent-blocker-reason-$gid.txt" 2>/dev/null || echo null)
+  local blocker_verdict="null"
+  [ -r "/tmp/agent-blocker-verdict-$gid.json" ] && blocker_verdict=$(jq -c . "/tmp/agent-blocker-verdict-$gid.json" 2>/dev/null || echo null)
 
   jq -cn \
     --arg gid "$gid" --arg name_hint "$name_hint" --arg spawned "$spawned" \
@@ -191,6 +212,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     --argjson prs "$prs" --argjson asana "$asana" --argjson slot "$slot" --argjson pool "$pool_entry" \
     --arg run_report "$run_report" --argjson revive "$revive_pings" --argjson operator "$operator_msgs" --argjson wd "$watchdog_mentions" \
     --argjson release_receipt "$release_receipt" \
+    --argjson attempt_log "$attempt_log" --argjson blocker_reason "$blocker_reason" --argjson blocker_verdict "$blocker_verdict" \
     --argjson forensics "$forensics" --arg state_dir "$STATE_DIR" --arg watchdog_log "$WATCHDOG_LOG" --arg watcher_log "$WATCHER_LOG" \
     --argjson runaway_log_exists "$([ -f "$STATE_DIR/runaway-guard.log" ] && echo true || echo false)" \
     '{
@@ -210,6 +232,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       pool_entry: $pool,
       run_report: $run_report,
       release_receipt: $release_receipt,
+      blocking: { attempt_log: $attempt_log, last_reason: $blocker_reason, validator_verdict: $blocker_verdict },
       signals: { revive_pings_in_transcript: $revive, operator_messages: $operator, watchdog_log_mentions: $wd, forensics_files: $forensics },
       logs: { watcher: $watcher_log, watchdog: $watchdog_log,
               runaway_guard: ($state_dir + "/runaway-guard.log"),
