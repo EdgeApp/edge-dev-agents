@@ -9,8 +9,9 @@
 //   3. Runs verification via ~/.cursor/skills/pm.sh (verify, else tsc + lint)
 //   4. Bumps version (minor for added/changed, patch for fixed)
 //   5. Updates CHANGELOG.md with version header
-//   6. Commits and tags locally (does NOT push)
-//   7. Returns JSON with needsPush flag
+//   6. Regenerates package-lock.json to match the new version (npm repos)
+//   7. Commits and tags locally (package.json + CHANGELOG.md + lockfile; no push)
+//   8. Returns JSON with needsPush flag
 //
 // The agent should:
 //   - Show the user the version bump details and ask for confirmation
@@ -82,20 +83,38 @@ function parseChangelog(repoDir) {
 function bumpVersion(repoDir, patchOnly) {
   const pkgPath = path.join(repoDir, "package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+  const oldVersion = pkg.version;
   const parts = pkg.version.split(".").map(Number);
-  
+
   if (patchOnly) {
     parts[2]++;
   } else {
     parts[1]++;
     parts[2] = 0;
   }
-  
+
   const newVersion = parts.join(".");
   pkg.version = newVersion;
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-  
-  return { oldVersion: pkg.version, newVersion };
+
+  return { oldVersion, newVersion };
+}
+
+// Regenerate package-lock.json so its embedded version matches the bumped
+// package.json. npm's lockfile records the package's OWN version (the top-level
+// `version` and `packages[""].version`); a version bump leaves those stale, so
+// without this the tag commit ships a lockfile pointing at the previous version.
+// `--package-lock-only` rewrites the lockfile from package.json without touching
+// node_modules or running lifecycle scripts. yarn.lock does NOT record the root
+// package's version, so yarn-only repos need nothing here. Returns the lockfile
+// paths to stage in the version commit (empty for yarn-only repos).
+function syncLockfile(repoDir) {
+  if (!existsSync(path.join(repoDir, "package-lock.json"))) return [];
+  execSync(
+    "npm install --package-lock-only --ignore-scripts --no-audit --no-fund",
+    { cwd: repoDir, stdio: "pipe" }
+  );
+  return ["package-lock.json"];
 }
 
 function updateChangelog(repoDir, newVersion) {
@@ -197,10 +216,26 @@ async function publishRepo(repo, branch) {
     // Update changelog
     updateChangelog(repoDir, newVersion);
     console.error("✓ Updated CHANGELOG.md");
-    
+
+    // Sync the lockfile to the new version so the tag commit ships a matching
+    // package-lock.json (npm repos only; see syncLockfile).
+    let lockFiles = [];
+    try {
+      lockFiles = syncLockfile(repoDir);
+      if (lockFiles.length > 0) {
+        console.error("✓ Regenerated package-lock.json for new version");
+      }
+    } catch (e) {
+      results.error = `Failed to regenerate package-lock.json: ${e.message}`;
+      return results;
+    }
+
     // Commit and tag (do NOT push yet - agent will prompt user first)
     try {
-      runGit("add package.json CHANGELOG.md", repoDir);
+      runGit(
+        ["add", "package.json", "CHANGELOG.md", ...lockFiles].join(" "),
+        repoDir
+      );
       execSync(`git commit -m "v${newVersion}" --no-verify`, { cwd: repoDir, stdio: "pipe" });
       runGit(`tag v${newVersion}`, repoDir);
       console.error(`✓ Committed and tagged v${newVersion}`);
