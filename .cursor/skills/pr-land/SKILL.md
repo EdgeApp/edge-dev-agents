@@ -41,7 +41,10 @@ Arguments are classified automatically:
 <rule id="unexpected-exit">Unexpected exit codes → STOP immediately. If any script returns an exit code not documented in this file, STOP and report to user. Do NOT attempt to interpret, retry, or work around unexpected errors.</rule>
 <rule id="sequential-rebase">Sequential merging requires rebase. Each subsequent PR MUST be rebased onto the updated base branch after the previous merge.</rule>
 <rule id="publish-gating">Don't publish if outstanding PRs remain. Only offer to publish a repo when ALL approved PRs for that repo are merged. If any were skipped or held back, do NOT publish that repo.</rule>
-<rule id="npm-otp-required">`npm publish` MUST be run with `--otp=<code>` supplied by the user. Do NOT attempt `npm publish` without an OTP. Do NOT run `npm login` — auth comes from the `_authToken` in `~/.npmrc`. If `npm whoami` fails before the first publish, STOP and report; do not try to re-authenticate.</rule>
+<rule id="npm-otp-required">`npm publish` requires the user's npm 2FA. Two paths, depending on the account's 2FA type — never skip 2FA on either:
+- **TOTP (authenticator app):** run with `--otp=<code>` from a 6-digit code the user supplies. Never run `npm publish` without the `--otp` flag on a TOTP account.
+- **Passkey / WebAuthn (no 6-digit code):** run `npm publish` with NO `--otp` flag; npm opens a browser / prints a URL for the user to approve with their passkey (relies on `auth-type=web`).
+If you do not know which the account uses, ask the user. Do NOT run `npm login` — auth comes from the `_authToken` in `~/.npmrc`; the user owns login. If `npm whoami` fails before the first publish, STOP and report; do not try to re-authenticate.</rule>
 <rule id="defer-gui">If the discovered PR set contains BOTH `edge-react-gui` PRs and at least one non-GUI PR, all GUI PRs are DEFERRED — they do NOT enter steps 3-7 (prepare/push/merge/publish/upgrade-dep). GUI PRs are processed in step 8 (new) after step 7's dep upgrades land on develop. If the batch is pure GUI or pure non-GUI, no deferral — proceed as normal.</rule>
 <rule id="asana-last">Asana updates are LAST. Do NOT update Asana tasks until ALL merges, publishes, and GUI dependency upgrades are complete. Only update status for PRs that are fully landed (merged, and if non-GUI: published + GUI deps updated).</rule>
 </rules>
@@ -273,9 +276,10 @@ cd <repoDir> && npm whoami
 If it fails or prints an unexpected username: STOP and tell the user to check `~/.npmrc`. Do NOT attempt `npm login`. Do NOT prompt for credentials.
 </sub-step>
 
-<sub-step name="Publish each repo with OTP from user">
-For each repo, in sequence:
+<sub-step name="Publish each repo (TOTP or passkey 2FA)">
+For each repo, in sequence. First determine the user's npm 2FA type (ask if unknown): **TOTP** (6-digit authenticator code) or **passkey/WebAuthn** (browser approval, no code).
 
+**TOTP path:**
 1. Ask the user exactly: `OTP for <repo> (npm publish)?` — wait for a 6-digit code.
 2. Run:
    ```bash
@@ -283,7 +287,18 @@ For each repo, in sequence:
    ```
 3. On success: capture the published version from output, proceed to the next repo.
 4. On failure with `EOTP` / "OTP required" / any auth error: treat as a stale OTP (OTPs are single-use and ~30s-lived). Ask for a fresh OTP and retry. Retry at most **2 times**; on third failure STOP and report.
-5. On any other failure (network, registry error, version conflict): STOP and report — do not retry.
+
+**Passkey / web-auth path:**
+1. Tell the user exactly: `Publishing <repo> — approve the npm passkey prompt in your browser when it opens.`
+2. Run (NO `--otp` flag; relies on `auth-type=web`):
+   ```bash
+   cd <repoDir> && npm publish
+   ```
+3. npm prints a URL / opens a browser; the user approves with their passkey. Use a long timeout — the command blocks until the user completes the browser prompt.
+4. On success: capture the published version from output, proceed to the next repo.
+5. On failure with a 2FA/auth error (user dismissed or missed the browser prompt): ask the user to retry the approval and re-run. Retry at most **2 times**; on third failure STOP and report.
+
+**Both paths:** On any other failure (network, registry error, version conflict): STOP and report — do not retry.
 
 After all repos publish successfully, proceed to step 7 automatically. Do NOT ask for a second confirmation — the exit codes are the confirmation.
 </sub-step>
