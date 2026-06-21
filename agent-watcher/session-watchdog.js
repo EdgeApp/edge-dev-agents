@@ -34,6 +34,9 @@ const STATE_FILE = path.join(slots.STATE_DIR, 'watchdog-state.json')
 const CRED_FILE = path.join(HOME, '.config/agent-watcher/credentials.json')
 const CFG_FILE = path.join(HOME, '.config/agent-watcher/asana-config.json')
 const IDLE_THRESHOLD_MS = 20 * 60 * 1000
+// After this long parked at a human-choice prompt, emit ONE escalation line (instead
+// of the per-tick park log) so an operator notices; never auto-sheds.
+const PARK_ESCALATE_MS = 60 * 60 * 1000
 const RC_ACTIVE_MARKER = 'Remote Control active'        // pane footer present iff the RC bridge is up (near-end view)
 const RC_HALFOPEN_BACKSTOP_MS = 3 * 60 * 60 * 1000      // DISABLED 2026-06-05 (backstop removed to eval zero-ping-on-healthy); kept for easy revert
 const SESSION_PREFIX = 'claude-asana-'
@@ -570,8 +573,24 @@ function main() {
     // (ping + /remote-control + Esc) would answer the dialog blindly. Both make the
     // pane static, so the idle heuristic alone cannot tell them from a hang.
     const awaitingChoice = paneAwaitingChoice(content)
+    // Park tracking: a session parked at a human-choice prompt is correctly NOT
+    // revived, but the per-tick log used to spam (~60 identical lines for a 2h park).
+    // Log ONCE on entering the park, then a SINGLE escalation after PARK_ESCALATE_MS
+    // (operator attention, not auto-shed — shedding could kill a session mid-decision),
+    // and reset the moment it leaves the park.
+    let parkedSince = null
+    let parkLogged = false
+    let parkEscalated = false
     if (awaitingChoice && !changed && now - (prior?.lastChange ?? now) > IDLE_THRESHOLD_MS) {
-      log(`[${session}] parked at an interactive prompt — NOT reviving (needs a human choice).`)
+      parkedSince = prior?.parkedSince ?? now
+      parkLogged = true
+      parkEscalated = prior?.parkEscalated ?? false
+      if (!prior?.parkLogged) {
+        log(`[${session}] parked at an interactive prompt — NOT reviving (needs a human choice).`)
+      } else if (!parkEscalated && now - parkedSince > PARK_ESCALATE_MS) {
+        log(`[${session}] STILL parked at a human-choice prompt after ${Math.round((now - parkedSince) / 60000)}m — operator attention needed (attach: tmux attach -t ${session}). Not reviving, not shedding.`)
+        parkEscalated = true
+      }
     }
     if (stateOk && !isBlocked && !awaitingChoice && !changed && !rcUp && now - prior.lastChange > IDLE_THRESHOLD_MS) {
       // Require stateOk: never revive on an UNCONFIRMED status. A transient Asana
@@ -591,7 +610,7 @@ function main() {
     }
     // On an unconfirmed fetch, preserve the prior heavyFreed rather than letting a
     // null-blocked blip reset it to false and re-free next tick.
-    state.sessions[session] = { lastContent: content, lastChange, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false) }
+    state.sessions[session] = { lastContent: content, lastChange, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated }
   }
 
   // Un-retire any completed session a human re-engaged for followup (status moved off
