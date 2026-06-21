@@ -33,7 +33,7 @@ usage() {
 Usage: $(basename "$0") <task_gid> <status_name> [--blocked yes|no] [--reason "<text>"]
   status_name: Pending | Planning | Developing | Reviewing | Testing | Complete
   --reason: REQUIRED with --blocked yes — the claimed blocker, judged by the
-            block-validation gate against the true-blocker taxonomy.
+            concession-validation gate against the true-blocker taxonomy.
 EOF
   exit 2
 }
@@ -54,13 +54,13 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -z "$BLOCKED" || "$BLOCKED" == "yes" || "$BLOCKED" == "no" ]] || usage
 
-# Persist the claimed blocker reason (read by the block-validation gate + the eval).
-# The reason is the justification the blocker-validator judges against the
+# Persist the claimed blocker reason (read by the concession-validation gate + the eval).
+# The reason is the justification the concession-validator judges against the
 # true-blocker taxonomy; an empty reason on a --blocked yes is itself suspect.
 if [[ "$BLOCKED" == "yes" ]]; then
-  printf '%s\n' "$REASON" > "/tmp/agent-blocker-reason-$TASK_GID.txt" 2>/dev/null || true
+  printf '%s\n' "$REASON" > "/tmp/agent-concession-reason-$TASK_GID.txt" 2>/dev/null || true
 elif [[ "$BLOCKED" == "no" ]]; then
-  rm -f "/tmp/agent-blocker-reason-$TASK_GID.txt" "/tmp/agent-blocker-verdict-$TASK_GID.json" 2>/dev/null || true
+  rm -f "/tmp/agent-concession-reason-$TASK_GID.txt" "/tmp/agent-concession-verdict-$TASK_GID.json" 2>/dev/null || true
 fi
 
 TOKEN=$(jq -r .asana_token "$CRED")

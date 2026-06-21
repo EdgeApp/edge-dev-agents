@@ -7,8 +7,12 @@
 #   PROVIDER                — exact provider name to force (e.g. "Maya Protocol").
 #                             Forcing works by SELECTING it in the provider sheet;
 #                             note Preferred/preferPluginId do NOT pin — engine
-#                             reverts to best-rate ~60s. For a hard pin, disable
-#                             competitors in Settings > Exchange first.
+#                             reverts to best-rate ~60s. For a HARD pin, disable
+#                             competitors LOCALLY in the worktree's corePlugins.ts
+#                             `swapPlugins` map (set them false) per build-and-test
+#                             `force-swap-provider-locally` — NOT in-app Settings >
+#                             Exchange, which is account-synced and thrashes under
+#                             parallel sessions.
 # GOTCHA: amount field retains prior text — eraseText before input.
 appId: ${APP_ID}
 env:
