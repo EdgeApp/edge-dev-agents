@@ -74,27 +74,46 @@ entry (the human audits and prunes it periodically — keep entries dense).
      recurs, note it as a known product blocker (link 1215619633542395), and
      fall back to an existing wallet. Do NOT spend the slot trying to "fix the
      sim."
-- **Debug builds crash to springboard (RN Fabric SIGABRT) on two reliable
-  triggers: rapid settings-row toggling, and swap-amount keypad entry.** Seen
-  repeatedly on the SideShift run. Do NOT keep relaunching to grind through it —
-  you'll burn the slot. **The direct-verification fallback below is GATED: it is
-  legitimate ONLY after you have actually funded and driven a REAL, available
-  swap to the point where THIS crash interrupts execution. It is NOT a substitute
-  for an executable swap you already hold.** If a funded, provider-supported pair
-  is in hand (both wallets present, e.g. BTC→FTM), you must drive THAT pair to
-  completion first (see the `executable-pair-must-complete` rule) — abandoning it
-  for a slower/riskier path and then citing "the build crashes" is the exact
-  miss this gate exists to prevent. Only once a genuine funded attempt is
-  interrupted by the Fabric crash do you switch to **direct verification of the
-  code path** as primary proof and treat the in-app run as partial evidence:
-  (1) `tsc` clean, (2) boot-time plugin/env validation (the app re-initializing
-  the plugin on your new bundle proves the changed init path), (3) hit the real
-  provider endpoint yourself (e.g. `curl` the exact request the plugin makes) to
-  confirm the behavior the change produces. Capture whatever in-app state you DID
-  reach (e.g. a fully-configured swap with source+receiving wallets selected) as
-  a proof screenshot before the crash. THAT combination — genuine funded attempt
-  + crash + direct proof — is a legitimate PASS; bailing to direct proof BEFORE a
-  real funded attempt is not.
+- **Debug builds crash on RN Fabric on several reliable triggers: rapid
+  settings-row toggling, swap-amount keypad entry (SIGABRT to springboard), and
+  `uiManagerDidDispatchCommand` (SIGSEGV).** The SIGSEGV variant ALSO wedges the
+  maestro driver into mis-targeting taps afterward — which is how a run drifts
+  into "I stopped to avoid an accidental send." Seen repeatedly on the SideShift
+  run. Do NOT keep relaunching to grind through it — you'll burn the slot.
+  **CONTINUE-WORKAROUND FIRST (this gotcha is documented precisely so you do NOT
+  stop on it):** a wedged/mis-targeting maestro driver is recoverable, not a
+  wall. Rebuild the correct flavor if the slot image drifted (the `ios-rn-build`
+  Podfile.lock stamp self-heal), then drive via the maestro CLI + `simctl io`
+  against `$AGENT_SIM_UDID` rather than the drifted MCP daemon (per
+  `maestro-flows-are-shortcuts`: the MCP is exploration-only and rebinds devices;
+  CLI is the proof path), and re-pin the swap pair via the corePlugins hack so
+  the keypad/confirm steps land deterministically. Stopping here — or finalizing
+  Complete/pr-create via direct verification — WITHOUT applying this workaround
+  is a DOWNGRADE concession the `require-concession-validation.sh` gate catches;
+  the concession-validator DENIES it because a documented continue-workaround
+  exists. **The direct-verification fallback below is GATED: it is legitimate
+  ONLY after you have actually funded and driven a REAL, available swap to the
+  point where THIS crash interrupts execution AND no continue-workaround remains.
+  It is NOT a substitute for an executable swap you already hold.** Invoking the
+  fallback is itself a concession — log the genuine funded attempt and its wall
+  via `log-attempt.sh` (`result: failed:fabric-sigsegv` / `blocked:...`) so the
+  validator can corroborate it; an un-logged or pre-attempt bail is denied. If a
+  funded, provider-supported pair is in hand (both wallets present, e.g. BTC→FTM),
+  you must drive THAT pair to completion first (see the
+  `executable-pair-must-complete` rule) — abandoning it for a slower/riskier path
+  and then citing "the build crashes" is the exact miss this gate exists to
+  prevent. Only once a genuine funded attempt is interrupted by the Fabric crash
+  AND the continue-workaround above did not recover the driver do you switch to
+  **direct verification of the code path** as primary proof and treat the in-app
+  run as partial evidence: (1) `tsc` clean, (2) boot-time plugin/env validation
+  (the app re-initializing the plugin on your new bundle proves the changed init
+  path), (3) hit the real provider endpoint yourself (e.g. `curl` the exact
+  request the plugin makes) to confirm the behavior the change produces. Capture
+  whatever in-app state you DID reach (e.g. a fully-configured swap with
+  source+receiving wallets selected) as a proof screenshot before the crash. THAT
+  combination — genuine funded attempt + crash + failed workaround + direct proof
+  — is a legitimate PASS; bailing to direct proof BEFORE a real funded attempt,
+  or before trying the documented workaround, is not.
 - **High-value wallets are sanctioned funding sources.** BTC / ETH / USDC and
   similar majors (which nearly every swap provider supports) MAY be swapped FROM
   to fund the asset a test needs. You are allowed to spend them for testing.
@@ -167,16 +186,21 @@ entry (the human audits and prunes it periodically — keep entries dense).
   usually answerable from source (settings store, plugin registration, env.json
   flags) or one `/debugger` breakpoint — minutes, vs. an hour of taps.
 - **Feature-enablement check (the Rango lesson):** when a provider/feature you
-  expect simply ISN'T THERE (no quotes from it, not in the list), FIRST suspect
-  a setting: swap providers can be individually disabled under
-  **Settings → Exchange Settings** (per-account state, so it differs between
-  edge-rjqa3 and edge-funds!). Verify via code/state or ONE settings screenshot —
-  this is general knowledge, NOT a mandatory physical preflight on every run. The
-  same surface is also the lever to FORCE a provider (disable competitors);
-  Preferred/preferPluginId do NOT pin (engine reverts to best-rate ~60s).
-- If you changed provider/exchange settings on an account to force routing,
-  **revert them when the test is done** — the next run (or human) inherits that
-  account state.
+  expect simply ISN'T THERE (no quotes from it, not in the list), FIRST suspect a
+  setting: a swap provider can be disabled in **Settings → Exchange Settings**,
+  which is PER-ACCOUNT state (differs between edge-rjqa3 and edge-funds). Use this
+  only to DIAGNOSE (read it from code/state or ONE screenshot) — do NOT toggle it.
+- **FORCE a provider via the LOCAL corePlugins hack, NEVER the in-app Exchange
+  Settings.** To isolate one swap provider, edit the gui worktree's
+  `src/util/corePlugins.ts` `swapPlugins` map and set every OTHER provider to
+  `false`, leaving only the target's `*_INIT` — local, uncommitted (per
+  `force-swap-provider-locally`). Exchange Settings are ACCOUNT-SYNCED: toggling
+  them on edge-funds thrashes against every other parallel session on the same
+  account (and persists to the next run / a human), so it is parallel-UNSAFE and
+  forbidden as the forcing lever. The corePlugins edit is worktree-local, so
+  parallel sessions never collide. (Preferred/preferPluginId do NOT pin — the
+  engine reverts to best-rate in ~60s — which is the other reason the local hard
+  disable of competitors is the reliable way to force routing.)
 - **Stake-plugin label/display changes are verifiable FUND-FREE on the Earn
   scene.** Home → Earn Crypto → Discover → search the asset code: the pool-card
   title comes from `stakeAssets[].displayName ?? currencyCode` in plugin config,
@@ -218,3 +242,42 @@ entry (the human audits and prunes it periodically — keep entries dense).
   (`XCTPerformOnMainRunLoop timed out 60s`). Tap "Allow Paste" with a
   hierarchy-free point tap, or feed the value through a debug override instead of
   the system clipboard.
+- **Re-stabilize a springboard-dropping debug build by trimming plugins.** When
+  the build starts crashing to springboard on swap/wallet-selector screens after
+  several relaunches, comment out `piratechain` and `stellar` in
+  `src/util/corePlugins.ts` (local-only, Metro reload, revert after) — it restores
+  stability without losing the logged-in account.
+- **Hot-swap an exchange-plugin JS change instead of a ~15 min native rebuild.**
+  For an `edge-exchange-plugins` JS change on re-test: rebuild the dep
+  (`npm run prepare`) and `cp` the webpacked `edge-exchange-plugins.js` over
+  `<app>/edge-exchange-plugins.bundle/edge-exchange-plugins.js` in the installed
+  `.app`, then relaunch — the WebView reloads the plugin bundle from the resource
+  on launch. Parallel-safe (per-slot `.app`).
+- **Force a provider + pick a quotable pair.** To route a swap through a specific
+  DEX provider, disable competitors in **Settings → Exchange Settings** (per-account
+  state). A small same-chain stablecoin→native amount may not quote on
+  Maya/Thorchain (price-impact/min); a cross-chain destination (e.g. token→BTC)
+  quotes reliably and exercises the same source-side token-spend code.
+- **Create-wallet entry points.** The Wallets bottom tab is labeled **"Assets"**;
+  the create-wallet entry is the header `addButton` (testID) — use it instead of
+  scrolling a long wallet list. YOLO auto-login (edge-funds / 0000) lands logged-in
+  a few seconds after launch.
+
+## Asset & provider specifics
+- **`edge-funds` holds a funded My MAYAChain (CACAO) wallet (~$150).** Usable for
+  real Maya swap execution (e.g. CACAO→BTC). Maya is the only provider for CACAO
+  pairs, so no provider forcing is needed for CACAO sources.
+- **keys-only create-wallet exclusion — proxy without the target asset:**
+  `bitcoinsv` is hardcoded-enabled in `corePlugins.ts` AND `keysOnlyMode: true`, so
+  searching "Bitcoin SV" in "Choose Wallets to Add" shows no creatable result — a
+  ready proxy for verifying the keys-only exclusion mechanism when the real asset
+  (e.g. Botanix) can't run in the sim.
+- **`BOTANIX_INIT` is `false` by default in env.json; enabling it crashes the
+  debug build on launch.** So Botanix is absent from `account.currencyConfig` in
+  normal builds and never appears in create-wallet regardless of `keysOnlyMode` —
+  exercise the gate via the bitcoinsv proxy above, not Botanix itself.
+- **`keysOnlyMode` in `SPECIAL_CURRENCY_INFO` can be a computed boolean evaluated
+  at module load** (precedents: zcash → `isZecBroken()`, piratechain → inline
+  Platform check). A helper it calls must not reference a module-level `const`
+  declared AFTER `SPECIAL_CURRENCY_INFO`, or it hits the temporal dead zone at
+  import.

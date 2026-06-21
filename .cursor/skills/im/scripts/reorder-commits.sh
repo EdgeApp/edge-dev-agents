@@ -27,8 +27,9 @@ BASE="$1"
 shift
 DESIRED_ORDER=("$@")
 
-# Remove stale index locks
-rm -f .git/index.lock
+# Remove stale index locks. A worktree's `.git` is a FILE (gitdir pointer), not a
+# directory, so `.git/index.lock` does not exist there; resolve the real path.
+rm -f "$(git rev-parse --git-path index.lock 2>/dev/null || echo .git/index.lock)"
 
 # Get short hashes for matching rebase todo lines
 BRANCH_COMMITS=$(git log --reverse --format='%h' "$BASE..HEAD")

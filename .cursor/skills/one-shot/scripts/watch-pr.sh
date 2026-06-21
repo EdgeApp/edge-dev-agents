@@ -35,6 +35,15 @@ if [ -z "$REPO" ] && ! git -C "$PWD" rev-parse --is-inside-work-tree >/dev/null 
   echo "ERROR: not in a git repo and no --repo given — pass --repo <owner/name> or run from the PR's worktree" >&2
   exit 2
 fi
+# Make the target repo EXPLICIT — never rely on gh's silent cwd inference. Run from
+# the WRONG worktree and gh would resolve a same-numbered PR in a different repo (or
+# "no checks") and the watch could read as green. If --repo was not passed, resolve
+# it from the cwd repo and LOG it, so a wrong-worktree cwd surfaces in the output
+# instead of silently watching the wrong PR.
+if [ -z "$REPO" ]; then
+  REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)
+  [ -n "$REPO" ] && echo ">> watch-pr: no --repo given; resolved '$REPO' from cwd ($(basename "$PWD"))" >&2
+fi
 command -v timeout >/dev/null || { echo "ERROR: timeout not on PATH (shim: ~/.cursor/skills/timeout.sh)" >&2; exit 2; }
 
 # Deadline is per task (falls back to per PR for ad-hoc use), shared across calls
@@ -64,7 +73,7 @@ if [ "$REMAINING" -le 0 ]; then
   echo ">> watch-pr: budget exhausted (deadline passed $((-REMAINING))s ago)" >&2
   exit 75
 fi
-echo ">> watch-pr: ${REMAINING}s of budget remain; watching PR #$PR" >&2
+echo ">> watch-pr: ${REMAINING}s of budget remain; watching ${REPO:+$REPO }PR #$PR" >&2
 
 ARGS=(pr checks "$PR" --watch --interval "$INTERVAL")
 [ -n "$REPO" ] && ARGS+=(--repo "$REPO")

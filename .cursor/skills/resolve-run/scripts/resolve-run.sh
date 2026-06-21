@@ -189,20 +189,24 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     [ -n "$release_receipt" ] || release_receipt="null"
   fi
 
-  # Block-decision evidence: the attempt-log (authoritative record of value-moving
+  # Concession-decision evidence: the attempt-log (authoritative record of value-moving
   # actions / test-drives, written by log-attempt.sh — agent-location-independent, so
   # it holds the attempt even when a separate tester subagent performed it), plus the
-  # last blocker reason + the blocker-validator verdict. The eval grades A7 (premature
-  # yield) and the block-gating O-dimension against these instead of transcript prose.
+  # last blocker reason + the concession-validator verdict. The verdict file is shared by
+  # BOTH concession kinds and carries `kind: block|downgrade`, so a downgrade-finalize
+  # (Complete/pr-create without reaching in-app success) surfaces here too even though it
+  # set no formal block (last_reason stays null; the verdict's reason_hash is the binding).
+  # The eval grades A7 (premature yield) and the concession-gating O-dimension against
+  # these instead of transcript prose.
   local attempt_log="[]"
   if [ -r "$STATE_DIR/attempts/$gid.jsonl" ]; then
     attempt_log=$(jq -cs . "$STATE_DIR/attempts/$gid.jsonl" 2>/dev/null || echo "[]")
     [ -n "$attempt_log" ] || attempt_log="[]"
   fi
   local blocker_reason="null"
-  [ -r "/tmp/agent-blocker-reason-$gid.txt" ] && blocker_reason=$(jq -Rs . "/tmp/agent-blocker-reason-$gid.txt" 2>/dev/null || echo null)
+  [ -r "/tmp/agent-concession-reason-$gid.txt" ] && blocker_reason=$(jq -Rs . "/tmp/agent-concession-reason-$gid.txt" 2>/dev/null || echo null)
   local blocker_verdict="null"
-  [ -r "/tmp/agent-blocker-verdict-$gid.json" ] && blocker_verdict=$(jq -c . "/tmp/agent-blocker-verdict-$gid.json" 2>/dev/null || echo null)
+  [ -r "/tmp/agent-concession-verdict-$gid.json" ] && blocker_verdict=$(jq -c . "/tmp/agent-concession-verdict-$gid.json" 2>/dev/null || echo null)
 
   jq -cn \
     --arg gid "$gid" --arg name_hint "$name_hint" --arg spawned "$spawned" \

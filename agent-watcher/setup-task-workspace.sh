@@ -253,7 +253,13 @@ link_shared_memory() {
 }
 
 # ── Idempotent reuse ──────────────────────────────────────────────────────────
-if git -C "$MAIN_REPO" worktree list --porcelain | grep -qxF "worktree $WT"; then
+# Clear stale registrations first: a worktree dir GC'd after completion can leave
+# its registration behind, so `worktree list` still names $WT while the directory
+# is gone. Pruning drops those dead entries so a fresh `worktree add` can proceed,
+# and the `-d "$WT"` guard means we only "reuse" a registration whose dir actually
+# exists (otherwise the reuse path runs env/node_modules ops against a missing dir).
+git -C "$MAIN_REPO" worktree prune 2>/dev/null || true
+if [[ -d "$WT" ]] && git -C "$MAIN_REPO" worktree list --porcelain | grep -qxF "worktree $WT"; then
   echo ">> setup-task-workspace: worktree already exists, reusing $WT" >&2
   ensure_env_json
   ensure_testconfig_json

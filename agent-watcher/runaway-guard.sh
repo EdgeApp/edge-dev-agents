@@ -44,9 +44,12 @@ CAPTURE="$HOME/.config/agent-watcher/capture-runaway-forensics.sh"
 
 ts() { date "+%Y-%m-%dT%H:%M:%S"; }
 
-# Rotate the log if it grows past ~2MB (cheap, keeps it bounded).
-if [[ -f "$LOG" ]] && [[ $(stat -f%z "$LOG" 2>/dev/null || echo 0) -gt 2097152 ]]; then
-  tail -2000 "$LOG" > "$LOG.tmp" 2>/dev/null && mv "$LOG.tmp" "$LOG"
+# Rotate the log if it grows past ~10MB, retaining ~10k lines. The old ~2MB/2k-line
+# cap rotated O2 RECORD/KILL evidence out of the window before /eval-run could read
+# it (forcing a fallback to the release-receipt flat_tree); the larger bound keeps a
+# multi-day window of guard activity durable while staying cheap.
+if [[ -f "$LOG" ]] && [[ $(stat -f%z "$LOG" 2>/dev/null || echo 0) -gt 10485760 ]]; then
+  tail -10000 "$LOG" > "$LOG.tmp" 2>/dev/null && mv "$LOG.tmp" "$LOG"
 fi
 
 check_once() {

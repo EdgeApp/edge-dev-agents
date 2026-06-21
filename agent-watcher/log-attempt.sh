@@ -3,13 +3,15 @@
 #
 # The attempt-log is the authoritative, agent-LOCATION-INDEPENDENT record of every
 # value-moving action (swap/send/sweep) and every test-drive/repro a run actually
-# performed. Whoever does the attempt writes it here; whoever validates a block (the
-# block-validation gate now, the eval post-hoc) reads it here. This decoupling is
-# what survives the tester split: when testing becomes its own subagent, the test
-# drive lands in the subagent's context — NOT the main agent's transcript — so a
-# transcript grep would miss it. The attempt-log, keyed by gid on the shared
-# filesystem, is written by the tester (whichever agent that is) and read by the
-# main agent's block gate and the eval all the same.
+# performed. Whoever does the attempt writes it here; whoever validates a CONCESSION
+# (the concession-validation gate now — covering BOTH a formal `--blocked yes` and a
+# silent DOWNGRADE-finalize that completes/opens a PR without reaching the prescribed
+# in-app success — the eval post-hoc) reads it here. This decoupling is what survives
+# the tester split: when testing becomes its own subagent, the test drive lands in the
+# subagent's context — NOT the main agent's transcript — so a transcript grep would miss
+# it. The attempt-log, keyed by gid on the shared filesystem, is written by the tester
+# (whichever agent that is) and read by the main agent's concession gate and the eval all
+# the same.
 #
 # Usage:
 #   log-attempt.sh --gid <gid> --action "<what was attempted>" \
