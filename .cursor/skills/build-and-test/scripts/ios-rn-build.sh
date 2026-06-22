@@ -68,6 +68,20 @@ PORT="${PORT:-${AGENT_METRO_PORT:-8081}}"
   exit 1
 }
 
+# Suppress React Native's Xcode "Start Packager" build phase. That phase `open`s
+# node_modules/react-native/scripts/launchPackager.command whenever nothing is
+# LISTENing on RCT_METRO_PORT, which pops a NEW Terminal.app window running Metro.
+# When the slot ends and the watchdog kills Metro, that window is orphaned at
+# "Process terminated. Press <enter> to close the window" and they pile up (manual
+# close + a "terminate running processes?" prompt each). This script runs its OWN
+# headless Metro on $PORT (ensure_metro_ready_and_pin → nohup, no window), so the
+# Xcode auto-launch is a redundant duplicate. RCT_NO_LAUNCH_PACKAGER makes the build
+# phase a no-op on BOTH the run-ios and the direct-xcodebuild fallback paths;
+# RCT_METRO_PORT points any port-derived logic at this slot's Metro, not the 8081
+# default (the fallback xcodebuild otherwise checks 8081 and spawns a window there).
+export RCT_NO_LAUNCH_PACKAGER=1
+export RCT_METRO_PORT="$PORT"
+
 # Confirm sim is booted. (get_app_container returns a false negative on a SHUT or
 # never-booted clone — even though the clone DOES inherit the app from the master
 # via APFS copy-on-write — so we MUST boot before checking, or we'd trigger a
@@ -196,9 +210,13 @@ fi
 echo ">> ios-rn-build: $PM run prepare.ios (via pm.sh)" >&2
 "$PM_SH" run prepare.ios
 
-# Refuse to race a foreign Metro before the (long) build: otherwise run-ios hangs on
-# an interactive "use another port?" prompt and can exit 0 without building.
-assert_metro_port_free_or_ours
+# Bring up THIS slot's headless Metro on $PORT before the (long) build (and refuse to
+# race a foreign Metro — otherwise run-ios hangs on an interactive "use another port?"
+# prompt and can exit 0 without building). With the Xcode packager-window auto-launch
+# suppressed above, run-ios and the xcodebuild fallback both find a ready headless
+# Metro to bundle from instead of spawning a Terminal.app window. ensure_metro_ready_and_pin
+# calls assert_metro_port_free_or_ours first, so the foreign-Metro guard still runs.
+ensure_metro_ready_and_pin
 
 RUN_ARGS=(--udid "$UDID")
 if [[ "$PORT" != "8081" ]]; then
