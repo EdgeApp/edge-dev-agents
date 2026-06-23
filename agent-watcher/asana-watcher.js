@@ -176,10 +176,19 @@ function waitRcReadyAndSendPrompt(sessionName, prompt) {
     execSync(`tmux send-keys -t "${sessionName}" Enter`, { stdio: 'inherit' })
     execSync('sleep 8')
     const pane = sh(`tmux capture-pane -t "${sessionName}" -p`)
-    // Submitted = the raw prompt text is NO LONGER sitting in the input line.
-    // (After submit it renders as a message/working state, not as editable input.)
-    const inputLine = pane.split('\n').filter((l) => l.trimStart().startsWith('❯')).pop() || ''
-    if (!inputLine.includes('/one-shot')) {
+    const paneLines = pane.split('\n')
+    // Submitted when the prompt has LEFT the input box. Two signals, EITHER suffices:
+    //  (a) the `❯` input line no longer holds it (cleared on submit); OR
+    //  (b) it appears as a SENT MESSAGE above the input — a non-`❯` line containing
+    //      `/one-shot`. (b) is the DUPLICATE GUARD: on a slow startup the Enter can land
+    //      on a DELAY, so on this poll the prompt is BOTH already-submitted-above AND
+    //      still echoed in the input box. Without (b) the retry C-u-clears and re-types
+    //      it, and the session gets two `/one-shot` runs (the observed "multiple oneshot
+    //      prompts"). The `/one-shot` token only appears at the prompt START, so a
+    //      wrapped URL tail on a non-`❯` continuation line never false-matches (b).
+    const inputLine = paneLines.filter((l) => l.trimStart().startsWith('❯')).pop() || ''
+    const submittedAbove = paneLines.some((l) => !l.trimStart().startsWith('❯') && l.includes('/one-shot'))
+    if (!inputLine.includes('/one-shot') || submittedAbove) {
       log(`  prompt sent (attempt ${attempt}): ${prompt}`)
       return
     }

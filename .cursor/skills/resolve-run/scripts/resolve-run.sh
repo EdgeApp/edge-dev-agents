@@ -75,6 +75,37 @@ asana_fetch() { # $1=gid → JSON {name,status,blocked} (or status=__MISSING__ /
   }'
 }
 
+# Followup-scope evidence. The agent attaches an `agent-run-report*.md` at each Complete;
+# that attachment's created_at is the "agent reported done here" WATERMARK. Any operator
+# comment newer than the PRIOR report is scope THIS run was responsible for — the eval
+# checks its work was DELIVERED (a PR shipped, on the parent or a per-repo subtask) before
+# Complete (catches the silent descope where a followup comment's asks are deferred to a
+# false Complete). Subtasks are unwatched PR/context holders, not separate runs; the list
+# is captured as evidence (which extra-repo PRs were attached), not as proof of discharge.
+asana_followup() { # $1=gid → {last_report_attached_at, prev_report_attached_at, comments_after_prev_report:[...], subtasks:[...]}
+  local gid="$1" token
+  token="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$CRED" 2>/dev/null)}"
+  local empty='{"last_report_attached_at":null,"prev_report_attached_at":null,"comments_after_prev_report":[],"subtasks":[]}'
+  [ -n "$token" ] || { echo "$empty"; return 0; }
+  local att sto sub reports last prev
+  att=$(curl -sf --max-time 20 "https://app.asana.com/api/1.0/tasks/$gid/attachments?opt_fields=name,created_at" -H "Authorization: Bearer $token" 2>/dev/null || echo '{"data":[]}')
+  sto=$(curl -sf --max-time 20 "https://app.asana.com/api/1.0/tasks/$gid/stories?opt_fields=resource_subtype,created_at,text" -H "Authorization: Bearer $token" 2>/dev/null || echo '{"data":[]}')
+  sub=$(curl -sf --max-time 20 "https://app.asana.com/api/1.0/tasks/$gid/subtasks?opt_fields=name,completed,created_at" -H "Authorization: Bearer $token" 2>/dev/null || echo '{"data":[]}')
+  # ISO8601-UTC created_at strings sort lexicographically, so no date parsing needed.
+  reports=$(echo "$att" | jq -c '[.data[]? | select((.name // "") | test("agent-run-report")) | .created_at] | sort | reverse' 2>/dev/null || echo '[]')
+  last=$(echo "$reports" | jq -r '.[0] // empty' 2>/dev/null || echo "")
+  prev=$(echo "$reports" | jq -r '.[1] // empty' 2>/dev/null || echo "")
+  echo "$sto" "$sub" | jq -cs --arg prev "$prev" --arg last "$last" '
+    .[0] as $s | .[1] as $t |
+    { last_report_attached_at: (if $last=="" then null else $last end),
+      prev_report_attached_at: (if $prev=="" then null else $prev end),
+      comments_after_prev_report: ( [ $s.data[]?
+        | select(.resource_subtype=="comment_added")
+        | select(($prev=="") or (.created_at > $prev))
+        | {created_at, text: ((.text // "")[0:500])} ] | .[-20:] ),
+      subtasks: [ $t.data[]? | {gid, name, completed, created_at} ] }' 2>/dev/null || echo "$empty"
+}
+
 find_transcript() { # $1=gid → newest jsonl whose FIRST asana URL gid equals the target
   # (mirrors resume-task.sh semantics: a later MENTION of the gid in another session
   #  must not match — six runs once resolved to one shared interactive transcript)
@@ -151,6 +182,8 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
 
   local asana; asana=$(asana_fetch "$gid" || true)
   [ -n "$asana" ] || asana='{"name":null,"status":null,"blocked":null}'
+  local followup; followup=$(asana_followup "$gid" || true)
+  [ -n "$followup" ] || followup='{"last_report_attached_at":null,"prev_report_attached_at":null,"comments_after_prev_report":[],"subtasks":[]}'
 
   local slot
   slot=$(node "$HOME/.config/agent-watcher/lib/slots.js" get --task-gid "$gid" 2>/dev/null | jq -c . 2>/dev/null || true)
@@ -217,6 +250,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     --arg run_report "$run_report" --argjson revive "$revive_pings" --argjson operator "$operator_msgs" --argjson wd "$watchdog_mentions" \
     --argjson release_receipt "$release_receipt" \
     --argjson attempt_log "$attempt_log" --argjson blocker_reason "$blocker_reason" --argjson blocker_verdict "$blocker_verdict" \
+    --argjson followup "$followup" \
     --argjson forensics "$forensics" --arg state_dir "$STATE_DIR" --arg watchdog_log "$WATCHDOG_LOG" --arg watcher_log "$WATCHER_LOG" \
     --argjson runaway_log_exists "$([ -f "$STATE_DIR/runaway-guard.log" ] && echo true || echo false)" \
     '{
@@ -237,6 +271,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       run_report: $run_report,
       release_receipt: $release_receipt,
       blocking: { attempt_log: $attempt_log, last_reason: $blocker_reason, validator_verdict: $blocker_verdict },
+      followup: $followup,
       signals: { revive_pings_in_transcript: $revive, operator_messages: $operator, watchdog_log_mentions: $wd, forensics_files: $forensics },
       logs: { watcher: $watcher_log, watchdog: $watchdog_log,
               runaway_guard: ($state_dir + "/runaway-guard.log"),
