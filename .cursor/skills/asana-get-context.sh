@@ -22,7 +22,7 @@
 #   REVIEWER: <name>
 #   COMMENTS: (most recent 5, one per block)
 #   PARENT: <gid> <name>                           [if task has a parent]
-#   SUBTASKS: <count>                              [if any; then one "<gid> [open|done] <name>" line each]
+#   SUBTASKS: <count>                              [if any; then per subtask a "<gid> [open|done] <name>" line + an indented "DESC: <notes>" line (eager body, truncated)]
 #   DEPENDENCIES: / DEPENDENTS:                    [if any; same per-line format]
 #   ATTACHMENTS: <count> files
 #   DOWNLOADED: <count> files to <dir>
@@ -124,10 +124,14 @@ for label, key in (('DEPENDENCIES', 'dependencies'), ('DEPENDENTS', 'dependents'
             print(f\"  {t['gid']} [{state}] {(t.get('name') or '')[:80]}\")
 "
 
-# Subtask pointers (separate endpoint). Skipped entirely when the task has none.
+# Subtasks (separate endpoint). Skipped entirely when the task has none. Bodies are
+# fetched EAGERLY (notes inline via opt_fields, one call, no extra round-trips) because
+# subtasks hold split-out requirements/context for related (often other-repo) work — the
+# active run needs them, not just the pointer. Each DESC is truncated with the gid to walk
+# via asana-get-context.sh for the full content (comments/attachments/nested subtasks).
 SUBTASK_COUNT=$(printf '%s' "$TASK_JSON" | python3 -c "import sys, json; print(json.load(sys.stdin)['data'].get('num_subtasks') or 0)")
 if [[ "$SUBTASK_COUNT" -gt 0 ]]; then
-  curl -s "$API/tasks/$TASK_GID/subtasks?opt_fields=name,completed" \
+  curl -s "$API/tasks/$TASK_GID/subtasks?opt_fields=name,completed,notes" \
     -H "$AUTH" | python3 -c "
 import sys, json
 rows = json.load(sys.stdin)['data']
@@ -136,6 +140,11 @@ if rows:
     for t in rows:
         state = 'done' if t.get('completed') else 'open'
         print(f\"  {t['gid']} [{state}] {(t.get('name') or '')[:80]}\")
+        notes = (t.get('notes') or '').strip().replace('\n', ' ')
+        if notes:
+            if len(notes) > 1000:
+                notes = notes[:1000] + f\"... (truncated; asana-get-context.sh {t['gid']} for full)\"
+            print(f'    DESC: {notes}')
 "
 fi
 

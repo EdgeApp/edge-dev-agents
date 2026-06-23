@@ -47,11 +47,12 @@ If `ATTACHMENTS: (none)` appears in script output, do **not** probe `/tmp/asana-
 </sub-step>
 
 <sub-step name="Relationship pointers">
-The script reports related tasks as pointers only: `PARENT:`, `SUBTASKS:`, `DEPENDENCIES:`, `DEPENDENTS:`, each row `<gid> [open|done] <name>`. Lines are omitted when empty. Decide what to walk by priority:
+The script reports `PARENT:`, `DEPENDENCIES:`, `DEPENDENTS:` as pointers only (each row `<gid> [open|done] <name>`), and `SUBTASKS:` as pointers PLUS each subtask's `DESC:` (its description, fetched eagerly and truncated). Lines are omitted when empty. Decide what to walk by priority:
 
 1. `PARENT:` present → also run `asana-get-context.sh <parent_gid>`. Requirements for split subtasks usually live on the parent. Walk up ONE level only; ignore the parent's own pointers.
-2. `SUBTASKS:` / `DEPENDENCIES:` / `DEPENDENTS:` present → list them in the Step 3 summary as-is. Fetch one ONLY when the task description or comments reference it as required context.
-3. Never bulk-fetch all pointers. Related-task content is opt-in per task; pulling every linked task pollutes context.
+2. `SUBTASKS:` present → their `DESC:` bodies are already inline; READ them as context (subtasks hold split-out requirements / other-repo work for this task). Walk a subtask FULLY (`asana-get-context.sh <subtask_gid>`) only when its `DESC:` is truncated or points to deeper context it carries (its own comments, attachments, or nested subtasks).
+3. `DEPENDENCIES:` / `DEPENDENTS:` present → list them in the Step 3 summary as-is. Fetch one ONLY when the task description or comments reference it as required context.
+4. Never bulk-fetch dependency/dependent pointers. That content is opt-in per task; pulling every linked task pollutes context.
 </sub-step>
 </step>
 

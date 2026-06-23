@@ -1,8 +1,17 @@
 #!/usr/bin/env node
 // session-watchdog.js — Watchdog tending live claude-asana-* tmux sessions.
-// (Formerly rc-watchdog.js; renamed because it does more than RC.) Three jobs:
-// RC-bridge revive, completion sweep (agent_status=Complete → teardown), and
-// worktree-retention GC. RC revive is just one of them.
+// (Formerly rc-watchdog.js; renamed because it does more than RC.) Jobs:
+// RC-bridge revive, completion sweep (agent_status=Complete → teardown), blocked
+// sweep, un-retire sweep, worktree-retention GC, orphan-Metro reaping, and the two
+// operator-escalation surfaces (paneAwaitingChoice park, and the Stop-hook stuck flag).
+//
+// BOUNDARY — what this watchdog does NOT do: it does NOT prod a stopped session to
+// CONTINUE. Forcing a premature-stopped --yolo run to keep going is owned by the
+// in-session Stop hook (hooks/require-continuation-or-block.sh), which fires the instant
+// the turn ends and injects a continue directive. The watchdog's only "prod" is the RC
+// revive WAKE PING, and that is gated to a DEAD RC bridge (!rcUp) — a different failure
+// (broken comms the agent can't receive through) than a clean stop. The two are
+// complementary, not redundant; do not re-add a general continue-prod here.
 //
 // Variants handled:
 //  - Variant 1 (RC bridge dead, claude alive): the pane footer ("Remote Control active") is the source of truth. Absent + idle past IDLE_THRESHOLD_MS → revive (wake message, wait, `/remote-control`, then Esc to dismiss the modal). Present → do NOT ping at all (a half-open bridge is left for the operator to reconnect on next attach). Keystroke-only; never spawns a new claude.
@@ -255,6 +264,30 @@ function freeSimAndMetro(taskGid) {
     sh(`"${DIR}/release-pool-entry.sh" --task-gid "${taskGid}"`)
   }
   freeMetroPort(slot?.metro_port ?? null)
+}
+
+// Operator-escalation surface for the Stop hook's livelock bound. CONTINUATION itself
+// is owned by the in-session Stop hook (require-continuation-or-block.sh): it forces a
+// premature-stopped --yolo run to keep going. Only when that hook hits STOP_BLOCK_MAX
+// consecutive premature stops (the run genuinely can't finish AND can't legitimately
+// block) does it give up, drop /tmp/agent-stuck-<gid>.md, and allow the stop. The
+// watchdog's job here is narrow: surface that flag to the operator ONCE (rename to
+// .escalated so it never re-logs every tick; a fresh .md from a later livelock cycle
+// re-escalates). The watchdog does NOT prod sessions to continue — that is the Stop
+// hook's job; the watchdog only revives DEAD RC BRIDGES (a different failure: a stop
+// event the Stop hook sees vs a broken comms channel the agent can't receive through)
+// and runs the lifecycle/GC sweeps below.
+function escalateStuckSessions() {
+  let files = []
+  try { files = fs.readdirSync('/tmp').filter((f) => /^agent-stuck-\d+\.md$/.test(f)) } catch { return }
+  for (const f of files) {
+    const gid = f.replace(/^agent-stuck-(\d+)\.md$/, '$1')
+    const full = `/tmp/${f}`
+    let detail = ''
+    try { detail = fs.readFileSync(full, 'utf8').split('\n').slice(1).join(' ').replace(/\s+/g, ' ').trim().slice(0, 220) } catch { /* best-effort */ }
+    log(`[claude-asana-${gid}] STUCK — agent gave up after repeated premature stops (Stop-hook livelock bound). Operator attention needed (attach: tmux attach -t claude-asana-${gid}). ${detail}`)
+    try { fs.renameSync(full, `${full}.escalated`) } catch { /* best-effort */ }
+  }
 }
 
 // Reap orphan Metro bundlers: a Metro whose cwd is an .agent-worktrees/<gid> dir
@@ -619,6 +652,9 @@ function main() {
 
   // Cap retired (completed-but-kept-alive) sessions so they don't accumulate in memory.
   pruneRetiredSessions()
+
+  // Surface any session the Stop hook gave up on (livelock bound) to the operator.
+  escalateStuckSessions()
 
   // Kill Metro bundlers whose worktree was torn down (orphans squatting slot ports).
   reapOrphanMetros()
