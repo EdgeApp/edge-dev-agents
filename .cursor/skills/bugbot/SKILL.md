@@ -11,7 +11,7 @@ metadata:
 <rules description="Non-negotiable constraints.">
 <rule id="use-companion-scripts">Do NOT call `gh` directly. Use `~/.cursor/skills/bugbot/scripts/bugbot.sh` for bugbot check-run queries, `~/.cursor/skills/pr-address/scripts/pr-address.sh` for all thread operations (fetch, fetch-thread, reply, resolve-thread, ensure-branch), and `~/.cursor/skills/pr-finalize-fixups.sh` for the post-fixup autosquash decision (SHARED with /pr-address — policy lives there, not here).</rule>
 <rule id="no-script-bypass">If a companion script fails, report the error and STOP. Do NOT fall back to raw `gh`, `curl`, or other workarounds.</rule>
-<rule id="cursor-bot-only">Only process threads whose first comment's author login is `cursor[bot]` (the literal `[bot]` suffix is required). Skip human threads, other-bot threads, and reviewer threads — those belong to `/pr-address`.</rule>
+<rule id="cursor-bot-only">Only process threads authored by CURSOR'S review bot. Match it by `__typename == "Bot"` with login `cursor` OR `cursor[bot]` — NOT a literal `cursor[bot]`-only filter. GraphQL strips the `[bot]` suffix, so Cursor's Bugbot AND its Security Reviewer both appear as `cursor`; only REST callers see `cursor[bot]`. A literal `cursor[bot]` filter MISSES the `cursor` threads and leaves their findings unaddressed (the makeMaxSpend false-Complete). `pr-address.sh fetch` already tags bot threads via `__typename` (its `isBot` collects every `__typename=="Bot"` login); use that. Skip human threads, OTHER-bot threads, and human-reviewer threads — those belong to `/pr-address`.</rule>
 <rule id="conclusion-is-not-clean">`check-run.conclusion: neutral` does NOT mean the PR is clean. `neutral` means bugbot posted findings that are non-blocking. ALWAYS combine check-run `status == "completed"` with "0 unresolved `cursor[bot]` threads" before declaring clean.</rule>
 <rule id="require-paginate">When the companion scripts query bot comments, they already pass `--paginate` — PRs with >30 bot comments miss newest without it. Do not implement your own comment queries; delegate.</rule>
 <rule id="reply-before-resolve">ALWAYS reply explaining how a thread was addressed (fix SHA for valid, invalidity class for invalid) BEFORE calling `resolve-thread`. No silent resolutions.</rule>
@@ -110,7 +110,7 @@ Pick the FIRST matching row. Set an internal `OUTCOME` variable to one of `waiti
   --owner <OWNER> --repo <REPO> --pr <NUMBER>
 ```
 
-The JSON output includes a `threads` array. Filter to threads whose first comment's author is `cursor[bot]` — that filter is the bot-only scope this skill owns. For each such thread, continue below.
+The JSON output includes a `threads` array. Filter to threads whose first comment's author is Cursor's bot — `__typename == "Bot"` with login `cursor` or `cursor[bot]` (per `cursor-bot-only`; `pr-address.sh fetch` already flags bot authors, so a literal `cursor[bot]` string match is wrong and misses `cursor`). That filter is the bot-only scope this skill owns. For each such thread, continue below.
 </sub-step>
 
 <sub-step id="4b" name="Per-thread: fetch body and classify">

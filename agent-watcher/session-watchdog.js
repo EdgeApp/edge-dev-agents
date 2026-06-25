@@ -290,6 +290,31 @@ function escalateStuckSessions() {
   }
 }
 
+// Load relief, independent of the watcher's load gate. A pool sim in state "dirty"
+// (released by a finished/blocked task, pending ensure-sim-pool's delete+re-clone) has
+// NO allocatable value while booted — it can't be handed out until refreshed, and the
+// refresh deletes it anyway. But ensure-sim-pool runs ONLY inside an asana-watcher spawn
+// tick, which is itself load-gated — so under high load (or with no Pending tasks) dirty
+// sims sit BOOTED indefinitely, burning the very CPU/RAM that keeps the box over the
+// spawn guardrail (the loop: high load → watcher skips → no refresh → dirty sims stay
+// booted → load stays high → never refreshed). The watchdog runs every tick regardless
+// of load, so shed them here: shut down (shutdown-only — ensure-sim-pool still does the
+// clean delete+re-clone later) any booted dirty pool sim. Never touches free/in_use sims
+// (the allocatable, pre-warmed ones) or the master.
+function reclaimIdlePoolSims() {
+  const poolPath = path.join(slots.STATE_DIR, 'pool.json')
+  let pool
+  try { pool = JSON.parse(fs.readFileSync(poolPath, 'utf8')).pool || [] } catch { return }
+  const dirty = pool.filter((e) => e && e.state === 'dirty' && e.udid)
+  if (!dirty.length) return
+  const booted = sh('xcrun simctl list devices booted 2>/dev/null')
+  for (const e of dirty) {
+    if (!booted.includes(e.udid)) continue // already shut down
+    sh(`"${DIR}/delete-ios-sim.sh" --udid "${e.udid}" --shutdown-only`)
+    log(`[reclaim] shut down booted dirty pool sim ${e.udid} (slot ${e.slot}) — idle + pending refresh; frees load while the watcher is gated`)
+  }
+}
+
 // Reap orphan Metro bundlers: a Metro whose cwd is an .agent-worktrees/<gid> dir
 // that no longer exists (the slot was torn down but its Metro lingered, squatting a
 // port the next slot reuses → the "foreign Metro on my port" failures). Only kills
@@ -655,6 +680,10 @@ function main() {
 
   // Surface any session the Stop hook gave up on (livelock bound) to the operator.
   escalateStuckSessions()
+
+  // Shut down booted dirty pool sims (idle, pending refresh) to relieve load even when
+  // the watcher is load-gated and won't run ensure-sim-pool. Breaks the high-load loop.
+  reclaimIdlePoolSims()
 
   // Kill Metro bundlers whose worktree was torn down (orphans squatting slot ports).
   reapOrphanMetros()

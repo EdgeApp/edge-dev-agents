@@ -81,7 +81,8 @@
     "keep_completed_sessions": 3,
     "agent_model": "claude-opus-4-8[1m]",
     "reviewer_bots": [
-      "cursor[bot]"
+      "cursor[bot]",
+      "cursor"
     ]
   }
 }

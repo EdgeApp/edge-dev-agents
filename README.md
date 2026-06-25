@@ -62,6 +62,71 @@ companion script directly when onboarding:
 
 ## Orchestration & Memory
 
+The orchestration system runs Asana tasks to PRs autonomously: a watcher picks up
+`Pending` tasks, spawns one isolated agent session per task, and a watchdog tends
+the live sessions. Post-hoc evals grade what each run did.
+
+### How a run flows
+
+1. **Watcher** (`agent-watcher/asana-watcher.js`, launchd every 120s): polls the
+   project for `agent_status = Pending`. It skips the tick when a resource
+   guardrail trips (1-minute load over `max_load_avg`, or free RAM under
+   `min_free_ram_gb`) or the concurrency cap (`max_concurrent`, default 4) is full.
+   For each pickable task it refreshes the iOS-sim pool, allocates a slot (a git
+   worktree, a cloned simulator, a Metro port), sets `agent_status = Planning`, and
+   spawns a tmux session `claude-asana-(gid)` running `/one-shot --yolo (task-url)`.
+2. **The run** (`/one-shot --yolo`, a single agent turn): seven phases, status
+   advanced via `update-status.sh` at each boundary. Planning (`/asana-plan`),
+   Developing (`/im`), local verify (`/build-and-test`), Reviewing (`/pr-create`),
+   Testing (CI watch + reviewer bots), Complete. The agent runs hands-off: no
+   interactive prompts, no self-respawn, every wait a bounded blocking in-turn call.
+3. **Finalize gate**: `Complete` is set only when every primary PR is CI-green,
+   every reviewer bot is clean on HEAD, and there are zero unresolved bot review
+   threads (bots matched by GraphQL `__typename == "Bot"`, so Cursor's `cursor` and
+   `cursor[bot]` logins both count).
+4. **Watchdog** (`agent-watcher/session-watchdog.js`, launchd every 120s): tends
+   live sessions. RC-bridge revive (only when the bridge is dead), completion sweep
+   (`Complete` retires `claude-asana-(gid)` to `done-asana-(gid)`, frees
+   sim/Metro/slot, keeps claude alive for re-engagement), blocked sweep (sheds
+   sim/Metro while a human is needed), un-retire (a followup reopens a slot), GC
+   (keep newest `keep_completed_sessions` / `keep_completed_worktrees`),
+   orphan-Metro reap, idle-dirty-sim reclaim, and operator escalation for parked
+   prompts or stuck sessions.
+5. **Eval** (post-hoc): `/resolve-run` builds an evidence manifest per run;
+   `/agent-eval` grades process compliance and outcome honesty (A-dimensions),
+   `/orch-eval` grades infrastructure health (O-dimensions), and `/eval-run`
+   orchestrates a cohort.
+
+```mermaid
+flowchart TD
+  A["Asana project (Pending tasks)"] -->|"watcher tick 120s"| B{"guardrail and cap OK?"}
+  B -- no --> A
+  B -- yes --> C["allocate slot: worktree + cloned sim + Metro port"]
+  C --> D["spawn tmux claude-asana-GID (claude --rc --yolo /one-shot)"]
+  D --> E["/one-shot 7 phases: Planning, Developing, Reviewing, Testing"]
+  E --> F{"finalize-gate: CI green + bots clean + 0 unresolved threads"}
+  F -- "not green" --> E
+  F -- green --> G["agent_status = Complete"]
+  G -->|"watchdog completion sweep"| H["retire to done-asana-GID; free sim, Metro, slot; claude kept alive"]
+  H -->|"operator reopens (Pending or phase)"| A
+  H -->|"beyond keep_completed_sessions"| I["reaped"]
+```
+
+The hands-off contract is enforced by deterministic PreToolUse and Stop hooks
+(active only when `AGENT_TASK_GID` is set), not merely documented:
+
+```mermaid
+flowchart LR
+  AG["orchestrated agent (/one-shot --yolo)"]
+  AG -->|"AskUserQuestion"| H1["no-interactive-prompt.sh: DENY, pick a default"]
+  AG -->|"ScheduleWakeup, CronCreate, claude --resume, /loop"| H2["no-self-respawn.sh: DENY, wait in-turn"]
+  AG -->|"blocked=Yes, or Complete on a wall"| H3["require-concession-validation.sh: needs validator verdict"]
+  AG -->|"turn ends, not Complete or blocked"| H4["require-continuation-or-block.sh (Stop): force continue, stuck flag at K"]
+  AG -->|"pr-create, Complete"| H5["require-test-evidence + finalize-gate: CI, bots, proof"]
+```
+
+### Distribution (what syncs)
+
 Beyond cursor skills/rules, this repo mirrors two more portable trees so a
 second Mac is reproducible from a single clone + `./bootstrap.sh`:
 
