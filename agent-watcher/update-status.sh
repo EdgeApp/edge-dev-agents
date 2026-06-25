@@ -110,6 +110,20 @@ fi
 
 echo "Updated task $TASK_GID: agent_status=$STATUS_NAME${BLOCKED:+, blocked=$BLOCKED}${REASON:+ (reason: $REASON)}"
 
+# Final-state marker for the Stop hook (require-continuation-or-block.sh). Written ONLY
+# after the status PUT above SUCCEEDED, so a fresh marker proves the agent JUST reached a
+# legit end (Complete/Archived, or blocked=Yes) — the hook allows the turn-end on it
+# WITHOUT an Asana read-after-write race. Removed when the task returns to a non-terminal
+# active status (a followup reopen) so a later premature stop is still caught. The hook
+# only trusts a FRESH marker (the lag window is seconds); an old marker falls through to
+# the authoritative Asana read.
+FINAL_MARKER="/tmp/agent-final-$TASK_GID"
+if [[ "$STATUS_NAME" == "Complete" || "$STATUS_NAME" == "Archived" || "$BLOCKED" == "yes" ]]; then
+  : > "$FINAL_MARKER" 2>/dev/null || true
+elif [[ "$STATUS_NAME" == "Pending" || "$STATUS_NAME" == "Planning" || "$STATUS_NAME" == "Developing" || "$STATUS_NAME" == "Reviewing" || "$STATUS_NAME" == "Testing" ]]; then
+  rm -f "$FINAL_MARKER" 2>/dev/null || true
+fi
+
 # Best-effort section move so a Board view of the kanban reflects the status.
 SECTION_GID=$(jq -r --arg s "$STATUS_NAME" '.custom_fields.agent_status.section_gids[$s] // empty' "$CONFIG")
 if [[ -z "$SECTION_GID" ]]; then
