@@ -55,7 +55,7 @@ log() { echo ">> ensure-sim-pool: $*" >&2; }
 # Returns the task GID of a LIVE active session (claude-asana-<digits>) currently
 # running on this sim UDID (its claude process exports AGENT_SIM_UDID), or empty.
 # Used to RECLAIM (not recycle) a sim that got marked dirty but is still in active
-# use — e.g. an un-retired followup session. Retired (done-asana-*) sessions are
+# use — e.g. a resumed followup session. Retired (done-asana-*) sessions are
 # intentionally NOT matched, so their sims remain recyclable.
 sim_live_owner() {
   local want="$1" sess gid ppid cpid envudid
@@ -141,7 +141,7 @@ for (( slot = 0; slot < SIZE; slot++ )); do
   fi
 
   # Guard: never recycle a sim a LIVE active session is still running on (a dirty
-  # entry whose UDID is in a claude-asana-<digits> session's env — e.g. an un-retired
+  # entry whose UDID is in a claude-asana-<digits> session's env — e.g. a resumed
   # followup). Reclaim it as in_use instead of deleting it out from under the agent.
   if [[ -n "$UDID" && "$UDID" != "null" ]]; then
     OWNER="$(sim_live_owner "$UDID")"

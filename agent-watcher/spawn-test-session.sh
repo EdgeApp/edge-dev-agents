@@ -189,6 +189,26 @@ chmod +x "$TMPSCRIPT"
 
 tmux new-session -d -s "$SESSION" "bash $TMPSCRIPT"
 
+# RESUME path only: `claude --resume` on a LARGE session (orchestration sessions run
+# 400k+ tokens) shows an interactive menu — "Resume from summary (recommended) / Resume
+# full session as-is / Don't ask again" — that would WEDGE this headless session at the
+# choice (the watcher/operator sees a session with RC up but no progress). Auto-answer it
+# by confirming the highlighted default (Enter = "Resume from summary": preserves the
+# prior run's context as a compact summary, leaving context headroom for the followup
+# work; far cheaper than resuming 400k+ tokens full). Bounded poll; no-op for a fresh
+# spawn (no RESUME_ID) where the watcher sends the /one-shot prompt itself.
+if [[ -n "$RESUME_ID" ]]; then
+  for _ in $(seq 1 30); do
+    sleep 2
+    _pane="$(tmux capture-pane -t "$SESSION" -p 2>/dev/null || true)"
+    if printf '%s' "$_pane" | grep -q "Resume from summary\|Resume full session"; then
+      tmux send-keys -t "$SESSION" Enter
+      echo ">> spawn-test-session: auto-answered the resume-summary menu (Enter = resume from summary)" >&2
+      break
+    fi
+  done
+fi
+
 echo "Spawned tmux session: $SESSION${YOLO:+ (yolo)}"
 if [[ -n "$SLOT_INDEX" ]]; then
   echo "  slot $SLOT_INDEX  |  cwd $CWD  |  sim ${SIM_UDID:-none}  |  metro ${METRO_PORT:-8081}"

@@ -10,9 +10,11 @@
 # claude session via `spawn-test-session.sh --resume` with that fresh env — giving
 # the resumed agent a working sim it can build/test on again.
 #
-# This is the deterministic, full-fat counterpart to the watchdog's lightweight
-# "un-retire" (which only renames a session back to fix slot accounting and CANNOT
-# refresh a running process's env).
+# This is the canonical resume path. The asana-watcher calls it for a Pending task
+# that has a prior transcript (re-engaging a finished task: memory + a fresh slot),
+# and it is also runnable standalone by an operator. (It replaced the watchdog's old
+# lightweight "un-retire" sweep, removed 2026-06-25, which could only rename a session
+# to fix slot accounting and could NOT refresh the sim/Metro a running process needs.)
 #
 # OPERATOR tool — NOT for an agent to run on its own session (it kills + respawns the
 # session, i.e. a self-respawn; refuses if invoked from inside the target's tmux).

@@ -2,8 +2,11 @@
 // session-watchdog.js — Watchdog tending live claude-asana-* tmux sessions.
 // (Formerly rc-watchdog.js; renamed because it does more than RC.) Jobs:
 // RC-bridge revive, completion sweep (agent_status=Complete → teardown), blocked
-// sweep, un-retire sweep, worktree-retention GC, orphan-Metro reaping, and the two
+// sweep, worktree-retention GC, orphan-Metro + idle-dirty-sim reclaim, and the two
 // operator-escalation surfaces (paneAwaitingChoice park, and the Stop-hook stuck flag).
+// RE-ENGAGEMENT IS NOT HERE: re-running/continuing a finished task is the WATCHER's job
+// (set it to Pending → the watcher resumes from the transcript on a fresh slot, or
+// fresh-spawns a never-run task). The un-retire sweep was removed 2026-06-25.
 //
 // BOUNDARY — what this watchdog does NOT do: it does NOT prod a stopped session to
 // CONTINUE. Forcing a premature-stopped --yolo run to keep going is owned by the
@@ -46,7 +49,24 @@ const IDLE_THRESHOLD_MS = 20 * 60 * 1000
 // After this long parked at a human-choice prompt, emit ONE escalation line (instead
 // of the per-tick park log) so an operator notices; never auto-sheds.
 const PARK_ESCALATE_MS = 60 * 60 * 1000
-const RC_ACTIVE_MARKER = 'Remote Control active'        // pane footer present iff the RC bridge is up (near-end view)
+// Remote-control "up" detection, across TWO claude build styles that render it
+// differently in the bottom status region:
+//   - New builds (--rc / /remote-control): a compact "/rc" token at the right end of the
+//     status footer line (the line carrying "shift+tab to cycle" / "for agents").
+//   - Old builds (e.g. a long-lived session still on an earlier claude): the words
+//     "Remote Control active" on their own line just below the footer, with NO "/rc".
+// Both signals live in the LAST few lines of the pane. We bound the old-style check to
+// the tail so the same words appearing in the scrolled CONVERSATION can never false-match
+// (the original plain whole-buffer substring marker did exactly that, and also missed the
+// "/rc" style entirely). A genuinely dead bridge shows neither → revive.
+const RC_FOOTER_RE = /shift\+tab to cycle|for agents/
+const RC_TOKEN_RE = /(^|\s)\/rc(\s|$)/
+function rcBridgeUp(content) {
+  const lines = content.split('\n')
+  if (lines.some((l) => RC_FOOTER_RE.test(l) && RC_TOKEN_RE.test(l))) return true // new style
+  if (/Remote Control active/.test(lines.slice(-3).join('\n'))) return true        // old style
+  return false
+}
 const RC_HALFOPEN_BACKSTOP_MS = 3 * 60 * 60 * 1000      // DISABLED 2026-06-05 (backstop removed to eval zero-ping-on-healthy); kept for easy revert
 const SESSION_PREFIX = 'claude-asana-'
 // Completed sessions are RENAMED to this prefix instead of being killed, so the
@@ -375,48 +395,18 @@ function listRetiredSessions() {
     .sort((a, b) => b.created - a.created)
 }
 
-// Un-retire sweep (symmetric to the completion sweep): a retired done-asana-<gid>
-// session whose task is NO LONGER Complete means a human re-engaged a finished task
-// for followup work (and, per one-shot's `followup-reopens-status`, the agent moved
-// agent_status off Complete). Rename it BACK to claude-asana-<gid> so it re-occupies
-// a concurrency slot — otherwise the followup runs off-the-books and the watcher can
-// oversubscribe. Only for still-alive sessions with a real, non-terminal status; the
-// session re-provisions its own sim/Metro as the work proceeds. 'Archived' is a
-// terminal status like 'Complete' (operator shelved the task to narrow focus, not a
-// followup request) — never un-retire for it. 'Pending' is NOT a followup-continue:
-// it means "spawn FRESH" (a re-run), so do NOT resurrect the stale retired session —
-// resurrecting it renames done-asana→claude-asana and blocks the watcher's fresh
-// spawn ("session already exists"). Leave a Pending retired session alone: the
-// watcher spawns a fresh claude-asana-<gid> alongside it, and the stale done-asana
-// is reaped on the next completion (retireSession kills a same-gid collision).
-function unretireFollowups() {
-  for (const r of listRetiredSessions()) {
-    const { agentStatus, ok } = fetchTaskState(r.gid)
-    if (!ok || !agentStatus || agentStatus === 'Complete' || agentStatus === 'Archived' || agentStatus === 'Pending') continue
-    const ppid = getPanePid(r.name)
-    if (ppid === null || !claudeRunningUnder(ppid)) continue // only re-occupy for a live session
-    const dest = `${SESSION_PREFIX}${r.gid}`
-    if (sh(`tmux has-session -t "${dest}" 2>/dev/null && echo yes`) === 'yes') continue // a live slot already owns the name
-    sh(`tmux rename-session -t "${r.name}" "${dest}"`)
-    log(`[${r.name}] agent_status=${agentStatus} (followup on a completed task) → UN-RETIRED as ${dest}; re-occupies a slot`)
-    // Re-reserve the resources this still-running session is ACTUALLY using, read
-    // from its live env, so slots.json reflects reality and the watcher won't hand its
-    // Metro port to another task. (ensure-sim-pool separately RECLAIMS the sim from
-    // recycling once it's referenced by this now-active session.)
-    const cpid = parseInt((sh(`pgrep -P ${ppid}`).split('\n')[0] || '').trim(), 10)
-    if (Number.isFinite(cpid)) {
-      const env = sh(`ps eww -p ${cpid}`)
-      const simUdid = (env.match(/AGENT_SIM_UDID=([0-9A-Fa-f-]{36})/) || [])[1]
-      const metroPort = parseInt((env.match(/AGENT_METRO_PORT=(\d+)/) || [])[1] || '', 10)
-      if (simUdid) {
-        try {
-          slots.allocate({ task_gid: r.gid, worktree_path: path.join(WORKTREES_ROOT, r.gid), sim_udid: simUdid, metro_port: Number.isFinite(metroPort) ? metroPort : undefined })
-          log(`  [${r.gid}] re-reserved slot (sim ${simUdid}, metro ${Number.isFinite(metroPort) ? metroPort : 'auto'})`)
-        } catch (e) { log(`  [${r.gid}] re-reserve failed: ${e.message}`) }
-      }
-    }
-  }
-}
+// REMOVED 2026-06-25 — un-retire sweep (was unretireFollowups):
+//   It renamed a retired done-asana-<gid> back to claude-asana-<gid> when its task moved
+//   off Complete to a PHASE status, to re-engage a finished task in place. Two problems:
+//   (a) it kept the LIVE process but could NOT refresh the sim/Metro freed at completion,
+//   so a re-engaged build/test ran on dead resources (the same "dead hands" as talking to
+//   a retired session directly); (b) it made re-engagement branch on status VALUE (a phase
+//   status un-retired here, while Pending fresh-spawned in the watcher) — the confusing
+//   split the operator never wanted. Re-engagement is now a SINGLE path through the WATCHER:
+//   set a finished task to `Pending` and the watcher RESUMES it (memory + a fresh slot, via
+//   resume-task) when a prior transcript exists, else fresh-spawns. So phase statuses are
+//   progress-only (set by the running agent), never a manual re-engagement trigger, and
+//   this watchdog stays out of re-engagement entirely (see the header BOUNDARY note).
 
 // Retire a completed session instead of killing it: rename it out of the
 // slot-counted `claude-asana-<gid>` namespace (so the watcher stops counting it and
@@ -611,7 +601,7 @@ function main() {
     }
 
     const content = capturePane(session)
-    const rcUp = content.includes(RC_ACTIVE_MARKER)   // near-end belief about the RC bridge
+    const rcUp = rcBridgeUp(content)   // footer "/rc" token = RC bridge up (idle near-end view)
     const prior = state.sessions[session]
     const isBlocked = /^yes$/i.test(blocked || '')
 
@@ -671,11 +661,9 @@ function main() {
     state.sessions[session] = { lastContent: content, lastChange, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated }
   }
 
-  // Un-retire any completed session a human re-engaged for followup (status moved off
-  // Complete) so it re-occupies a slot. Runs BEFORE the retired-cap prune.
-  unretireFollowups()
-
   // Cap retired (completed-but-kept-alive) sessions so they don't accumulate in memory.
+  // (Re-engagement of a finished task is the WATCHER's job now, via Pending → resume;
+  // the un-retire sweep was removed 2026-06-25 — see its REMOVED note above.)
   pruneRetiredSessions()
 
   // Surface any session the Stop hook gave up on (livelock bound) to the operator.
