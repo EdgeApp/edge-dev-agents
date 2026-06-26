@@ -72,9 +72,14 @@ the live sessions. Post-hoc evals grade what each run did.
    project for `agent_status = Pending`. It skips the tick when a resource
    guardrail trips (1-minute load over `max_load_avg`, or free RAM under
    `min_free_ram_gb`) or the concurrency cap (`max_concurrent`, default 4) is full.
-   For each pickable task it refreshes the iOS-sim pool, allocates a slot (a git
-   worktree, a cloned simulator, a Metro port), sets `agent_status = Planning`, and
-   spawns a tmux session `claude-asana-(gid)` running `/one-shot --yolo (task-url)`.
+   For each pickable task it refreshes the iOS-sim pool and allocates a slot (a git
+   worktree, a cloned simulator, a Metro port). A NEVER-run task is spawned fresh:
+   `agent_status = Planning`, a tmux session `claude-asana-(gid)` running
+   `/one-shot --yolo (task-url)`. A task with a PRIOR transcript (a revisit) is
+   RESUMED instead (its conversation restored on the fresh slot, via `resume-task`).
+   So re-engaging a finished task is one signal: set it back to `Pending` and it
+   continues with memory plus working resources, never a fresh session. This is the
+   single re-engagement entry point.
 2. **The run** (`/one-shot --yolo`, a single agent turn): seven phases, status
    advanced via `update-status.sh` at each boundary. Planning (`/asana-plan`),
    Developing (`/im`), local verify (`/build-and-test`), Reviewing (`/pr-create`),
@@ -88,10 +93,11 @@ the live sessions. Post-hoc evals grade what each run did.
    live sessions. RC-bridge revive (only when the bridge is dead), completion sweep
    (`Complete` retires `claude-asana-(gid)` to `done-asana-(gid)`, frees
    sim/Metro/slot, keeps claude alive for re-engagement), blocked sweep (sheds
-   sim/Metro while a human is needed), un-retire (a followup reopens a slot), GC
-   (keep newest `keep_completed_sessions` / `keep_completed_worktrees`),
-   orphan-Metro reap, idle-dirty-sim reclaim, and operator escalation for parked
-   prompts or stuck sessions.
+   sim/Metro while a human is needed), GC (keep newest `keep_completed_sessions` /
+   `keep_completed_worktrees`), orphan-Metro reap, idle-dirty-sim reclaim, and
+   operator escalation for parked prompts or stuck sessions. It does NOT re-engage
+   finished tasks: that is the watcher's job (Pending → resume), so the watchdog and
+   watcher are decoupled.
 5. **Eval** (post-hoc): `/resolve-run` builds an evidence manifest per run;
    `/agent-eval` grades process compliance and outcome honesty (A-dimensions),
    `/orch-eval` grades infrastructure health (O-dimensions), and `/eval-run`
@@ -108,7 +114,7 @@ flowchart TD
   F -- "not green" --> E
   F -- green --> G["agent_status = Complete"]
   G -->|"watchdog completion sweep"| H["retire to done-asana-GID; free sim, Metro, slot; claude kept alive"]
-  H -->|"operator reopens (Pending or phase)"| A
+  H -->|"operator sets Pending (revisit resumes with memory)"| A
   H -->|"beyond keep_completed_sessions"| I["reaped"]
 ```
 

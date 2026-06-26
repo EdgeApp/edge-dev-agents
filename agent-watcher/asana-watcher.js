@@ -214,10 +214,35 @@ function spawnForTask(task, cfg) {
   }
 
   if (DRY_RUN) {
-    log(`  (dry-run) would: Planning → allocate slot/sim → spawn in ${reposRoot} (agent creates per-repo worktrees)`)
-    log(`  (dry-run) would send-keys: /one-shot --yolo ${taskUrl}`)
+    log(`  (dry-run) would try resume-task first (RESUME if a prior transcript exists → memory + fresh slot; else FRESH /one-shot --yolo ${taskUrl})`)
     return true
   }
+
+  // REVISIT vs NEW. A task with a prior resumable transcript is re-engaged by RESUMING it
+  // (continue the conversation, on a fresh slot), never by a fresh /one-shot — the operator
+  // "never wants a fresh session on revisit" (a poisoned run becomes a new task instead).
+  // resume-task.sh owns the whole resume flow (resolve the transcript, kill any stale
+  // session for the gid, allocate a fresh slot/sim/Metro, set status off Pending, spawn
+  // `claude --rc --resume`); exit 2 means "no resumable transcript" → this is a brand-new
+  // task, fall through to the fresh-spawn path below. The watcher is a launchd process (not
+  // an agent session), so it is allowed to call resume-task. This is the SINGLE
+  // re-engagement entry point: the watchdog no longer un-retires on a phase status.
+  const rt = spawnSync(`${DIR}/resume-task.sh`, ['--task-gid', task.gid], { stdio: 'inherit' })
+  if (rt.status === 0) {
+    log(`  resumed prior session for ${task.gid} (revisit: memory + fresh slot)`)
+    // The resumed conversation was previously FINISHED, so it comes back idle at the input
+    // prompt (resume-task answered the resume-summary menu but does not drive it). Send the
+    // SAME /one-shot prompt the fresh path sends: the resumed agent has its summarized prior
+    // context, re-reads the task, and picks up the followup scope per
+    // `followup-scope-is-the-deliverable`. Without this nudge the session sits idle.
+    waitRcReadyAndSendPrompt(`${SESSION_PREFIX}${task.gid}`, `/one-shot --yolo ${taskUrl}`)
+    return true
+  }
+  if (rt.status !== 2) {
+    log(`  resume-task failed (exit ${rt.status}) — leaving ${task.gid} Pending for the next tick`)
+    return false
+  }
+  log(`  no prior transcript for ${task.gid} → fresh spawn`)
 
   // No eager worktree: the agent reads the task, determines the target repo(s), and
   // creates co-located per-task worktrees itself (one-shot skill → setup-task-workspace).
