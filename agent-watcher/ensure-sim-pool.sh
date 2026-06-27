@@ -52,6 +52,19 @@ fi
 
 log() { echo ">> ensure-sim-pool: $*" >&2; }
 
+# Refresh the master sim's build from develop BEFORE the dirty→reclone loop below,
+# so clones inherit a current-develop app instead of a stale one. This is the single
+# provisioning choke point both the fresh-spawn path and resume-task.sh call, so the
+# hook lives here (not duplicated per caller). When develop advanced with a native
+# (Podfile.lock) change, refresh-master-build rebuilds the master and marks the
+# not-in_use pool slots dirty — which the loop below then reclones from the fresh
+# master in this same pass. It is BLOCKING by design and NON-FATAL: a fetch/build
+# failure logs and returns 0 so provisioning continues on the last-good master.
+# Runs before acquire_lock so refresh-master-build can take pool.lock itself.
+if [[ "${SKIP_MASTER_REFRESH:-}" != "1" && -x "$DIR/refresh-master-build.sh" ]]; then
+  "$DIR/refresh-master-build.sh" || log "master-build refresh exited $? (non-fatal; continuing on current master)"
+fi
+
 # Returns the task GID of a LIVE active session (claude-asana-<digits>) currently
 # running on this sim UDID (its claude process exports AGENT_SIM_UDID), or empty.
 # Used to RECLAIM (not recycle) a sim that got marked dirty but is still in active

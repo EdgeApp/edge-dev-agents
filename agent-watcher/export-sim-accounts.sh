@@ -85,7 +85,9 @@ echo ">> accounts imported into the master sim ($UDID)."
 if [ -x "$HOME/.config/agent-watcher/ensure-sim-pool.sh" ]; then
   echo ">> refreshing the sim pool so clones inherit the logged-in master (~minutes)..."
   rm -f "$HOME/.config/agent-watcher/pool.json"
-  "$HOME/.config/agent-watcher/ensure-sim-pool.sh" --size 2 || echo ">> (pool refresh failed; rerun it later)"
+  # SKIP_MASTER_REFRESH: the master was JUST given a build by the import above, so
+  # don't let ensure-sim-pool immediately rebuild it from develop on a fresh machine.
+  SKIP_MASTER_REFRESH=1 "$HOME/.config/agent-watcher/ensure-sim-pool.sh" --size 2 || echo ">> (pool refresh failed; rerun it later)"
 else
   echo ">> (orchestration not installed here — skipped pool refresh)"
 fi
