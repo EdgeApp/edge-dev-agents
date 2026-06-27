@@ -49,7 +49,7 @@
     "_doc": {
       "max_concurrent": "Max parallel agent sessions. Slot accounting is by LIVE tmux sessions, not Asana state. Env override: AGENT_WATCHER_MAX_CONCURRENT.",
       "metro_base_port": "Slot N gets Metro port (metro_base_port + N). 8181 (NOT 8081) keeps slot Metro ports out of the hardcoded DEBUG_<dep> dev-server range (8080/8082/8083/8084/8101) so a slot's Metro never collides with a DEBUG_<dep> webpack dev-server. Env override: AGENT_METRO_BASE_PORT.",
-      "master_sim": "The iOS 18 iPhone 16 Pro Max sim holding the test account; cloned per slot. Resolved by device+runtime unless a UDID is hardcoded.",
+      "master_sim": "The iOS 18 iPhone 16 Pro Max sim holding the test account; cloned per slot. Resolved by device+runtime unless a UDID is hardcoded. refresh_on_develop (default true): before each spawn tick, refresh-master-build.sh checks if develop_ref advanced and, if its native side (ios/Podfile.lock) changed, rebuilds the master from develop and reclones the pool so runs test against a current build (BLOCKING; a JS-only develop advance skips the rebuild). develop_ref (default origin/develop): the branch the master tracks. Set refresh_on_develop=false or env SKIP_MASTER_REFRESH=1 to disable.",
       "resource_guardrail": "Pre-spawn safety gate. Skip spawning this tick if 1-min load avg > max_load_avg OR free RAM < min_free_ram_gb. Env overrides: AGENT_WATCHER_MAX_LOAD_AVG, AGENT_WATCHER_MIN_FREE_RAM_GB.",
       "npm_migration_commit": "Commit cherry-picked onto each fresh agent worktree so RN tooling uses npm not yarn.",
       "worktrees_root": "Where per-task worktrees live: <worktrees_root>/<task-gid>/<repo>/.",
@@ -65,7 +65,9 @@
     "metro_base_port": 8181,
     "master_sim": {
       "device": "iPhone 16 Pro Max",
-      "runtime": "iOS 18"
+      "runtime": "iOS 18",
+      "refresh_on_develop": true,
+      "develop_ref": "origin/develop"
     },
     "resource_guardrail": {
       "max_load_avg": 12.0,

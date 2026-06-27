@@ -73,7 +73,13 @@ the live sessions. Post-hoc evals grade what each run did.
    guardrail trips (1-minute load over `max_load_avg`, or free RAM under
    `min_free_ram_gb`) or the concurrency cap (`max_concurrent`, default 4) is full.
    For each pickable task it refreshes the iOS-sim pool and allocates a slot (a git
-   worktree, a cloned simulator, a Metro port). A NEVER-run task is spawned fresh:
+   worktree, a cloned simulator, a Metro port). Before recloning the pool it runs
+   `refresh-master-build.sh`: if `develop` has advanced and its native side
+   (`ios/Podfile.lock`) changed, it rebuilds the master sim from `develop` and
+   reclones so runs test against a current build instead of a pinned-stale one. A
+   JS-only `develop` advance skips the rebuild (clones bundle JS live from Metro);
+   the check is a cheap `git fetch` plus a SHA compare, and a build failure is
+   non-fatal (provisioning continues on the last-good master). A NEVER-run task is spawned fresh:
    `agent_status = Planning`, a tmux session `claude-asana-(gid)` running
    `/one-shot --yolo (task-url)`. A task with a PRIOR transcript (a revisit) is
    RESUMED instead (its conversation restored on the fresh slot, via `resume-task`).
