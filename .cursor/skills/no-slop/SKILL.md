@@ -53,9 +53,9 @@ Do not swap synonyms for the same thing across sentences to avoid repetition. If
 
 Do not call things pivotal, transformative, revolutionary, or groundbreaking. Do not say something "marks a turning point" or "leaves an indelible mark." If it's important, show why with evidence — don't announce it.
 
-## 9. Em dash discipline
+## 9. No em dashes
 
-Use em dashes sparingly — maximum one per paragraph, and only when parentheses or a comma won't work. AI text is riddled with em dashes.
+Do not use em dashes (`—`, U+2014). Use a comma, colon, semicolon, parentheses, or two sentences instead. Zero is the rule for every destination this skill governs (external prose and chat responses). Hyphens (`-`) and en-dashes (`–`) are fine. AI text is riddled with em dashes.
 
 ## 10. No collaborative language
 
