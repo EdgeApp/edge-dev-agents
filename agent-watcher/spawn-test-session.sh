@@ -96,12 +96,41 @@ CHROME_FLAG="--chrome "
 MCP_FLAG=""
 [[ -f "$HOME/.config/agent-watcher/maestro-mcp.json" ]] && \
   MCP_FLAG="--mcp-config $HOME/.config/agent-watcher/maestro-mcp.json "
-# Model pin: config .watcher.agent_model forces what spawned sessions START on
-# (e.g. claude-opus-4-8[1m] = Opus 4.8 with 1M context). Empty/absent = the
-# server-side default alias. Quoted in the invoke — [1m] is a glob class.
-AGENT_MODEL="$(jq -r '.watcher.agent_model // empty' "$HOME/.config/agent-watcher/asana-config.json" 2>/dev/null)"
+# Model + effort pin: what spawned sessions START on (a human can still flip a LIVE
+# session per-turn via the RC/desktop picker). Resolution order, both flags:
+#   1. Per-task Asana custom field (agent_model / agent_effort) if the task selected one.
+#   2. Config default (.watcher.agent_model = claude-opus-4-8[1m], .watcher.agent_effort = high).
+# Both the fresh-spawn path (asana-watcher) and the follow-up-resume path (resume-task)
+# pass --task-gid, so this ONE resolver covers new tasks and follow-ups alike. The
+# per-task lookup is best-effort: no token / API error / unset field → config default.
+# Model strings carry [1m] (a glob class), so they stay double-quoted in the invoke.
+_CONFIG="$HOME/.config/agent-watcher/asana-config.json"
+AGENT_MODEL="$(jq -r '.watcher.agent_model // empty' "$_CONFIG" 2>/dev/null)"
+AGENT_EFFORT="$(jq -r '.watcher.agent_effort // "high"' "$_CONFIG" 2>/dev/null)"
+if [[ -n "$TASK_GID" ]]; then
+  _TOK="$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null || true)"
+  _MODEL_FGID="$(jq -r '.custom_fields.agent_model.gid // empty' "$_CONFIG" 2>/dev/null || true)"
+  _EFFORT_FGID="$(jq -r '.custom_fields.agent_effort.gid // empty' "$_CONFIG" 2>/dev/null || true)"
+  if [[ -n "$_TOK" ]]; then
+    _CF="$(curl -sS -H "Authorization: Bearer $_TOK" \
+      "https://app.asana.com/api/1.0/tasks/$TASK_GID?opt_fields=custom_fields.gid,custom_fields.enum_value.name" 2>/dev/null || true)"
+    if [[ -n "$_CF" ]]; then
+      _MSEL="$(printf '%s' "$_CF" | jq -r --arg g "$_MODEL_FGID" '.data.custom_fields[]? | select(.gid==$g) | .enum_value.name // empty' 2>/dev/null || true)"
+      _ESEL="$(printf '%s' "$_CF" | jq -r --arg g "$_EFFORT_FGID" '.data.custom_fields[]? | select(.gid==$g) | .enum_value.name // empty' 2>/dev/null || true)"
+      if [[ -n "$_MSEL" ]]; then
+        _MMAP="$(jq -r --arg l "$_MSEL" '.custom_fields.agent_model.options[$l].model // empty' "$_CONFIG" 2>/dev/null || true)"
+        [[ -n "$_MMAP" ]] && AGENT_MODEL="$_MMAP"
+      fi
+      # The effort option label IS the CLI value; accept only known levels.
+      case "$_ESEL" in low|medium|high|xhigh|max) AGENT_EFFORT="$_ESEL" ;; esac
+      echo ">> spawn-test-session: model=${AGENT_MODEL:-default} effort=${AGENT_EFFORT} (task $TASK_GID; model_sel='${_MSEL:-unset}' effort_sel='${_ESEL:-unset}')" >&2
+    fi
+  fi
+fi
 MODEL_FLAG=""
 [[ -n "$AGENT_MODEL" ]] && MODEL_FLAG="--model \"$AGENT_MODEL\" "
+EFFORT_FLAG=""
+[[ -n "$AGENT_EFFORT" ]] && EFFORT_FLAG="--effort $AGENT_EFFORT "
 if [[ -n "$RESUME_ID" ]]; then
   # RESUME MODE: re-attach an existing claude session instead of starting fresh.
   # No initial prompt — the restored conversation IS the state. Composes with slot
@@ -109,9 +138,9 @@ if [[ -n "$RESUME_ID" ]]; then
   # bare `claude --resume` would lack). CWD must match the session's original launch
   # dir for --resume to resolve it; slot mode already sets CWD from --worktree-path
   # (the watcher passes ~/git), which is where orch sessions launch.
-  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}${MCP_FLAG}${MODEL_FLAG}--rc --resume $RESUME_ID"
+  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}${MCP_FLAG}${MODEL_FLAG}${EFFORT_FLAG}--rc --resume $RESUME_ID"
 else
-  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}${MCP_FLAG}${MODEL_FLAG}--rc \"$ESC_PROMPT\""
+  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}${MCP_FLAG}${MODEL_FLAG}${EFFORT_FLAG}--rc \"$ESC_PROMPT\""
 fi
 
 # Build the per-slot env exports (empty in legacy mode).
