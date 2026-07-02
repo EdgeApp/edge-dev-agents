@@ -25,10 +25,11 @@ Using `window.start..window.end` from the manifest, in parallel:
 - O3: window slice of `/tmp/memory-monitor.log` level transitions; `logs.mem_trace_dir` daily file for the run date (cliCount trend).
 - O4: manifest `signals.revive_pings_in_transcript` (already counted; >0 = BAD with the transcript as citation).
 - O5/O6 hints: `grep -n "<gid>" <logs.watchdog>` (retire/death/shed lines for this gid).
-- O8: Asana story log for the status timeline; `git -C <worktree> ...` for branch/base when the worktree survives.
+- O8: manifest `probe_index.update_status.ladder` (the pre-computed status timeline) + Asana story log; `git -C <worktree> ...` for branch/base when the worktree survives.
+- O10: `grep -n "simctl\|maestro" <transcript>` invocation lines: compare targeted UDIDs against the slot UDID (manifest `slot`/run-report `sim_udid`) and the master UDID (`$XDG_STATE_HOME/agent-watcher/master-build.json`); any by-name or `booted` resolution is a hit.
 </step>
 
-<step id="3" name="Grade O1-O9">
+<step id="3" name="Grade O1-O10">
 Apply the rubric's GOOD/BAD anchors per dimension. Specifics:
 - **O6:** manifest `slot`/`pool_entry` non-null on a Complete run = BAD (leak, citable live observation). Null = NOT_CAPTURED unless run-report capture fields (`released:{sim,slot,metro}`) exist.
 - **O7:** NA if the Asana story log shows blocked never went Yes during the window.

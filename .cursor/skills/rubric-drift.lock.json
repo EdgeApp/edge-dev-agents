@@ -294,6 +294,102 @@
       "dims": [
         "A24"
       ]
+    },
+    "one-shot:ignore-refired-one-shot": {
+      "hash": "0a664408b9c4",
+      "dims": [
+        "A1"
+      ]
+    },
+    "pr-create:no-base-push": {
+      "hash": "4a5c88fa1fc9",
+      "dims": [
+        "A8"
+      ]
+    },
+    "pr-create:no-reviewer-assignment": {
+      "hash": "768485d31514",
+      "dims": [
+        "A10"
+      ]
+    },
+    "one-shot:pr-watch-loop-amend-pattern": {
+      "hash": "edd7de1c68b3",
+      "dims": [
+        "A12"
+      ]
+    },
+    "pr-land:no-force-push": {
+      "hash": "79af460244ea",
+      "dims": [
+        "A12"
+      ]
+    },
+    "staging-cherry-pick:no-force-push": {
+      "hash": "68a3ca18469e",
+      "dims": [
+        "A12"
+      ]
+    },
+    "cheese:force-with-lease": {
+      "hash": "b61d87493bcb",
+      "dims": [
+        "A12"
+      ]
+    },
+    "pr-land:code-conflicts": {
+      "hash": "c78896dc5104",
+      "dims": [
+        "A15"
+      ]
+    },
+    "build-and-test:build-the-test-harness": {
+      "hash": "7b05988c27ee",
+      "dims": [
+        "A25"
+      ]
+    },
+    "build-and-test:single-asset-plugin-trim": {
+      "hash": "f645019cb548",
+      "dims": [
+        "A25"
+      ]
+    },
+    "build-and-test:no-mutation": {
+      "hash": "400407463137",
+      "dims": [
+        "A25"
+      ]
+    },
+    "debugger:no-mutation": {
+      "hash": "88536d71c23d",
+      "dims": [
+        "A25"
+      ]
+    },
+    "build-and-test:force-swap-provider-locally": {
+      "hash": "c52e7a7ed3c7",
+      "dims": [
+        "A27"
+      ]
+    },
+    "build-and-test:funded-test-accounts": {
+      "hash": "b164d8be728c",
+      "dims": [
+        "A27"
+      ]
+    },
+    "build-and-test:log-every-attempt": {
+      "hash": "a5f4b6eaee50",
+      "dims": [
+        "A26"
+      ]
+    },
+    "build-and-test:slot-sim-is-the-clone": {
+      "hash": "738b56cb7942",
+      "dims": [
+        "O10"
+      ]
     }
   },
   "acked_uncovered": {
@@ -441,21 +537,9 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "625a193ffb67"
     },
-    "build-and-test:no-mutation": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "400407463137"
-    },
     "build-and-test:testids-over-coordinates": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "1a79f82f9499"
-    },
-    "build-and-test:single-asset-plugin-trim": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "f645019cb548"
-    },
-    "build-and-test:force-swap-provider-locally": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "c52e7a7ed3c7"
     },
     "build-and-test:scripts-over-inline": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -481,14 +565,6 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "3d76677f9d80"
     },
-    "build-and-test:log-every-attempt": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "a5f4b6eaee50"
-    },
-    "build-and-test:build-the-test-harness": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "7b05988c27ee"
-    },
     "build-and-test:maestro-flows-are-shortcuts": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "10d33a2e2b38"
@@ -497,17 +573,9 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "42b510117cac"
     },
-    "build-and-test:funded-test-accounts": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "b164d8be728c"
-    },
     "build-and-test:executable-pair-must-complete": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "25e341f6dc25"
-    },
-    "build-and-test:slot-sim-is-the-clone": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "738b56cb7942"
     },
     "build-and-test:spaced-pin-taps": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -552,10 +620,6 @@
     "cheese:use-companion-script": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "050b29b6beb8"
-    },
-    "cheese:force-with-lease": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "b61d87493bcb"
     },
     "concession-validator:default-deny": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -624,10 +688,6 @@
     "debugger:line-numbers-are-1-based": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "47a707826ec5"
-    },
-    "debugger:no-mutation": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "88536d71c23d"
     },
     "debugger:one-breakpoint-per-invocation": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -781,10 +841,6 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "c7a0784aa196"
     },
-    "one-shot:ignore-refired-one-shot": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "0a664408b9c4"
-    },
     "one-shot:set-tested-field": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "60b34baf497f"
@@ -792,10 +848,6 @@
     "one-shot:yolo-no-silent-downgrade": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "78bde95df09f"
-    },
-    "one-shot:pr-watch-loop-amend-pattern": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "edd7de1c68b3"
     },
     "one-shot:bugbot-in-watch": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -873,14 +925,6 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "467a6a08c08d"
     },
-    "pr-create:no-base-push": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "4a5c88fa1fc9"
-    },
-    "pr-create:no-reviewer-assignment": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "768485d31514"
-    },
     "pr-create:flag-contract": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "fd26325efd86"
@@ -897,10 +941,6 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "e76cf40a84bf"
     },
-    "pr-land:code-conflicts": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "c78896dc5104"
-    },
     "pr-land:stale-prs": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "7b0be0ec435a"
@@ -912,10 +952,6 @@
     "pr-land:verification": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "75044fc537e0"
-    },
-    "pr-land:no-force-push": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "79af460244ea"
     },
     "pr-land:no-editors": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1000,10 +1036,6 @@
     "staging-cherry-pick:changelog-conflicts": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "40e3c725ace2"
-    },
-    "staging-cherry-pick:no-force-push": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "68a3ca18469e"
     },
     "staging-cherry-pick:no-editors": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
