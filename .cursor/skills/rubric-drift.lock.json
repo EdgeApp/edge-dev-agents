@@ -1,0 +1,568 @@
+{
+  "baselined_at": "2026-07-02",
+  "anchors": {
+    "one-shot:orchestrate-existing-skills": {
+      "hash": "16db69540985",
+      "dims": [
+        "A2"
+      ]
+    },
+    "one-shot:no-script-bypass": {
+      "hash": "5c9a961655b8",
+      "dims": [
+        "A2"
+      ]
+    },
+    "one-shot:agent-status-on-pending-task": {
+      "hash": "cc854b4b411e",
+      "dims": [
+        "A4"
+      ]
+    },
+    "file:update-status.sh": {
+      "hash": "f319111a12de",
+      "dims": [
+        "A4",
+        "O8"
+      ]
+    },
+    "one-shot:pr-watch-bounded-poll": {
+      "hash": "8f27a0fd742b",
+      "dims": [
+        "A5"
+      ]
+    },
+    "one-shot:never-self-respawn": {
+      "hash": "a74708e9b5c5",
+      "dims": [
+        "A6"
+      ]
+    },
+    "one-shot:yolo-execution": {
+      "hash": "b143dc05c376",
+      "dims": [
+        "A7"
+      ]
+    },
+    "one-shot:yolo-true-blockers": {
+      "hash": "d54476a835c3",
+      "dims": [
+        "A7"
+      ]
+    },
+    "one-shot:yolo-stop-at-pr": {
+      "hash": "ec6def879e05",
+      "dims": [
+        "A8"
+      ]
+    },
+    "one-shot:report-as-attachment": {
+      "hash": "067ea5b6eb30",
+      "dims": [
+        "A9"
+      ]
+    },
+    "file:agent-run-report.md": {
+      "hash": "c610937fb687",
+      "dims": [
+        "A18",
+        "A20",
+        "A9"
+      ]
+    },
+    "one-shot:attach-prs-by-default": {
+      "hash": "935a13b4389c",
+      "dims": [
+        "A10"
+      ]
+    },
+    "one-shot:multi-repo-subtasks": {
+      "hash": "3259a2344433",
+      "dims": [
+        "A10"
+      ]
+    },
+    "asana-plan:create-plan-required": {
+      "hash": "5bfb68d55374",
+      "dims": [
+        "A11"
+      ]
+    },
+    "asana-plan:no-impl-before-confirm": {
+      "hash": "aa99bd3f06be",
+      "dims": [
+        "A11"
+      ]
+    },
+    "im:no-impl-before-confirm": {
+      "hash": "637c86832211",
+      "dims": [
+        "A11"
+      ]
+    },
+    "im:commit-script": {
+      "hash": "1316ceaf9a10",
+      "dims": [
+        "A12"
+      ]
+    },
+    "im:clean-history": {
+      "hash": "7ac78fbb5280",
+      "dims": [
+        "A12"
+      ]
+    },
+    "im:lint-before-change": {
+      "hash": "b046513fe5ea",
+      "dims": [
+        "A12"
+      ]
+    },
+    "pr-create:verification-required": {
+      "hash": "fc85e9ee37e6",
+      "dims": [
+        "A13"
+      ]
+    },
+    "pr-create:no-dirty-pr": {
+      "hash": "19777a1a6f98",
+      "dims": [
+        "A13"
+      ]
+    },
+    "pr-create:repo-template-required": {
+      "hash": "c58b00c7ba16",
+      "dims": [
+        "A13"
+      ]
+    },
+    "pr-create:attach-test-evidence": {
+      "hash": "409a0c6eea79",
+      "dims": [
+        "A13"
+      ]
+    },
+    "pr-address:reply-before-resolve": {
+      "hash": "11e8035a191a",
+      "dims": [
+        "A14"
+      ]
+    },
+    "pr-address:non-owner-reply-only": {
+      "hash": "ecb8f4adf67f",
+      "dims": [
+        "A14"
+      ]
+    },
+    "pr-address:resolution-source-of-truth": {
+      "hash": "5fad3c41ed9a",
+      "dims": [
+        "A14"
+      ]
+    },
+    "pr-address:never-sets-completion": {
+      "hash": "34c67ff9f721",
+      "dims": [
+        "A14"
+      ]
+    },
+    "pr-land:publish-gating": {
+      "hash": "6446464a2054",
+      "dims": [
+        "A15"
+      ]
+    },
+    "pr-land:sequential-rebase": {
+      "hash": "2d56ec5004f5",
+      "dims": [
+        "A15"
+      ]
+    },
+    "pr-land:npm-otp-required": {
+      "hash": "ed7942eae767",
+      "dims": [
+        "A15"
+      ]
+    },
+    "pr-land:asana-last": {
+      "hash": "af3e35286071",
+      "dims": [
+        "A15"
+      ]
+    },
+    "workflow-halt-on-error:halt-on-error": {
+      "hash": "1f9a85327577",
+      "dims": [
+        "A16"
+      ]
+    },
+    "workflow-halt-on-error:auto-fix-verification-failures": {
+      "hash": "96aba591af4f",
+      "dims": [
+        "A16"
+      ]
+    },
+    "workflow-halt-on-error:no-silent-substitution": {
+      "hash": "7e40ea17b867",
+      "dims": [
+        "A16"
+      ]
+    },
+    "one-shot:finalize-gate": {
+      "hash": "04579b8772a2",
+      "dims": [
+        "A3"
+      ]
+    },
+    "one-shot:reviewer-bots": {
+      "hash": "301dab68665f",
+      "dims": [
+        "A3"
+      ]
+    },
+    "one-shot:followup-scope-is-the-deliverable": {
+      "hash": "602463077aa7",
+      "dims": [
+        "A23"
+      ]
+    },
+    "file:set-tested.sh": {
+      "hash": "8df123a2ad4d",
+      "dims": [
+        "A22"
+      ]
+    },
+    "build-and-test:test-on-sim-by-default": {
+      "hash": "cb6c331ece2d",
+      "dims": [
+        "A21"
+      ]
+    },
+    "build-and-test:gui-dependency-integration": {
+      "hash": "190a36c10943",
+      "dims": [
+        "A21"
+      ]
+    },
+    "build-and-test:test-drives-the-real-action": {
+      "hash": "e11de6646b51",
+      "dims": [
+        "A21"
+      ]
+    },
+    "file:asana-watcher.js": {
+      "hash": "768520a352a4",
+      "dims": [
+        "O1"
+      ]
+    },
+    "file:runaway-guard.sh": {
+      "hash": "156eae5f5109",
+      "dims": [
+        "O2"
+      ]
+    },
+    "file:memory-monitor.sh": {
+      "hash": "f47b7c2a09b7",
+      "dims": [
+        "O3"
+      ]
+    },
+    "file:session-watchdog.js": {
+      "hash": "f1f4b891d263",
+      "dims": [
+        "O4",
+        "O5",
+        "O6",
+        "O7"
+      ]
+    },
+    "file:setup-task-workspace.sh": {
+      "hash": "29a8d8a9b9e6",
+      "dims": [
+        "O8"
+      ]
+    },
+    "file:require-concession-validation.sh": {
+      "hash": "692db476a883",
+      "dims": [
+        "O9"
+      ]
+    }
+  },
+  "acked_uncovered": {
+    "agent-eval:read-only": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "agent-eval:rubric-is-the-contract": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "agent-eval:evidence-or-not-captured": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "agent-eval:skip-in-flight": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "agent-eval:testing-section-na": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "agent-eval:targeted-reads": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "asana-plan:task-review-for-asana": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "asana-task-update:use-companion-script": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "asana-task-update:task-required": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "asana-task-update:attach-graceful-without-secret": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "asana-task-update:create-subtask": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "asana-task-update:prompt-codes": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "asana-task-update:script-timeouts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "author:constraint-1": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "author:constraint-2": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "blocker-validator:default-deny": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "blocker-validator:read-only": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "blocker-validator:evidence-not-narration": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "blocker-validator:actionable-deny": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:use-companion-scripts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:no-script-bypass": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:cursor-bot-only": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:conclusion-is-not-clean": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:require-paginate": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:reply-before-resolve": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:commit-via-script": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:slot-after-each-fixup": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:fixup-target-headline": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:no-summary-comment": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:self-schedule-on-claude-code": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:one-cron-per-pr": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:script-timeouts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:finalize-on-task-gid": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "bugbot:this-file-wins": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:autodetect-repo-shape": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:report-failures-actionable": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:no-mutation": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:testids-over-coordinates": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:single-asset-plugin-trim": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:force-swap-provider-locally": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:scripts-over-inline": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:runtime-inspection-via-debugger": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:blocking-in-turn-waits": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:lockfile-driven-pm": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:platform-ios-default-android-on-callout": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:unrunnable-asset-proxy-verification": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:log-every-attempt": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:build-the-test-harness": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:maestro-flows-are-shortcuts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:proof-screenshots-for-pr": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:funded-test-accounts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:executable-pair-must-complete": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:slot-sim-is-the-clone": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:spaced-pin-taps": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:no-hideKeyboard": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "build-and-test:no-hierarchy-polling-on-buy": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "chat-audit:use-companion-script": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "chat-audit:tools-only-default": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "chat-audit:no-raw-json": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "chat-audit:concise-output": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "cheese:cheese-branch-only": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "cheese:clean-working-tree": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "cheese:tarball-not-git-url": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "cheese:use-companion-script": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "cheese:force-with-lease": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "concession-validator:default-deny": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "concession-validator:read-only": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "concession-validator:evidence-not-narration": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "concession-validator:actionable-deny": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "convention-sync:local-is-canonical": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "convention-sync:extra-trees": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "convention-sync:cross-machine-safety": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "convention-sync:use-companion-script": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "convention-sync:dry-run-first": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "convention-sync:no-script-bypass": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "convention-sync:readme-is-source": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "convention-sync:claude-compat": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "convention-sync:target-repo-resolution": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "debugger:pick-the-right-method": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "debugger:preflight-required": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "debugger:use-script": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "debugger:line-numbers-are-1-based": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "debugger:no-mutation": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "debugger:one-breakpoint-per-invocation": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "debugger:report-is-stdout-json": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "dep-pr:parent-required": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "dep-pr:check-existence": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "dep-pr:script-timeouts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "dep-pr:no-impl-before-task": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "dep-pr:same-project": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "dep-pr:initial-assignee": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "eval-run:orchestrate-existing-skills": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "eval-run:workflow-does-the-work": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "eval-run:verdict-policy": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "eval-run:completed-runs-only": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "eval-run:read-only": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "eval-run:actions-are-drafts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "fix-eslint:tsc-after-fix": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "fix-eslint:no-suppress": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "fix-eslint:scope-control": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "im:read-coding-standards": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "im:no-manual-formatting": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "im:generated-companion-files": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "im:no-script-bypass": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "im:script-timeouts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "local-research:local-not-web": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "local-research:workflow-does-the-work": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "local-research:scope-before-fanout": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "local-research:citations-are-the-product": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "local-research:write-the-report-out": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "obsidian:vault-path": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "obsidian:no-clobber": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "obsidian:obsidian-markdown": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "obsidian:frontmatter": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "obsidian:stop-if-target-missing": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "obsidian:confirm-location": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "one-shot:im-owns-implementation": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "one-shot:dep-pr-draft-vs-bump": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "one-shot:task-gid-for-pr-body-link": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "one-shot:pr-body-owned-by-pr-create": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "one-shot:ignore-watchdog-revive-ping": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "one-shot:ignore-refired-one-shot": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "one-shot:set-tested-field": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "one-shot:yolo-no-silent-downgrade": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "one-shot:pr-watch-loop-amend-pattern": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "one-shot:bugbot-in-watch": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "one-shot:followup-reopens-status": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "orch-eval:read-only": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "orch-eval:rubric-is-the-contract": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "orch-eval:no-good-without-evidence": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "orch-eval:run-vs-infra-bugs": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "orch-eval:skip-in-flight": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "orch-eval:targeted-reads": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-address:use-companion-script": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-address:no-script-bypass": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-address:no-git-editor": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-address:no-gitkraken": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-address:this-file-wins": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-address:commit-via-script": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-address:slot-after-each-fixup": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-address:script-timeouts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-address:operate-in-worktree": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-create:use-companion-script": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-create:no-script-bypass": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-create:gh-auth-required": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-create:no-base-push": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-create:no-reviewer-assignment": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-create:flag-contract": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-create:script-timeouts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-land:scripts-only": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-land:gh-auth": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-land:code-conflicts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-land:stale-prs": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-land:changelog-conflicts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-land:verification": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-land:no-force-push": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-land:no-editors": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-land:unexpected-exit": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-land:defer-gui": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-review:standards-first": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-review:use-companion-script": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-review:no-script-bypass": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-review:no-duplicate-feedback": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-review:batch-reads": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "pr-review:script-timeouts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "q:no-sycophancy": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "q:no-filler": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "q:no-unverified-claims": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "q:calibrated-confidence": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "q:no-code-changes": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "resolve-run:read-only": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "resolve-run:script-does-the-work": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "resolve-run:no-credentials": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "resolve-run:manifest-is-pointers": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "staging-cherry-pick:individual-commits": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "staging-cherry-pick:pull-first": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "staging-cherry-pick:changelog-conflicts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "staging-cherry-pick:no-force-push": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "staging-cherry-pick:no-editors": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "staging-cherry-pick:push-confirmation": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "staging-cherry-pick:scripts-only": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "staging-cherry-pick:unexpected-exit": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "standup:links-as-titles": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "standup:no-reassign-in-accomplishments": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "standup:single-gist": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "standup:cleanup": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "standup:script-timeout": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "task-review:summary-first": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "task-review:script-timeout": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "after_each_chat:every-turn": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "after_each_chat:full-response": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "after_each_chat:no-confirmation": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "after_each_chat:single-command": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "after_each_chat:no-extra-args": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "load-standards-by-filetype:check-before-read": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "load-standards-by-filetype:read-before-edit": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:preserve-stack-traces": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:avoid-ts-expect-error": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:undefined-vs-null-semantics": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:always-await-async": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:no-redundant-catch": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:tokenid-no-null-fallback": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:no-redundant-error-handling": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:handle-user-cancellation": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:dont-mask-errors": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:check-array-bounds": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:compare-same-types": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:lookup-table-defensive-access": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:consolidate-guard-clauses": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:useHandler-over-useCallback": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:combine-related-effects": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:display-logic-extraction": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:stylesheet-compose": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:platform-keyboard": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:preserve-props-replacement": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:maintain-styling-icon-switch": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:interactionmanager-nav": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:disable-ui-async": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:no-duplicate-redux-local": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:module-level-cache-bugs": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:settings-in-redux": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:datastore-api": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:data-format-migrations": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:merge-state-objects": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:makePeriodicTask": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:background-services-location": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:prevent-concurrent-execution": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:polling-race-conditions": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:refresh-state-callbacks": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:cleanup-timeouts-shutdown": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:serialize-event-handlers": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:clean-all-external-data": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:derive-types-from-cleaners": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:asoptional-handles-null": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:new-fields-optional": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:remove-unused-cleaner-fields": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:delete-unnecessary-code": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:put-parameters-inline": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:use-existing-helpers": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:avoid-duplicated-mocks": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:no-hardcoded-debug-urls": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:no-local-path-deps": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:guard-debug-logging": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:validation-single-source": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:local-helpers-amount-conversion": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:no-hand-rolled-ops": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:keep-config-consistent": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:remove-unused-styles": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:reuse-existing-strings": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:context-based-key-names": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:avoid-tap-to-x": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:localization-gui-level": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:add-non-obvious-constraints": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:remove-stale-comments": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:comments-why-not-what": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:server-devdependencies": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:separate-configs": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:pm2-process-management": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "review-standards:build-both": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "typescript-standards:no-hardcoded-strings": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "typescript-standards:localized-string-placeholders": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "typescript-standards:no-any": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "typescript-standards:no-optional-chaining-in-conditions": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "typescript-standards:no-empty-catch": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "typescript-standards:catch-typing": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "typescript-standards:no-void-operator": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "typescript-standards:no-inline-styles": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "typescript-standards:no-inline-arrow-jsx": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "workflow-halt-on-error:cursor-workflow-paths": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "workflow-halt-on-error:skill-script-path-resolution": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "workflow-halt-on-error:fix-workflow-first": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "workflow-halt-on-error:skill-scope-only": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
+    "workflow-halt-on-error:companion-script-nonzero-contracts": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually"
+  }
+}

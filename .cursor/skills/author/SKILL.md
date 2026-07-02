@@ -123,6 +123,19 @@ When revising an existing command, **every item below is mandatory** — not a s
 </revision-checklist>
 
 <post-authoring-actions>
+When the change touched any `<rule>` block (SKILL.md or .mdc) or any `~/.config/agent-watcher` script, run the rubric drift check BEFORE offering convention-sync:
+
+```bash
+~/.cursor/skills/rubric-drift.sh
+```
+
+The eval rubrics (agent-eval, orch-eval) anchor their dimensions to rule ids and orch scripts; this detects when an edit moved an anchored expectation or introduced an uncovered rule. Triage every finding line — never leave one unhandled:
+- `CHANGED <anchor>` — read the rule/file diff; if the eval expectation moved, update the citing dimension's wording in the rubric, then `--reconcile <anchor>`. If the change doesn't affect what an eval should check, `--reconcile` directly.
+- `MISSING <anchor>` — the dimension cites a deleted/renamed rule; fix the rubric grounding (and wording if needed), then re-run.
+- `UNCOVERED <skill:rule-id>` — a new rule with no dimension: PROPOSE a dimension to the user (the rubric is curated; never auto-write dimensions), or `--ack <skill:rule-id> --reason "<why not eval-relevant>"`.
+
+The lock file (`~/.cursor/skills/rubric-drift.lock.json`) is state; commit it with the sync so other machines share the reconcile point.
+
 After any authoring change (skills/scripts/rules), ask:
 
 > Run `/convention-sync` to sync files and update PR conventions/description?
