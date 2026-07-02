@@ -32,6 +32,8 @@
 #                                            #   current hash (A = skill:rule-id
 #                                            #   or file:<basename>)
 #   rubric-drift.sh --ack skill:rule-id --reason R   # ack one uncovered rule
+#   rubric-drift.sh --map                    # emit {dim: {name, gate, file, line}} JSON
+#                                            #   (consumed by eval-run report annotation)
 #
 # Acks are PER-VERSION (store the rule's hash at ack time): if an acked rule's
 # content later changes it re-flags once as UNCOVERED-CHANGED for re-triage.
@@ -70,7 +72,7 @@ const vals = (f) => { // all non-flag tokens after f
   for (let j = i + 1; j < argv.length && !argv[j].startsWith('--'); j++) out.push(argv[j])
   return out
 }
-const MODE = has('--baseline') ? 'baseline' : has('--reconcile') ? 'reconcile' : has('--ack') ? 'ack' : 'check'
+const MODE = has('--baseline') ? 'baseline' : has('--reconcile') ? 'reconcile' : has('--ack') ? 'ack' : has('--map') ? 'map' : 'check'
 
 const sha = (s) => crypto.createHash('sha256').update(s.replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 12)
 
@@ -121,14 +123,24 @@ function resolveFile(tok) {
   }
   return flat(tok).find(isFile)
 }
+const dimIndex = {} // dim -> {name, gate, file, line} for --map consumers
 for (const rubric of RUBRICS) {
   if (!fs.existsSync(rubric)) { parseErrors.push('rubric missing: ' + rubric); continue }
-  for (const line of fs.readFileSync(rubric, 'utf8').split('\n')) {
+  const rubricLines = fs.readFileSync(rubric, 'utf8').split('\n')
+  for (let li = 0; li < rubricLines.length; li++) {
+    const line = rubricLines[li]
     const row = line.match(/^\|\s*([AO]\d+)\s*\|/)
     if (!row) continue
     const dim = row[1]
     const cells = line.split('|').map((c) => c.trim()).filter((c) => c.length)
     const grounding = cells[cells.length - 1]
+    const rawName = cells[1] || ''
+    dimIndex[dim] = {
+      name: rawName.replace(/\*\*/g, '').replace(/\s*\(GATE[^)]*\)\s*/i, '').trim(),
+      gate: /GATE/.test(rawName),
+      file: rubric,
+      line: li + 1,
+    }
     // rule anchors: backticked tokens matching known rule ids
     for (const t of grounding.matchAll(/`([a-z][a-z0-9_-]*)`/g)) {
       const id = t[1]
@@ -151,6 +163,8 @@ for (const rubric of RUBRICS) {
     }
   }
 }
+
+if (MODE === 'map') { console.log(JSON.stringify(dimIndex)); process.exit(0) }
 
 // ---- lock ----
 const lock = fs.existsSync(LOCK)
