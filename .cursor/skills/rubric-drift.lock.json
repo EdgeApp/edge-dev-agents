@@ -1384,6 +1384,18 @@
     "workflow-halt-on-error:companion-script-nonzero-contracts": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "c32f66511e88"
+    },
+    "agent-eval:use-probe-index": {
+      "reason": "2026-07-02: eval-skill internal behavior, not an orchestrated-run contract",
+      "hash": "ea82267ee16b"
+    },
+    "agent-eval:plain-language-dimensions": {
+      "reason": "2026-07-02: eval-skill internal behavior, not an orchestrated-run contract",
+      "hash": "e844ac904c28"
+    },
+    "orch-eval:use-probe-index": {
+      "reason": "2026-07-02: eval-skill internal behavior, not an orchestrated-run contract",
+      "hash": "175279744e28"
     }
   }
 }

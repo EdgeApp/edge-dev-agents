@@ -37,9 +37,10 @@ const FINDINGS_SCHEMA = {
       type: 'array',
       items: {
         type: 'object',
-        required: ['id', 'verdict', 'evidence'],
+        required: ['id', 'name', 'verdict', 'evidence'],
         properties: {
           id: { type: 'string' },
+          name: { type: 'string', description: 'the dimension name from the rubric, e.g. review-response for A14 — never emit a bare code' },
           verdict: { enum: ['GOOD', 'MINOR', 'BAD', 'NA', 'NOT_CAPTURED'] },
           evidence: { type: 'string' },
           citation: { type: 'string' },
@@ -66,7 +67,10 @@ const evalPrompt = (skill, m) =>
   `(read-only; evidence-or-NOT_CAPTURED; targeted greps only; never read whole transcripts/logs).\n` +
   `Do NOT write any report file — return findings via StructuredOutput only (the orchestrator writes reports).\n` +
   `Run manifest (from /resolve-run):\n${JSON.stringify(m)}\n` +
-  `Return every rubric dimension exactly once.`
+  `The manifest carries probe_index (pre-computed transcript probe hits: counts + sample line numbers, plus the update-status ladder) ` +
+  `and auto_na (manifest-derived NA determinations). START from them: verify at the indexed lines instead of re-deriving discovery greps ` +
+  `(counts are advisory — quoted skill bodies inflate them), and accept each auto_na entry unless evidence contradicts it.\n` +
+  `Return every rubric dimension exactly once, each with BOTH its id and its rubric name (e.g. A14 + review-response).`
 
 // Evaluate + verify per run, pipelined (no cross-run barrier)
 const results = await pipeline(
@@ -85,7 +89,7 @@ const results = await pipeline(
         `Re-open the citation yourself and try to REFUTE it. Default to refuted=true if the evidence does not hold up ` +
         `or the citation cannot be opened.\nDimension: ${b.id}\nClaim: ${b.evidence}\nCitation: ${b.citation || 'none given'}\n` +
         `Manifest: ${JSON.stringify(m)}`,
-        { label: `verify:${m.gid}:${b.id}`, phase: 'Verify', schema: VERDICT_SCHEMA, ...MOPT }
+        { label: `verify:${m.gid}:${b.id}`, phase: 'Verify', schema: VERDICT_SCHEMA, effort: 'low', ...MOPT }
       ).then(v => ({ ...b, refuted: v ? v.refuted : true, verify_reason: v ? v.reason : 'verifier died' }))
     ))
     const confirmed = verified.filter(Boolean).filter(v => !v.refuted)
@@ -119,6 +123,10 @@ const cohort = await agent(
   `Write a cohort evaluation report (markdown) for ${runs.length} orchestrated agent runs evaluated on ${runDate}.\n` +
   `Verdict policy: gates (${Object.values(GATES).join(', ')}) hard-fail; GOLD = all gates green AND zero confirmed BAD.\n` +
   `Per-run results:\n${JSON.stringify(runs)}\nSkipped: ${JSON.stringify(skipped)}\n` +
+  `DIMENSION RENDERING (hard rule): never write a bare dimension code anywhere in the report. Every mention is id + name ` +
+  `(e.g. "A14 review-response", "O6 resource-release"), and the FIRST mention of each dimension in the findings section adds a ` +
+  `one-line plain-language gloss of what it checks (take it from the finding's evidence context). A reader who has never seen ` +
+  `the rubric must be able to follow the report.\n` +
   `Structure: 1) verdict summary table (gid, task, verdict, gate failures, confirmed-BAD count, coverage gaps); ` +
   `2) confirmed findings grouped by dimension WITH citations, so recurring patterns across runs are visible; ` +
   `3) infra issues (substrate, not per-run); 4) coverage gaps (NOT_CAPTURED patterns — note O1/O6 expected until capture hook ships); ` +

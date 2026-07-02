@@ -136,7 +136,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
   fi
 
   local transcript; transcript=$(find_transcript "$gid")
-  local win_start="" win_end="" prs="[]" revive_pings=0 operator_msgs=0
+  local win_start="" win_end="" prs="[]" revive_pings=0 operator_msgs=0 probe_index="{}"
   if [ -n "$transcript" ]; then
     # first/last lines are often timestamp-less meta records (mode, bridge-session);
     # take the first and last lines that carry a timestamp
@@ -178,6 +178,46 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       })().catch(() => console.log(0));
     ' "$transcript" 2>/dev/null || echo 0)
     operator_msgs=${operator_msgs:-0}
+    # Deterministic probe index: ONE pass over the transcript pre-computes the
+    # standard evidence probes both evaluators otherwise re-derive with ad-hoc
+    # greps (counts + sample line numbers, and the update-status ladder for A4/O8).
+    # Counts are ADVISORY (skill bodies quoted into the transcript can inflate
+    # them) — evaluators verify hits at the given lines instead of re-discovering.
+    probe_index=$(node -e '
+      const fs = require("fs"); const rl = require("readline");
+      const PROBES = {
+        lint_commit: /lint-commit\.sh/,
+        raw_git_commit: /git (commit|-C [^ ]+ commit)/,
+        amend: /commit --amend/,
+        self_respawn: /ScheduleWakeup|CronCreate|claude --resume|claude &|\/loop /,
+        pr_create: /gh pr create|\/pr-create/,
+        pr_land: /pr-land/,
+        watch_pr: /watch-pr\.sh/,
+        build_and_test: /build-and-test/,
+        set_tested: /set-tested\.sh/,
+        log_attempt: /log-attempt\.sh/,
+        maestro: /maestro/,
+        skill_reads: /skills\/[a-z-]+\/SKILL\.md/,
+        tool_errors: /"is_error":\s*true/,
+      };
+      const STATUS = /update-status\.sh ([0-9]+) (Pending|Planning|Developing|Testing|Reviewing|Complete)/;
+      (async () => {
+        const out = {}; for (const k of Object.keys(PROBES)) out[k] = { count: 0, lines: [] };
+        out.update_status = { count: 0, ladder: [] };
+        let n = 0;
+        const r = rl.createInterface({ input: fs.createReadStream(process.argv[1]), crlfDelay: Infinity });
+        for await (const line of r) {
+          n++;
+          for (const [k, re] of Object.entries(PROBES)) {
+            if (re.test(line)) { out[k].count++; if (out[k].lines.length < 5) out[k].lines.push(n); }
+          }
+          const m = line.match(STATUS);
+          if (m) { out.update_status.count++; if (out.update_status.ladder.length < 20) out.update_status.ladder.push({ line: n, status: m[2] }); }
+        }
+        console.log(JSON.stringify(out));
+      })().catch(() => console.log("{}"));
+    ' "$transcript" 2>/dev/null || echo "{}")
+    [ -n "$probe_index" ] || probe_index="{}"
   fi
 
   local asana; asana=$(asana_fetch "$gid" || true)
@@ -250,7 +290,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     --arg run_report "$run_report" --argjson revive "$revive_pings" --argjson operator "$operator_msgs" --argjson wd "$watchdog_mentions" \
     --argjson release_receipt "$release_receipt" \
     --argjson attempt_log "$attempt_log" --argjson blocker_reason "$blocker_reason" --argjson blocker_verdict "$blocker_verdict" \
-    --argjson followup "$followup" \
+    --argjson followup "$followup" --argjson probe_index "$probe_index" \
     --argjson forensics "$forensics" --arg state_dir "$STATE_DIR" --arg watchdog_log "$WATCHDOG_LOG" --arg watcher_log "$WATCHER_LOG" \
     --argjson runaway_log_exists "$([ -f "$STATE_DIR/runaway-guard.log" ] && echo true || echo false)" \
     '{
@@ -272,6 +312,16 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       release_receipt: $release_receipt,
       blocking: { attempt_log: $attempt_log, last_reason: $blocker_reason, validator_verdict: $blocker_verdict },
       followup: $followup,
+      probe_index: $probe_index,
+      auto_na: ( {}
+        + (if ($prs | length) == 0 then {A13: "no PR created this run", A14: "no PR, so no review threads to address"} else {} end)
+        + (if (($probe_index.pr_land.count // 0) == 0) then {A15: "pr-land never invoked"} else {} end)
+        + (if $followup.last_report_attached_at == null
+           then {A23: "not a followup (no prior run-report attached)", A24: "not a re-engagement (no prior run-report attached)"}
+           else (if ($followup.comments_after_prev_report | length) == 0 then {A23: "no operator comments after the prior report"} else {} end)
+           end)
+        + (if ($blocker_verdict == null and $blocker_reason == null and ($asana.blocked != "Yes")) then {O7: "never blocked (no reason file, no verdict, blocked field != Yes)"} else {} end)
+      ),
       signals: { revive_pings_in_transcript: $revive, operator_messages: $operator, watchdog_log_mentions: $wd, forensics_files: $forensics },
       logs: { watcher: $watcher_log, watchdog: $watchdog_log,
               runaway_guard: ($state_dir + "/runaway-guard.log"),
