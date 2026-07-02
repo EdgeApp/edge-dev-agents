@@ -85,7 +85,14 @@ the live sessions. Post-hoc evals grade what each run did.
    RESUMED instead (its conversation restored on the fresh slot, via `resume-task`).
    So re-engaging a finished task is one signal: set it back to `Pending` and it
    continues with memory plus working resources, never a fresh session. This is the
-   single re-engagement entry point.
+   single re-engagement entry point. Both the fresh-spawn and the resume path route
+   through `spawn-test-session.sh`, which pins the session's model and reasoning
+   effort from the task's `agent_model` / `agent_effort` Asana fields: the selected
+   `agent_model` option maps to a CLI model string (all 1M-context: Opus 4.8, Opus
+   4.7, Sonnet 5, Sonnet 4.6), the `agent_effort` option is the CLI level directly
+   (low/medium/high/xhigh/max). Unset falls back to the config defaults
+   (`.watcher.agent_model` = Opus 4.8 1M, `.watcher.agent_effort` = high), so new
+   tasks and follow-ups honor the same per-task overrides.
 2. **The run** (`/one-shot --yolo`, a single agent turn): seven phases, status
    advanced via `update-status.sh` at each boundary. Planning (`/asana-plan`),
    Developing (`/im`), local verify (`/build-and-test`), Reviewing (`/pr-create`),
