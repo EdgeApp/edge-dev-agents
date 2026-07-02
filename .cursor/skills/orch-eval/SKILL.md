@@ -12,6 +12,7 @@ description: Evaluate one orchestrated agent run's infrastructure health (fork-s
 <rule id="run-vs-infra-bugs">Separate the run's behavior from infrastructure bugs. A guard that misfired, a sim reclaimed from under a live run, or a watchdog defect penalizes the INFRA (report under `infra_issues`), not the run's verdict.</rule>
 <rule id="skip-in-flight">If the manifest says `in_flight: true`, stop and report the run as not evaluable yet.</rule>
 <rule id="targeted-reads">Logs are large/rolling. Grep within the manifest `window` only; never read whole logs into context.</rule>
+<rule id="use-probe-index">The manifest's `probe_index.update_status.ladder` is the pre-computed status timeline for O8 (verify at those lines, do not re-grep), and `auto_na` entries (e.g. O7 never-blocked) are accepted unless evidence contradicts. Every emitted finding carries BOTH the dimension id and its rubric name (`O6` + `resource-release`); human-facing output never shows a bare code without its name.</rule>
 </rules>
 
 <step id="1" name="Get the manifest">

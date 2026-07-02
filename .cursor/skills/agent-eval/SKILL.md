@@ -12,6 +12,8 @@ description: Evaluate one orchestrated agent run for process compliance (did it 
 <rule id="skip-in-flight">If the manifest says `in_flight: true`, stop and report the run as not evaluable yet.</rule>
 <rule id="testing-section-na">A18 (testing-report) is NA for runs that predate the Testing-section template feature: if the run-report has no `## Testing` heading and the run ended before the feature existed, record NA — never penalize pre-feature runs for it.</rule>
 <rule id="targeted-reads">Transcripts are large. Use targeted greps and line-range reads driven by what each dimension needs (e.g. `grep -n "lint-commit.sh\|git commit" <transcript>`); never read a whole transcript JSONL into context.</rule>
+<rule id="use-probe-index">The manifest's `probe_index` is the pre-computed first pass (per-probe counts + sample line numbers, and the full update-status ladder for A4): verify at those lines instead of re-deriving discovery greps. Counts are advisory (skill bodies quoted into the transcript inflate them) — confirm hits before citing. The manifest's `auto_na` entries are manifest-derived NA determinations: accept each unless evidence contradicts it, and note the contradiction when you override.</rule>
+<rule id="plain-language-dimensions">Every emitted finding carries BOTH the dimension id and its rubric name (`A14` + `review-response`), and any human-facing output (standalone report file, chat summary) never shows a bare code without its name.</rule>
 </rules>
 
 <step id="1" name="Get the manifest">
