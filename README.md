@@ -88,8 +88,8 @@ the live sessions. Post-hoc evals grade what each run did.
    single re-engagement entry point. Both the fresh-spawn and the resume path route
    through `spawn-test-session.sh`, which pins the session's model and reasoning
    effort from the task's `agent_model` / `agent_effort` Asana fields: the selected
-   `agent_model` option maps to a CLI model string (all 1M-context: Opus 4.8, Opus
-   4.7, Sonnet 5, Sonnet 4.6), the `agent_effort` option is the CLI level directly
+   `agent_model` option maps to a CLI model string (all 1M-context: Fable 5, Opus
+   4.8, Opus 4.7, Sonnet 5, Sonnet 4.6), the `agent_effort` option is the CLI level directly
    (low/medium/high/xhigh/max). Unset falls back to the config defaults
    (`.watcher.agent_model` = Opus 4.8 1M, `.watcher.agent_effort` = high), so new
    tasks and follow-ups honor the same per-task overrides.
