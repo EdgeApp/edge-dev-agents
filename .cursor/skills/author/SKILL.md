@@ -133,6 +133,7 @@ The eval rubrics (agent-eval, orch-eval) anchor their dimensions to rule ids and
 - `CHANGED <anchor>` — read the rule/file diff; if the eval expectation moved, update the citing dimension's wording in the rubric, then `--reconcile <anchor>`. If the change doesn't affect what an eval should check, `--reconcile` directly.
 - `MISSING <anchor>` — the dimension cites a deleted/renamed rule; fix the rubric grounding (and wording if needed), then re-run.
 - `UNCOVERED <skill:rule-id>` — a new rule with no dimension: PROPOSE a dimension to the user (the rubric is curated; never auto-write dimensions), or `--ack <skill:rule-id> --reason "<why not eval-relevant>"`.
+- `UNCOVERED-CHANGED <skill:rule-id>` — a previously-acked rule's content changed (acks are per-version): re-judge it fresh — propose a dimension or re-`--ack` at the new version.
 
 The lock file (`~/.cursor/skills/rubric-drift.lock.json`) is state; commit it with the sync so other machines share the reconcile point.
 

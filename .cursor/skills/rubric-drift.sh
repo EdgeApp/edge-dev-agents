@@ -33,6 +33,9 @@
 #                                            #   or file:<basename>)
 #   rubric-drift.sh --ack skill:rule-id --reason R   # ack one uncovered rule
 #
+# Acks are PER-VERSION (store the rule's hash at ack time): if an acked rule's
+# content later changes it re-flags once as UNCOVERED-CHANGED for re-triage.
+#
 # Env (for testing): RD_SKILLS_DIR, RD_RULES_DIR, RD_WATCHER_DIR, RD_LOCK.
 # Exit: 0 = clean, 1 = drift/coverage findings, 2 = usage/parse error.
 set -euo pipefail
@@ -156,13 +159,34 @@ const lock = fs.existsSync(LOCK)
 const save = () => fs.writeFileSync(LOCK, JSON.stringify(lock, null, 2) + '\n')
 const today = new Date().toISOString().slice(0, 10)
 
+// Acks are PER-VERSION: each stores the rule's hash at ack time, so a later
+// content change re-flags once (UNCOVERED-CHANGED) for re-triage. Migrate
+// legacy string acks in place; drop acks for rules a dimension now anchors
+// (anchored rules are hash-tracked, the ack is redundant).
+{
+  let migrated = 0, dropped = 0
+  for (const k of Object.keys(lock.acked_uncovered)) {
+    if (typeof lock.acked_uncovered[k] === 'string') {
+      lock.acked_uncovered[k] = { reason: lock.acked_uncovered[k], hash: ruleIndex.has(k) ? ruleIndex.get(k).hash : null }
+      migrated++
+    }
+    if (anchors.has(k)) { delete lock.acked_uncovered[k]; dropped++ }
+  }
+  if (migrated || dropped) {
+    save()
+    console.log(`MIGRATED ${migrated} ack(s) to per-version format; dropped ${dropped} now-anchored ack(s)`)
+  }
+}
+
 if (MODE === 'baseline') {
   const reason = val('--reason') || 'pre-baseline (not triaged individually)'
   lock.baselined_at = today
   lock.anchors = {}
   for (const [key, a] of anchors) lock.anchors[key] = { hash: a.hash, dims: [...a.dims].sort() }
   for (const key of ruleIndex.keys()) {
-    if (!anchors.has(key) && !lock.acked_uncovered[key]) lock.acked_uncovered[key] = `${today}: ${reason}`
+    if (!anchors.has(key) && !lock.acked_uncovered[key]) {
+      lock.acked_uncovered[key] = { reason: `${today}: ${reason}`, hash: ruleIndex.get(key).hash }
+    }
   }
   save()
   console.log(`BASELINED ${anchors.size} anchors (${[...anchors.values()].filter((a) => a.kind === 'rule').length} rule, ${[...anchors.values()].filter((a) => a.kind === 'file').length} file); acked ${Object.keys(lock.acked_uncovered).length} uncovered rules`)
@@ -186,7 +210,7 @@ if (MODE === 'ack') {
   const id = val('--ack'), reason = val('--reason')
   if (!id || !reason) { console.error('usage: --ack skill:rule-id --reason "why not eval-relevant"'); process.exit(2) }
   if (!ruleIndex.has(id)) { console.error(`ACK-FAIL ${id}: no such rule in corpus`); process.exit(2) }
-  lock.acked_uncovered[id] = `${today}: ${reason}`
+  lock.acked_uncovered[id] = { reason: `${today}: ${reason}`, hash: ruleIndex.get(id).hash }
   save()
   console.log(`ACKED ${id}`)
   process.exit(0)
@@ -208,9 +232,12 @@ for (const key of Object.keys(lock.anchors)) {
     out(`${gone ? 'MISSING' : 'UNANCHORED'} ${key} (dims ${lock.anchors[key].dims}) — ${gone ? 'the anchored rule/file no longer exists; the dimension may be stale' : 'rubric no longer cites it; --reconcile after confirming intentional'}`)
   }
 }
-// coverage: corpus rules with no anchor and no ack
+// coverage: corpus rules with no anchor and no current-version ack
 for (const key of ruleIndex.keys()) {
-  if (!anchors.has(key) && !lock.acked_uncovered[key]) out(`UNCOVERED ${key} — new rule with no rubric dimension; propose a dimension or --ack with a reason`)
+  if (anchors.has(key)) continue
+  const ack = lock.acked_uncovered[key]
+  if (!ack) out(`UNCOVERED ${key} — new rule with no rubric dimension; propose a dimension or --ack with a reason`)
+  else if (ack.hash && ack.hash !== ruleIndex.get(key).hash) out(`UNCOVERED-CHANGED ${key} ${ack.hash} -> ${ruleIndex.get(key).hash} — acked rule's content changed since the ack; re-triage: propose a dimension or --ack ${key} again`)
 }
 // hygiene: acks pointing at dead rules
 for (const key of Object.keys(lock.acked_uncovered)) {
