@@ -83,6 +83,15 @@ the live sessions. Post-hoc evals grade what each run did.
    `agent_status = Planning`, a tmux session `claude-asana-(gid)` running
    `/one-shot --yolo (task-url)`. A task with a PRIOR transcript (a revisit) is
    RESUMED instead (its conversation restored on the fresh slot, via `resume-task`).
+   Note the resume answers the resume menu with "Resume from summary", which
+   COMPACTS the conversation from a summary built before the re-arm, so a resumed
+   agent's memory never includes the followup comment that triggered the re-arm.
+   That is why finalize is gated on a live scope check: `check-followup-scope.sh`
+   fetches the task's comments and attachments, lists every operator comment newer
+   than the latest `agent-run-report*.md` watermark, and writes a marker; the
+   `require-followup-scope-on-complete.sh` PreToolUse hook blocks
+   `update-status.sh (gid) Complete` unless that marker exists and still matches
+   the live newest comment. Recalled context never stands in for the fetch.
    So re-engaging a finished task is one signal: set it back to `Pending` and it
    continues with memory plus working resources, never a fresh session. This is the
    single re-engagement entry point. Both the fresh-spawn and the resume path route
