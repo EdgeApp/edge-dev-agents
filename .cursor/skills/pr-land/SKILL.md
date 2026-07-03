@@ -47,6 +47,7 @@ Arguments are classified automatically:
 If you do not know which the account uses, ask the user. Do NOT run `npm login` — auth comes from the `_authToken` in `~/.npmrc`; the user owns login. If `npm whoami` fails before the first publish, STOP and report; do not try to re-authenticate.</rule>
 <rule id="defer-gui">If the discovered PR set contains BOTH `edge-react-gui` PRs and at least one non-GUI PR, all GUI PRs are DEFERRED — they do NOT enter steps 3-7 (prepare/push/merge/publish/upgrade-dep). GUI PRs are processed in step 8 (new) after step 7's dep upgrades land on develop. If the batch is pure GUI or pure non-GUI, no deferral — proceed as normal.</rule>
 <rule id="asana-last">Asana updates are LAST. Do NOT update Asana tasks until ALL merges, publishes, and GUI dependency upgrades are complete. Only update status for PRs that are fully landed (merged, and if non-GUI: published + GUI deps updated).</rule>
+<rule id="build-field-routing">During discovery, resolve each linked task's Build field: `~/.cursor/skills/asana-build-field.sh <task-gid>`. `staging` → the PR is staging-targeted: step 9 MUST cherry-pick its commits after merge even when its CHANGELOG entry sits under `## Unreleased` — a field/CHANGELOG disagreement is a placement question (offer to move the entry to the `(staging)` section per step 3's placement-warning flow), never a silent skip of the cherry-pick. A cheese value (`feta|gouda|halloumi|cheddar`) changes NOTHING about landing: land the task's FEATURE branch PR normally; a `test-*` branch is never a landing target (skip + report any discovered PR whose head branch matches `test-*`; see cheese `pointer-not-workspace`), and no re-cheese follows a land — CI builds wherever the landing happened (develop, or develop + staging).</rule>
 </rules>
 
 <scripts description="Companion scripts and their expected exit codes.">
@@ -369,11 +370,11 @@ Do NOT re-enter steps 6 or 7 — GUI does not publish to npm and has no deps of 
 </step>
 
 <step id="9" name="Staging Cherry-Pick">
-**Trigger:** Only for `edge-react-gui` commits that target the `## X.Y.Z (staging)` CHANGELOG section (not `## Unreleased`). This includes both merged PR commits and GUI dependency upgrade commits from step 7.
+**Trigger:** `edge-react-gui` commits qualify on EITHER signal (per `build-field-routing`): (a) the linked Asana task's Build field is `staging` — the primary, field-driven signal — or (b) the commit's CHANGELOG entry targets the `## X.Y.Z (staging)` section (the backstop for PRs with no linked task). This includes both merged PR commits and GUI dependency upgrade commits from step 7.
 
-Check CHANGELOG diffs to determine which commits qualify — if the entry was added under a `(staging)` heading, it needs cherry-picking.
+Check the Build field of each landed PR's task plus CHANGELOG diffs to determine which commits qualify. On disagreement (field `staging`, entry under `## Unreleased`), the placement question was already surfaced in step 3 — the field wins for routing.
 
-**Skip** this step entirely if no commits have staging CHANGELOG entries.
+**Skip** this step entirely only when NO commit qualifies on either signal.
 
 For qualifying PRs/commits, invoke the `/staging-cherry-pick` skill:
 

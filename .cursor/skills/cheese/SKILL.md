@@ -10,6 +10,7 @@ metadata:
 
 <rules description="Non-negotiable constraints.">
 <rule id="cheese-branch-only">Target branch MUST match `test-*`. For any other branch name, stop and ask the user to confirm it is scratch space safe to force-push.</rule>
+<rule id="pointer-not-workspace">A `test-*` branch is a build-trigger POINTER, never a workspace: all development happens on the working/feature branch and every change is pushed THERE. The cheese operation is exclusively a hard-reset of `test-*` to an already-pushed source ref + force-push (CI auto-builds on `test-*` pushes). Never commit on, develop on, or open a PR from a `test-*` branch, and never land/merge one — the feature branch is what lands (see pr-land `build-field-routing`).</rule>
 <rule id="clean-working-tree">Require a clean working tree in edge-react-gui (no staged, unstaged, or untracked files) before starting. Do NOT auto-stash — tell the user to commit or stash first.</rule>
 <rule id="tarball-not-git-url">When pinning an unreleased dep, use a prebuilt tarball (`npm pack` or `yarn pack`, auto-detected from the dep repo's lockfile), never a git URL. Git URLs make the build server run the dep's `prepare` script, which fails on native toolchain deps (bs-platform needs python; ed25519 fails to build against current Node v8 ABI).</rule>
 <rule id="use-companion-script">Run the full workflow via `~/.cursor/skills/cheese/scripts/cheese-build.sh`. Do not inline git / pack / package-manager operations in chat.</rule>
