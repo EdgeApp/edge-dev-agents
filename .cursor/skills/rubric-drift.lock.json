@@ -51,7 +51,7 @@
       ]
     },
     "one-shot:yolo-stop-at-pr": {
-      "hash": "ec6def879e05",
+      "hash": "676ad1743270",
       "dims": [
         "A8"
       ]
@@ -392,7 +392,7 @@
       ]
     },
     "one-shot:cheese-build-on-green": {
-      "hash": "35395e4deff7",
+      "hash": "1563bb1b75a5",
       "dims": [
         "A28"
       ]
@@ -413,6 +413,18 @@
       "hash": "013dd0d945d5",
       "dims": [
         "A28"
+      ]
+    },
+    "one-shot:land-on-approval": {
+      "hash": "8fefc93f8ebb",
+      "dims": [
+        "A8"
+      ]
+    },
+    "file:asana-force-land.sh": {
+      "hash": "b7036bbd8c43",
+      "dims": [
+        "A8"
       ]
     }
   },
