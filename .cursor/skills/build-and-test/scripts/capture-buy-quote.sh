@@ -22,7 +22,8 @@
 #
 # Usage:
 #   capture-buy-quote.sh [--out <path>] [--flow <path-to-maestro-yaml>] \
-#                        [--bundle-id <id>] [--quote-secs N] [--window-secs N] [--cycles N]
+#                        [--bundle-id <id>] [--quote-secs N] [--window-secs N] [--cycles N] \
+#                        [--device <udid>] [--driver-port N]
 #
 # Defaults:
 #   --out         /tmp/agent-mvp-buy-quote-screenshot.png
@@ -31,6 +32,15 @@
 #   --quote-secs  7   (require a live frame from at least this late post-input)
 #   --window-secs 14  (stop bursting after this long; app survived → static frame)
 #   --cycles      5   (retry the whole login→Buy→input cycle this many times)
+#   --device      $AGENT_SIM_UDID when set (slot session), else simctl "booted"
+#   --driver-port $AGENT_METRO_PORT+1000 when set (per-slot maestro driver port,
+#                 keeps parallel slots' iOS drivers off each other), else unset
+#
+# Device pinning: with multiple sims booted (parallel orch slots), an unpinned
+# maestro attaches to an arbitrary device and `simctl io booted` photographs an
+# arbitrary one — the two can DISAGREE, producing sincere-but-false proof of the
+# wrong simulator. Every maestro/simctl call below therefore targets ONE
+# resolved $DEVICE.
 #
 # Exit codes:
 #   0 = captured a post-quote-resolution frame
@@ -46,6 +56,9 @@ BUNDLE_ID="co.edgesecure.app"
 QUOTE_SECS=7
 WINDOW_SECS=14
 CYCLES=5
+DEVICE="${AGENT_SIM_UDID:-}"
+DRIVER_PORT=""
+[[ -n "${AGENT_METRO_PORT:-}" ]] && DRIVER_PORT=$((AGENT_METRO_PORT + 1000))
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -55,9 +68,18 @@ while [[ $# -gt 0 ]]; do
     --quote-secs)  QUOTE_SECS="$2";  shift 2 ;;
     --window-secs) WINDOW_SECS="$2"; shift 2 ;;
     --cycles)      CYCLES="$2";      shift 2 ;;
+    --device)      DEVICE="$2";      shift 2 ;;
+    --driver-port) DRIVER_PORT="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
+
+# Resolve the device once; "booted" is acceptable ONLY outside slot sessions
+# (single-sim manual use). Build the maestro global args from what's resolved.
+SIMCTL_DEVICE="${DEVICE:-booted}"
+MAESTRO_ARGS=()
+[[ -n "$DEVICE" ]]      && MAESTRO_ARGS+=(--device "$DEVICE")
+[[ -n "$DRIVER_PORT" ]] && MAESTRO_ARGS+=(--driver-host-port "$DRIVER_PORT")
 
 command -v maestro       >/dev/null 2>&1 || { echo "maestro not found in PATH" >&2; exit 1; }
 command -v xcrun         >/dev/null 2>&1 || { echo "xcrun not found (need Xcode CLT)" >&2; exit 1; }
@@ -66,15 +88,15 @@ command -v xcrun         >/dev/null 2>&1 || { echo "xcrun not found (need Xcode 
 TMP="$(mktemp -d /tmp/buyquote-cap.XXXXXX)"
 trap 'rm -rf "$TMP"' EXIT
 
-alive() { xcrun simctl spawn booted launchctl list 2>/dev/null | grep -qi "${BUNDLE_ID#*.}"; }
+alive() { xcrun simctl spawn "$SIMCTL_DEVICE" launchctl list 2>/dev/null | grep -qi "${BUNDLE_ID#*.}"; }
 
 for ((cycle = 1; cycle <= CYCLES; cycle++)); do
-  echo "[capture] cycle $cycle/$CYCLES: maestro $FLOW ..."
-  maestro test "$FLOW" >"$TMP/maestro.log" 2>&1 || true
+  echo "[capture] cycle $cycle/$CYCLES: maestro ${MAESTRO_ARGS[*]:-} $FLOW (simctl device: $SIMCTL_DEVICE) ..."
+  maestro ${MAESTRO_ARGS[@]+"${MAESTRO_ARGS[@]}"} test "$FLOW" >"$TMP/maestro.log" 2>&1 || true
   best=""; best_t=0; SECONDS=0
   while [[ "$SECONDS" -lt "$WINDOW_SECS" ]]; do
     alive || break
-    if xcrun simctl io booted screenshot "$TMP/cap-${SECONDS}-$RANDOM.png" >/dev/null 2>&1; then
+    if xcrun simctl io "$SIMCTL_DEVICE" screenshot "$TMP/cap-${SECONDS}-$RANDOM.png" >/dev/null 2>&1; then
       best="$(ls -t "$TMP"/cap-*.png 2>/dev/null | head -1)"; best_t=$SECONDS
     fi
   done

@@ -566,8 +566,8 @@
       "hash": "3d76677f9d80"
     },
     "build-and-test:maestro-flows-are-shortcuts": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "10d33a2e2b38"
+      "reason": "2026-07-03: exploration/proof guidance; device+proof substance graded via A21/A22/O10, driver-port compliance hook-enforced (require-maestro-device.sh)",
+      "hash": "94b5f370735f"
     },
     "build-and-test:proof-screenshots-for-pr": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
