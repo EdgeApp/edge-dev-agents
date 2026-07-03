@@ -390,6 +390,30 @@
       "dims": [
         "O10"
       ]
+    },
+    "one-shot:cheese-build-on-green": {
+      "hash": "35395e4deff7",
+      "dims": [
+        "A28"
+      ]
+    },
+    "pr-land:build-field-routing": {
+      "hash": "b74b96fb4c68",
+      "dims": [
+        "A28"
+      ]
+    },
+    "cheese:pointer-not-workspace": {
+      "hash": "74777edc597a",
+      "dims": [
+        "A28"
+      ]
+    },
+    "file:asana-build-field.sh": {
+      "hash": "013dd0d945d5",
+      "dims": [
+        "A28"
+      ]
     }
   },
   "acked_uncovered": {
