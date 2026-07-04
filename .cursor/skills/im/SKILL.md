@@ -9,8 +9,8 @@ metadata:
 <goal>Implement an Asana task or ad-hoc feature/fix with clean, well-structured commits.</goal>
 
 <rules description="Non-negotiable constraints.">
-<rule id="read-coding-standards">Before writing ANY code, read `.cursor/rules/typescript-standards.mdc` and follow all rules and standards in it throughout the implementation.</rule>
-<rule id="no-impl-before-confirm">Do NOT begin implementation until the user confirms the `/asana-plan` output (Step 0).</rule>
+<rule id="read-coding-standards">Before writing ANY code, read `~/.cursor/rules/typescript-standards.mdc` and follow all rules and standards in it throughout the implementation. (The home path is canonical — repos do not carry a `.cursor/rules/` copy.)</rule>
+<rule id="no-impl-before-confirm">Do NOT begin implementation until the user confirms the `/asana-plan` output (Step 0). CARVE-OUT: in an orchestrated `--yolo` run (one-shot `yolo-execution`), the confirmation gate is waived — proceed without pausing and record deferred decisions in the plan/report instead.</rule>
 <rule id="lint-before-change">Before the first edit to any `.ts` / `.tsx` file, run `~/.cursor/skills/im/scripts/lint-warnings.sh <files...>` to auto-fix auto-fixable lint issues, then load any remaining lint findings and matching fix patterns into context. If the script changes files or leaves findings, handle those in a separate lint-fix commit IMMEDIATELY BEFORE the commit with actual changes. This applies to every `.ts` / `.tsx` file you touch, including ones discovered mid-implementation — not just the files you planned upfront. Do **not** run this script for non-TypeScript files such as `CHANGELOG.md`.</rule>
 <rule id="no-manual-formatting">Do not manually fix formatting. `lint-commit.sh` runs `eslint --fix` (which includes Prettier) before committing. If you see a formatting lint after editing, do NOT make another edit to fix it.</rule>
 <rule id="commit-script">Always commit using `~/.cursor/skills/lint-commit.sh -m "message" [files...]` or `--fixup <hash>` for fixup commits.</rule>
@@ -21,12 +21,12 @@ metadata:
 </rules>
 
 <step id="0" name="Planning handoff via /asana-plan">
-Always delegate planning to `~/.cursor/skills/asana-plan/SKILL.md` first:
+Delegate planning to `~/.cursor/skills/asana-plan/SKILL.md` first — UNLESS planning already happened in this session (e.g. one-shot step 2 already produced the plan doc); in that case proceed from the existing plan, do not re-run `/asana-plan`.
 
 - If user provided an Asana URL, run `/asana-plan` in Asana mode.
 - If user provided ad-hoc text or file references, run `/asana-plan` in text/file mode.
 
-`/asana-plan` returns a plan file path + short execution summary and waits for user confirmation. Start implementation only after that confirmation.
+`/asana-plan` returns a plan file path + short execution summary and waits for user confirmation (waived under `--yolo`, per the `no-impl-before-confirm` carve-out). Start implementation only after that confirmation or waiver.
 
 ### Regression analysis
 
@@ -46,7 +46,7 @@ After Step 0 determines the target repo (or if no Asana task, use the current re
    - **On an unrelated feature branch**: Switch to the base branch (see "Branch from" column in `task-review.md`), then create a new feature branch.
    - **On the base branch**: Create a new feature branch.
    - **On the correct feature branch**: Continue.
-3. **Branch naming**: `$GIT_BRANCH_PREFIX/<short-description>` or `$GIT_BRANCH_PREFIX/fix/<short-description>` for bug fixes. Use kebab-case. Example: `<prefix>/some-feature` or `<prefix>/fix/some-bug`
+3. **Branch naming**: `${GIT_BRANCH_PREFIX:-jon}/<short-description>` or `${GIT_BRANCH_PREFIX:-jon}/fix/<short-description>` for bug fixes. Use kebab-case. Example: `<prefix>/some-feature` or `<prefix>/fix/some-bug`. (`GIT_BRANCH_PREFIX` comes from the interactive shell profile and is often UNSET in orchestrated/spawned shells — always fall back to `jon`, never create a branch starting with a bare `/`.)
 4. **Assume a new branch is needed** unless the current branch clearly matches the task. Do NOT ask for confirmation — the existing branch has its own committed work and is unaffected.
 5. **Install dependencies**: After creating or switching to the feature branch, run `~/.cursor/skills/install-deps.sh` with a timeout of at least 120000ms to ensure dependencies match the base branch state without false timeout failures.
 
@@ -156,11 +156,11 @@ Run full verification to catch issues that per-commit checks (`lint-commit.sh`) 
 ~/.cursor/skills/verify-repo.sh . --base <upstream-ref>
 ```
 
-Where `<upstream-ref>` is `origin/develop` for `edge-react-gui` or `origin/master` for other repos. Set `block_until_ms: 120000`.
+Where `<upstream-ref>` is `origin/develop` for `edge-react-gui` or `origin/master` for other repos. Run it with a timeout of at least 120000ms (Cursor shell `block_until_ms`, or the Claude Code Bash `timeout` parameter).
 
 If verification fails, fix the issue with a fixup commit targeting the responsible commit, then re-run history cleanup (step 4) and verification.
 </step>
 
 <step id="6" name="Retrospective">
-When finished, evaluate the context and propose potential improvements to this process — mistakes or errors in the tool calls, ways to improve excessive context bloat, etc.
+When finished, evaluate the context and propose potential improvements to this process — mistakes or errors in the tool calls, ways to improve excessive context bloat, etc. In an orchestrated run, do not produce a separate retrospective deliverable: fold it into the run report's Skill Gaps / Follow-ups section (one-shot `report-as-attachment`).
 </step>

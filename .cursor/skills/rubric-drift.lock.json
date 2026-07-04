@@ -14,7 +14,7 @@
       ]
     },
     "one-shot:agent-status-on-pending-task": {
-      "hash": "cc854b4b411e",
+      "hash": "9a79a27f16d7",
       "dims": [
         "A4"
       ]
@@ -95,7 +95,7 @@
       ]
     },
     "im:no-impl-before-confirm": {
-      "hash": "637c86832211",
+      "hash": "56a8da4b71b7",
       "dims": [
         "A11"
       ]
@@ -794,8 +794,8 @@
       "hash": "6d39b950b74c"
     },
     "im:read-coding-standards": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "9b615bc6fe7d"
+      "reason": "2026-07-04: path correction only (repo-relative -> home-canonical); loading coding standards remains a process detail below eval granularity",
+      "hash": "946d638a3b56"
     },
     "im:no-manual-formatting": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
