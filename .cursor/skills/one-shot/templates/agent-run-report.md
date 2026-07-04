@@ -19,9 +19,25 @@ sim_udid: ""             # $AGENT_SIM_UDID
 
 ## Summary
 <!-- cat: summary -->
-<!-- 3-6 lines: what was asked, what shipped, final state, links.
+<!-- 3-6 SHORT BULLETS: what was asked, what shipped, final state, links.
+     FORMAT, whole report: bullets and short sections over prose blocks — a
+     reviewer scans this, they don't read it. No paragraph longer than 2 lines.
      ALL prose in this report follows /no-slop (~/.cursor/skills/no-slop/SKILL.md):
      no em-dashes, no courtesy enders, no self-grading or announcement sentences. -->
+_None observed._
+
+## Finalize Gate
+<!-- cat: finalize-gate -->
+<!-- The completion evidence as a CHECKLIST — one line per gate condition, checked
+     only if verified against LIVE state at finalize time (each unchecked box needs
+     a one-line reason). This is the structured mirror of one-shot `finalize-gate`;
+     the eval cross-checks every box against GitHub/Asana (a checked box that
+     contradicts live state is a report-honesty finding). Per PRIMARY PR:
+       - [ ] CI checks green on HEAD (`gh pr checks`)
+       - [ ] every reviewer bot completed-clean on HEAD (SUCCESS/skipped; not NEUTRAL)
+       - [ ] zero unresolved review threads (bot AND human)
+       - [ ] landed or auto-merge armed (per `land-on-approval`) / stopped at PR (say which)
+       - [ ] Build field routing done (cheese pushed / staging noted / none)  -->
 _None observed._
 
 ## Testing
