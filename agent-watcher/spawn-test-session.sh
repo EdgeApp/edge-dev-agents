@@ -167,6 +167,7 @@ if [[ -f "$_AW_CRED" ]]; then
 fi
 ENV_EXPORTS+="export LANG=\"\${LANG:-en_US.UTF-8}\"
 export PATH=\"\$HOME/.maestro/bin:\$PATH\"
+export GIT_BRANCH_PREFIX=\"\${GIT_BRANCH_PREFIX:-jon}\"
 "
 # Android SDK: export ANDROID_HOME/ANDROID_SDK_ROOT so an Android-called-out task can
 # run `./gradlew :app:assembleDebug` without per-run setup (proposal: 1215776835822945).
