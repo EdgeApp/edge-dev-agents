@@ -9,34 +9,50 @@
 #
 # Usage:
 #   resume-agent.sh                 # picks the most recent watcher session
-#   resume-agent.sh <search-term>   # filters to histories containing the term
-#                                   # (Asana task GID, task name fragment, etc.)
+#   resume-agent.sh <term> [term..] # filter; ALL words must appear (case-insensitive)
+#                                   # in the transcript HEAD (task URL/name/prompt
+#                                   # region), so generic words don't match everything
 #   resume-agent.sh --list          # list candidates; do not resume
+#   resume-agent.sh <term> --chat   # DISCUSSION MODE: fork the matched transcript into
+#                                   # a watchdog-covered tmux session with remote
+#                                   # control armed (talk to a past run from anywhere,
+#                                   # no slot provisioning, original conversation
+#                                   # untouched). Session/RC name: chat-<slug>.
+#   resume-agent.sh <term> --latest # skip the ambiguity guard: silently take the
+#                                   # newest transcript among multi-task matches
 #   resume-agent.sh <task-gid> --recover
 #                                   # before resuming, if the task's slot is gone
 #                                   # but Asana shows it in-flight, re-provision the
 #                                   # worktree + sim + Metro port (slot re-allocate).
 #                                   # Default (no --recover) just `claude --resume`.
 #
+# When a term matches transcripts of MORE THAN ONE task, the script LISTS them and
+# exits 1 instead of silently taking the newest (pass --latest to override).
+# Multiple transcripts of the SAME task (fork chains) resolve to the newest.
+#
 # Exit codes:
 #   0 = matched + resumed (or listed, with --list)
-#   1 = no match / search produced no candidates
+#   1 = no match / ambiguous across tasks / search produced no candidates
 
 set -euo pipefail
 
 DIR="$HOME/.config/agent-watcher"
 DO_LIST=false
 RECOVER=false
+CHAT=false
+LATEST=false
 TERM=""
 for arg in "$@"; do
   case "$arg" in
     --list) DO_LIST=true ;;
     --recover) RECOVER=true ;;
+    --chat) CHAT=true ;;
+    --latest) LATEST=true ;;
     -h|--help)
       sed -n '2,/^$/p' "$0" | sed 's|^# \{0,1\}||'
       exit 0
       ;;
-    *) TERM="$arg" ;;
+    *) TERM="${TERM:+$TERM }$arg" ;;   # multi-word terms accumulate
   esac
 done
 
@@ -105,21 +121,59 @@ if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
   exit 1
 fi
 
-# Optionally filter by search term
+first_gid_of() { head -c 16384 "$1" | grep -oE 'app\.asana\.com[A-Za-z0-9/._-]*' | head -1 | grep -oE '[0-9]{12,}' | tail -1 || true; }
+
+# Optionally filter by search term(s): every word must match, case-insensitively,
+# against the session's TASK IDENTITY — its gid + its Asana task NAME (fetched in
+# ONE batch call for the whole agent project). Transcript-body matching is
+# deliberately avoided: a generic word ("swap") appears in nearly every transcript,
+# which made ambiguous matches resolve to an unrelated session; and the transcript
+# HEAD carries only the task URL, never the name. Falls back to head-region
+# matching only if the Asana lookup is unavailable.
 if [[ -n "$TERM" ]]; then
+  GID_NAMES=""
+  cred="$DIR/credentials.json"; cfg="$DIR/asana-config.json"
+  token="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$cred" 2>/dev/null)}"
+  proj=$(jq -r '.project_gid // empty' "$cfg" 2>/dev/null)
+  if [[ -n "$token" && -n "$proj" ]]; then
+    GID_NAMES=$(curl -sf --max-time 20 "https://app.asana.com/api/1.0/projects/$proj/tasks?opt_fields=name&limit=100" \
+      -H "Authorization: Bearer $token" 2>/dev/null | jq -r '.data[] | .gid + "\t" + .name' 2>/dev/null || true)
+  fi
+  identity_of() { # $1=file → "gid<space>task name" (falls back to head region)
+    local g; g=$(first_gid_of "$1")
+    local nm=""
+    [[ -n "$GID_NAMES" && -n "$g" ]] && nm=$(printf '%s\n' "$GID_NAMES" | awk -F'\t' -v g="$g" '$1==g {print $2; exit}')
+    if [[ -n "$nm" ]]; then printf '%s %s' "$g" "$nm"; else printf '%s %s' "$g" "$(head -c 65536 "$1" | tr -d '\0')"; fi
+  }
   FILTERED=()
   for f in "${CANDIDATES[@]}"; do
-    if grep -q -- "$TERM" "$f"; then
-      FILTERED+=("$f")
-    fi
+    id=$(identity_of "$f")
+    ok=true
+    for w in $TERM; do
+      printf '%s' "$id" | grep -qi -- "$w" || { ok=false; break; }
+    done
+    $ok && FILTERED+=("$f")
   done
   if [[ ${#FILTERED[@]} -eq 0 ]]; then
-    echo "No watcher-spawned session matches: $TERM" >&2
-    echo "(candidates that exist but don't match the term:)" >&2
-    for f in "${CANDIDATES[@]}"; do echo "  $(basename "$f" .jsonl)" >&2; done
+    echo "No watcher-spawned session's task gid/name matches: $TERM" >&2
+    echo "(use --list to see all candidates)" >&2
     exit 1
   fi
   CANDIDATES=("${FILTERED[@]}")
+fi
+
+# Ambiguity guard: if the surviving candidates span MORE THAN ONE task (by the
+# first asana URL's gid), listing beats guessing — a silent newest-mtime pick
+# resumes an unrelated run. Fork chains of one task still auto-resolve to newest.
+if [[ -n "$TERM" ]] && ! $LATEST && ! $DO_LIST; then
+  DISTINCT=$(for f in "${CANDIDATES[@]}"; do first_gid_of "$f"; done | sort -u | grep -c . || true)
+  if [[ "$DISTINCT" -gt 1 ]]; then
+    echo "Ambiguous: '$TERM' matches sessions of $DISTINCT different tasks. Narrow the term, or pass --latest:" >&2
+    for f in "${CANDIDATES[@]}"; do
+      printf "  %s  gid=%s  %s\n" "$(date -r "$(stat -f %m "$f")" '+%m-%d %H:%M')" "$(first_gid_of "$f")" "$(basename "$f" .jsonl)" >&2
+    done
+    exit 1
+  fi
 fi
 
 # Sort by mtime desc; emit one line per candidate with timestamp + UUID + first prompt preview.
@@ -128,7 +182,9 @@ emit_candidates() {
     mtime=$(stat -f "%m" "$f")
     uuid=$(basename "$f" .jsonl)
     # Find the first user `/one-shot ...` line and pull a short preview of the prompt.
-    preview=$(head -30 "$f" | grep -m1 '"/one-shot --yolo' | sed -E 's/.*"(\/one-shot --yolo [^"]{0,80})[^"]*".*/\1/' | head -c 100)
+    # `grep -m1` closes the pipe early; head/sed upstream die SIGPIPE (141), which
+    # `set -eo pipefail` turns into a silent abort mid-listing. Absorb it.
+    preview=$( (head -30 "$f" | grep -m1 '"/one-shot --yolo' | sed -E 's/.*"(\/one-shot --yolo [^"]{0,80})[^"]*".*/\1/' | head -c 100) 2>/dev/null || true)
     printf "%s\t%s\t%s\n" "$mtime" "$uuid" "$preview"
   done | sort -rn
 }
@@ -189,6 +245,46 @@ elif [[ -n "$ORIG_CWD" ]]; then
     echo ">> resume-agent: $ORIG_CWD gone and repos root unavailable — resuming from \$HOME (resume may fail)" >&2
     cd "$HOME"
   fi
+fi
+
+if $CHAT; then
+  # DISCUSSION MODE: fork the transcript into a watchdog-covered tmux session with
+  # remote control, instead of resuming in this terminal. Properties:
+  #   - --fork-session: the original conversation is untouched (the watcher's own
+  #     resume-task transcript resolution is unaffected by this chat's existence
+  #     only until the fork's mtime advances past it — real followup work should
+  #     still be re-engaged via agent_status=Pending, never done in the chat).
+  #   - session name claude-asana-chat-<slug>: the "claude-asana-" prefix puts it
+  #     under session-watchdog RC revive; the NON-GID name keeps the completion
+  #     sweep from retiring it when the task is Complete (same pattern as the
+  #     main/eval discussion sessions).
+  #   - --remote-control chat-<slug>: reachable from the phone session list.
+  SLUG=$(printf '%s' "${TERM:-latest}" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-' | cut -c1-24)
+  TMUX_NAME="claude-asana-chat-${SLUG}"
+  if tmux has-session -t "$TMUX_NAME" 2>/dev/null; then
+    echo ">> resume-agent: chat session $TMUX_NAME already exists — attach: tmux attach -t $TMUX_NAME (or find 'chat-$SLUG' in your remote session list)" >&2
+    exit 0
+  fi
+  CHAT_CWD="$PWD"   # the cwd resolution above already ran
+  tmux new-session -d -s "$TMUX_NAME" -c "$CHAT_CWD"
+  tmux send-keys -t "$TMUX_NAME" "claude --resume $LATEST_UUID --fork-session --dangerously-skip-permissions --remote-control chat-$SLUG" Enter
+  # Auto-answer the resume-summary menu (option 1, pre-selected) when it appears.
+  for _ in $(seq 1 30); do
+    sleep 2
+    pane=$(tmux capture-pane -p -t "$TMUX_NAME" 2>/dev/null || true)
+    if printf '%s' "$pane" | grep -q "No conversation found"; then
+      echo ">> resume-agent: claude could not load $LATEST_UUID from $CHAT_CWD" >&2
+      tmux kill-session -t "$TMUX_NAME" 2>/dev/null || true
+      exit 1
+    fi
+    if printf '%s' "$pane" | grep -q "Resume from summary"; then
+      tmux send-keys -t "$TMUX_NAME" Enter
+      break
+    fi
+    printf '%s' "$pane" | grep -qE '(^|\s)/rc(\s|$)|bypass permissions on' && break
+  done
+  echo ">> resume-agent: chat session up — tmux: $TMUX_NAME | remote: chat-$SLUG | fork of $LATEST_UUID"
+  exit 0
 fi
 
 echo ">> resume-agent: resuming $LATEST_UUID (--dangerously-skip-permissions)"
