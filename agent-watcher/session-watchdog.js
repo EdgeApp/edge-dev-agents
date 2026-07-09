@@ -46,6 +46,13 @@ const STATE_FILE = path.join(slots.STATE_DIR, 'watchdog-state.json')
 const CRED_FILE = path.join(HOME, '.config/agent-watcher/credentials.json')
 const CFG_FILE = path.join(HOME, '.config/agent-watcher/asana-config.json')
 const IDLE_THRESHOLD_MS = 20 * 60 * 1000
+// resume-agent --chat forks (claude-asana-chat-*) are discussion sessions: their
+// non-gid names exempt them from the completion sweep, so without a reaper they
+// accumulate (each idle claude holds 100s of MB). Reap after 48h without pane
+// change; the transcript survives, so `resume-agent <term> --chat` resurrects.
+// Named discussion anchors (main/eval/pokemon/...) are NOT chat- prefixed and
+// are never reaped.
+const CHAT_IDLE_REAP_MS = 48 * 60 * 60 * 1000
 // After this long parked at a human-choice prompt, emit ONE escalation line (instead
 // of the per-tick park log) so an operator notices; never auto-sheds.
 const PARK_ESCALATE_MS = 60 * 60 * 1000
@@ -595,6 +602,14 @@ function main() {
     if (!claudeRunningUnder(panePid)) {
       // Death-path auto-resume REMOVED (2026-05-28) — it was a memory-runaway vector.
       // Log and leave the session for manual / Asana-driven handling; do NOT spawn claude.
+      // EXCEPT chat forks: a claude-asana-chat-* pane with no claude is pure waste
+      // (no forensic value; the transcript survives on disk) — kill it immediately.
+      if (taskGid.startsWith('chat-')) {
+        log(`[${session}] chat session's claude is gone → killing the empty pane (transcript survives; resurrect: resume-agent <term> --chat)`)
+        sh(`tmux kill-session -t "${session}"`)
+        delete state.sessions[session]
+        continue
+      }
       log(`[${session}] claude not detected under pane (pid ${panePid}). NOT auto-resuming (death-path removed). Leaving for manual handling.`)
       delete state.sessions[session]
       continue
@@ -616,6 +631,15 @@ function main() {
 
     const changed = !prior || prior.lastContent !== content
     let lastChange = changed ? now : prior.lastChange
+    // Chat-session idle reaper (see CHAT_IDLE_REAP_MS). Runs after the pane
+    // capture so `changed` is fresh; RC revive below still applies to chat
+    // sessions younger than the reap threshold.
+    if (taskGid.startsWith('chat-') && !changed && now - (prior?.lastChange ?? now) > CHAT_IDLE_REAP_MS) {
+      log(`[${session}] chat session idle ${Math.round((now - prior.lastChange) / 3600000)}h > 48h → reaped (transcript survives; resurrect: resume-agent <term> --chat)`)
+      sh(`tmux kill-session -t "${session}"`)
+      delete state.sessions[session]
+      continue
+    }
     // Never revive a session that is DELIBERATELY idle waiting on a human: a blocked
     // task, or one parked at an interactive choice prompt. The revive keystrokes
     // (ping + /remote-control + Esc) would answer the dialog blindly. Both make the
