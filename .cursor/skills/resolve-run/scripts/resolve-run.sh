@@ -201,9 +201,20 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
         tool_errors: /"is_error":\s*true/,
       };
       const STATUS = /update-status\.sh ([0-9]+) (Pending|Planning|Developing|Testing|Reviewing|Complete)/;
+      // Friction: how hard the run had to grind, not whether it got there (the
+      // outcome dimensions grade that). Collected mechanically so the eval and
+      // the scorecard read the same numbers. Counts share the probe caveat:
+      // skill text quoted into the transcript inflates them; graders confirm.
+      const HOOK_BLOCK = /PreToolUse:\w+ hook error: \[[^\]]*\/([a-z0-9-]+\.sh)\]/;
+      const BUILD = /ios-rn-build\.sh/;
+      const MAESTRO_CALL = /"name":"mcp__maestro__run"/;
+      const TS = /"timestamp":"([^"]+)"/;
       (async () => {
         const out = {}; for (const k of Object.keys(PROBES)) out[k] = { count: 0, lines: [] };
         out.update_status = { count: 0, ladder: [] };
+        const fr = { hook_blocks: { total: 0, by_hook: {} }, tool_errors: 0, build_invocations: 0,
+                     maestro_run_calls: 0, first_testing_ts: null, first_maestro_run_ts: null,
+                     first_hook_block_ts: null, compact_boundaries: 0 };
         let n = 0;
         const r = rl.createInterface({ input: fs.createReadStream(process.argv[1]), crlfDelay: Infinity });
         for await (const line of r) {
@@ -212,8 +223,26 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
             if (re.test(line)) { out[k].count++; if (out[k].lines.length < 5) out[k].lines.push(n); }
           }
           const m = line.match(STATUS);
-          if (m) { out.update_status.count++; if (out.update_status.ladder.length < 20) out.update_status.ladder.push({ line: n, status: m[2] }); }
+          if (m) {
+            out.update_status.count++;
+            if (out.update_status.ladder.length < 20) out.update_status.ladder.push({ line: n, status: m[2] });
+            if (m[2] === "Testing" && !fr.first_testing_ts) fr.first_testing_ts = (line.match(TS) || [])[1] || null;
+          }
+          const hb = line.match(HOOK_BLOCK);
+          if (hb) {
+            fr.hook_blocks.total++;
+            fr.hook_blocks.by_hook[hb[1]] = (fr.hook_blocks.by_hook[hb[1]] || 0) + 1;
+            if (!fr.first_hook_block_ts) fr.first_hook_block_ts = (line.match(TS) || [])[1] || null;
+          }
+          if (/"is_error":\s*true/.test(line)) fr.tool_errors++;
+          if (BUILD.test(line)) fr.build_invocations++;
+          if (MAESTRO_CALL.test(line)) {
+            fr.maestro_run_calls++;
+            if (!fr.first_maestro_run_ts) fr.first_maestro_run_ts = (line.match(TS) || [])[1] || null;
+          }
+          if (/"subtype":"compact_boundary"/.test(line)) fr.compact_boundaries++;
         }
+        out.friction = fr;
         console.log(JSON.stringify(out));
       })().catch(() => console.log("{}"));
     ' "$transcript" 2>/dev/null || echo "{}")
@@ -312,7 +341,8 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       release_receipt: $release_receipt,
       blocking: { attempt_log: $attempt_log, last_reason: $blocker_reason, validator_verdict: $blocker_verdict },
       followup: $followup,
-      probe_index: $probe_index,
+      friction: ($probe_index.friction // {}),
+      probe_index: ($probe_index | del(.friction)),
       auto_na: ( {}
         + (if ($prs | length) == 0 then {A13: "no PR created this run", A14: "no PR, so no review threads to address"} else {} end)
         + (if (($probe_index.pr_land.count // 0) == 0) then {A15: "pr-land never invoked"} else {} end)
