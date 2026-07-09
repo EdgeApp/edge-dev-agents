@@ -57,7 +57,7 @@
       ]
     },
     "one-shot:report-as-attachment": {
-      "hash": "35c5a3288c83",
+      "hash": "4826fc4c5c8d",
       "dims": [
         "A9"
       ]
@@ -425,6 +425,12 @@
       "hash": "b7036bbd8c43",
       "dims": [
         "A8"
+      ]
+    },
+    "file:require-clean-run-report.sh": {
+      "hash": "db207c1dae0d",
+      "dims": [
+        "A9"
       ]
     }
   },
