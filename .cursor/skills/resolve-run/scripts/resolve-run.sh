@@ -106,9 +106,18 @@ asana_followup() { # $1=gid → {last_report_attached_at, prev_report_attached_a
       subtasks: [ $t.data[]? | {gid, name, completed, created_at} ] }' 2>/dev/null || echo "$empty"
 }
 
-find_transcript() { # $1=gid → newest jsonl whose FIRST asana URL gid equals the target
-  # (mirrors resume-task.sh semantics: a later MENTION of the gid in another session
-  #  must not match — six runs once resolved to one shared interactive transcript)
+find_transcript() { # $1=gid → newest RUN jsonl whose FIRST asana URL gid equals the target
+  # (mirrors resume-task.sh's first-URL semantics: a later MENTION of the gid in
+  #  another session must not match — six runs once resolved to one shared
+  #  interactive transcript)
+  #
+  # RUN SIGNATURE required: the head must carry an actual `/one-shot --yolo` USER
+  # message (JSON string starting with it). Fresh spawns open with it; watcher
+  # resumes receive it right after the resume summary. `resume-agent --chat`
+  # DISCUSSION FORKS inherit the run's first URL but never receive a /one-shot,
+  # so without this gate an active chat (newest mtime) would be graded as the
+  # run: friction/probe counts from the discussion, chat messages counted as
+  # operator nudges, eval window misaligned.
   local gid="$1" best="" best_m=0 f m first_url
   for f in "$PROJECTS_DIR"/*"$gid"*/*.jsonl "$PROJECTS_DIR"/*git*/*.jsonl; do
     [ -r "$f" ] || continue
@@ -116,6 +125,16 @@ find_transcript() { # $1=gid → newest jsonl whose FIRST asana URL gid equals t
     [ -n "$first_url" ] || continue
     # the task gid is the LAST long numeric segment of the URL (handles /0/<proj>/<task> and /f suffix)
     echo "$first_url" | grep -oE '[0-9]{12,}' | tail -1 | grep -qx "$gid" || continue
+    # run signature; excludes resume-agent --chat discussion forks. Line-based head
+    # (the resume-summary record is one huge line, so a byte-based head truncates
+    # before the /one-shot message). Captured to a var first: `head | grep -q`
+    # under pipefail returns 141 on a MATCH (grep -q quits, head SIGPIPEs), which
+    # `|| continue` would misread as no-match, skipping every genuine run.
+    # herestring, NOT a pipe: `printf | grep -q` under pipefail returns 141 on a
+    # match past the pipe buffer (grep quits, printf SIGPIPEs), misread as no-match.
+    # -a: BSD grep binary-detects transcript heads and silently misses without it.
+    sig_head=$(head -50 "$f" 2>/dev/null || true)
+    grep -qa '"/one-shot --yolo' <<<"$sig_head" || continue
     m=$(stat -f %m "$f" 2>/dev/null || echo 0)
     if [ "$m" -gt "$best_m" ]; then best="$f"; best_m=$m; fi
   done
