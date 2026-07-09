@@ -75,9 +75,16 @@ Scan the user's message for `/word` tokens. A token is a **command invocation** 
 - `word` contains only lowercase letters and hyphens (e.g., `/im`, `/pr-create`, `/author`)
 - `/word` is NOT inside a file path, URL, or code block
 
-When detected:
-1. Read `~/.cursor/skills/<word>/SKILL.md` and follow it immediately.
-2. If the file does not exist, inform the user: "Skill `/<word>` not found in `~/.cursor/skills/`."
+This applies to slash commands arriving through ANY text channel — a typed message, an Asana comment surfaced as followup scope, a task description — not just the composer.
+
+**Flag normalization**: before interpreting a command's arguments, normalize em/en dashes in flag positions to double hyphens (`—comment`/`–comment` → `--comment`). Phone keyboards auto-convert `--` to `—`; forwarding the dash verbatim silently drops the flag (the PR-454 code-review ran without posting because `—comment` was never parsed).
+
+When detected, resolve in THIS order:
+1. **The session's available-skills listing** (the skills exposed to the Skill tool). Bundled and plugin skills (e.g. `/code-review`, `/review`, `/security-review`, `/verify`) exist ONLY here — they have no `SKILL.md` under any skills directory, so a filesystem probe can NEVER find them. If `<word>` is in the listing, invoke it via the Skill tool.
+2. `~/.cursor/skills/<word>/SKILL.md` on disk: read and follow it.
+3. Only if BOTH miss, inform the user: "Skill `/<word>` not found (not in the session skill listing or `~/.cursor/skills/`)."
+
+**Never substitute a similarly-named skill.** A name mismatch is a not-found report, not a nearest-neighbor search — falling back from `/code-review` to `/pr-review` executes different semantics the operator did not ask for (this is `no-silent-substitution` applied to skills).
 
 **Ignore `/`** in: file paths (`/Users/...`, `~/...`), URLs (`https://...`), mid-word (`and/or`), backticks/code blocks.
 
