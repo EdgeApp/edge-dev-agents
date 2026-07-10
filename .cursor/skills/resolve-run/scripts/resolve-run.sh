@@ -324,6 +324,14 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     attempt_log=$(jq -cs . "$STATE_DIR/attempts/$gid.jsonl" 2>/dev/null || echo "[]")
     [ -n "$attempt_log" ] || attempt_log="[]"
   fi
+  # Orch-version stamps: one line per spawn/resume segment (stamp-orch-version.sh).
+  # Lets evals slice findings by the orch version actually in force per segment, and
+  # makes "run predates rule X" determinations mechanical via repo_head.
+  local versions="[]"
+  if [ -r "$STATE_DIR/versions/$gid.jsonl" ]; then
+    versions=$(jq -cs . "$STATE_DIR/versions/$gid.jsonl" 2>/dev/null || echo "[]")
+    [ -n "$versions" ] || versions="[]"
+  fi
   local blocker_reason="null"
   [ -r "/tmp/agent-concession-reason-$gid.txt" ] && blocker_reason=$(jq -Rs . "/tmp/agent-concession-reason-$gid.txt" 2>/dev/null || echo null)
   local blocker_verdict="null"
@@ -339,6 +347,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     --argjson release_receipt "$release_receipt" \
     --argjson attempt_log "$attempt_log" --argjson blocker_reason "$blocker_reason" --argjson blocker_verdict "$blocker_verdict" \
     --argjson followup "$followup" --argjson probe_index "$probe_index" \
+    --argjson versions "$versions" \
     --argjson forensics "$forensics" --arg state_dir "$STATE_DIR" --arg watchdog_log "$WATCHDOG_LOG" --arg watcher_log "$WATCHER_LOG" \
     --argjson runaway_log_exists "$([ -f "$STATE_DIR/runaway-guard.log" ] && echo true || echo false)" \
     '{
@@ -360,6 +369,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       release_receipt: $release_receipt,
       blocking: { attempt_log: $attempt_log, last_reason: $blocker_reason, validator_verdict: $blocker_verdict },
       followup: $followup,
+      versions: $versions,
       friction: ($probe_index.friction // {}),
       probe_index: ($probe_index | del(.friction)),
       auto_na: ( {}

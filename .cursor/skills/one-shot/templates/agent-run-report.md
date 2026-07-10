@@ -2,6 +2,7 @@
 task_gid: ""
 task_name: ""
 agent_session_uuid: ""   # $AGENT_SESSION_UUID — the orchestration session that produced this run
+orch_version: ""         # $AGENT_ORCH_VERSION — digest of the orch (skills/rules/watcher/hooks) governing this segment
 repo: ""
 branch: ""
 base: origin/develop
