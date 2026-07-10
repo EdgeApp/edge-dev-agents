@@ -195,6 +195,21 @@ if [[ -n "$AGENT_SESSION_UUID" ]]; then
 "
   echo ">> spawn-test-session: agent session uuid $AGENT_SESSION_UUID (task ${TASK_GID:-?})" >&2
 fi
+# Orch version stamp: record WHICH version of the orchestration governs this segment
+# (per-segment: spawn AND resume both pass through here). Appends to
+# $STATE/versions/<gid>.jsonl and exports AGENT_ORCH_VERSION for the run report
+# frontmatter. Best-effort — a stamp failure never blocks a spawn.
+if [[ -n "$TASK_GID" ]]; then
+  _SEG="spawn"; [[ -n "$RESUME_ID" ]] && _SEG="resume"
+  AGENT_ORCH_VERSION="$("$HOME/.config/agent-watcher/stamp-orch-version.sh" \
+    --gid "$TASK_GID" --segment "$_SEG" --model "${AGENT_MODEL:-default}" \
+    --effort "${AGENT_EFFORT:-}" --session-uuid "${AGENT_SESSION_UUID:-}" 2>/dev/null || true)"
+  if [[ -n "$AGENT_ORCH_VERSION" ]]; then
+    ENV_EXPORTS+="export AGENT_ORCH_VERSION=\"$AGENT_ORCH_VERSION\"
+"
+    echo ">> spawn-test-session: orch version $AGENT_ORCH_VERSION ($_SEG, task $TASK_GID)" >&2
+  fi
+fi
 if [[ -n "$SLOT_INDEX" ]]; then
   [[ -n "$TASK_GID" ]]   && ENV_EXPORTS+="export AGENT_TASK_GID=\"$TASK_GID\"
 "

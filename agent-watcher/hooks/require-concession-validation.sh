@@ -30,6 +30,21 @@ case "$CMD" in
   *update-status.sh*--blocked*yes*)
     KIND="block"
     REASON=$(printf '%s' "$CMD" | node -e 'const s=require("fs").readFileSync(0,"utf8");const m=s.match(/--reason\s+("([^"]*)"|\x27([^\x27]*)\x27|(\S+))/);process.stdout.write(m?(m[2]!==undefined?m[2]:m[3]!==undefined?m[3]:m[4]||""):"")' 2>/dev/null || true)
+    # HASH-BUG FIX (2026-07-09 eval, O9 finding): PreToolUse sees the command string
+    # UNEXPANDED, so `--reason "$(cat /tmp/file)"` extracted the literal `$(cat …)` and
+    # its hash could never match the validator's hash of the actual text — genuine
+    # ALLOW verdicts bounced and agents learned to fight the gate. Expand the common
+    # command-substitution shapes ($(cat F), $(< F), `cat F`) by reading the file now.
+    _SUBST_FILE=$(printf '%s' "$REASON" | sed -nE 's/^\$\((cat|<)[[:space:]]+([^)]+)\)$/\2/p; s/^`cat[[:space:]]+([^`]+)`$/\1/p' | head -1)
+    if [ -n "$_SUBST_FILE" ]; then
+      _SUBST_FILE="${_SUBST_FILE/#\~/$HOME}"
+      if [ -r "$_SUBST_FILE" ]; then
+        REASON=$(cat "$_SUBST_FILE")
+      else
+        echo "BLOCKED: --reason used command substitution (\$(cat $_SUBST_FILE)) but that file is not readable by the gate. Pass the reason as a plain quoted string, or write the file first." >&2
+        exit 2
+      fi
+    fi
     if [ -z "$REASON" ]; then
       echo "BLOCKED: a --blocked yes write must carry --reason \"<the claimed blocker>\" so the concession-validator can judge it. Add --reason and retry." >&2
       exit 2
