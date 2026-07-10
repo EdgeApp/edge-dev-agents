@@ -105,3 +105,10 @@ else
 fi
 
 echo "PLAN: $PLAN"
+# Exact invocation for the plan — run it verbatim, no flag-guessing.
+IRB="$HOME/.cursor/skills/build-and-test/scripts/ios-rn-build.sh"
+case "$PLAN" in
+  ready)        echo "INVOKE: (none — app is current; start Metro via ios-rn-build only if not already running, then drive)" ;;
+  full-rebuild) echo "INVOKE: $IRB --udid $UDID --bundle-id $BUNDLE_ID --port $PORT --force-rebuild" ;;
+  *)            echo "INVOKE: $IRB --udid $UDID --bundle-id $BUNDLE_ID --port $PORT" ;;
+esac

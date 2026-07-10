@@ -171,6 +171,11 @@ entry (the human audits and prunes it periodically — keep entries dense).
   app"). Size sends ≤ ~60 sats from a single freshly-claimed leaf
   (leaf-headroom). Mint the receive invoice and verify receipt out-of-band with
   the `@breeztech/breez-sdk-spark` node SDK.
+- **edge-funds funding snapshot (2026-07-02, re-verify balances before relying):**
+  My Bitcoin (BTC) is EMPTY — a BTC Send triggers the wallet-empty modal. Funded:
+  My Base 4 (0.35 ETH, ~$600), My Zano (~$460), L3USD on Fantom (~$240),
+  My MAYAChain (CACAO). EVM chains block a SECOND send while one is unconfirmed —
+  wait for confirmation before chaining sends. (2026-07-09 eval, Houdini run)
 
 ## Navigation
 - **Gift Card Marketplace (EdgeSpend):** reachable in-app from Home → 'Spend
@@ -209,6 +214,16 @@ entry (the human audits and prunes it periodically — keep entries dense).
   StakeOptions) does need an Optimism wallet + working RPC and can hit a
   debug-build SIGSEGV, so do not go deeper than the card unless the change is in
   the pool flow itself.
+- **Deterministic cross-check beats eyeballing for signature/encoding fixes:** for
+  BIP-137/message-signing correctness, byte-compare the gui transform against
+  `bitcoinjs-message`'s `segwitType` output over many random keys — dependency is
+  already present, and identity over N keys proves external-verifier compatibility
+  better than staring at one signature. (2026-07-09 eval, CEX-signing run)
+- **Houdini routes are verifiable fund-free via the partner API:**
+  `GET https://api-partner.houdiniswap.com/v2/tokens?chain=<chain>&mainnet=true&pageSize=100`
+  then `GET /v2/quotes?amount=<x>&from=<id>&to=<id>`. A same-asset cross-chain pair
+  may legitimately return only dex/standard (no private route) — that's an answer,
+  not a failure. (2026-07-09 eval, Houdini run)
 
 ## Driving the app (mechanics)
 - **Compose, don't re-derive.** Reusable subflows live in this skill's
@@ -262,6 +277,15 @@ entry (the human audits and prunes it periodically — keep entries dense).
   the create-wallet entry is the header `addButton` (testID) — use it instead of
   scrolling a long wallet list. YOLO auto-login (edge-funds / 0000) lands logged-in
   a few seconds after launch.
+- **EVM send-flow drive recipe:** search "Ethereum" in Assets to filter ETH
+  wallets → wallet "Send" → address tile "Enter" (regex `.*Enter.*`) → type a
+  LOWERCASE 0x address (lowercase sidesteps EIP-55 checksum rejection) → "Next".
+  The SafeSlider confirm thumb carries testID `confirmSliderThumb`, so
+  `common/confirm-slider.yaml` resolves without coordinate taps. (2026-07-09 eval)
+- **edge-exchange-plugins JS fix, in-app verification:** after `npm run prepare`,
+  copy `dist/edge-exchange-plugins.js` + `dist/898.chunk.js` + `dist/195.chunk.js`
+  over `<app>/edge-exchange-plugins.bundle/`, relaunch, and confirm the INSTALLED
+  bundle no longer contains the old symbol before crediting the fix. (2026-07-09 eval)
 
 ## Asset & provider specifics
 - **`edge-funds` holds a funded My MAYAChain (CACAO) wallet (~$150).** Usable for
@@ -281,3 +305,23 @@ entry (the human audits and prunes it periodically — keep entries dense).
   Platform check). A helper it calls must not reference a module-level `const`
   declared AFTER `SPECIAL_CURRENCY_INFO`, or it hits the temporal dead zone at
   import.
+- **TON send/sync tests need no swap-to-fund:** edge-funds holds funded
+  "My Toncoin" (~3.4 TON) and "My Toncoin 2"; a wallet-to-wallet self-send at
+  ~0.0064 TON exercises pending→confirmed reconciliation. (2026-07-09 eval)
+- **TON public endpoint rate-limits under parallel slots:** toncenter.com/api/v2
+  429s ("Ratelimit exceed") on repeated /sendBoc + /estimateFee; it rejects BEFORE
+  any txid is saved (no corruption). Cool down 2-3 min and retry; a clean fee
+  estimate is the recovery signal. (2026-07-09 eval, TON run)
+- **Maya/Thorchain pending-metadata tests: confirm the FIRST fresh quote.** The
+  60s timeout is on the quote re-fetch, not the broadcast — slide immediately,
+  don't let the quote expire. edge-funds USDT(Ethereum)→ETH is a reliable
+  executable Maya token-source pair; min ~5.21 USDT. (2026-07-09 eval)
+- **SideShift geo-gate is per-request from the CURRENT egress — re-verify fresh
+  each run:** `curl https://sideshift.ai/api/v2/permissions` →
+  `{"createShift":<bool>}`; `POST /api/v2/quotes` returns ACCESS_DENIED when
+  blocked. A non-US VPN exit flips createShift true. (2026-07-09 eval)
+- **Xgram executable-pair recipe:** only XMR pairs are enabled for Edge's key
+  (BTC/LTC/BCH/TRX/SOL ↔ XMR); floors ~$50-100 equivalent (SOL→XMR min 0.62 SOL,
+  XMR→BTC min 0.159 XMR, TRX→XMR min 67 TRX — discover live via BELOW_LIMIT).
+  SOL→XMR from My Solana → My Monero executes reliably; the confirm slider needs a
+  coordinate swipe on the quote scene. (2026-07-09 eval)
