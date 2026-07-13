@@ -391,9 +391,40 @@ function verifyCode() {
       };
     }
 
-    const fullCmd = runCmd(cmd);
-    console.log(`▶  ${fullCmd}...`);
-    const result = runCommandWithLog(fullCmd, `${PM}-${cmd}`, repoDir, pmEnv);
+    let fullCmd = runCmd(cmd);
+    let cmdEnv = pmEnv;
+    // Prepare runs its verification-safe form: a trailing runtime-setup step
+    // is stripped — see verification-prepare-cmd.sh for the convention and
+    // output contract.
+    if (cmd === "prepare") {
+      let mode = "FULL";
+      let safeCmd = "";
+      try {
+        const helper = path.join(__dirname, "verification-prepare-cmd.sh");
+        const out = execSync(`"${helper}" "${repoDir}"`, { encoding: "utf8" });
+        const nl = out.indexOf("\n");
+        mode = (nl === -1 ? out : out.slice(0, nl)).trim();
+        safeCmd = nl === -1 ? "" : out.slice(nl + 1).trim();
+      } catch {
+        // Helper failure falls back to the raw prepare script.
+      }
+      if (mode === "NONE") {
+        console.log(`⏭  ${fullCmd} - skipped (prepare is runtime setup only)`);
+        continue;
+      }
+      if (mode === "STRIPPED" && safeCmd !== "") {
+        fullCmd = safeCmd;
+        cmdEnv = {
+          ...pmEnv,
+          PATH: `${path.join(repoDir, "node_modules", ".bin")}:${process.env.PATH}`,
+        };
+        console.log(`▶  prepare (runtime setup step skipped)...`);
+      }
+    }
+    if (cmd !== "prepare" || fullCmd === runCmd(cmd)) {
+      console.log(`▶  ${fullCmd}...`);
+    }
+    const result = runCommandWithLog(fullCmd, `${PM}-${cmd}`, repoDir, cmdEnv);
     if (result.success) {
       console.log(`✓  ${fullCmd} - passed\n`);
       continue;

@@ -3,7 +3,9 @@
 // Surfaces unresolved inline threads, review bodies, and top-level comments
 // posted after the last commit. Uses a single GraphQL query per PR.
 //
-// Skips: resolved threads, bot comments, current-user (self) comments, items with addressed markers.
+// Skips: resolved threads, current-user (self) comments, items with addressed markers.
+// Bot-authored unresolved threads are NOT skipped: they are emitted under a
+// separate `botThreads` key per PR (no recency filter — see inline comment).
 //
 // Usage: echo '[{"repo":"...","prNumber":123,"branch":"..."}]' | ./pr-land-comments.sh
 
@@ -136,9 +138,25 @@ async function main() {
 
     const addressedIds = extractAddressedIds(pr.comments.nodes)
     const recentComments = []
+    // Unresolved threads whose FIRST comment is bot-authored (same semantics
+    // as one-shot's finalize-gate). No recency filter: a bot finding blocks
+    // until addressed + resolved, regardless of when it was posted.
+    const botThreads = []
 
     for (const thread of pr.reviewThreads.nodes) {
       if (thread.isResolved) continue
+      const first = thread.comments.nodes[0]
+      if (first && isBot(first.author)) {
+        botThreads.push({
+          type: "bot-thread",
+          threadId: thread.id,
+          commentId: first.databaseId,
+          user: first.author?.login,
+          path: first.path,
+          body: first.body?.slice(0, 200)
+        })
+        continue
+      }
       for (const c of thread.comments.nodes) {
         if (isBot(c.author)) continue
         if (c.author?.login === currentUser) continue
@@ -197,8 +215,8 @@ async function main() {
       }
     }
 
-    if (recentComments.length > 0) {
-      results.push({ repo, prNumber, branch, recentComments })
+    if (recentComments.length > 0 || botThreads.length > 0) {
+      results.push({ repo, prNumber, branch, recentComments, botThreads })
     }
   }
 

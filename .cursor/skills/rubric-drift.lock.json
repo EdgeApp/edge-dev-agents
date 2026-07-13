@@ -178,12 +178,6 @@
         "A15"
       ]
     },
-    "pr-land:npm-otp-required": {
-      "hash": "ed7942eae767",
-      "dims": [
-        "A15"
-      ]
-    },
     "pr-land:asana-last": {
       "hash": "af3e35286071",
       "dims": [
@@ -416,7 +410,7 @@
       ]
     },
     "one-shot:land-on-approval": {
-      "hash": "8fefc93f8ebb",
+      "hash": "54810ff16399",
       "dims": [
         "A8"
       ]
@@ -437,6 +431,24 @@
       "hash": "d700de8e8049",
       "dims": [
         "A29"
+      ]
+    },
+    "pr-land:same-repo-batching": {
+      "hash": "5d99c6c52b81",
+      "dims": [
+        "A15"
+      ]
+    },
+    "pr-land:npm-publish-auth": {
+      "hash": "12c18c670200",
+      "dims": [
+        "A15"
+      ]
+    },
+    "pr-land:bot-thread-gate": {
+      "hash": "fb58781eaffe",
+      "dims": [
+        "A15"
       ]
     }
   },

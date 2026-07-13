@@ -34,17 +34,16 @@ Arguments are classified automatically:
 <rule id="gh-auth">If a script exits code 2 with `PROMPT_GH_AUTH`, prompt the user to run `gh auth login`.</rule>
 <rule id="code-conflicts">Code (non-CHANGELOG) conflicts → ATTEMPT semantic resolution when confidently determinable; the prepare/merge scripts leave the rebase IN PROGRESS (no auto-abort) so you resolve in place. "Confidently determinable" = the two sides have independent intent you can preserve without guessing: dependency/version bumps, lockfile regeneration, accepting an upstream file deletion, non-overlapping edits. To resolve: read each conflicted file, edit to keep BOTH sides' intent (the upstream change AND our change), regenerate lockfiles via the repo's package manager if deps changed (`npm install` or `yarn install` per the repo's lockfile), `git add <files> && GIT_EDITOR=true git rebase --continue`, then re-run the script to verify (re-verification catches any follow-on issue, e.g. a formatting fix needed via `eslint --fix`). SKIP only when resolution is NOT confidently determinable — overlapping logic in the same function, unclear semantic intent, or you would be guessing: `git rebase --abort`, continue with remaining PRs, report. Never guess at a merge. CHANGELOG conflicts keep their `changelog-conflicts` handling.</rule>
 <rule id="stale-prs">Stale PRs → Skip and report. Old PRs with multiple conflicts should be skipped like code conflicts. Don't block the flow.</rule>
+<rule id="bot-thread-gate">An unresolved reviewer-bot review thread blocks arming, with NO recency exemption — bot findings on old commits still gate (`pr-land-comments.sh` emits them under `botThreads`, detected by `__typename == "Bot"` on the thread's first comment, the same shared detection one-shot's finalize-gate prescribes). Before arming any PR: address each `botThreads` entry (evaluate the finding; fix valid ones as a fixup + reply + resolve, refute invalid ones with a reply + resolve — /bugbot semantics). A force-push during the land (comment fixups, NEEDS_REBASE re-prepare) re-triggers the reviewer bots on the new head: re-run the step 2 comment check on that PR after the bots' check-runs complete, BEFORE treating it as clean — a bot check-run conclusion of `skipping`/`NEUTRAL` is not findings-clean; the unresolved-thread query is the gate.</rule>
 <rule id="changelog-conflicts">CHANGELOG conflicts (any section, including staging): Agent resolves semantically, scripts verify the result.</rule>
 <rule id="verification">Verification is mandatory. On the DEFAULT path a PR is gated twice: first locally (Step 3 prepare runs `verify-repo.sh` before the branch is pushed and auto-merge is armed), then by GitHub's REQUIRED status checks (auto-merge will not merge until they pass). Do NOT also merge locally on this path — GitHub owns the merge; the agent watches CI to completion (see Step 5). On the local fallback path, verification is built into `pr-land-merge.sh`, no bypass. Either way a PR never lands without green checks.</rule>
 <rule id="no-force-push">Do NOT force-push without explicit user confirmation.</rule>
 <rule id="no-editors">Never open editors. All git operations must be non-interactive: `GIT_EDITOR=true` for commit messages, `GIT_SEQUENCE_EDITOR=:` for rebase todo lists.</rule>
 <rule id="unexpected-exit">Unexpected exit codes → STOP immediately. If any script returns an exit code not documented in this file, STOP and report to user. Do NOT attempt to interpret, retry, or work around unexpected errors.</rule>
 <rule id="sequential-rebase">Sequential merging requires rebase. Each subsequent PR MUST be rebased onto the updated base branch after the previous merge.</rule>
+<rule id="same-repo-batching">Multiple PRs against the SAME repo land serially, not in parallel: arming auto-merge on all at once makes each merge invalidate the others' rebases (every survivor goes DIRTY/BEHIND on the shared CHANGELOG and re-conflicts, one round per merge). Arm/watch one PR per repo at a time; when `pr-merge-watch.sh` exits NEEDS_REBASE for the next PR, re-run prepare — its CHANGELOG conflict resolves mechanically via `changelog-union-merge.sh <repoDir> --continue`, then push and rearm. PRs in DIFFERENT repos proceed in parallel as usual.</rule>
 <rule id="publish-gating">Don't publish if outstanding PRs remain. Only offer to publish a repo when ALL approved PRs for that repo are merged. If any were skipped or held back, do NOT publish that repo.</rule>
-<rule id="npm-otp-required">`npm publish` requires the user's npm 2FA. Two paths, depending on the account's 2FA type — never skip 2FA on either:
-- **TOTP (authenticator app):** run with `--otp=<code>` from a 6-digit code the user supplies. Never run `npm publish` without the `--otp` flag on a TOTP account.
-- **Passkey / WebAuthn (no 6-digit code):** run `npm publish` with NO `--otp` flag; npm opens a browser / prints a URL for the user to approve with their passkey (relies on `auth-type=web`).
-If you do not know which the account uses, ask the user. Do NOT run `npm login` — auth comes from the `_authToken` in `~/.npmrc`; the user owns login. If `npm whoami` fails before the first publish, STOP and report; do not try to re-authenticate.</rule>
+<rule id="npm-publish-auth">`npm publish` requires the user's npm 2FA — never skip it. The DEFAULT path is web/link auth via `npm-publish-web.sh` (step 6): the script preflights `npm whoami`, runs `npm login --auth-type=web` FIRST when needed (a publish without a token dies at ENEEDAUTH before it ever prints an auth link — login and publish are separate auth events), then publishes; both phases run under a PTY it owns (npm's web-auth poller dies with its process, killing the link) and it emits `AUTH_URL <phase> <url>` lines. Relay each AUTH_URL to the user AT THE MOMENT IT APPEARS — the link works on ANY of their devices (the passkey lives with them, not this machine). In orchestrated runs deliver the link via push notification, never Slack (self-sent Slack messages do not notify). The user completing the link IS the publish confirmation — ask no separate y/N. Publishes in the same run may reuse the auth session (no second link); the script handles that. TOTP (`--otp=<code>`) is the FALLBACK, only when the user explicitly offers a 6-digit code: retry a stale OTP at most 2 times, then STOP.</rule>
 <rule id="defer-gui">If the discovered PR set contains BOTH `edge-react-gui` PRs and at least one non-GUI PR, all GUI PRs are DEFERRED — they do NOT enter steps 3-7 (prepare/push/merge/publish/upgrade-dep). GUI PRs are processed in step 8 (new) after step 7's dep upgrades land on develop. If the batch is pure GUI or pure non-GUI, no deferral — proceed as normal.</rule>
 <rule id="asana-last">Asana updates are LAST. Do NOT update Asana tasks until ALL merges, publishes, and GUI dependency upgrades are complete. Only update status for PRs that are fully landed (merged, and if non-GUI: published + GUI deps updated).</rule>
 <rule id="build-field-routing">During discovery, resolve each linked task's Build field: `~/.cursor/skills/asana-build-field.sh <task-gid>`. `staging` → the PR is staging-targeted: step 9 MUST cherry-pick its commits after merge even when its CHANGELOG entry sits under `## Unreleased` — a field/CHANGELOG disagreement is a placement question (offer to move the entry to the `(staging)` section per step 3's placement-warning flow), never a silent skip of the cherry-pick. A cheese value (`feta|gouda|halloumi|cheddar`) changes NOTHING about landing: land the task's FEATURE branch PR normally; a `test-*` branch is never a landing target (skip + report any discovered PR whose head branch matches `test-*`; see cheese `pointer-not-workspace`), and no re-cheese follows a land — CI builds wherever the landing happened (develop, or develop + staging).</rule>
@@ -55,7 +54,7 @@ If you do not know which the account uses, ask the user. Do NOT run `npm login` 
 | Script | Purpose |
 |--------|---------|
 | `pr-land-discover.sh` | Discover PRs and approval status |
-| `pr-land-comments.sh` | Check for recent unaddressed feedback (inline threads, review bodies, top-level comments) |
+| `pr-land-comments.sh` | Check for recent unaddressed feedback (inline threads, review bodies, top-level comments) + unresolved reviewer-bot threads (`botThreads`, no recency filter — see `bot-thread-gate`) |
 | `git-branch-ops.sh` | Shared autosquash / push helper for explicit git branch actions |
 | `pr-land-prepare.sh` | Rebase + conflict detection + verification |
 | `verify-repo.sh` | Verification (CHANGELOG + code; lint scoped to changed files when `--base` given; accommodates both Unreleased-style and legacy versions-only CHANGELOG formats; prepare invokes it with `--require-changelog`, so every landed PR must include a CHANGELOG entry) |
@@ -63,6 +62,9 @@ If you do not know which the account uses, ask the user. Do NOT run `npm login` 
 | `pr-land-publish.sh` | Version bump, changelog update, commit + tag (no push) |
 | `staging-cherry-pick.sh` | Cherry-pick merged PR commits onto staging (see `/staging-cherry-pick` skill) |
 | `asana-task-update.sh` | Update linked Asana tasks after merge |
+| `pr-merge-watch.sh` | Babysit armed PRs: poll until all merge, a check fails, or one needs a rebase (DIRTY, or BEHIND with green checks — auto-merge never updates a BEHIND branch) |
+| `changelog-union-merge.sh` | Mechanically resolve a CHANGELOG rebase/cherry-pick conflict (union, dedupe, type-order) |
+| `npm-publish-web.sh` | Login-if-needed + publish via npm web/link auth under a PTY; emits `AUTH_URL` lines to relay |
 
 | Script | Exit 0 | Exit 1 | Exit 2 | Exit 3 | Exit 4 |
 |--------|--------|--------|--------|--------|--------|
@@ -75,6 +77,11 @@ If you do not know which the account uses, ask the user. Do NOT run `npm login` 
 | `staging-cherry-pick.sh` | All cherry-picked | Error | Auth needed | CHANGELOG conflict | - |
 | `pr-land-publish.sh` | Ready (needs push) | Verify fail | No unreleased | - | - |
 | `asana-task-update.sh` | Success | Error | Needs user input | - | - |
+| `pr-merge-watch.sh` | All merged | Usage error | - | Needs rebase (re-prepare listed PRs) | Check failed |
+| `changelog-union-merge.sh` | Resolved (+continued) | No markers / continue failed | Usage | - | - |
+| `npm-publish-web.sh` | Published | Registry/other error | Auth never completed | - | - |
+
+(`pr-merge-watch.sh` exit 5 = timeout with PRs still pending: re-invoke to keep watching.)
 
 **Any exit code not in this table = STOP immediately and report to user.**
 
@@ -83,10 +90,10 @@ If you do not know which the account uses, ask the user. Do NOT run `npm login` 
 | `status` | Meaning | Prescribed action |
 |----------|---------|-------------------|
 | `ready` | Prepared + verified | Proceed to push (step 4). Check `placementWarnings` first. |
-| `changelog_conflict` | CHANGELOG-only rebase conflict, left in progress | Resolve semantically, `git add CHANGELOG.md && GIT_EDITOR=true git rebase --continue`, re-run prepare. |
+| `changelog_conflict` | CHANGELOG-only rebase conflict, left in progress | Run `changelog-union-merge.sh <repoDir> --continue` (mechanical union: dedupe + type-order), re-run prepare. Resolve by hand only if the script exits non-zero. |
 | `code_conflict` | Code-file rebase conflict, rebase LEFT IN PROGRESS | Resolve semantically in place when confidently determinable (dep/version bumps, lockfile regen, accept upstream deletion, non-overlapping edits): keep both sides' intent, regenerate lockfiles if deps changed, `git add` + `GIT_EDITOR=true git rebase --continue`, re-run prepare. `git rebase --abort` + skip ONLY if not confidently resolvable. See `code-conflicts`. |
 | `verification_failed` | verify-repo.sh failed | Read `failedStep` + `logPath` from the JSON; inspect the log tail (`tail -40 <logPath>`); fix only if trivially in-scope, else report. Special case `failedStep: "CHANGELOG entry existence check"` — prepare REQUIRES every landed PR to have updated CHANGELOG.md: add a correctly-formatted entry for the PR's change (under `## Unreleased`, or the topmost version section in legacy versions-only repos), amend it onto the branch, and re-run prepare. Only if an entry is genuinely unwarranted (e.g. CI-only change), ask the user whether to land without one. |
-| `install_failed` | Dependency install failed | Report; usually environmental. Do not retry blindly. |
+| `install_failed` | Dependency install failed | Read the error: a Socket Firewall HTML page ("Please connect to Socket Firewall") is a transient proxy outage — retry the prepare ONCE, then report. Runtime-setup steps in `scripts.prepare` are already stripped during verification installs (see `verification-prepare-cmd.sh`), so a persistent failure is a real install problem: report, do not retry further. |
 | `autosquash_failed` | Fixup autosquash rebase failed (aborted) | Report; branch likely needs manual history repair. |
 | `checkout_failed` | Fetch/checkout failed | Report the git error. Note: dirty trees no longer cause this — they are auto-stashed (see `dirty-tree-policy`). |
 | `clone_failed` | Initial clone failed | Report; check repo name/access. |
@@ -129,16 +136,15 @@ Returns PRs with unaddressed feedback posted after the last commit. The script c
 Items previously marked with `<!-- addressed:review:ID -->` or `<!-- addressed:comment:ID -->` markers are automatically excluded.
 
 <sub-step name="Comment handling">
-1. AI/bot comments: Already filtered out by the script.
+1. Bot findings: each PR entry's `botThreads` array lists unresolved reviewer-bot threads — these BLOCK arming per `bot-thread-gate`. Address every entry (fix-or-refute, reply, resolve) before the PR proceeds to step 5. Bot chatter that is not an unresolved thread is already filtered out.
 2. Human reviewer comments are **blocking until the user decides how to handle them**. Use the `approved` and `changesRequested` fields from discovery to determine the path:
    1. **`changesRequested: true`**:
       - Treat the feedback as re-review-blocking
       - If the user wants it addressed now, make the fix as a visible fixup commit, push it, reply/resolve the feedback, and **remove the PR from the merge set** so it can go back for review
       - If the user does not want to address it now, leave the PR out of the merge set and report it as blocked by requested changes
    2. **`approved: true` and `changesRequested: false`**:
-      - Present the recent human comments to the user and ask whether to **ignore** them or **address** them before continuing
-      - If the user chooses **ignore**: leave the code unchanged and continue the landing workflow
-      - If the user chooses **address**:
+      - DEFAULT: **address** the comments via the /pr-address flow below, without asking — the reviewer already approved, so follow-up comments are nits to fix, not re-review gates. Ask the user ONLY when a comment is ambiguous, expands scope beyond the PR, or you cannot determine the concrete change it wants.
+      - To address each comment:
         1. Read the comment and understand the requested change
         2. Make the fix as a fixup commit: `~/.cursor/skills/lint-commit.sh --fixup <hash> [files...]`
         3. Push the updated branch with `~/.cursor/skills/git-branch-ops.sh push --force-with-lease --branch <branch>`. Use `--force-with-lease` because `lint-commit.sh --fixup` may autosquash immediately.
@@ -148,7 +154,7 @@ Items previously marked with `<!-- addressed:review:ID -->` or `<!-- addressed:c
            - **Top-level** (`type: "top-level"`): Use `commentId` with `~/.cursor/skills/pr-address/scripts/pr-address.sh mark-addressed --type comment ...`
         5. Continue the landing workflow immediately — do **not** remove the PR from the merge set solely because an already-approved reviewer left optional comments
    3. Continue with remaining PRs that have no outstanding blocking comment decision
-   4. Report ignored comments, addressed-and-continued PRs, and set-aside PRs at the end of the workflow
+   4. Report addressed-and-continued PRs, comments escalated to the user, and set-aside PRs at the end of the workflow
 
 **Do NOT block the rest of the flow** for PRs with comments.
 </sub-step>
@@ -171,7 +177,7 @@ The prepare script handles: clone/checkout, autosquash fixups, rebase onto upstr
 
 <sub-step name="On code conflict">The rebase is LEFT IN PROGRESS (status `code_conflict`, reported in `codeConflicts`). Resolve per the `code-conflicts` rule: if confidently determinable, edit each conflicted file to keep both sides' intent, regenerate lockfiles if deps changed, `git add` + `GIT_EDITOR=true git rebase --continue`, then re-run prepare to verify. If NOT confidently resolvable, `git rebase --abort` and skip, continuing with other PRs.</sub-step>
 
-<sub-step name="On CHANGELOG conflict">Agent resolves semantically (upstream entries first, then ours), then re-runs prepare.</sub-step>
+<sub-step name="On CHANGELOG conflict">Run `~/.cursor/skills/pr-land/scripts/changelog-union-merge.sh <repoDir> --continue`, then re-run prepare. Only resolve by hand (upstream entries first, then ours) if the script exits non-zero.</sub-step>
 
 <sub-step name="On CHANGELOG placement warning">
 If any entry in `prepared[i].placementWarnings` is non-empty, the PR added CHANGELOG entries under a DATED released heading (e.g. `## 4.46.0 (2026-03-20)`) instead of `## Unreleased (develop)` or `## X.Y.Z (staging)`. This usually means the author placed the entry under the then-current released version but the PR actually targets a later unreleased version.
@@ -212,18 +218,19 @@ Use:
    ```
 
    Per-PR result lines: `armed` (auto-merge on; GitHub merges on green), `merged` (already merged), `blocked` (changes requested — resolve first), `unsupported` (repo disallows auto-merge/merge-commit → use the local fallback below), `error`. Exit 0 = all armed/merged.
-3. **Watch CI until merged or a check fails (babysit):** for each armed PR, poll its CI/merge state until it lands or a check goes red. Do NOT walk away at `armed`:
+3. **Watch until merged or actionable (babysit):** run the watcher over every armed PR (background it for long CI). Do NOT walk away at `armed`:
 
    ```bash
-   ~/.cursor/scripts/pr-watch.sh --once --repo <repo> --user <user>
+   ~/.cursor/skills/pr-land/scripts/pr-merge-watch.sh <repo#num> [more...] [--timeout 3600]
    ```
 
-   Poll on a sane interval (about 60s; the script clamps to a safe minimum). Read the PR's state from the output:
-   - PR shows **PENDING** → CI still running; keep polling.
-   - PR **drops off the open list** → auto-merge fired and it merged; capture the merge and move on.
-   - PR shows **BLOCKED** (CI failure / changes requested) → STOP watching that PR, report the failing check, and leave auto-merge armed unless the user says to disarm. Do not local-merge around a red check.
+   Act on the exit code — every non-zero exit is actionable, never a stop-and-wait:
+   - **0 ALL_MERGED** → capture the merges, move on.
+   - **3 NEEDS_REBASE `<prs>`** → the base moved (DIRTY, or BEHIND with green checks — GitHub auto-merge NEVER updates a BEHIND branch; unwatched it stalls forever). Loop the listed PRs back through prepare (step 3; CHANGELOG conflicts resolve via `changelog-union-merge.sh`) and push (step 4); auto-merge stays armed. The re-push re-triggers reviewer bots — re-run the step 2 comment check on those PRs per `bot-thread-gate` once their bot check-runs complete. Re-invoke the watcher.
+   - **4 CHECK_FAILED `<pr>`** → report the failing check, leave auto-merge armed unless the user says to disarm, keep watching the others. Do not local-merge around a red check.
+   - **5 TIMEOUT** → CI still running; re-invoke to keep watching.
 
-   Resolve `<user>` from the branch-prefix owner (e.g. `Jon-edge`); omit `--user` to watch all of the repo's open PRs. Only finalize the land once every armed PR has either merged or been reported as blocked.
+   Only finalize the land once every armed PR has either merged or been reported as blocked.
 
 **FALLBACK: local rebase + verify + merge.** Use the local path ONLY when auto-merge is `unsupported`/`blocked`, when a rebase CONFLICT needs local resolution (per `code-conflicts`), or when the user explicitly asks for an immediate local merge. Run Steps 3-4 (prepare/push) first, then:
 
@@ -254,74 +261,46 @@ The local merge script processes PRs **sequentially** with automatic rebase-befo
 <step id="6" name="Publish">
 **Gating:** Only non-GUI repos. Only when ALL approved PRs for the repo are merged. Skip if any were skipped/held back.
 
-Ask for user confirmation:
-```
-Merged repos ready to publish (all PRs landed):
-  - <repo> (<branch>)
-
-Repos with outstanding PRs (not ready to publish):
-  - <repo> (N PRs skipped)
-
-Publish ready repos to npm? [y/N]
-```
-
-If confirmed:
+**GUI-dep check (owns it — steps 7 and 10 reference):** the GUI's package.json is the source of truth for which repos are GUI dependencies — never assume every non-GUI repo publishes. Resolve per repo:
 
 ```bash
-echo '[{"repo":"...","branch":"master"}]' | ~/.cursor/skills/pr-land/scripts/pr-land-publish.sh
+pkg=$(jq -r .name <repoDir>/package.json)
+jq -e --arg p "$pkg" '.dependencies[$p] // empty' ~/git/edge-react-gui/package.json
 ```
 
-**Exit codes:**
-- `0` = Version bumped, committed, tagged (check `needsPush` in JSON output)
-- `1` = Verification failed
-- `2` = No unreleased changes in CHANGELOG
+Exit 0 → GUI dep: publish here, upgrade in step 7. Non-zero (not a dependency — e.g. a deployed server, typically also `"private": true`) → SKIP publish and step 7 for this repo entirely; its land is complete at merge (step 10 counts it fully landed then).
 
-After script completes:
+**Ordering rationale (owns it — other steps reference, don't restate):** git is retryable, npm is not. A pushed version commit that npm lacks is benign — `npm publish` completes it any time later, no history rewrite. A published npm version whose commit was never pushed is the unrecoverable direction (same-version republish is forbidden even after unpublish). So push BEFORE publish, and gate only the publish on the user's auth link. No y/N confirmations anywhere in this step: the land-and-publish request implies the push, and completing the AUTH_URL link is the publish confirmation (per `npm-publish-auth`).
 
-<sub-step name="Push version commit + tag">
-1. Show version bump details to user (repo, old → new version, entries).
-2. Ask user to confirm the push.
-3. If confirmed, push master and tag: `cd <repoDir> && git push origin master && git push origin v<version>`.
-</sub-step>
+For each ready repo, in sequence:
 
-<sub-step name="Sanity-check npm auth (once, before first publish)">
-Before publishing the first repo of the run, verify the token:
-```bash
-cd <repoDir> && npm whoami
-```
-If it fails or prints an unexpected username: STOP and tell the user to check `~/.npmrc`. Do NOT attempt `npm login`. Do NOT prompt for credentials.
-</sub-step>
+1. **Bump + commit + tag (local):**
 
-<sub-step name="Publish each repo (TOTP or passkey 2FA)">
-For each repo, in sequence. First determine the user's npm 2FA type (ask if unknown): **TOTP** (6-digit authenticator code) or **passkey/WebAuthn** (browser approval, no code).
-
-**TOTP path:**
-1. Ask the user exactly: `OTP for <repo> (npm publish)?` — wait for a 6-digit code.
-2. Run:
    ```bash
-   cd <repoDir> && npm publish --otp=<otp>
+   echo '[{"repo":"...","branch":"master"}]' | ~/.cursor/skills/pr-land/scripts/pr-land-publish.sh
    ```
-3. On success: capture the published version from output, proceed to the next repo.
-4. On failure with `EOTP` / "OTP required" / any auth error: treat as a stale OTP (OTPs are single-use and ~30s-lived). Ask for a fresh OTP and retry. Retry at most **2 times**; on third failure STOP and report.
 
-**Passkey / web-auth path:**
-1. Tell the user exactly: `Publishing <repo> — approve the npm passkey prompt in your browser when it opens.`
-2. Run (NO `--otp` flag; relies on `auth-type=web`):
+   Exit codes: `0` = bumped/committed/tagged (needs push), `1` = verification failed (report), `2` = no unreleased changes. **Idempotent resume on exit 2:** if the version at HEAD is already bumped but missing from npm (a prior run's publish was abandoned), skip the bump and go straight to sub-step 3 — `npm-publish-web.sh` detects an already-published version and exits 0.
+
+2. **Push master + tag:**
+
    ```bash
-   cd <repoDir> && npm publish
+   cd <repoDir> && git push origin master && git push origin v<version>
    ```
-3. npm prints a URL / opens a browser; the user approves with their passkey. Use a long timeout — the command blocks until the user completes the browser prompt.
-4. On success: capture the published version from output, proceed to the next repo.
-5. On failure with a 2FA/auth error (user dismissed or missed the browser prompt): ask the user to retry the approval and re-run. Retry at most **2 times**; on third failure STOP and report.
 
-**Both paths:** On any other failure (network, registry error, version conflict): STOP and report — do not retry.
+3. **Publish (auth link = the confirmation):** run in the background and relay every `AUTH_URL` line to the user the moment it appears (push notification in orchestrated runs — never Slack):
 
-After all repos publish successfully, proceed to step 7 automatically. Do NOT ask for a second confirmation — the exit codes are the confirmation.
-</sub-step>
+   ```bash
+   ~/.cursor/skills/pr-land/scripts/npm-publish-web.sh <repoDir>
+   ```
+
+   The script preflights `npm whoami`, web-logs-in first if needed (login and publish are separate auth events — see `npm-publish-auth`), publishes, and prints `PUBLISHED <name>@<version>`. Exit codes: `0` = published, `1` = registry error (STOP and report; git stays as-is and the version is resumable), `2` = auth never completed (report; resume later via the idempotent path above).
+
+After all repos publish successfully, proceed to step 7 automatically — the exit codes are the confirmation.
 </step>
 
 <step id="7" name="Update GUI Dependencies">
-**Trigger:** Only if non-`edge-react-gui` repos were published successfully in step 6 (exit 0 per repo). All non-GUI EdgeApp repos are GUI dependencies, so publishing always requires a GUI dep upgrade. Flows directly from step 6 — no additional user confirmation.
+**Trigger:** Only for repos that passed step 6's GUI-dep check AND published successfully (exit 0 per repo). Publishing a GUI dep always requires the matching GUI upgrade. Flows directly from step 6 — no additional user confirmation.
 
 <sub-step name="Sync develop once (before any upgrade)">
 `upgrade-dep.sh` assumes it is run on a clean `develop` synced to origin and does NOT manage the branch itself (running it N times would otherwise reset develop N times and wipe prior-package commits). Do this ONCE before the upgrade loop:
@@ -345,7 +324,7 @@ Stashes remain stashed — the user can restore them after the run.
    ```bash
    cd <gui-repo-dir> && ~/.cursor/skills/pr-land/scripts/upgrade-dep.sh <package-name>
    ```
-   Each invocation bumps the version in package.json, runs install + prepare + prepare.ios via the repo's package manager (npm or yarn, auto-detected), and commits package.json + lockfile. On success it prints `UPGRADE_READY ... sha=<commit_sha>`. If any run fails, STOP and report. Ask user how to proceed.
+   Each invocation bumps the version in package.json, runs install + prepare + prepare.ios via the repo's package manager (npm or yarn, auto-detected), inserts a `- changed: Upgrade <pkg> to <version>` CHANGELOG entry under `## Unreleased` (repo convention; also step 9's staging-routing signal for dep tasks), and commits package.json + lockfile + CHANGELOG. On success it prints `UPGRADE_READY ... sha=<commit_sha>`. If any run fails, STOP and report. Ask user how to proceed.
 
 2. After all dependency upgrades succeed, show the created `develop` commit SHA(s) to the user and ask for confirmation to land them:
    ```bash
@@ -355,14 +334,14 @@ Stashes remain stashed — the user can restore them after the run.
 </step>
 
 <step id="8" name="Prepare and Merge GUI PRs (deferred)">
-**Trigger:** Only runs when `guiPrs` was populated at step 1 AND step 7's dep upgrades pushed to develop successfully. Skip entirely if no GUI PRs exist. If step 7 failed or was skipped due to no non-GUI merges, also skip this step.
+**Trigger:** Only runs when `guiPrs` was populated at step 1 AND every GUI-dep repo that merged in this run has published + upgraded on develop (step 7). Skip entirely if no GUI PRs exist. If a required step 7 upgrade failed, also skip this step. When the batch's non-GUI repos were all non-deps (step 6's GUI-dep check skipped them), there is nothing to wait for — proceed with the GUI PRs directly.
 
 At this point, `origin/develop` contains the new dep-upgrade commits from step 7, so each GUI PR will rebase cleanly onto a develop that already has its new dep versions.
 
 Re-run steps 3, 4, and 5 against `guiPrs`:
 
 1. Feed `guiPrs` into `pr-land-prepare.sh` (same invocation shape as step 3).
-2. On CHANGELOG conflict: resolve semantically, `git add CHANGELOG.md && GIT_EDITOR=true git rebase --continue`, re-run prepare — same flow as step 3's CHANGELOG sub-step.
+2. On CHANGELOG conflict: `changelog-union-merge.sh <repoDir> --continue`, re-run prepare — same flow as step 3's CHANGELOG sub-step.
 3. For each prepared GUI branch, push with `~/.cursor/skills/git-branch-ops.sh push --force-with-lease --branch <branch>` (step 4).
 4. Feed `guiPrs` into `pr-land-merge.sh` (step 5).
 
@@ -384,7 +363,7 @@ echo '[{"repo":"edge-react-gui","prNumber":123,"mergeSha":"abc123"}]' | ~/.curso
 
 Pass the `mergeSha` from the merge step's JSON output. For dep upgrade commits, pass the commit SHA from step 7. The script cherry-picks individual (non-merge) commits onto the staging branch.
 
-**On exit 3 (CHANGELOG conflict):** Resolve semantically (existing staging entries first, then the new entry), then `git add CHANGELOG.md && GIT_EDITOR=true git cherry-pick --continue`. Re-run for remaining PRs.
+**On exit 3 (CHANGELOG conflict):** Run `changelog-union-merge.sh <repoDir> --continue` (it detects the in-progress cherry-pick). Resolve by hand (existing staging entries first, then the new entry) only if it exits non-zero. Re-run for remaining PRs.
 
 **On exit 1 (code conflict):** STOP and report to user.
 
@@ -401,9 +380,17 @@ Then restore the previous branch.
 
 Only update for fully landed PRs:
 - GUI PRs: merged
-- Non-GUI PRs: merged AND published AND GUI deps updated
+- GUI-dep repos (per step 6's GUI-dep check): merged AND published AND GUI deps updated
+- Non-dep repos (fail the GUI-dep check, e.g. deployed servers): merged
 
-Do NOT update for: skipped PRs, addressed-but-not-re-reviewed PRs, or repos not published.
+Do NOT update for: skipped PRs, addressed-but-not-re-reviewed PRs, or GUI-dep repos not published.
+
+<sub-step name="env.json gate (before any update)">
+A task whose landed diff requires a build-server `env.json` change is NOT done when it merges — the new config value must exist on the build server before QA can verify. For each landed GUI PR, check its diff for `src/envConfig.ts` ADDITIONS (`gh pr diff <n> --repo EdgeApp/edge-react-gui | grep '^+.*_INIT'` or equivalent). If a PR adds env keys:
+- Do NOT move that task's Board State.
+- Surface it in the final report (and as an Asana comment on the task in orchestrated runs): name the exact key path(s) needed, e.g. `NYM_SWAP_INIT.apiKey`.
+Removals are fine (cleaners strip unknown env.json fields); only additions gate.
+</sub-step>
 
 <sub-step name="Extract Asana task GIDs">
 Pipe the PR metadata through the new helper so you only consume the Asana link once per PR:
