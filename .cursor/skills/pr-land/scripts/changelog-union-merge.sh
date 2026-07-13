@@ -48,6 +48,13 @@ while (i < lines.length) {
   const theirs = [];
   while (i < lines.length && !lines[i].startsWith(">>>>>>> ")) { theirs.push(lines[i]); i++; }
   i++; // skip >>>>>>>
+  // A hunk spanning a section heading (stale branch conflicting across a
+  // release boundary) cannot be union-sorted without scrambling sections —
+  // bail so the caller resolves by hand.
+  if ([...ours, ...theirs].some((l) => /^## /.test(l))) {
+    console.error("hunk spans a section heading — resolve by hand");
+    process.exit(1);
+  }
   // During rebase, HEAD (ours) is upstream and theirs is the branch commit —
   // union keeps upstream first, then branch lines not already present.
   const seen = new Set(ours.filter((l) => l.trim() !== ""));
@@ -60,7 +67,20 @@ while (i < lines.length) {
   merged.sort((a, b) => typeRank(a) - typeRank(b)); // stable: preserves order within a type
   out.push(...merged);
 }
-fs.writeFileSync(file, out.join("\n"));
+// Section-wide dedupe: a hunk-local union cannot see an identical entry that
+// already sits elsewhere in the same section (e.g. carried by an earlier
+// resolution). Drop exact-duplicate entry lines within each ## section.
+const deduped = [];
+let sectionSeen = new Set();
+for (const line of out) {
+  if (/^## /.test(line)) sectionSeen = new Set();
+  if (/^- /.test(line)) {
+    if (sectionSeen.has(line)) continue;
+    sectionSeen.add(line);
+  }
+  deduped.push(line);
+}
+fs.writeFileSync(file, deduped.join("\n"));
 ' "$file"
 
 echo "resolved: $file"

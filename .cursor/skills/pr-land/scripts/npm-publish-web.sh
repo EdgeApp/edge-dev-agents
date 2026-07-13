@@ -130,6 +130,15 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
   fi
 done
 
+# An auth approval that lands right at the phase deadline can complete on
+# npm's side after the local poller was killed — re-check the registry after
+# a settle delay before declaring failure.
+sleep 20
+if published; then
+  echo "PUBLISHED $pkg_name@$pkg_version"
+  exit 0
+fi
+
 # Distinguish auth-timeout from a real registry error using the last output.
 if grep -qiE "auth|otp|2fa|browser" "$WORK_DIR/publish.out" 2>/dev/null; then
   echo "FAILED publish auth never completed"
