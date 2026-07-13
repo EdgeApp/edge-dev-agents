@@ -66,6 +66,19 @@ if [[ -f yarn.lock ]]; then
   sed -i "" "s/git+//" yarn.lock
 fi
 
+# CHANGELOG entry — repo convention records dep upgrades ("changed: Upgrade
+# <pkg> ..."), and the entry is the staging-routing signal for step 9 when a
+# dep task carries Build=staging. Insert under the Unreleased heading.
+if [[ -f CHANGELOG.md ]] && grep -qE "^## Unreleased" CHANGELOG.md; then
+  entry="- changed: Upgrade $package to $new_version"
+  if ! grep -qxF "$entry" CHANGELOG.md; then
+    awk -v entry="$entry" '
+      /^## Unreleased/ && !done { print; getline; print; print entry; done=1; next }
+      { print }
+    ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+  fi
+fi
+
 # Stage and commit (git add -A picks up whichever lockfile changed)
 git add -A
 git commit -m "Upgrade $package@$new_version" --no-verify

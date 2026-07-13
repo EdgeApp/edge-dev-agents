@@ -41,13 +41,33 @@ else
   (cd "$repo_dir" && yarn install)
 fi
 
-if (cd "$repo_dir" && node -e "process.exit(require('./package.json').scripts?.prepare ? 0 : 1)" 2>/dev/null); then
-  echo "Running prepare (using $PM)..." >&2
-  if [ "$PM" = "npm" ]; then
-    (cd "$repo_dir" && npm run prepare)
-  else
-    (cd "$repo_dir" && yarn prepare)
-  fi
-fi
+# Run the verification-safe prepare command. A trailing runtime-setup step
+# (`npm run setup` / `yarn setup`) is stripped — see verification-prepare-cmd.sh
+# for the convention and output contract.
+prep_out=$("$(cd "$(dirname "$0")" && pwd)/verification-prepare-cmd.sh" "$repo_dir")
+prep_mode=$(printf '%s\n' "$prep_out" | head -1)
+prep_cmd=$(printf '%s\n' "$prep_out" | tail -n +2)
+
+case "$prep_mode" in
+  FULL)
+    echo "Running prepare (using $PM)..." >&2
+    if [ "$PM" = "npm" ]; then
+      (cd "$repo_dir" && npm run prepare)
+    else
+      (cd "$repo_dir" && yarn prepare)
+    fi
+    ;;
+  STRIPPED)
+    echo "Running prepare (runtime setup step skipped)..." >&2
+    (cd "$repo_dir" && PATH="$repo_dir/node_modules/.bin:$PATH" sh -c "$prep_cmd")
+    ;;
+  NONE)
+    echo "⏭  No verification-relevant prepare script — skipping" >&2
+    ;;
+  *)
+    echo "✗ verification-prepare-cmd.sh returned unexpected mode: $prep_mode" >&2
+    exit 1
+    ;;
+esac
 
 echo "✓ Dependencies installed and prepared (via $PM)" >&2
