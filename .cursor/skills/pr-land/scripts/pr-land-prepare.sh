@@ -182,15 +182,35 @@ async function prepareBranch(repo, branch) {
     }
   }
 
-  // If the branch is already checked out in another worktree (e.g. left behind
-  // by agent-watcher), git won't let the canonical clone check it out. Operate
-  // inside that worktree instead.
+  // If the branch is checked out in another worktree (left behind by an
+  // agent-watcher run), git won't let the canonical clone check it out.
+  // Landing always operates on the PRIMARY checkout: free the branch by
+  // detaching the worktree's HEAD when its tree is clean. A dirty worktree
+  // means unfinished work — fail with a clear message instead of landing
+  // inside a stale orch workspace.
   const wtDir = findWorktreeForBranch(canonicalDir, branch);
   if (wtDir && path.resolve(wtDir) !== path.resolve(canonicalDir)) {
     console.error(`Branch ${branch} is held by worktree: ${wtDir}`);
-    console.error(`Operating inside that worktree.`);
-    repoDir = wtDir;
-    result.repoDir = repoDir;
+    let wtDirty = true;
+    try {
+      wtDirty =
+        execSync(`git -C "${wtDir}" status --porcelain`, { encoding: "utf8" }).trim() !== "";
+    } catch (e) {
+      // status failure → treat as dirty and refuse below.
+    }
+    if (wtDirty) {
+      result.status = "checkout_failed";
+      result.message = `Branch is held by DIRTY worktree ${wtDir} — resolve or stash its changes (or remove the worktree) before landing`;
+      return result;
+    }
+    try {
+      execSync(`git -C "${wtDir}" checkout --detach`, { stdio: "pipe" });
+      console.error(`Worktree is clean — detached its HEAD to free the branch; operating on the primary checkout.`);
+    } catch (e) {
+      result.status = "checkout_failed";
+      result.message = `Failed to detach worktree ${wtDir}: ${e.message}`;
+      return result;
+    }
   }
   console.error(`Directory: ${repoDir}`);
 

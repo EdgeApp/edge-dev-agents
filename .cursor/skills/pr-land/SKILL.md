@@ -324,7 +324,7 @@ Stashes remain stashed — the user can restore them after the run.
    ```bash
    cd <gui-repo-dir> && ~/.cursor/skills/pr-land/scripts/upgrade-dep.sh <package-name>
    ```
-   Each invocation bumps the version in package.json, runs install + prepare + prepare.ios via the repo's package manager (npm or yarn, auto-detected), inserts a `- changed: Upgrade <pkg> to <version>` CHANGELOG entry under `## Unreleased` (repo convention; also step 9's staging-routing signal for dep tasks), and commits package.json + lockfile + CHANGELOG. On success it prints `UPGRADE_READY ... sha=<commit_sha>`. If any run fails, STOP and report. Ask user how to proceed.
+   Each invocation bumps the version in package.json, runs install + prepare + prepare.ios via the repo's package manager (npm or yarn, auto-detected), and commits package.json + lockfile. NO CHANGELOG entry: dep bumps are not user-visible release notes (when an upgrade IS the user-facing change, a human writes that entry deliberately). Dep-upgrade commits therefore route to staging in step 9 on the Build field signal alone. On success it prints `UPGRADE_READY ... sha=<commit_sha>`. If any run fails, STOP and report. Ask user how to proceed.
 
 2. After all dependency upgrades succeed, show the created `develop` commit SHA(s) to the user and ask for confirmation to land them:
    ```bash
