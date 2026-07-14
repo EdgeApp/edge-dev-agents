@@ -386,7 +386,7 @@
       ]
     },
     "one-shot:cheese-build-on-green": {
-      "hash": "065e3fa37557",
+      "hash": "5379336a8894",
       "dims": [
         "A28"
       ]
@@ -449,6 +449,12 @@
       "hash": "fb58781eaffe",
       "dims": [
         "A15"
+      ]
+    },
+    "cheese:orch-pins-required": {
+      "hash": "2cb4f6dd39eb",
+      "dims": [
+        "A28"
       ]
     }
   },
