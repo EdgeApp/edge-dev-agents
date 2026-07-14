@@ -153,6 +153,90 @@ flowchart LR
   AG -->|"pr-create, Complete"| H5["require-test-evidence + finalize-gate: CI, bots, proof"]
 ```
 
+
+### /one-shot decision flowchart
+
+The full decision flow of an orchestrated `/one-shot --yolo` run, including the
+followup, concession, landing, and cheese branches. Rule ids in brackets name
+the governing one-shot/cheese/build-and-test rules.
+
+```mermaid
+flowchart TD
+  START["/one-shot --yolo task-url"] --> REFIRE{"re-fire? task already
+  ran in this session"}
+  REFIRE -- "no (fresh or resumed-new)" --> PLAN
+  REFIRE -- "yes, still mid-run" --> CONT["continue current phase
+  [ignore-refired-one-shot]"]
+  REFIRE -- "yes, previously FINISHED" --> SCOPE["LIVE scope check:
+  check-followup-scope.sh
+  (never from memory)"]
+  SCOPE -- "operator asks newer
+  than report watermark" --> FOLLOWUP["deliver the new scope
+  [followup-scope-is-the-deliverable]"]
+  FOLLOWUP --> DEV
+  SCOPE -- "0 newer comments" --> GATE
+
+  PLAN["Planning: /asana-plan, plan doc
+  (confirmation waived in yolo)"] --> DEV
+  DEV["Developing: /im contract
+  (lint-warnings, lint-commit,
+  clean history)"] --> TEST
+  TEST["Testing: slot-preflight -> obey PLAN/INVOKE
+  -> build -> drive the REAL action on sim
+  (log-attempt every drive, pixel-verify proofs)
+  [preflight-before-build-decisions]"] --> WALL{"hit a wall?"}
+  WALL -- no --> PR
+  WALL -- yes --> ATTEMPT["log the attempt
+  (failed:/blocked:/loss:)"] --> VALID{"concession-validator
+  verdict [yolo-true-blockers]"}
+  VALID -- "legitimate: true" --> BLOCKED["blocked = Yes, park
+  (one-line comment, NO report doc)"]
+  VALID -- "legitimate: false" --> RETRY["do what_to_try, continue"] --> TEST
+
+  PR["Reviewing: /pr-create (verify green, clean tree,
+  template, evidence; Asana attach; multi-repo
+  subtasks; draft dep PRs excluded from gate)"] --> WATCH
+  WATCH["watch-pr bounded poll; bots must be
+  SUCCESS (NEUTRAL = findings -> /bugbot);
+  fixes via amend + force-with-lease"] --> GATE
+  GATE{"finalize-gate green:
+  CI + every bot clean +
+  0 unresolved bot threads
+  on EVERY primary PR"}
+  GATE -- "not green" --> WATCH
+  GATE -- green --> LAND{"landable? human APPROVED
+  review (any point in history)
+  OR Force Land field
+  [land-on-approval]"}
+
+  LAND -- yes --> PRLAND["/pr-land with TASK URL
+  (dep ordering: merge dep -> publish ->
+  bump -> gui; npm OTP parks at
+  operator boundary). Build field IGNORED
+  -> NO cheese push"] --> REPORT
+  LAND -- no --> BUILDF{"Build field?
+  [cheese-build-on-green]"}
+  BUILDF -- none --> REPORT
+  BUILDF -- staging --> REPORT
+  BUILDF -- "cheese (feta/gouda/...)" --> PINQ{"gui deliverable requires
+  unpublished dep PRs?"}
+  PINQ -- yes --> PINNED["/cheese --pin each dep
+  at ITS PR head
+  [cheese:orch-pins-required]"] --> REPORT
+  PINQ -- no --> POINTER["/cheese pointer reset
+  test-branch -> PR head"] --> REPORT
+
+  REPORT["RE-READ report template -> write report
+  -> require-clean-run-report lint at attach
+  -> set tested field from THIS run's evidence"] --> COMPLETE
+  COMPLETE["agent_status = Complete
+  (gated: fresh followup-scope check
+  required by hook)"]
+```
+
+Status discipline throughout: the phase status is set when that KIND of work
+starts (status leads the work), never as a side effect of a terminal action.
+
 ### Distribution (what syncs)
 
 Beyond cursor skills/rules, this repo mirrors two more portable trees so a
@@ -236,7 +320,6 @@ scripts, not be re-described independently across skills.
 | Skill | Description |
 |------|-------------|
 | [`/asana-task-update`](.cursor/skills/asana-task-update/SKILL.md) | Generic Asana mutations such as attach PR, assign, unassign, and status updates |
-| [`/standup`](.cursor/skills/standup/SKILL.md) | Generate daily standup notes from Asana and GitHub activity |
 | [`/chat-audit`](.cursor/skills/chat-audit/SKILL.md) | Audit Cursor chat sessions for waste, drift, and workflow gaps |
 | [`/convention-sync`](.cursor/skills/convention-sync/SKILL.md) | Sync `~/.cursor/` with this repo, mirror the local README to repo root, and update PR descriptions from `README.md` |
 | [`/author`](.cursor/skills/author/SKILL.md) | Create, revise, and debug skills, scripts, and rules |
@@ -251,7 +334,6 @@ scripts, not be re-described independently across skills.
 | [`pr-create.sh`](.cursor/skills/pr-create/scripts/pr-create.sh) | Create a PR for the current branch with standardized body formatting | `gh pr create` |
 | [`pr-address.sh`](.cursor/skills/pr-address/scripts/pr-address.sh) | Fetch unresolved feedback, reply, resolve threads, and mark items addressed | `gh api` REST + GraphQL |
 | [`github-pr-review.sh`](.cursor/skills/pr-review/scripts/github-pr-review.sh) | Fetch PR context and submit reviews | `gh pr view` + `gh api` |
-| [`github-pr-activity.sh`](.cursor/skills/standup/scripts/github-pr-activity.sh) | Gather recent PR activity and CI context for standups | `gh api graphql` |
 
 ### PR Landing Pipeline (`/pr-land`)
 

@@ -896,8 +896,8 @@
       "hash": "5313517deadf"
     },
     "one-shot:task-gid-for-pr-body-link": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "5e495e2ce448"
+      "reason": "2026-07-14: prose-only edit: dropped the deleted standup skill from the downstream-consumers list; rule behavior unchanged",
+      "hash": "37b18491b019"
     },
     "one-shot:pr-body-owned-by-pr-create": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1119,26 +1119,6 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "0274754b1008"
     },
-    "standup:links-as-titles": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "cd94c03c5e7e"
-    },
-    "standup:no-reassign-in-accomplishments": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "8b7a6f9cea8b"
-    },
-    "standup:single-gist": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "c89898262b61"
-    },
-    "standup:cleanup": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "1fc6662765b7"
-    },
-    "standup:script-timeout": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "c8a45fd1366b"
-    },
     "task-review:summary-first": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "d4da4d2f4059"
@@ -1146,26 +1126,6 @@
     "task-review:script-timeout": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "d4f4dc05bdfb"
-    },
-    "after_each_chat:every-turn": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "9f1f717a3cbb"
-    },
-    "after_each_chat:full-response": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "13821f5d9e6e"
-    },
-    "after_each_chat:no-confirmation": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "3785c79df475"
-    },
-    "after_each_chat:single-command": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "2b086debacb0"
-    },
-    "after_each_chat:no-extra-args": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "0b4b6200aae2"
     },
     "load-standards-by-filetype:check-before-read": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
