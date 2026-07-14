@@ -55,6 +55,22 @@ in_list() {
   return 1
 }
 
+# Feature sniff for gui-dependency repos not in the curated list: DETERMINISTIC
+# membership check against the gui's own manifest — a repo whose npm package name
+# appears in edge-react-gui/package.json dependencies is a gui dep, and its
+# changes are not verified until they run in the app (ios-sim lane). This is the
+# same check cheese-build.sh applies before pinning; here it makes the sim lane
+# self-maintaining for new dep repos the curated list hasn't caught up with.
+detect_gui_dep_by_manifest() {
+  local path="$1"
+  local gui_pkg="$GIT_ROOT/edge-react-gui/package.json"
+  [[ -f "$path/package.json" && -f "$gui_pkg" ]] || return 1
+  local npm_name
+  npm_name="$(jq -r '.name // empty' "$path/package.json" 2>/dev/null)"
+  [[ -n "$npm_name" ]] || return 1
+  jq -e --arg n "$npm_name" '.dependencies[$n] // empty | length > 0' "$gui_pkg" >/dev/null 2>&1
+}
+
 # Feature sniff for couch repos not in the curated list: a couch client
 # dependency, an initDbs setup script, or a couch URL in the repo config.
 detect_couch_by_features() {
@@ -77,7 +93,7 @@ detect() {
 
   # 1. Simulator lane (curated: gui + gui-deps). Takes precedence: a gui dep is
   #    verified on the sim even if it also has server-ish signals.
-  if in_list "$repo" "${SIM_REPOS[@]}"; then
+  if in_list "$repo" "${SIM_REPOS[@]}" || detect_gui_dep_by_manifest "$path"; then
     echo "ios-sim"; return 0
   fi
   # 2. Couch lane (curated, then feature sniff for new server repos).
