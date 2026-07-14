@@ -69,30 +69,34 @@ done
 MAIN_REPO="$REPOS_ROOT/$REPO"
 [[ -d "$MAIN_REPO/.git" ]] || { echo "Repo not found or not a git repo: $MAIN_REPO" >&2; exit 1; }
 
-# Per-repo base overrides: repos whose PUBLISHED default differs from the Edge
-# `develop` convention AND that still carry a stale legacy `develop` we must not
-# branch off. Checked before the develop-first logic below so it wins.
+# Resolve the base ref when not given on the CLI. THE REPO\'S PUBLISHED DEFAULT
+# BRANCH (origin/HEAD) IS THE TRUTH. Never prefer a `develop` that merely
+# EXISTS: several master-based repos carry a stale legacy `develop`
+# (edge-info-server, edge-reports-server — the 2026-07-14 reports run
+# provisioned its worktree off that stale branch). The old develop-first logic
+# required hand-listing every such repo; this inverts the default so an
+# unlisted repo can never silently base off a stale branch.
+# edge-react-gui keeps an explicit pin to its documented `develop` convention
+# (matches its origin/HEAD; the pin protects against a mis-set remote HEAD).
 if [[ -z "$BASE" ]]; then
   case "$REPO" in
-    edge-info-server) BASE="origin/master" ;;  # publishes from master; develop is stale legacy lineage
+    edge-react-gui) BASE="origin/develop" ;;
   esac
 fi
-
-# Resolve the base ref when not given on the CLI. Edge convention is `develop`;
-# repos that don't use it (most deps/servers) fall back to their actual default
-# branch (origin/HEAD), then origin/main, then origin/master.
 if [[ -z "$BASE" ]]; then
-  if git -C "$MAIN_REPO" rev-parse --verify --quiet "origin/develop" >/dev/null 2>&1; then
-    BASE="origin/develop"
-  else
+  BASE="$(git -C "$MAIN_REPO" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/||')"
+  if [[ -z "$BASE" ]]; then
+    # local clone never had origin/HEAD recorded — ask the remote once
+    git -C "$MAIN_REPO" remote set-head origin --auto >/dev/null 2>&1 || true
     BASE="$(git -C "$MAIN_REPO" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/||')"
-    if [[ -z "$BASE" ]]; then
-      for cand in origin/main origin/master; do
-        git -C "$MAIN_REPO" rev-parse --verify --quiet "$cand" >/dev/null 2>&1 && { BASE="$cand"; break; }
-      done
-    fi
   fi
-  [[ -z "$BASE" ]] && BASE="origin/develop"   # last-resort
+  if [[ -z "$BASE" ]]; then
+    # offline fallback: main/master before develop (develop last — stale-branch hazard)
+    for cand in origin/main origin/master origin/develop; do
+      git -C "$MAIN_REPO" rev-parse --verify --quiet "$cand" >/dev/null 2>&1 && { BASE="$cand"; break; }
+    done
+  fi
+  [[ -z "$BASE" ]] && { echo "setup-task-workspace: cannot resolve a base ref for $REPO (no origin/HEAD, main, master, or develop) — refusing to guess" >&2; exit 1; }
   echo ">> setup-task-workspace: base ref for $REPO → $BASE" >&2
 fi
 

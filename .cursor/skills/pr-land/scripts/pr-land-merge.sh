@@ -216,6 +216,17 @@ function mergePR(repo, prNumber, branch) {
 
 // --- Main ---
 
+
+// Per-repo land mutex (repo-land-lock.sh): serializes rebase/merge/publish trains
+// across sessions — land-on-approval means two approved tasks in one repo can land
+// concurrently, and this script's sequencing is only per-invocation. Exit 75 = busy.
+const LAND_LOCK = `${process.env.HOME}/.cursor/skills/pr-land/scripts/repo-land-lock.sh`;
+const LAND_LOCK_OWNER = process.env.AGENT_SESSION_UUID || `op-${process.env.USER || "shell"}`;
+function landLock(cmd, repo) {
+  const r = require("child_process").spawnSync(LAND_LOCK, [cmd, "--repo", repo, "--owner", LAND_LOCK_OWNER], { stdio: ["ignore", "pipe", "inherit"] });
+  return (r.status || 0) === 0;
+}
+
 async function main() {
   let input = "";
   for await (const chunk of process.stdin) {
@@ -223,6 +234,16 @@ async function main() {
   }
 
   const prs = JSON.parse(input);
+
+  const lockRepos = [...new Set(prs.map((x) => x.repo))];
+  for (const repo of lockRepos) {
+    if (!landLock("acquire", repo)) {
+      console.error(`pr-land-merge: land lock busy for ${repo} — another session is landing there; wait and retry.`);
+      process.exit(75);
+    }
+  }
+  process.on("exit", () => { for (const repo of lockRepos) landLock("release", repo); });
+
   const results = {
     merged: [],
     failed: [],
