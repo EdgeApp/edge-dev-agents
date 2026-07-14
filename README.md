@@ -68,62 +68,7 @@ the live sessions. Post-hoc evals grade what each run did.
 
 ### How a run flows
 
-1. **Watcher** (`agent-watcher/asana-watcher.js`, launchd every 120s): polls the
-   project for `agent_status = Pending`. It skips the tick when a resource
-   guardrail trips (1-minute load over `max_load_avg`, or free RAM under
-   `min_free_ram_gb`) or the concurrency cap (`max_concurrent`, default 4) is full.
-   For each pickable task it refreshes the iOS-sim pool and allocates a slot (a git
-   worktree, a cloned simulator, a Metro port). Before recloning the pool it runs
-   `refresh-master-build.sh`: if `develop` has advanced and its native side
-   (`ios/Podfile.lock`) changed, it rebuilds the master sim from `develop` and
-   reclones so runs test against a current build instead of a pinned-stale one. A
-   JS-only `develop` advance skips the rebuild (clones bundle JS live from Metro);
-   the check is a cheap `git fetch` plus a SHA compare, and a build failure is
-   non-fatal (provisioning continues on the last-good master). A NEVER-run task is spawned fresh:
-   `agent_status = Planning`, a tmux session `claude-asana-(gid)` running
-   `/one-shot --yolo (task-url)`. A task with a PRIOR transcript (a revisit) is
-   RESUMED instead (its conversation restored on the fresh slot, via `resume-task`).
-   Note the resume answers the resume menu with "Resume from summary", which
-   COMPACTS the conversation from a summary built before the re-arm, so a resumed
-   agent's memory never includes the followup comment that triggered the re-arm.
-   That is why finalize is gated on a live scope check: `check-followup-scope.sh`
-   fetches the task's comments and attachments, lists every operator comment newer
-   than the latest `agent-run-report*.md` watermark, and writes a marker; the
-   `require-followup-scope-on-complete.sh` PreToolUse hook blocks
-   `update-status.sh (gid) Complete` unless that marker exists and still matches
-   the live newest comment. Recalled context never stands in for the fetch.
-   So re-engaging a finished task is one signal: set it back to `Pending` and it
-   continues with memory plus working resources, never a fresh session. This is the
-   single re-engagement entry point. Both the fresh-spawn and the resume path route
-   through `spawn-test-session.sh`, which pins the session's model and reasoning
-   effort from the task's `agent_model` / `agent_effort` Asana fields: the selected
-   `agent_model` option maps to a CLI model string (all 1M-context: Fable 5, Opus
-   4.8, Opus 4.7, Sonnet 5, Sonnet 4.6), the `agent_effort` option is the CLI level directly
-   (low/medium/high/xhigh/max). Unset falls back to the config defaults
-   (`.watcher.agent_model` = Opus 4.8 1M, `.watcher.agent_effort` = high), so new
-   tasks and follow-ups honor the same per-task overrides.
-2. **The run** (`/one-shot --yolo`, a single agent turn): seven phases, status
-   advanced via `update-status.sh` at each boundary. Planning (`/asana-plan`),
-   Developing (`/im`), local verify (`/build-and-test`), Reviewing (`/pr-create`),
-   Testing (CI watch + reviewer bots), Complete. The agent runs hands-off: no
-   interactive prompts, no self-respawn, every wait a bounded blocking in-turn call.
-3. **Finalize gate**: `Complete` is set only when every primary PR is CI-green,
-   every reviewer bot is clean on HEAD, and there are zero unresolved bot review
-   threads (bots matched by GraphQL `__typename == "Bot"`, so Cursor's `cursor` and
-   `cursor[bot]` logins both count).
-4. **Watchdog** (`agent-watcher/session-watchdog.js`, launchd every 120s): tends
-   live sessions. RC-bridge revive (only when the bridge is dead), completion sweep
-   (`Complete` retires `claude-asana-(gid)` to `done-asana-(gid)`, frees
-   sim/Metro/slot, keeps claude alive for re-engagement), blocked sweep (sheds
-   sim/Metro while a human is needed), GC (keep newest `keep_completed_sessions` /
-   `keep_completed_worktrees`), orphan-Metro reap, idle-dirty-sim reclaim, and
-   operator escalation for parked prompts or stuck sessions. It does NOT re-engage
-   finished tasks: that is the watcher's job (Pending → resume), so the watchdog and
-   watcher are decoupled.
-5. **Eval** (post-hoc): `/resolve-run` builds an evidence manifest per run;
-   `/agent-eval` grades process compliance and outcome honesty (A-dimensions),
-   `/orch-eval` grades infrastructure health (O-dimensions), and `/eval-run`
-   orchestrates a cohort.
+At a glance:
 
 ```mermaid
 flowchart TD
@@ -140,6 +85,89 @@ flowchart TD
   H -->|"beyond keep_completed_sessions"| I["reaped"]
 ```
 
+#### 1. Watcher: spawn and resume
+
+`agent-watcher/asana-watcher.js`, launchd every 120s, polls the project for
+`agent_status = Pending`.
+
+- **Tick gate.** The tick is skipped when a resource guardrail trips (1-minute
+  load over `max_load_avg`, free RAM under `min_free_ram_gb`) or the
+  concurrency cap is full (`max_concurrent`, default 4).
+- **Provisioning.** Each pickable task gets a slot: a git worktree, a cloned
+  simulator from the pool, and a Metro port. Before recloning the pool the
+  watcher runs `refresh-master-build.sh`: if `develop` advanced AND its native
+  side (`ios/Podfile.lock`) changed, the master sim is rebuilt from `develop`
+  and the pool recloned, so runs test against a current build. A JS-only
+  advance skips the rebuild (clones bundle JS live from Metro). The check is a
+  cheap `git fetch` plus SHA compare; a build failure is non-fatal
+  (provisioning continues on the last-good master).
+- **Fresh vs revisit.** A never-run task spawns fresh: `agent_status =
+  Planning`, a tmux session `claude-asana-(gid)` running `/one-shot --yolo
+  (task-url)`. A task with a prior transcript is RESUMED instead, on a fresh
+  slot, via `resume-task`. Re-engaging a finished task is therefore one
+  signal: set it back to `Pending`.
+- **Resume compaction, and why finalize is gated.** The resume auto-answers
+  the resume menu with "Resume from summary", which COMPACTS the conversation
+  from a summary built before the re-arm, so a resumed agent's memory never
+  contains the followup comment that triggered it. The counter is mechanical:
+  `check-followup-scope.sh` live-fetches comments and attachments, lists every
+  operator comment newer than the latest `agent-run-report*.md` watermark, and
+  writes a marker; the `require-followup-scope-on-complete.sh` hook blocks
+  `Complete` unless that marker exists and still matches the live newest
+  comment. Recalled context never stands in for the fetch.
+- **Per-task model and effort.** Both spawn and resume route through
+  `spawn-test-session.sh`, which pins the session model and reasoning effort
+  from the task's `agent_model` / `agent_effort` Asana fields (models all
+  1M-context: Fable 5, Opus 4.8, Opus 4.7, Sonnet 5, Sonnet 4.6; effort
+  low/medium/high/xhigh/max). Unset falls back to config defaults
+  (`.watcher.agent_model` = Opus 4.8 1M, `.watcher.agent_effort` = high).
+- **Version stamp.** Every spawn and resume segment records which orch version
+  governs it: `stamp-orch-version.sh` appends content digests of the governing
+  trees (skills, rules, watcher, hooks, settings hooks) plus repo head, CLI
+  version, model, and effort to `versions/(gid).jsonl`, and exports
+  `AGENT_ORCH_VERSION` for the run report. Evals slice findings by the version
+  actually in force per segment.
+
+#### 2. The run
+
+`/one-shot --yolo`, a single agent turn: seven phases with `agent_status`
+advanced via `update-status.sh` at each boundary. Planning (`/asana-plan`),
+Developing (`/im`), Testing (`/build-and-test`, on-sim verification), Reviewing
+(`/pr-create` through the CI + reviewer-bot watch), Complete. Status LEADS the
+work: the phase status is set when that kind of work starts, never as a side
+effect of a terminal action. The agent runs hands-off: no interactive prompts,
+no self-respawn, every wait a bounded blocking in-turn call. The full decision
+graph, including followup, concession, landing, and cheese branches, is in the
+[/one-shot decision flowchart](#one-shot-decision-flowchart) below.
+
+#### 3. Finalize: gate, land, or cheese
+
+`Complete` requires the finalize gate: every primary PR CI-green, every
+reviewer bot clean on HEAD, zero unresolved bot review threads (bots matched by
+GraphQL `__typename == "Bot"`). At green, landability is decided FIRST: a PR
+with a human APPROVED review (or the task's Force Land field) lands via
+`/pr-land` and the Build field is ignored. Only a non-landable green run kicks
+a cheese build, pinning the task's own unpublished dep PRs when the deliverable
+requires them.
+
+#### 4. Watchdog
+
+`agent-watcher/session-watchdog.js`, launchd every 120s, tends live sessions:
+
+- RC-bridge revive (only when the bridge is dead)
+- completion sweep: `Complete` retires `claude-asana-(gid)` to
+  `done-asana-(gid)`, frees sim/Metro/slot, keeps claude alive for
+  re-engagement
+- blocked sweep: sheds sim/Metro while a human is needed
+- GC: keep newest `keep_completed_sessions` / `keep_completed_worktrees`
+- orphan-Metro reap, idle-dirty-sim reclaim, and operator escalation for
+  parked prompts or stuck sessions
+
+It does NOT re-engage finished tasks: that is the watcher's job (Pending
+resumes), so watchdog and watcher stay decoupled.
+
+#### 5. Hands-off enforcement (hooks)
+
 The hands-off contract is enforced by deterministic PreToolUse and Stop hooks
 (active only when `AGENT_TASK_GID` is set), not merely documented:
 
@@ -153,6 +181,15 @@ flowchart LR
   AG -->|"pr-create, Complete"| H5["require-test-evidence + finalize-gate: CI, bots, proof"]
 ```
 
+#### 6. Eval
+
+Post-hoc, per run or per cohort: `/resolve-run` builds an evidence manifest
+(transcript, PRs, Asana state, attempt log, friction block, version stamps);
+`/agent-eval` grades process compliance and outcome honesty, `/orch-eval`
+grades infrastructure health, `/eval-run` orchestrates a cohort with
+adversarial verification. Between cohorts, `friction-scorecard.sh` prints a
+zero-LLM trend table (hook blocks, tool errors, builds, compactions, drives,
+attempt walls) straight from the manifests.
 
 ### /one-shot decision flowchart
 
