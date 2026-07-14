@@ -274,6 +274,15 @@ async function publishRepo(repo, branch) {
   }
 }
 
+
+// Per-repo land mutex — publishes serialize with rebase/merge trains (see repo-land-lock.sh).
+const LAND_LOCK = `${process.env.HOME}/.cursor/skills/pr-land/scripts/repo-land-lock.sh`;
+const LAND_LOCK_OWNER = process.env.AGENT_SESSION_UUID || `op-${process.env.USER || "shell"}`;
+function landLock(cmd, repo) {
+  const r = require("child_process").spawnSync(LAND_LOCK, [cmd, "--repo", repo, "--owner", LAND_LOCK_OWNER], { stdio: ["ignore", "pipe", "inherit"] });
+  return (r.status || 0) === 0;
+}
+
 async function main() {
   let input = "";
   for await (const chunk of process.stdin) {
@@ -281,6 +290,16 @@ async function main() {
   }
   
   const repos = JSON.parse(input);
+
+  const lockRepos = [...new Set(repos.map((x) => x.repo || x.name || x))].filter(Boolean);
+  for (const repo of lockRepos) {
+    if (!landLock("acquire", repo)) {
+      console.error(`pr-land-publish: land lock busy for ${repo} — another session is landing there; wait and retry.`);
+      process.exit(75);
+    }
+  }
+  process.on("exit", () => { for (const repo of lockRepos) landLock("release", repo); });
+
   const results = {
     published: [],
     failed: [],

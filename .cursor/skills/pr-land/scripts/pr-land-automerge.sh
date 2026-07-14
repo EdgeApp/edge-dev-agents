@@ -26,6 +26,16 @@ INPUT="$(cat)"
 [ -n "$INPUT" ] || { echo "ERROR: no PR JSON on stdin" >&2; exit 2; }
 
 RC=0
+# Per-repo land mutex: arming itself is server-side-safe, but automerge runs in
+# the same trains as local rebases (see repo-land-lock.sh). Exit 75 = busy.
+LOCK="$HOME/.cursor/skills/pr-land/scripts/repo-land-lock.sh"
+LOCK_OWNER="${AGENT_SESSION_UUID:-op-${USER:-shell}}"
+LOCK_REPOS="$(echo "$INPUT" | jq -r '.[].repo' | sed 's|.*/||' | sort -u)"
+for _r in $LOCK_REPOS; do
+  "$LOCK" acquire --repo "$_r" --owner "$LOCK_OWNER" || { echo "pr-land-automerge: land lock busy for $_r — wait and retry." >&2; exit 75; }
+done
+trap 'for _r in $LOCK_REPOS; do "$LOCK" release --repo "$_r" --owner "$LOCK_OWNER" >/dev/null 2>&1; done' EXIT
+
 echo "$INPUT" | jq -c '.[]' | while read -r pr; do
   REPO=$(echo "$pr" | jq -r '.repo')
   NUM=$(echo "$pr" | jq -r '.prNumber')
