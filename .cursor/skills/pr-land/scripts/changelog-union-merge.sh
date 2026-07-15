@@ -38,23 +38,10 @@ const typeRank = (line) => {
 
 const lines = fs.readFileSync(file, "utf8").split("\n");
 const out = [];
-let i = 0;
-while (i < lines.length) {
-  if (!lines[i].startsWith("<<<<<<< ")) { out.push(lines[i]); i++; continue; }
-  i++; // skip <<<<<<<
-  const ours = [];
-  while (i < lines.length && !lines[i].startsWith("=======")) { ours.push(lines[i]); i++; }
-  i++; // skip =======
-  const theirs = [];
-  while (i < lines.length && !lines[i].startsWith(">>>>>>> ")) { theirs.push(lines[i]); i++; }
-  i++; // skip >>>>>>>
-  // A hunk spanning a section heading (stale branch conflicting across a
-  // release boundary) cannot be union-sorted without scrambling sections —
-  // bail so the caller resolves by hand.
-  if ([...ours, ...theirs].some((l) => /^## /.test(l))) {
-    console.error("hunk spans a section heading — resolve by hand");
-    process.exit(1);
-  }
+const touched = new Set();   // sections whose content a conflict hunk modified
+let curSection = "__top__";  // heading of the section currently being emitted
+
+function unionMerge(ours, theirs) {
   // During rebase, HEAD (ours) is upstream and theirs is the branch commit —
   // union keeps upstream first, then branch lines not already present.
   const seen = new Set(ours.filter((l) => l.trim() !== ""));
@@ -65,16 +52,80 @@ while (i < lines.length) {
     merged.push(l);
   }
   merged.sort((a, b) => typeRank(a) - typeRank(b)); // stable: preserves order within a type
-  out.push(...merged);
+  return merged;
 }
-// Section-wide dedupe: a hunk-local union cannot see an identical entry that
-// already sits elsewhere in the same section (e.g. carried by an earlier
-// resolution). Drop exact-duplicate entry lines within each ## section.
+
+function pushOut(seg) {
+  for (const l of seg) {
+    if (/^## /.test(l)) curSection = l;
+    out.push(l);
+  }
+}
+
+let i = 0;
+while (i < lines.length) {
+  if (!lines[i].startsWith("<<<<<<< ")) {
+    if (/^## /.test(lines[i])) curSection = lines[i];
+    out.push(lines[i]); i++; continue;
+  }
+  i++; // skip <<<<<<<
+  const ours = [];
+  while (i < lines.length && !lines[i].startsWith("=======")) { ours.push(lines[i]); i++; }
+  i++; // skip =======
+  const theirs = [];
+  while (i < lines.length && !lines[i].startsWith(">>>>>>> ")) { theirs.push(lines[i]); i++; }
+  i++; // skip >>>>>>>
+
+  const headingsOf = (ls) => ls.filter((l) => /^## /.test(l));
+  const oh = headingsOf(ours);
+  const th = headingsOf(theirs);
+  if (oh.length || th.length) {
+    // Hunk spans section heading(s). Mechanically resolvable when BOTH sides
+    // carry the SAME headings in the SAME order (the common rebase shape:
+    // entries added around a release boundary both sides agree on): split each
+    // side into per-heading segments and union them pairwise. If the sides
+    // disagree on the headings themselves, the union would scramble sections —
+    // bail for hand resolution.
+    if (oh.length !== th.length || oh.some((h, k) => h !== th[k])) {
+      console.error("hunk spans a section heading and the two sides disagree on the headings — resolve by hand");
+      process.exit(1);
+    }
+    const split = (ls) => {
+      const segs = [[]];
+      for (const l of ls) {
+        if (/^## /.test(l)) segs.push([l]);
+        else segs[segs.length - 1].push(l);
+      }
+      return segs;
+    };
+    const os = split(ours);
+    const ts = split(theirs);
+    touched.add(curSection);
+    pushOut(unionMerge(os[0], ts[0]));
+    for (let k = 1; k < os.length; k++) {
+      const heading = os[k][0];
+      pushOut([heading]);
+      touched.add(heading);
+      pushOut(unionMerge(os[k].slice(1), ts[k].slice(1)));
+    }
+    continue;
+  }
+
+  touched.add(curSection);
+  pushOut(unionMerge(ours, theirs));
+}
+// Section-scoped dedupe: a hunk-local union cannot see an identical entry that
+// already sits elsewhere in the SAME section, so dedupe entry lines per section
+// — but ONLY in sections a hunk actually touched. A whole-file dedupe silently
+// deleted pre-existing duplicates from long-released sections during the
+// 2026-07-14 Banxa land; historical sections are immutable record, not ours to
+// clean.
 const deduped = [];
 let sectionSeen = new Set();
+let inTouched = touched.has("__top__");
 for (const line of out) {
-  if (/^## /.test(line)) sectionSeen = new Set();
-  if (/^- /.test(line)) {
+  if (/^## /.test(line)) { sectionSeen = new Set(); inTouched = touched.has(line); }
+  if (inTouched && /^- /.test(line)) {
     if (sectionSeen.has(line)) continue;
     sectionSeen.add(line);
   }
