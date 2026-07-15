@@ -16,11 +16,23 @@ let bodyFile = null;
 let draft = false;
 let asanaTask = null;
 
+let asanaAttach = false;
+
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--title" && args[i + 1]) title = args[++i];
   else if (args[i] === "--body-file" && args[i + 1]) bodyFile = args[++i];
   else if (args[i] === "--asana-task" && args[i + 1]) asanaTask = args[++i];
+  else if (args[i] === "--asana-attach") asanaAttach = true;
+  else if (args[i] === "--no-asana-attach") asanaAttach = false;
   else if (args[i] === "--draft") draft = true;
+  else if (args[i].startsWith("--")) {
+    // FAIL LOUD on unknown flags. Silent swallowing is how the 2026-07-15 Maya
+    // Dash task lost its PR attach: the caller passed --asana-attach when this
+    // script did not yet implement it, the flag vanished without a warning, and
+    // the agent believed the attach was handled.
+    console.error(`ERROR: unknown flag ${args[i]}`);
+    process.exit(2);
+  }
 }
 
 function git(cmd) {
@@ -313,10 +325,32 @@ if (!prMatch) {
   process.exit(1);
 }
 
+// --asana-attach: widget-attach the fresh PR to the Asana task via the shared
+// asana-task-update.sh (which resolves the PR from the current branch, and
+// degrades to a warning when ASANA_GITHUB_SECRET is absent). This used to be a
+// skill-prose step the agent had to run separately; the script owns it now so
+// the flag every caller already passes does what it says.
+let asanaAttached = false;
+if (asanaAttach) {
+  if (!asanaTask) {
+    console.error("ERROR: --asana-attach requires --asana-task <gid> (or drop the flag)");
+    process.exit(2);
+  }
+  const attach = spawnSync(
+    `${process.env.HOME}/.cursor/skills/asana-task-update/scripts/asana-task-update.sh`,
+    ["--task", asanaTask, "--attach-pr",
+     "--pr-url", prUrl, "--pr-title", title, "--pr-number", prMatch[1]],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], timeout: 120000 }
+  );
+  asanaAttached = (attach.status || 0) === 0;
+  if (!asanaAttached) console.error(`WARN: PR created but Asana attach failed (exit ${attach.status}) — attach manually: asana-task-update.sh --task ${asanaTask} --attach-pr`);
+}
+
 console.log(
   JSON.stringify(
     {
       url: prUrl,
+      asana_attached: asanaAttach ? asanaAttached : null,
       number: parseInt(prMatch[1], 10),
       title,
       base: defaultBranch,
