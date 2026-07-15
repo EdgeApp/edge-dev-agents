@@ -19,19 +19,35 @@ set -uo pipefail
 #   NEEDS_REBASE <repo#num...> (exit 3) — DIRTY, or BEHIND with green checks,
 #                 on two consecutive polls; re-run prepare→push for those PRs
 #   TIMEOUT       (exit 5) — deadline hit with PRs still pending
+#
+# BACKGROUNDED CALLERS: read the VERDICT, never the exit code. A backgrounded
+# wrapper reports ITS OWN exit 0 and can mask exit 3 (the 2026-07-14 Banxa
+# land nearly called a BEHIND branch merged this way). The verdict is written
+# to --result-file (default /tmp/pr-merge-watch-<sanitized-first-pr>.result)
+# as "<VERDICT> <details>", and is also always the final stdout line.
 
 INTERVAL=90
 TIMEOUT=3600
+RESULT_FILE=""
 PRS=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --interval) INTERVAL="$2"; shift 2 ;;
     --timeout) TIMEOUT="$2"; shift 2 ;;
+    --result-file) RESULT_FILE="$2"; shift 2 ;;
     *) PRS+=("$1"); shift ;;
   esac
 done
-[ ${#PRS[@]} -gt 0 ] || { echo "usage: pr-merge-watch.sh <repo#num> [more...]" >&2; exit 1; }
+[ ${#PRS[@]} -gt 0 ] || { echo "usage: pr-merge-watch.sh <repo#num> [more...] [--result-file <path>]" >&2; exit 1; }
+[ -n "$RESULT_FILE" ] || RESULT_FILE="/tmp/pr-merge-watch-$(printf "%s" "${PRS[0]}" | tr -c "A-Za-z0-9" "-").result"
+rm -f "$RESULT_FILE"
+
+finish() { # $1=verdict line, $2=exit code
+  echo "$1"
+  printf "%s\n" "$1" > "$RESULT_FILE" 2>/dev/null || true
+  exit "$2"
+}
 
 deadline=$(( $(date +%s) + TIMEOUT ))
 # Consecutive-poll state tracking without associative arrays (macOS bash 3.2).
@@ -86,9 +102,9 @@ while :; do
 
   echo "$(date +%H:%M:%S) open=$open |$line"
 
-  if [ "$open" -eq 0 ]; then echo "ALL_MERGED"; exit 0; fi
-  if [ -n "$red_pr" ]; then echo "CHECK_FAILED $red_pr"; exit 4; fi
-  if [ ${#rebase_prs[@]} -gt 0 ]; then echo "NEEDS_REBASE ${rebase_prs[*]}"; exit 3; fi
-  if [ "$(date +%s)" -ge "$deadline" ]; then echo "TIMEOUT"; exit 5; fi
+  if [ "$open" -eq 0 ]; then finish "ALL_MERGED" 0; fi
+  if [ -n "$red_pr" ]; then finish "CHECK_FAILED $red_pr" 4; fi
+  if [ ${#rebase_prs[@]} -gt 0 ]; then finish "NEEDS_REBASE ${rebase_prs[*]}" 3; fi
+  if [ "$(date +%s)" -ge "$deadline" ]; then finish "TIMEOUT" 5; fi
   sleep "$INTERVAL"
 done
