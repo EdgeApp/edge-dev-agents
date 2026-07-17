@@ -290,7 +290,7 @@
       ]
     },
     "one-shot:ignore-refired-one-shot": {
-      "hash": "137ae88a55f8",
+      "hash": "8cc3b751677f",
       "dims": [
         "A1"
       ]
@@ -410,7 +410,7 @@
       ]
     },
     "one-shot:land-on-approval": {
-      "hash": "8e86bcff049b",
+      "hash": "1103512ed101",
       "dims": [
         "A8"
       ]
@@ -467,6 +467,12 @@
       "hash": "f6e4145f45ba",
       "dims": [
         "O6"
+      ]
+    },
+    "pr-land:force-land-review-bypass": {
+      "hash": "8b94b61d3d54",
+      "dims": [
+        "A8"
       ]
     }
   },
