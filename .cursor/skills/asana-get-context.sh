@@ -103,6 +103,8 @@ FIELDS = {
     '1190660107346181': 'STATUS',
     '1203334386796983': 'IMPLEMENTOR',
     '1203334388004673': 'REVIEWER',
+    '1213939602865824': 'RELEASE',   # Release (4.x.x): CHANGELOG placement signal
+    '1213928707858644': 'BUILD',     # Build (staging/cheese): placement + routing
 }
 for f in data.get('custom_fields', []):
     label = FIELDS.get(f['gid'])
@@ -147,20 +149,6 @@ if rows:
             print(f'    DESC: {notes}')
 "
 fi
-
-# Fetch project memberships — look for version project (e.g. "4.44.0")
-curl -s "$API/tasks/$TASK_GID?opt_fields=memberships.project.name" \
-  -H "$AUTH" | python3 -c "
-import sys, json, re
-data = json.load(sys.stdin)['data']
-for m in data.get('memberships', []):
-    name = m.get('project', {}).get('name', '')
-    if re.match(r'^\d+\.\d+\.\d+$', name):
-        print(f'VERSION_PROJECT: {name}')
-        break
-else:
-    print('VERSION_PROJECT: (not set)')
-"
 
 # Fetch recent comments (last 5)
 curl -s "$API/tasks/$TASK_GID/stories?opt_fields=resource_subtype,text,created_by.name,created_at&limit=100" \

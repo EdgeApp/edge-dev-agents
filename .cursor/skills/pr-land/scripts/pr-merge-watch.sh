@@ -19,6 +19,13 @@ set -uo pipefail
 #   NEEDS_REBASE <repo#num...> (exit 3) — DIRTY, or BEHIND with green checks,
 #                 on two consecutive polls; re-run prepare→push for those PRs
 #   TIMEOUT       (exit 5) — deadline hit with PRs still pending
+#   BLOCKED_ON_REVIEW <repo#num...> (exit 6) — every check on HEAD complete and
+#                 green, zero pending, but branch protection requires an approving
+#                 review that does not exist (reviewDecision REVIEW_REQUIRED);
+#                 auto-merge will never fire on its own. Caller decides: wait for
+#                 a human review, or — ONLY with Force Land authority — admin-merge
+#                 past exactly that review requirement (never past checks; see
+#                 pr-land `force-land-review-bypass`)
 #
 # BACKGROUNDED CALLERS: read the VERDICT, never the exit code. A backgrounded
 # wrapper reports ITS OWN exit 0 and can mask exit 3 (the 2026-07-14 Banxa
@@ -58,6 +65,7 @@ while :; do
   open=0
   red_pr=""
   rebase_prs=()
+  review_prs=()
   line=""
   next_states=""
 
@@ -69,7 +77,7 @@ while :; do
       *) slug="EdgeApp/$repo_part" ;;
     esac
 
-    js=$(gh pr view "$num" --repo "$slug" --json state,mergeStateStatus,statusCheckRollup 2>/dev/null) || {
+    js=$(gh pr view "$num" --repo "$slug" --json state,mergeStateStatus,statusCheckRollup,reviewDecision 2>/dev/null) || {
       line="$line $spec=FETCH_ERR"
       open=$((open + 1))
       continue
@@ -88,14 +96,28 @@ while :; do
       red_pr="$spec"
       continue
     fi
+    track="$ms"
     # DIRTY, or BEHIND with all checks green, needs a rebase — but only after
     # the same state on two consecutive polls (GitHub recomputes after pushes).
     if [ "$ms" = "DIRTY" ] || [ "$ms" = "BEHIND" ]; then
       if [ "$(prev_state "$spec")" = "$ms" ]; then
         rebase_prs+=("$spec")
       fi
+    elif [ "$ms" = "BLOCKED" ]; then
+      # BLOCKED covers both "required checks still running" and "approving review
+      # missing". Only when ZERO checks are pending/queued/expected AND zero are
+      # red AND reviewDecision is REVIEW_REQUIRED is the review the sole unmet
+      # requirement — surface it (two consecutive polls) instead of timing out.
+      rd=$(echo "$js" | jq -r '.reviewDecision // ""')
+      pend=$(echo "$js" | jq -r '[.statusCheckRollup[]? | select((.status // .state // "") | test("QUEUED|IN_PROGRESS|PENDING|EXPECTED"))] | length')
+      if [ "$rd" = "REVIEW_REQUIRED" ] && [ "${pend:-1}" -eq 0 ] 2>/dev/null; then
+        track="BLOCKED_REVIEW"
+        if [ "$(prev_state "$spec")" = "BLOCKED_REVIEW" ]; then
+          review_prs+=("$spec")
+        fi
+      fi
     fi
-    next_states="$next_states|$spec=$ms
+    next_states="$next_states|$spec=$track
 "
   done
   PREV_STATES="$next_states"
@@ -105,6 +127,7 @@ while :; do
   if [ "$open" -eq 0 ]; then finish "ALL_MERGED" 0; fi
   if [ -n "$red_pr" ]; then finish "CHECK_FAILED $red_pr" 4; fi
   if [ ${#rebase_prs[@]} -gt 0 ]; then finish "NEEDS_REBASE ${rebase_prs[*]}" 3; fi
+  if [ ${#review_prs[@]} -gt 0 ]; then finish "BLOCKED_ON_REVIEW ${review_prs[*]}" 6; fi
   if [ "$(date +%s)" -ge "$deadline" ]; then finish "TIMEOUT" 5; fi
   sleep "$INTERVAL"
 done

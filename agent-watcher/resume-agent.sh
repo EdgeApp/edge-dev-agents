@@ -18,6 +18,12 @@
 #                                   # control armed (talk to a past run from anywhere,
 #                                   # no slot provisioning, original conversation
 #                                   # untouched). Session/RC name: chat-<slug>.
+#                                   # Resumes FULL-FIDELITY by default: chat exists to
+#                                   # continue the conversation's details (drafts, exact
+#                                   # wording), which a summary resume compresses away.
+#                                   # Pass --summary to opt into the cheaper compact
+#                                   # resume. (Orch resumes are separate: resume-task/
+#                                   # spawn-test-session keep the summary default.)
 #   resume-agent.sh <term> --latest # skip the ambiguity guard: silently take the
 #                                   # newest transcript among multi-task matches
 #   resume-agent.sh <task-gid> --recover
@@ -41,6 +47,7 @@ DO_LIST=false
 RECOVER=false
 CHAT=false
 LATEST=false
+SUMMARY=false
 TERM=""
 for arg in "$@"; do
   case "$arg" in
@@ -48,6 +55,7 @@ for arg in "$@"; do
     --recover) RECOVER=true ;;
     --chat) CHAT=true ;;
     --latest) LATEST=true ;;
+    --summary) SUMMARY=true ;;
     -h|--help)
       sed -n '2,/^$/p' "$0" | sed 's|^# \{0,1\}||'
       exit 0
@@ -278,7 +286,16 @@ if $CHAT; then
       exit 1
     fi
     if printf '%s' "$pane" | grep -q "Resume from summary"; then
-      tmux send-keys -t "$TMUX_NAME" Enter
+      # Menu order: 1. Resume from summary (highlighted)  2. Resume full session as-is.
+      # Chat defaults to FULL (a summary resume compresses away the drafts/details a
+      # chat exists to continue); --summary keeps the cheaper compact resume.
+      if $SUMMARY; then
+        tmux send-keys -t "$TMUX_NAME" Enter
+      else
+        tmux send-keys -t "$TMUX_NAME" Down
+        sleep 1
+        tmux send-keys -t "$TMUX_NAME" Enter
+      fi
       break
     fi
     printf '%s' "$pane" | grep -qE '(^|\s)/rc(\s|$)|bypass permissions on' && break

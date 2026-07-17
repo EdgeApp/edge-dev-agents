@@ -16,6 +16,14 @@
 # the repo reconstructs the exact governing files for any stamp; when dirty, dirty
 # component names bound the ambiguity.
 #
+# fields — a snapshot of the Asana task's custom fields (+ completed) at this
+# segment's START: the record of what this session COULD see, so evals can tell
+# "agent ignored the field" from "field wasn't set yet" (the Nym staging/force-land
+# case, set minutes AFTER Complete). It is a RECORD and a delta baseline for
+# check-followup-scope.sh, NEVER a read source for decisions — build routing,
+# force-land, and cheese checks keep reading live at decision time. null = fetch
+# failed (distinct from {} = task has no fields).
+#
 # Usage: stamp-orch-version.sh --gid <gid> --segment spawn|resume
 #          [--model <m>] [--effort <e>] [--session-uuid <u>]
 # Prints the 12-hex orch digest on stdout. Never fails the caller (best-effort): on
@@ -80,6 +88,20 @@ if [[ -d "$REPO/.git" ]]; then
 fi
 REPO_DIRTY=$([[ "$DIRTY_COMPONENTS" != "[]" ]] && echo true || echo false)
 
+# Asana field snapshot (best-effort; null on any failure). Whole field map, not a
+# curated list — same API call either way, future fields ride along.
+FIELDS="null"
+TOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null)}"
+if [[ -n "$TOKEN" ]]; then
+  RESP=$(curl -sf --max-time 20 \
+    "https://app.asana.com/api/1.0/tasks/$GID?opt_fields=completed,custom_fields.name,custom_fields.display_value" \
+    -H "Authorization: Bearer $TOKEN" 2>/dev/null) \
+    && FIELDS=$(echo "$RESP" | jq -c '{completed: .data.completed}
+         + ([.data.custom_fields[]? | {(.name // "?"): (.display_value // null)}] | add // {})' 2>/dev/null) \
+    || FIELDS="null"
+  [[ -n "$FIELDS" ]] || FIELDS="null"
+fi
+
 mkdir -p "$STATE_DIR/versions"
 jq -nc \
   --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -90,10 +112,11 @@ jq -nc \
   --arg head "$REPO_HEAD" --argjson dirty "$REPO_DIRTY" --argjson dcomp "$DIRTY_COMPONENTS" \
   --arg cli "$(claude --version 2>/dev/null | head -1 || true)" \
   --arg model "$MODEL" --arg effort "$EFFORT" --arg suuid "$SUUID" \
+  --argjson fields "$FIELDS" \
   '{ts:$ts, gid:$gid, segment:$segment, orch_digest:$orch, eval_digest:$eval,
     components:{skills:$skills, rules:$rules, watcher:$watcher, hooks:$hooks, settings_hooks:$settings},
     repo_head:$head, repo_dirty:$dirty, dirty_components:$dcomp,
-    claude_version:$cli, model:$model, effort:$effort, session_uuid:$suuid}' \
+    claude_version:$cli, model:$model, effort:$effort, session_uuid:$suuid, fields:$fields}' \
   >> "$STATE_DIR/versions/$GID.jsonl" 2>/dev/null || exit 0
 
 echo "$ORCH"
