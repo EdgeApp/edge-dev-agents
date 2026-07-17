@@ -40,6 +40,7 @@ Arguments are classified automatically:
 <rule id="no-force-push">Do NOT force-push without explicit user confirmation.</rule>
 <rule id="no-editors">Never open editors. All git operations must be non-interactive: `GIT_EDITOR=true` for commit messages, `GIT_SEQUENCE_EDITOR=:` for rebase todo lists.</rule>
 <rule id="unexpected-exit">Unexpected exit codes → STOP immediately. If any script returns an exit code not documented in this file, STOP and report to user. Do NOT attempt to interpret, retry, or work around unexpected errors.</rule>
+<rule id="force-land-review-bypass">Force Land is NOT a CI bypass — it substitutes for exactly ONE thing: the human APPROVED review. When branch protection requires an approving review that does not exist, armed auto-merge can never fire; `pr-merge-watch.sh` surfaces this as `BLOCKED_ON_REVIEW` (exit 6), and it does so ONLY once every check on HEAD is complete and green with zero pending. Only at that verdict, and only when the landing authority is Force Land (`~/.cursor/skills/asana-force-land.sh <gid>` prints `land-approved`), merge with `gh pr merge --admin` — the admin flag bypasses exactly the review requirement. COMMENTS GATE THE ADMIN MERGE: immediately before `--admin`, re-run `pr-land-comments.sh` on the PR — feedback can arrive between arming and the verdict, and the admin merge is the moment a human review would normally intervene. Any unresolved feedback (human or bot) is addressed per Step 2's comment handling first (a fix pushes new commits, which restart CI and the watch — the admin merge waits for the NEXT clean BLOCKED_ON_REVIEW); a substantive objection removes the PR from the merge set per Step 2 comment path 3. NEVER `--admin` over pending, queued, or failing checks (a red or running check always waits or follows CHECK_FAILED/NEEDS_REBASE handling), never for DIRTY/BEHIND (rebase first), and never without Force Land authority — a human-approved PR merges via auto-merge on its own, and a PR with neither approval nor Force Land is reported as waiting on review. Disclose every admin merge in the landing's Asana comment (what was bypassed and under which authority).</rule>
 <rule id="repo-land-mutex">One land train per repo at a time, MACHINE-WIDE — not just per invocation. land-on-approval means two approved tasks in the same repo can reach finalize concurrently; interleaved rebase/merge/publish trains against one base branch race each other. The companion scripts (prepare, merge, automerge, publish) enforce this mechanically via `repo-land-lock.sh` (lease per repo, 30-min TTL, renewals by the same session): exit 75 means another session holds the repo's land lease — WAIT (bounded, e.g. `sleep 120`) and retry the same call; never work around the lock, never start a parallel train, never release a lease you do not own. Operator shells share one owner id and self-coordinate.</rule>
 <rule id="sequential-rebase">Sequential merging requires rebase. Each subsequent PR MUST be rebased onto the updated base branch after the previous merge.</rule>
 <rule id="same-repo-batching">Multiple PRs against the SAME repo land serially, not in parallel: arming auto-merge on all at once makes each merge invalidate the others' rebases (every survivor goes DIRTY/BEHIND on the shared CHANGELOG and re-conflicts, one round per merge). Arm/watch one PR per repo at a time; when `pr-merge-watch.sh` exits NEEDS_REBASE for the next PR, re-run prepare — its CHANGELOG conflict resolves mechanically via `changelog-union-merge.sh <repoDir> --continue`, then push and rearm. PRs in DIFFERENT repos proceed in parallel as usual.</rule>
@@ -63,7 +64,7 @@ Arguments are classified automatically:
 | `pr-land-publish.sh` | Version bump, changelog update, commit + tag (no push) |
 | `staging-cherry-pick.sh` | Cherry-pick merged PR commits onto staging (see `/staging-cherry-pick` skill) |
 | `asana-task-update.sh` | Update linked Asana tasks after merge |
-| `pr-merge-watch.sh` | Babysit armed PRs: poll until all merge, a check fails, or one needs a rebase (DIRTY, or BEHIND with green checks — auto-merge never updates a BEHIND branch) |
+| `pr-merge-watch.sh` | Babysit armed PRs: poll until all merge, a check fails, one needs a rebase (DIRTY, or BEHIND with green checks — auto-merge never updates a BEHIND branch), or one is green but blocked solely on a missing approving review |
 | `changelog-union-merge.sh` | Mechanically resolve a CHANGELOG rebase/cherry-pick conflict (union, dedupe, type-order) |
 | `npm-publish-web.sh` | Login-if-needed + publish via npm web/link auth under a PTY; emits `AUTH_URL` lines to relay |
 
@@ -82,7 +83,7 @@ Arguments are classified automatically:
 | `changelog-union-merge.sh` | Resolved (+continued) | No markers / continue failed | Usage | - | - |
 | `npm-publish-web.sh` | Published | Registry/other error | Auth never completed | - | - |
 
-(`pr-merge-watch.sh` exit 5 = timeout with PRs still pending: re-invoke to keep watching.)
+(`pr-merge-watch.sh` exit 5 = timeout with PRs still pending: re-invoke to keep watching. Exit 6 = `BLOCKED_ON_REVIEW`: all checks green, only the approving review missing — handle per `force-land-review-bypass`.)
 
 **Any exit code not in this table = STOP immediately and report to user.**
 
@@ -154,8 +155,9 @@ Items previously marked with `<!-- addressed:review:ID -->` or `<!-- addressed:c
            - **Review body** (`type: "review-body"`): Use `reviewId` with `~/.cursor/skills/pr-address/scripts/pr-address.sh mark-addressed --type review ...`
            - **Top-level** (`type: "top-level"`): Use `commentId` with `~/.cursor/skills/pr-address/scripts/pr-address.sh mark-addressed --type comment ...`
         5. Continue the landing workflow immediately — do **not** remove the PR from the merge set solely because an already-approved reviewer left optional comments
-   3. Continue with remaining PRs that have no outstanding blocking comment decision
-   4. Report addressed-and-continued PRs, comments escalated to the user, and set-aside PRs at the end of the workflow
+   3. **`approved: false` and `changesRequested: false` with feedback present** — the Force Land shape (no human review exists): the comments are the ONLY human signal on the PR, so they get the SAME address flow as 2.2 (fix as fixup, push, reply, mark addressed), and a behavioral fix re-runs the relevant verification before the PR proceeds. One stricter default: a comment that disputes the approach or expands scope is treated as changes-requested in spirit — remove the PR from the merge set and report it; Force Land authorizes landing without a review, never landing over an objection.
+   4. Continue with remaining PRs that have no outstanding blocking comment decision
+   5. Report addressed-and-continued PRs, comments escalated to the user, and set-aside PRs at the end of the workflow
 
 **Do NOT block the rest of the flow** for PRs with comments.
 </sub-step>
@@ -230,6 +232,7 @@ Use:
    - **3 NEEDS_REBASE `<prs>`** → the base moved (DIRTY, or BEHIND with green checks — GitHub auto-merge NEVER updates a BEHIND branch; unwatched it stalls forever). Loop the listed PRs back through prepare (step 3; CHANGELOG conflicts resolve via `changelog-union-merge.sh`) and push (step 4); auto-merge stays armed. The re-push re-triggers reviewer bots — re-run the step 2 comment check on those PRs per `bot-thread-gate` once their bot check-runs complete. Re-invoke the watcher.
    - **4 CHECK_FAILED `<pr>`** → report the failing check, leave auto-merge armed unless the user says to disarm, keep watching the others. Do not local-merge around a red check.
    - **5 TIMEOUT** → CI still running; re-invoke to keep watching.
+   - **6 BLOCKED_ON_REVIEW `<prs>`** → every check on HEAD is green; the only unmet branch-protection requirement is an approving review. With Force Land authority, admin-merge per `force-land-review-bypass` and disclose it; otherwise leave auto-merge armed and report the PR as waiting on human review.
 
    Only finalize the land once every armed PR has either merged or been reported as blocked.
 

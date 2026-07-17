@@ -122,14 +122,13 @@ The following apply only when working in the `edge-react-gui` repo:
 
 ### CHANGELOG placement (edge-react-gui)
 
-`edge-react-gui` has two active CHANGELOG sections: `## Unreleased (develop)` and `## X.Y.Z (staging)`. Which section to target depends on the Asana task's version project:
+`edge-react-gui` has two active CHANGELOG sections: `## Unreleased (develop)` and `## X.Y.Z (staging)`. Which section to target is decided by two Asana fields from the context output — `BUILD` ("Build (staging/cheese)") and `RELEASE` ("Release (4.x.x)") — in priority order:
 
-1. **Read the staging version** from CHANGELOG: grep for `^## [0-9].*staging` to get the version (e.g. `4.43.0`).
-2. **Read the task's version project** from the `VERSION_PROJECT` field in the Asana context output (e.g. `4.44.0`).
-3. **Compare**:
-   - If `VERSION_PROJECT` matches the staging version → add entry under the `## X.Y.Z (staging)` heading.
-   - If `VERSION_PROJECT` does NOT match (or is not set) → add entry under `## Unreleased (develop)`.
-4. If no Asana context was fetched, default to `## Unreleased`.
+1. **Read the staging version** from CHANGELOG: grep for `^## [0-9].*staging` to get the version (e.g. `4.50.0`).
+2. **`BUILD` is `staging`** → add the entry under the `## X.Y.Z (staging)` heading.
+3. **Else `RELEASE` matches the staging version** (match with or without the leading major: `50.0` and `4.50.0` both match `## 4.50.0 (staging)`) → staging section too. This is a detectable operator mis-spec — the task targets the staging release but the Build field was never set to `Staging`, and landing's staging cherry-pick routes off that FIELD, not the CHANGELOG section — so surface it: note it in the run report AND post one Asana task comment recommending `Build (staging/cheese) = Staging`. NEVER set the field yourself; fields are operator-authored intent (Force Land and build routing trust them as such).
+4. **Otherwise** (both unset or non-matching; a cheese `BUILD` value changes nothing here) → add the entry under `## Unreleased (develop)`.
+5. If no Asana context was fetched, default to `## Unreleased`.
 
 Other repos only have `## Unreleased` — no staging distinction.
 </edge-cases>
