@@ -4,6 +4,9 @@
 // Uses edge-repo.js for shared utilities (no GitHub API calls needed).
 //
 // Usage: echo '[{"repo":"edge-react-gui","branch":"jon/feature"}]' | ./pr-land-prepare.sh
+//   Optional per-branch "buildField": the linked task's Build field value from
+//   asana-build-field.sh (resolved at discovery). "staging" arms the
+//   staging-task-under-unreleased CHANGELOG placement check.
 //
 // For each branch:
 //   1. Checkout + fetch
@@ -32,11 +35,16 @@ const {
   installAndPrepare,
 } = require(path.join(__dirname, "edge-repo.js"));
 
-// Detect NEW CHANGELOG entries (added vs baseRef) placed under a DATED
-// released heading instead of `## Unreleased` or `## X.Y.Z (staging)`.
-// Pure inspection — returns an array of { line, text, section } misplaced entries.
+// Detect NEW CHANGELOG entries (added vs baseRef) placed in the wrong section.
+// Two shapes, distinguished by `reason` on each entry:
+//   "released-section": entry under a DATED released heading instead of
+//     `## Unreleased` or `## X.Y.Z (staging)` — a judgment call, agent asks.
+//   "staging-task-under-unreleased": buildField is "staging" (the linked task's
+//     Build field, operator intent) but the entry sits under `## Unreleased` —
+//     deterministic: the entry belongs in the staging section, no ask needed.
+// Pure inspection — returns an array of { line, text, section, reason }.
 // Does not modify the repo. Empty array means no concerns.
-function checkChangelogPlacement(repoDir, baseRef) {
+function checkChangelogPlacement(repoDir, baseRef, buildField) {
   const changelogPath = path.join(repoDir, "CHANGELOG.md");
   if (!existsSync(changelogPath)) return [];
 
@@ -95,7 +103,9 @@ function checkChangelogPlacement(repoDir, baseRef) {
       if (/^- (added|changed|deprecated|fixed|removed|security):/i.test(text)) {
         const sect = sectionForLine(headLine);
         if (sect != null && sect.kind === "released") {
-          misplaced.push({ line: headLine, text, section: sect.text });
+          misplaced.push({ line: headLine, text, section: sect.text, reason: "released-section" });
+        } else if (sect != null && sect.kind === "unreleased" && buildField === "staging") {
+          misplaced.push({ line: headLine, text, section: sect.text, reason: "staging-task-under-unreleased" });
         }
       }
       headLine++;
@@ -155,7 +165,7 @@ function describeBranchState(repoDir, branch) {
   return parts.join("\n");
 }
 
-async function prepareBranch(repo, branch) {
+async function prepareBranch(repo, branch, buildField) {
   const canonicalDir = getRepoDir(repo);
   let repoDir = canonicalDir;
   const result = {
@@ -342,7 +352,7 @@ async function prepareBranch(repo, branch) {
   // dated released heading instead of `## Unreleased` or staging. Non-fatal:
   // the agent prompts the user to decide (leave / move to Unreleased / move to
   // staging) before pushing.
-  const misplaced = checkChangelogPlacement(repoDir, upstream);
+  const misplaced = checkChangelogPlacement(repoDir, upstream, buildField);
   if (misplaced.length > 0) {
     console.error(
       `\n⚠ CHANGELOG placement warning: ${misplaced.length} new entry(s) under a released heading:`
@@ -393,8 +403,8 @@ async function main() {
 
   let exitCode = 0;
 
-  for (const { repo, branch } of branches) {
-    const result = await prepareBranch(repo, branch);
+  for (const { repo, branch, buildField } of branches) {
+    const result = await prepareBranch(repo, branch, buildField);
 
     switch (result.status) {
       case "ready":

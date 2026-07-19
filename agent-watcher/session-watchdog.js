@@ -231,8 +231,12 @@ function saveState(state) {
 
 function attemptRcRevive(session) {
   log(`[${session}] RC revive: wake ping + /remote-control + Esc-dismiss.`)
+  // C-u before each typed send: remote-control clients can sync drafts into
+  // the composer; typing without clearing concatenates the draft.
+  sh(`tmux send-keys -t "${session}" C-u`)
   sh(`tmux send-keys -t "${session}" "<watchdog-revive-ping>" Enter`)
   sh('sleep 8')
+  sh(`tmux send-keys -t "${session}" C-u`)
   sh(`tmux send-keys -t "${session}" "/remote-control" Enter`)
   // `/remote-control` opens a blocking modal (Continue / Esc). Left open it
   // intercepts ALL keystrokes and wedges the session input — prompts and pings

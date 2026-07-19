@@ -171,6 +171,12 @@ function waitRcReadyAndSendPrompt(sessionName, prompt) {
   // (slow MCP server JVM, model resolution, trust dialogs) even after the RC marker
   // shows — the Exolix spawn lost its prompt exactly this way.
   for (let attempt = 1; attempt <= 3; attempt++) {
+    // Clear any pre-existing composer draft BEFORE typing. Remote-control
+    // clients sync suggested-command drafts into the composer (observed
+    // 2026-07-17: "! gh auth refresh ..." re-typed by the agents app); typing
+    // without clearing concatenates the draft into the submitted prompt.
+    execSync(`tmux send-keys -t "${sessionName}" C-u`, { stdio: 'inherit' })
+    execSync('sleep 0.3')
     execSync(`tmux send-keys -t "${sessionName}" ${JSON.stringify(prompt)}`, { stdio: 'inherit' })
     execSync('sleep 1')
     execSync(`tmux send-keys -t "${sessionName}" Enter`, { stdio: 'inherit' })
@@ -192,8 +198,7 @@ function waitRcReadyAndSendPrompt(sessionName, prompt) {
       log(`  prompt sent (attempt ${attempt}): ${prompt}`)
       return
     }
-    log(`  prompt still in input box after attempt ${attempt}; clearing + retrying`)
-    execSync(`tmux send-keys -t "${sessionName}" C-u`, { stdio: 'inherit' })
+    log(`  prompt still in input box after attempt ${attempt}; retrying (loop-top C-u clears)`)
     execSync('sleep 5')
   }
   log(`  WARNING: prompt did not submit after 3 attempts — session ${sessionName} needs a manual poke`)

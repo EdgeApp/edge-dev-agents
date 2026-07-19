@@ -245,7 +245,7 @@
       ]
     },
     "file:asana-watcher.js": {
-      "hash": "768520a352a4",
+      "hash": "cdd4914f65fa",
       "dims": [
         "O1"
       ]
@@ -263,7 +263,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "89229430f11d",
+      "hash": "d1aa4184d571",
       "dims": [
         "O4",
         "O5",
@@ -392,7 +392,7 @@
       ]
     },
     "pr-land:build-field-routing": {
-      "hash": "b74b96fb4c68",
+      "hash": "11d0552501f5",
       "dims": [
         "A28"
       ]
@@ -1472,6 +1472,114 @@
     "orch-eval:use-probe-index": {
       "reason": "2026-07-02: eval-skill internal behavior, not an orchestrated-run contract",
       "hash": "175279744e28"
+    },
+    "asana-task-create:no-mcp": {
+      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
+      "hash": "0a097d56425a"
+    },
+    "asana-task-create:standard-homes": {
+      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
+      "hash": "dd218b14f2de"
+    },
+    "asana-task-create:release-optional": {
+      "reason": "2026-07-17: per operator: task creation is manually invoked and not eval'd; rule edit only documented release-spelling normalization (4.53 == 53.0)",
+      "hash": "062e5b94c13d"
+    },
+    "asana-task-create:fill-eng-fields": {
+      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
+      "hash": "28a42f43a42f"
+    },
+    "asana-task-create:automation-fields-off-limits": {
+      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
+      "hash": "0d1b69b40e5f"
+    },
+    "asana-task-create:notes-file": {
+      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
+      "hash": "5c7d62a9e6cb"
+    },
+    "asana-task-create:delegate-mutations": {
+      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
+      "hash": "b2f42a87c9b0"
+    },
+    "asana-task-create:script-timeouts": {
+      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
+      "hash": "53435041f090"
+    },
+    "tdd:decisions-with-alternatives": {
+      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
+      "hash": "b9e7c572c255"
+    },
+    "tdd:status-lifecycle": {
+      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
+      "hash": "7300925168e5"
+    },
+    "tdd:repo-separation": {
+      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
+      "hash": "8ef3e3269ad6"
+    },
+    "tdd:clickable-everything": {
+      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
+      "hash": "aa4009d0f16f"
+    },
+    "tdd:diagrams-and-signatures": {
+      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
+      "hash": "b279bfde7704"
+    },
+    "tdd:snapshot-and-live": {
+      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
+      "hash": "158084a875e6"
+    },
+    "tdd:length-discipline": {
+      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
+      "hash": "4264faac30e9"
+    },
+    "tdd:style": {
+      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
+      "hash": "7b9386fd755f"
+    },
+    "resume-session:scripts-do-the-mechanics": {
+      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
+      "hash": "4b10380bca81"
+    },
+    "resume-session:live-first": {
+      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
+      "hash": "df2308397591"
+    },
+    "resume-session:mode-follows-kind": {
+      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
+      "hash": "e9b273645eb3"
+    },
+    "resume-session:echo-aware-search": {
+      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
+      "hash": "dc2309955313"
+    },
+    "resume-session:never-newest-guess": {
+      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
+      "hash": "aab383ed9ee2"
+    },
+    "resume-session:verify-before-handoff": {
+      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
+      "hash": "8efd2d6dbc8f"
+    },
+    "resume-session:orch-boundary": {
+      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
+      "hash": "41b267de85c8"
+    },
+    "resume-session:session-hygiene-facts": {
+      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
+      "hash": "27a28ed614e9"
+    },
+    "tdd:investigate-dont-defer": {
+      "reason": "2026-07-19: interactive design-doc authoring skill; not orchestrated-run behavior",
+      "hash": "3d2590c4419c"
+    },
+    "tdd:post-impl-retro": {
+      "reason": "2026-07-19: interactive design-doc authoring skill; not orchestrated-run behavior",
+      "hash": "3a1d64376d0c"
+    },
+    "tdd:draft-gate": {
+      "reason": "2026-07-19: interactive design-doc authoring skill; not orchestrated-run behavior",
+      "hash": "00e3d963a038"
     }
   }
 }

@@ -155,6 +155,7 @@ name/runtime, Metro defaults to 8081.
 | `lib/slots.js` | atomic slot allocator (lib + CLI) |
 | `slots.json` | slot state |
 | `gc-worktrees.sh` | manual orphan cleanup |
+| `session-index.sh` | inventory of live sessions + all transcripts (kind, task, lineage, content search with fork-echo demotion); feeds /resume-session |
 | `resume-agent.sh` | resume a session by task gid/name terms; `--chat` forks it into a watchdog-covered RC discussion session (no slot); `--recover` re-provisions a missing slot |
 | `asana-config.json` | project GIDs + `.watcher.*` knobs |
 | `update-status.sh` | set `agent_status` (+ kanban section move) |
