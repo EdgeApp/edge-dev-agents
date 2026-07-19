@@ -26,6 +26,13 @@
 #                                   # spawn-test-session keep the summary default.)
 #   resume-agent.sh <term> --latest # skip the ambiguity guard: silently take the
 #                                   # newest transcript among multi-task matches
+#   resume-agent.sh --uuid <id> [--chat [--in-place]]
+#                                   # exact transcript selection (any kind, any project
+#                                   # dir - chat forks/interactive transcripts have no
+#                                   # /one-shot signature and only resolve this way;
+#                                   # /resume-session resolves via session-index.sh).
+#                                   # --in-place: continue the SAME conversation (no
+#                                   # fork) - for dead discussion forks.
 #   resume-agent.sh <task-gid> --recover
 #                                   # before resuming, if the task's slot is gone
 #                                   # but Asana shows it in-flight, re-provision the
@@ -48,19 +55,27 @@ RECOVER=false
 CHAT=false
 LATEST=false
 SUMMARY=false
+IN_PLACE=false
+UUID=""
 TERM=""
-for arg in "$@"; do
-  case "$arg" in
-    --list) DO_LIST=true ;;
-    --recover) RECOVER=true ;;
-    --chat) CHAT=true ;;
-    --latest) LATEST=true ;;
-    --summary) SUMMARY=true ;;
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --list) DO_LIST=true; shift ;;
+    --recover) RECOVER=true; shift ;;
+    --chat) CHAT=true; shift ;;
+    --latest) LATEST=true; shift ;;
+    --summary) SUMMARY=true; shift ;;
+    --in-place) IN_PLACE=true; shift ;;         # with --chat: continue the SAME conversation (no fork).
+                                                # For resuming a DEAD DISCUSSION FORK: forking a fork
+                                                # duplicates history again and pollutes future search.
+    --uuid) UUID="${2:-}"; shift 2 ;;           # exact transcript selection; bypasses matching entirely
+                                                # (the /resume-session skill resolves via session-index
+                                                # and passes the uuid here)
     -h|--help)
       sed -n '2,/^$/p' "$0" | sed 's|^# \{0,1\}||'
       exit 0
       ;;
-    *) TERM="${TERM:+$TERM }$arg" ;;   # multi-word terms accumulate
+    *) TERM="${TERM:+$TERM }$1"; shift ;;       # multi-word terms accumulate
   esac
 done
 
@@ -123,6 +138,19 @@ for d in "$HOME/.claude/projects/$ENC_GIT_PREFIX"*; do
   done
 done
 shopt -u nullglob
+
+# --uuid: exact selection replaces the candidate machinery entirely (any project
+# dir, any kind — chat forks and interactive transcripts carry no /one-shot
+# signature and are invisible to the matcher above; the /resume-session skill
+# resolves them via session-index.sh and passes the uuid here).
+if [[ -n "$UUID" ]]; then
+  CANDIDATES=()
+  shopt -s nullglob
+  for f in "$HOME/.claude/projects"/*/"$UUID.jsonl"; do CANDIDATES+=("$f"); done
+  shopt -u nullglob
+  [[ ${#CANDIDATES[@]} -gt 0 ]] || { echo ">> resume-agent: no transcript found for uuid $UUID" >&2; exit 1; }
+  TERM=""   # bypass term filtering and the ambiguity guard
+fi
 
 if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
   echo "No watcher-spawned sessions found in ~/.claude/projects/${ENC_GIT_PREFIX}*" >&2
@@ -267,15 +295,26 @@ if $CHAT; then
   #     sweep from retiring it when the task is Complete (same pattern as the
   #     main/eval discussion sessions).
   #   - --remote-control chat-<slug>: reachable from the phone session list.
-  SLUG=$(printf '%s' "${TERM:-latest}" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-' | cut -c1-24)
+  SLUG=$(printf '%s' "${TERM:-${UUID:-latest}}" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-' | cut -c1-24)
   TMUX_NAME="claude-asana-chat-${SLUG}"
   if tmux has-session -t "$TMUX_NAME" 2>/dev/null; then
     echo ">> resume-agent: chat session $TMUX_NAME already exists — attach: tmux attach -t $TMUX_NAME (or find 'chat-$SLUG' in your remote session list)" >&2
     exit 0
   fi
   CHAT_CWD="$PWD"   # the cwd resolution above already ran
+  # --in-place continues the SAME conversation (no fork) — the right mode for a dead
+  # DISCUSSION FORK, where forking again would duplicate history a second time and
+  # pollute future content search. Default (fork) is right for RUN transcripts.
+  FORK_FLAG="--fork-session"
+  $IN_PLACE && FORK_FLAG=""
+  # Snapshot the project dir so the fork's new transcript uuid is detectable after
+  # boot (claude does not print it) — feeds the lineage registry.
+  PROJ_ENC=$(printf '%s' "$CHAT_CWD" | sed 's#[/.]#-#g')
+  PROJ_DIR="$HOME/.claude/projects/$PROJ_ENC"
+  BEFORE_LIST=$(ls "$PROJ_DIR"/*.jsonl 2>/dev/null || true)
   tmux new-session -d -s "$TMUX_NAME" -c "$CHAT_CWD"
-  tmux send-keys -t "$TMUX_NAME" "claude --resume $LATEST_UUID --fork-session --dangerously-skip-permissions --remote-control chat-$SLUG" Enter
+  tmux send-keys -t "$TMUX_NAME" C-u   # clear any stray typed text before the command
+  tmux send-keys -t "$TMUX_NAME" "claude --resume $LATEST_UUID $FORK_FLAG --dangerously-skip-permissions --remote-control chat-$SLUG" Enter
   # Auto-answer the resume-summary menu (option 1, pre-selected) when it appears.
   for _ in $(seq 1 30); do
     sleep 2
@@ -300,7 +339,29 @@ if $CHAT; then
     fi
     printf '%s' "$pane" | grep -qE '(^|\s)/rc(\s|$)|bypass permissions on' && break
   done
-  echo ">> resume-agent: chat session up — tmux: $TMUX_NAME | remote: chat-$SLUG | fork of $LATEST_UUID"
+  # Lineage registry (forward-only): record the fork's new transcript uuid so
+  # session-index.sh can classify it as a chat fork and demote its inherited
+  # content-search hits. In-place resumes create no new transcript — skip.
+  if ! $IN_PLACE; then
+    NEW_JSONL=""
+    for _ in 1 2 3 4 5; do
+      NEW_JSONL=$(comm -13 <(printf '%s\n' $BEFORE_LIST | sort) <(ls "$PROJ_DIR"/*.jsonl 2>/dev/null | sort) | head -1)
+      [[ -n "$NEW_JSONL" ]] && break
+      sleep 2
+    done
+    if [[ -n "$NEW_JSONL" ]]; then
+      CHILD=$(basename "$NEW_JSONL" .jsonl)
+      mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"
+      printf '{"child":"%s","parent":"%s","created":"%s","slug":"chat-%s"}\n' \
+        "$CHILD" "$LATEST_UUID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SLUG" \
+        >> "${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/chat-forks.jsonl"
+      echo ">> resume-agent: lineage recorded ($CHILD <- $LATEST_UUID)" >&2
+    else
+      echo ">> resume-agent: WARNING could not detect the fork's transcript uuid; lineage not recorded" >&2
+    fi
+  fi
+  MODE_DESC="fork of"; $IN_PLACE && MODE_DESC="continuing"
+  echo ">> resume-agent: chat session up — tmux: $TMUX_NAME | remote: chat-$SLUG | $MODE_DESC $LATEST_UUID"
   exit 0
 fi
 

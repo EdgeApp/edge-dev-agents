@@ -260,6 +260,13 @@ const getStyles = cacheStyles((theme: Theme) => ({
 Note: This is an architectural change. If the file has many `styled()` usages, flag to user rather than refactoring inline.
 </pattern>
 
+<pattern id="array-sort-compare" rule="@typescript-eslint/require-array-sort-compare">`Array.sort()` requires an explicit compare function, even for strings.
+❌ `names.sort()`
+✅ `names.sort((a, b) => a.localeCompare(b))`
+✅ `numbers.sort((a, b) => a - b)`
+Also prefer sorting a copy (`[...list].sort(...)`) when the original order matters elsewhere — bare `.sort()` mutates in place.
+</pattern>
+
 <pattern id="cleaner-error-matching" rule="@typescript-eslint/use-unknown-in-catch-callback-variable">When catching unknown errors that need property inspection, use `cleaners` instead of type assertions.
 ❌ `const err = e as { code?: string; message?: string }`
 ✅ Define a cleaner and use `asMaybe`:
