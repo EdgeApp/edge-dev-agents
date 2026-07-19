@@ -474,6 +474,42 @@
       "dims": [
         "A8"
       ]
+    },
+    "one-shot:tdd-when-flagged": {
+      "hash": "8edfe97bf645",
+      "dims": [
+        "A29"
+      ]
+    },
+    "tdd:post-impl-retro": {
+      "hash": "3a1d64376d0c",
+      "dims": [
+        "A29"
+      ]
+    },
+    "file:asana-field-value.sh": {
+      "hash": "0558fd01ecf1",
+      "dims": [
+        "A29"
+      ]
+    },
+    "tdd:draft-gate": {
+      "hash": "00e3d963a038",
+      "dims": [
+        "A30"
+      ]
+    },
+    "tdd:investigate-dont-defer": {
+      "hash": "3d2590c4419c",
+      "dims": [
+        "A30"
+      ]
+    },
+    "one-shot:pr-body-current-before-complete": {
+      "hash": "b1311b20a1b0",
+      "dims": [
+        "A29"
+      ]
     }
   },
   "acked_uncovered": {
@@ -1514,16 +1550,16 @@
       "hash": "7300925168e5"
     },
     "tdd:repo-separation": {
-      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
-      "hash": "8ef3e3269ad6"
+      "reason": "2026-07-19: cross-repo seam linking added; still a doc-quality convention checked by lint/human review, A30 covers pushed-revision hygiene",
+      "hash": "cb35e17f3cb8"
     },
     "tdd:clickable-everything": {
       "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
       "hash": "aa4009d0f16f"
     },
     "tdd:diagrams-and-signatures": {
-      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
-      "hash": "b279bfde7704"
+      "reason": "2026-07-19: cross-repo diagram boxes added; doc-quality convention judged at review, not an orch-run behavior beyond A29/A30",
+      "hash": "b792f3ce57c9"
     },
     "tdd:snapshot-and-live": {
       "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
@@ -1568,18 +1604,6 @@
     "resume-session:session-hygiene-facts": {
       "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
       "hash": "27a28ed614e9"
-    },
-    "tdd:investigate-dont-defer": {
-      "reason": "2026-07-19: interactive design-doc authoring skill; not orchestrated-run behavior",
-      "hash": "3d2590c4419c"
-    },
-    "tdd:post-impl-retro": {
-      "reason": "2026-07-19: interactive design-doc authoring skill; not orchestrated-run behavior",
-      "hash": "3a1d64376d0c"
-    },
-    "tdd:draft-gate": {
-      "reason": "2026-07-19: interactive design-doc authoring skill; not orchestrated-run behavior",
-      "hash": "00e3d963a038"
     }
   }
 }
