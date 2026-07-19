@@ -32,6 +32,12 @@
 #                                            #   current hash (A = skill:rule-id
 #                                            #   or file:<basename>)
 #   rubric-drift.sh --ack skill:rule-id --reason R   # ack one uncovered rule
+#   rubric-drift.sh --exclude-skill <name> --reason R
+#                                            # mark a whole skill OUT OF COVERAGE SCOPE:
+#                                            # rubrics grade ORCH-DEPENDENT skills only
+#                                            # (operator/discussion tooling never runs
+#                                            # inside an orch run), so its rules are
+#                                            # never flagged UNCOVERED and need no acks
 #   rubric-drift.sh --map                    # emit {dim: {name, gate, file, line}} JSON
 #                                            #   (consumed by eval-run report annotation)
 #
@@ -72,7 +78,7 @@ const vals = (f) => { // all non-flag tokens after f
   for (let j = i + 1; j < argv.length && !argv[j].startsWith('--'); j++) out.push(argv[j])
   return out
 }
-const MODE = has('--baseline') ? 'baseline' : has('--reconcile') ? 'reconcile' : has('--ack') ? 'ack' : has('--map') ? 'map' : 'check'
+const MODE = has('--baseline') ? 'baseline' : has('--reconcile') ? 'reconcile' : has('--ack') ? 'ack' : has('--map') ? 'map' : has('--exclude-skill') ? 'exclude' : 'check'
 
 const sha = (s) => crypto.createHash('sha256').update(s.replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 12)
 
@@ -220,6 +226,21 @@ if (MODE === 'reconcile') {
   process.exit(0)
 }
 
+if (MODE === 'exclude') {
+  const name = val('--exclude-skill'), reason = val('--reason')
+  if (!name || !reason) { console.error('usage: --exclude-skill <name> --reason "why non-orch"'); process.exit(2) }
+  lock.excluded_skills = lock.excluded_skills || {}
+  lock.excluded_skills[name] = `${today}: ${reason}`
+  // prune now-redundant per-rule acks for the excluded skill
+  let pruned = 0
+  for (const k of Object.keys(lock.acked_uncovered)) {
+    if (k.startsWith(name + ':')) { delete lock.acked_uncovered[k]; pruned++ }
+  }
+  save()
+  console.log(`EXCLUDED ${name} from coverage scope (${pruned} per-rule ack(s) pruned)`)
+  process.exit(0)
+}
+
 if (MODE === 'ack') {
   const id = val('--ack'), reason = val('--reason')
   if (!id || !reason) { console.error('usage: --ack skill:rule-id --reason "why not eval-relevant"'); process.exit(2) }
@@ -246,8 +267,12 @@ for (const key of Object.keys(lock.anchors)) {
     out(`${gone ? 'MISSING' : 'UNANCHORED'} ${key} (dims ${lock.anchors[key].dims}) — ${gone ? 'the anchored rule/file no longer exists; the dimension may be stale' : 'rubric no longer cites it; --reconcile after confirming intentional'}`)
   }
 }
-// coverage: corpus rules with no anchor and no current-version ack
+// coverage: corpus rules with no anchor and no current-version ack.
+// Skills in excluded_skills are categorically OUT OF SCOPE (rubrics grade
+// orch-dependent behavior only): never flagged, no per-rule acks needed.
+const excluded = lock.excluded_skills || {}
 for (const key of ruleIndex.keys()) {
+  if (excluded[key.slice(0, key.indexOf(':'))]) continue
   if (anchors.has(key)) continue
   const ack = lock.acked_uncovered[key]
   if (!ack) out(`UNCOVERED ${key} — new rule with no rubric dimension; propose a dimension or --ack with a reason`)

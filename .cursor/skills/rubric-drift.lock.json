@@ -513,30 +513,6 @@
     }
   },
   "acked_uncovered": {
-    "agent-eval:read-only": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "bea2bcbea8ef"
-    },
-    "agent-eval:rubric-is-the-contract": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "5d22c0a0a312"
-    },
-    "agent-eval:evidence-or-not-captured": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "e35b9129490e"
-    },
-    "agent-eval:skip-in-flight": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "d96a3686a8da"
-    },
-    "agent-eval:testing-section-na": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "7b22415d28ad"
-    },
-    "agent-eval:targeted-reads": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "08fc56c70151"
-    },
     "asana-plan:task-review-for-asana": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "b43a8fa8e06e"
@@ -564,14 +540,6 @@
     "asana-task-update:script-timeouts": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "c6ce294d8717"
-    },
-    "author:constraint-1": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "ab5df625bc76"
-    },
-    "author:constraint-2": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "ab5df625bc76"
     },
     "blocker-validator:default-deny": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -709,22 +677,6 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "baaf8f5a0c09"
     },
-    "chat-audit:use-companion-script": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "c821d89f843c"
-    },
-    "chat-audit:tools-only-default": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "5e12060328a1"
-    },
-    "chat-audit:no-raw-json": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "5deee61a8685"
-    },
-    "chat-audit:concise-output": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "8d34aef70e7e"
-    },
     "cheese:cheese-branch-only": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "e02b1721a2c1"
@@ -756,42 +708,6 @@
     "concession-validator:actionable-deny": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "d9884bb8b686"
-    },
-    "convention-sync:local-is-canonical": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "accaf1cae0cd"
-    },
-    "convention-sync:extra-trees": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "9a2757a502ab"
-    },
-    "convention-sync:cross-machine-safety": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "3191b2ca401c"
-    },
-    "convention-sync:use-companion-script": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "50034252fde9"
-    },
-    "convention-sync:dry-run-first": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "1bfa73e47511"
-    },
-    "convention-sync:no-script-bypass": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "c4190ee92059"
-    },
-    "convention-sync:readme-is-source": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "ac1bde213d88"
-    },
-    "convention-sync:claude-compat": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "c06696a9b36d"
-    },
-    "convention-sync:target-repo-resolution": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "1f463491705e"
     },
     "debugger:pick-the-right-method": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -841,30 +757,6 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "4917ff0538f4"
     },
-    "eval-run:orchestrate-existing-skills": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "6b5ff2a9eb70"
-    },
-    "eval-run:workflow-does-the-work": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "e0d4fac55347"
-    },
-    "eval-run:verdict-policy": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "c6cb89797add"
-    },
-    "eval-run:completed-runs-only": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "b1190604ea64"
-    },
-    "eval-run:read-only": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "15efebf4ac2f"
-    },
-    "eval-run:actions-are-drafts": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "285a8065601e"
-    },
     "fix-eslint:tsc-after-fix": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "18a11a6fbfa7"
@@ -897,50 +789,6 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "4d0237bab121"
     },
-    "local-research:local-not-web": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "d77e45726dba"
-    },
-    "local-research:workflow-does-the-work": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "c03c2873fe92"
-    },
-    "local-research:scope-before-fanout": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "b7209174737c"
-    },
-    "local-research:citations-are-the-product": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "b34edc1bc73d"
-    },
-    "local-research:write-the-report-out": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "6a5d269113c5"
-    },
-    "obsidian:vault-path": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "54a76e260127"
-    },
-    "obsidian:no-clobber": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "11fd5be61f0e"
-    },
-    "obsidian:obsidian-markdown": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "3677596a83d4"
-    },
-    "obsidian:frontmatter": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "8678ea9d7f61"
-    },
-    "obsidian:stop-if-target-missing": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "855e413b6020"
-    },
-    "obsidian:confirm-location": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "59c7e360bbd3"
-    },
     "one-shot:im-owns-implementation": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "c9e17c6df17e"
@@ -972,30 +820,6 @@
     "one-shot:bugbot-in-watch": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "b1f775e8c0c3"
-    },
-    "orch-eval:read-only": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "199ffe87c140"
-    },
-    "orch-eval:rubric-is-the-contract": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "138220a47fb2"
-    },
-    "orch-eval:no-good-without-evidence": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "44032c2fe554"
-    },
-    "orch-eval:run-vs-infra-bugs": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "f5d2eb06368c"
-    },
-    "orch-eval:skip-in-flight": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "d96a3686a8da"
-    },
-    "orch-eval:targeted-reads": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "16adf75051e9"
     },
     "pr-address:use-companion-script": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1084,66 +908,6 @@
     "pr-land:defer-gui": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "8f90992d5dc4"
-    },
-    "pr-review:standards-first": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "5c9ae2d6fdeb"
-    },
-    "pr-review:use-companion-script": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "bead550daeb6"
-    },
-    "pr-review:no-script-bypass": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "043a43051f6f"
-    },
-    "pr-review:no-duplicate-feedback": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "b2da1a9af597"
-    },
-    "pr-review:batch-reads": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "f5b8e5575171"
-    },
-    "pr-review:script-timeouts": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "5b956995d13a"
-    },
-    "q:no-sycophancy": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "d683bd8d8a52"
-    },
-    "q:no-filler": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "85bbd7d28f7f"
-    },
-    "q:no-unverified-claims": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "8b65a0859c8e"
-    },
-    "q:calibrated-confidence": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "ca97af1523df"
-    },
-    "q:no-code-changes": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "1be00b6e4d24"
-    },
-    "resolve-run:read-only": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "0bf9dd5bfe3e"
-    },
-    "resolve-run:script-does-the-work": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "3b4b4ccd0e22"
-    },
-    "resolve-run:no-credentials": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "5d11845c5c47"
-    },
-    "resolve-run:manifest-is-pointers": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "c80955b2c626"
     },
     "staging-cherry-pick:individual-commits": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1496,114 +1260,23 @@
     "workflow-halt-on-error:companion-script-nonzero-contracts": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "c32f66511e88"
-    },
-    "agent-eval:use-probe-index": {
-      "reason": "2026-07-02: eval-skill internal behavior, not an orchestrated-run contract",
-      "hash": "ea82267ee16b"
-    },
-    "agent-eval:plain-language-dimensions": {
-      "reason": "2026-07-02: eval-skill internal behavior, not an orchestrated-run contract",
-      "hash": "e844ac904c28"
-    },
-    "orch-eval:use-probe-index": {
-      "reason": "2026-07-02: eval-skill internal behavior, not an orchestrated-run contract",
-      "hash": "175279744e28"
-    },
-    "asana-task-create:no-mcp": {
-      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
-      "hash": "0a097d56425a"
-    },
-    "asana-task-create:standard-homes": {
-      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
-      "hash": "dd218b14f2de"
-    },
-    "asana-task-create:release-optional": {
-      "reason": "2026-07-17: per operator: task creation is manually invoked and not eval'd; rule edit only documented release-spelling normalization (4.53 == 53.0)",
-      "hash": "062e5b94c13d"
-    },
-    "asana-task-create:fill-eng-fields": {
-      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
-      "hash": "28a42f43a42f"
-    },
-    "asana-task-create:automation-fields-off-limits": {
-      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
-      "hash": "0d1b69b40e5f"
-    },
-    "asana-task-create:notes-file": {
-      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
-      "hash": "5c7d62a9e6cb"
-    },
-    "asana-task-create:delegate-mutations": {
-      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
-      "hash": "b2f42a87c9b0"
-    },
-    "asana-task-create:script-timeouts": {
-      "reason": "2026-07-17: interactive task-creation skill; not part of any orchestrated run flow that agent-eval/orch-eval grade. Revisit (esp. automation-fields-off-limits) if /one-shot or dep-pr adopt it.",
-      "hash": "53435041f090"
-    },
-    "tdd:decisions-with-alternatives": {
-      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
-      "hash": "b9e7c572c255"
-    },
-    "tdd:status-lifecycle": {
-      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
-      "hash": "7300925168e5"
-    },
-    "tdd:repo-separation": {
-      "reason": "2026-07-19: cross-repo seam linking added; still a doc-quality convention checked by lint/human review, A30 covers pushed-revision hygiene",
-      "hash": "cb35e17f3cb8"
-    },
-    "tdd:clickable-everything": {
-      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
-      "hash": "aa4009d0f16f"
-    },
-    "tdd:diagrams-and-signatures": {
-      "reason": "2026-07-19: cross-repo diagram boxes added; doc-quality convention judged at review, not an orch-run behavior beyond A29/A30",
-      "hash": "b792f3ce57c9"
-    },
-    "tdd:snapshot-and-live": {
-      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
-      "hash": "158084a875e6"
-    },
-    "tdd:length-discipline": {
-      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
-      "hash": "4264faac30e9"
-    },
-    "tdd:style": {
-      "reason": "2026-07-19: doc-quality convention enforced by tdd-lint.sh or judged at human review; not an orchestrated-run behavior agent-eval/orch-eval grade",
-      "hash": "7b9386fd755f"
-    },
-    "resume-session:scripts-do-the-mechanics": {
-      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
-      "hash": "4b10380bca81"
-    },
-    "resume-session:live-first": {
-      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
-      "hash": "df2308397591"
-    },
-    "resume-session:mode-follows-kind": {
-      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
-      "hash": "e9b273645eb3"
-    },
-    "resume-session:echo-aware-search": {
-      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
-      "hash": "dc2309955313"
-    },
-    "resume-session:never-newest-guess": {
-      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
-      "hash": "aab383ed9ee2"
-    },
-    "resume-session:verify-before-handoff": {
-      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
-      "hash": "8efd2d6dbc8f"
-    },
-    "resume-session:orch-boundary": {
-      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
-      "hash": "41b267de85c8"
-    },
-    "resume-session:session-hygiene-facts": {
-      "reason": "2026-07-19: operator discussion-session tooling; never executes inside an orch run (its orch-boundary rule forbids it)",
-      "hash": "27a28ed614e9"
     }
+  },
+  "excluded_skills": {
+    "resume-session": "2026-07-19: operator/discussion tooling; not an orch dependent",
+    "tdd": "2026-07-19: operator/discussion tooling; not an orch dependent",
+    "author": "2026-07-19: operator/discussion tooling; not an orch dependent",
+    "q": "2026-07-19: operator/discussion tooling; not an orch dependent",
+    "obsidian": "2026-07-19: operator/discussion tooling; not an orch dependent",
+    "chat-audit": "2026-07-19: operator/discussion tooling; not an orch dependent",
+    "convention-sync": "2026-07-19: operator/discussion tooling; not an orch dependent",
+    "local-research": "2026-07-19: operator/discussion tooling; not an orch dependent",
+    "pr-review": "2026-07-19: operator/discussion tooling; not an orch dependent",
+    "asana-task-create": "2026-07-19: operator/discussion tooling; not an orch dependent",
+    "standup": "2026-07-19: operator/discussion tooling; not an orch dependent",
+    "agent-eval": "2026-07-19: the eval layer itself; grades orch runs, is not one",
+    "orch-eval": "2026-07-19: the eval layer itself; grades orch runs, is not one",
+    "eval-run": "2026-07-19: the eval layer itself; grades orch runs, is not one",
+    "resolve-run": "2026-07-19: the eval layer itself; grades orch runs, is not one"
   }
 }
