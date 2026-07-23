@@ -52,5 +52,5 @@ echo "$JSON" | jq -r '
       ($f.maestro_run_calls // "-"),
       ([.blocking.attempt_log[]? | select(.result | test("^(failed|blocked|loss):"))] | length),
       ([.blocking.attempt_log[]? | select(.result | test("^success"))] | length),
-      (mins($f.first_testing_ts; $f.first_maestro_run_ts) // "-")
+      (if ((.versions // []) | length) > 1 and (($f.first_testing_ts // "9999") < ((.versions // [{}])[-1].ts // "")) then "multi-seg" else (mins($f.first_testing_ts; $f.first_maestro_run_ts) // "-") end)
     ]) | @tsv'

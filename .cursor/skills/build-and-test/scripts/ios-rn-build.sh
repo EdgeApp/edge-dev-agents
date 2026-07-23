@@ -144,7 +144,18 @@ ensure_metro_ready_and_pin() {
 # DATA container at build time; the stamp clones along with the app via APFS, so a
 # slot clone inherits the master's stamp and a JS-only change still fast-paths.
 native_deps_hash() {
-  if [[ -f ios/Podfile.lock ]]; then shasum -a 256 ios/Podfile.lock | cut -c1-16; else echo "no-podfile-lock"; fi
+  # Podfile.lock catches pod-level native drift. Webview bundle assets catch the
+  # OTHER native-embedded surface: edge-* packages ship built webview bundles
+  # under android/src/main/assets (embedded on iOS too), and a dep update
+  # (updot/pin swap) rewrites them WITHOUT touching Podfile.lock — a Metro JS
+  # reload can never refresh a native-embedded asset, so the cached fast path
+  # shipped a stale plugin webview on the 2026-07-22 swapter run. Hash both.
+  {
+    if [[ -f ios/Podfile.lock ]]; then shasum -a 256 ios/Podfile.lock; else echo "no-podfile-lock"; fi
+    for p in node_modules/edge-*/android/src/main/assets; do
+      [[ -d "$p" ]] && find "$p" -name "*.js" -o -name "*.wasm"
+    done | LC_ALL=C sort | xargs shasum -a 256 2>/dev/null
+  } | shasum -a 256 | cut -c1-16
 }
 app_stamp_path() {
   local data; data="$(xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" data 2>/dev/null || true)"
