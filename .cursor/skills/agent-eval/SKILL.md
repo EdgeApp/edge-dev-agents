@@ -44,6 +44,7 @@ For A1-A2, A4-A17, A19: walk the transcript with targeted greps against each dim
 - **A28:** run `~/.cursor/skills/asana-build-field.sh <gid>`: `none` → NA. A cheese value → the transcript must show the `test-<value>` push (via /cheese) after finalize-green and before the Complete transition, pointer-only. `staging` (when /pr-land ran) → the staging branch log shows the cherry-picks post-land.
 - **A24:** applies only to re-engaged runs (manifest `followup` non-empty or the transcript shows a resume onto a task with an existing PR). Fetch the PR's review threads (same graphql as A3) for the resume window: every thread unresolved at resume must show a reply then resolution; transcript must show amend+force-push (not fixup commits) and the Developing→Testing→Reviewing status flow during the pass. No unresolved threads at resume → NA.
 - **Playbook proposals:** copy any `[playbook]`-tagged bullets from the run report's Dev Notes & Gotchas into the `playbook_proposals` output array, verbatim. Collection only — never write the playbook itself (the operator promotes after review).
+- **Flow proposals:** likewise copy `[flow]`- and `[flow-update]`-tagged bullets (INCLUDING their embedded yaml blocks) into a `flow_proposals` output array, verbatim. Collection only — flow promotion happens exclusively in eval-run's manually-triggered consolidation pass, never here.
 </step>
 
 <step id="5" name="Emit findings">

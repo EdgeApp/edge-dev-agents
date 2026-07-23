@@ -7,10 +7,23 @@
 # subsequent call bounds its watch by the remaining budget. One blocking call per
 # invocation. No loops, no respawned processes (never-self-respawn).
 #
+# SLOW-CI CARVE-OUT (2026-07-24): the Travis check is non-blocking WHILE PENDING.
+# Travis runs 9-13 min but queues 40-90 min under contention (shared account
+# concurrency + develop/staging push builds), and this watch fires after EVERY
+# force-push — each bot-fix cycle re-waited the whole queue, and queue time alone
+# could exhaust the 30-min budget into a spurious blocked=Yes. The watch now goes
+# green once every OTHER check passes; a pending Travis is reported, a FAILED
+# Travis still exits 1 (red is signal, queued is not). Landing paths are
+# unaffected: pr-land's auto-merge + BLOCKED_ON_REVIEW require full green.
+#
 # Usage: watch-pr.sh --pr <num> [--repo <owner/name>] [--task-gid <gid>]
 #                    [--budget-seconds 1800] [--interval 30]
-# Exit: 0   all checks pass
-#       1   a check failed (read `gh run view --log-failed`, fix, amend, re-run)
+# Exit: 0   green — final stdout line distinguishes:
+#             RESULT: green                   (everything passed, Travis included)
+#             RESULT: green-travis-pending    (all but Travis passed; Travis
+#                                              queued/running — report its state
+#                                              in the Finalize Gate checklist)
+#       1   a check failed, Travis included (read `gh run view --log-failed`, fix)
 #       75  budget already exhausted — stop watching, take the blocked=Yes path
 #       124 this watch hit the remaining-budget timeout (same: budget is gone)
 #       2   usage error / missing tool
@@ -75,6 +88,30 @@ if [ "$REMAINING" -le 0 ]; then
 fi
 echo ">> watch-pr: ${REMAINING}s of budget remain; watching ${REPO:+$REPO }PR #$PR" >&2
 
-ARGS=(pr checks "$PR" --watch --interval "$INTERVAL")
-[ -n "$REPO" ] && ARGS+=(--repo "$REPO")
-timeout "$REMAINING" gh "${ARGS[@]}"
+# Poll loop instead of `gh pr checks --watch`: --watch blocks on ALL checks with
+# no way to exempt the slow-CI check. Same budget contract as before.
+SLOW_CI_PATTERN="Travis CI"
+while :; do
+  NOW=$(date +%s)
+  [ "$NOW" -ge "$DEADLINE" ] && { echo ">> watch-pr: remaining-budget timeout" >&2; exit 124; }
+  JSON=$(gh pr checks "$PR" ${REPO:+--repo "$REPO"} --json name,bucket 2>/dev/null || true)
+  [ -n "$JSON" ] || JSON="[]"
+  TOTAL=$(jq 'length' <<<"$JSON" 2>/dev/null || echo 0)
+  FAILS=$(jq -r --arg p "" '[.[] | select(.bucket=="fail" or .bucket=="cancel") | .name] | join(", ")' <<<"$JSON" 2>/dev/null || true)
+  if [ -n "$FAILS" ]; then
+    echo ">> watch-pr: FAILED check(s): $FAILS" >&2
+    exit 1
+  fi
+  PENDING_OTHER=$(jq -r --arg p "$SLOW_CI_PATTERN" '[.[] | select(.bucket=="pending") | .name | select(startswith($p) | not)] | join(", ")' <<<"$JSON" 2>/dev/null || true)
+  PENDING_SLOW=$(jq -r --arg p "$SLOW_CI_PATTERN" '[.[] | select(.bucket=="pending") | .name | select(startswith($p))] | join(", ")' <<<"$JSON" 2>/dev/null || true)
+  if [ "$TOTAL" -gt 0 ] && [ -z "$PENDING_OTHER" ]; then
+    if [ -z "$PENDING_SLOW" ]; then
+      echo "RESULT: green"
+    else
+      echo ">> watch-pr: every check green except still-pending: $PENDING_SLOW (non-blocking; red would block)" >&2
+      echo "RESULT: green-travis-pending ($PENDING_SLOW)"
+    fi
+    exit 0
+  fi
+  sleep "$INTERVAL"
+done
