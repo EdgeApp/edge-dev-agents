@@ -28,9 +28,11 @@ Show the user the target list (gid, task name, status, evaluable-or-skipped + re
 ```
 Workflow({
   scriptPath: "/Users/eddy/.cursor/skills/eval-run/eval-run.workflow.js",
-  args: { manifests: <resolved array>, runDate: "<today YYYY-MM-DD>" }
+  args: { manifests: <resolved array>, runDate: "<today YYYY-MM-DD>", profile: "<name, only for targeted evals>" }
 })
 ```
+
+TARGETED MODE: when the user asks a focused question ("is sim testing churn OK?") or passes `--profile <name>`, set `profile` to a name from agent-eval's `<profiles>` (e.g. `sim-testing`). The workflow then grades only that dimension subset and SKIPS orch-eval entirely — that is what makes it cheap. Additionally run `~/.cursor/skills/resolve-run/scripts/friction-scorecard.sh --since <window>` (zero-LLM) and embed its TSV in the report. Targeted verdicts: only gates inside the profile apply; GOLD is never awarded from a targeted run (it cannot see the other dimensions) — the report header says `targeted: <profile>`. KNOWN METRIC CAVEAT for sim-testing: the scorecard's `testing_to_drive_min` spans SEGMENTS, so multi-day re-armed tasks show huge values that are watermark artifacts, not churn — read it per-segment or ignore it for re-armed tasks.
 
 It runs in the background (watch with /workflows): per run, /agent-eval and /orch-eval execute concurrently, every BAD finding is adversarially re-verified (refuted findings are demoted to MINOR with the refutation noted, not silently dropped), then verdicts are computed per `verdict-policy` and a cohort report is synthesized.
 </step>

@@ -12,11 +12,19 @@
 #                                    # -summary record is an ECHO of another session's
 #                                    # text, not authorship — the trap that mis-resolved
 #                                    # the nym-letter session, 2026-07-17)
+#   ... --grep <phrase> --hits [N]   # include up to N excerpt samples per matching
+#                                    # transcript in grep.hits (bare --hits = ALL hits)
+#                                    # for disambiguation when counts alone don't decide
+#
+# Grep-mode ordering: transcripts ranked originals-first (inherited fork copies
+# demoted), then authored hit count desc, then mtime desc. Ranking is advisory —
+# the consumer still applies its own ambiguity rules (see /resume-session).
 #
 # Output: JSON {generated_at, live: [...], transcripts: [...]}
 #   live:        {tmux, kind, rc_name, resume_uuid, created}
 #   transcripts: {uuid, project_dir, kind(run|chat|interactive), task_gid, task_name,
-#                 fork_parent, mtime, birth, bytes, live_tmux, grep: {authored, echo}}
+#                 fork_parent, mtime, birth, bytes, live_tmux,
+#                 grep: {authored, echo, inherited_from?, hits?: [{ts, role, echo, text}]}}
 # Fork lineage comes from $STATE_DIR/chat-forks.jsonl (written by resume-agent --chat
 # at fork time; forward-only — pre-registry forks show fork_parent null).
 #
@@ -24,16 +32,26 @@
 set -euo pipefail
 
 GREP_PHRASE=""
+GREP_HITS="0"
 while [ $# -gt 0 ]; do
   case "$1" in
     --grep) GREP_PHRASE="${2:-}"; shift 2 ;;
+    --hits)
+      case "${2:-}" in
+        ''|-*) GREP_HITS="-1"; shift 1 ;;             # bare --hits = all hits
+        *[!0-9]*) echo "usage: --hits [N]" >&2; exit 2 ;;
+        *) GREP_HITS="$2"; shift 2 ;;
+      esac ;;
     -h|--help) sed -n '2,/^$/p' "$0" | sed 's|^# \{0,1\}||' >&2; exit 0 ;;
-    *) echo "usage: session-index.sh [--grep <phrase>]" >&2; exit 2 ;;
+    *) echo "usage: session-index.sh [--grep <phrase> [--hits [N]]]" >&2; exit 2 ;;
   esac
 done
+if [ "$GREP_HITS" != "0" ] && [ -z "$GREP_PHRASE" ]; then
+  echo "usage: --hits requires --grep <phrase>" >&2; exit 2
+fi
 
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"
-export GREP_PHRASE STATE_DIR
+export GREP_PHRASE GREP_HITS STATE_DIR
 
 # tmux inventory + per-pane claude args (uuid + rc name), TSV to the node joiner.
 TMUX_TSV=""
@@ -66,6 +84,7 @@ const HOME = os.homedir()
 const PROJECTS = path.join(HOME, '.claude/projects')
 const STATE_DIR = process.env.STATE_DIR
 const PHRASE = process.env.GREP_PHRASE || ''
+const HITS = parseInt(process.env.GREP_HITS || '0', 10) // 0 = counts only, -1 = all hits, N = first N per transcript
 const SENTINEL = 'This session is being continued from a previous conversation'
 
 // fork registry (forward-only)
@@ -124,6 +143,7 @@ for (const d of dirs) {
     if (PHRASE) {
       // full-file scan, line-classified: echo = hit inside a compact-summary record
       let authored = 0, echo = 0
+      const samples = []
       try {
         const data = fs.readFileSync(p, 'utf8')
         if (!data.includes(PHRASE)) continue
@@ -132,10 +152,20 @@ for (const d of dirs) {
           let rec = null; try { rec = JSON.parse(line) } catch {}
           const isEcho = rec?.type === 'summary' || line.includes(SENTINEL)
           if (isEcho) echo++; else authored++
+          if (HITS !== 0 && (HITS < 0 || samples.length < HITS)) {
+            const i = line.indexOf(PHRASE)
+            samples.push({
+              ts: rec?.timestamp || null,
+              role: rec?.message?.role || rec?.type || null,
+              echo: isEcho,
+              text: line.slice(Math.max(0, i - 90), i + PHRASE.length + 90),
+            })
+          }
         }
       } catch { continue }
       if (authored + echo === 0) continue
       entry.grep = { authored, echo }
+      if (HITS !== 0) entry.grep.hits = samples
     }
     transcripts.push(entry)
   }
@@ -174,5 +204,16 @@ if (PHRASE) {
   }
 }
 
-transcripts.sort((a, b) => (a.mtime < b.mtime ? 1 : -1))
+// Ordering: grep mode ranks originals-first (inherited fork copies demoted), then
+// by authored hit count, then recency — so overlapping matches surface the likely
+// original at the top instead of whichever transcript was touched last. Advisory
+// only: the consumer still applies /resume-session's ambiguity rules.
+if (PHRASE) {
+  transcripts.sort((a, b) =>
+    (a.grep.inherited_from ? 1 : 0) - (b.grep.inherited_from ? 1 : 0) ||
+    b.grep.authored - a.grep.authored ||
+    (a.mtime < b.mtime ? 1 : -1))
+} else {
+  transcripts.sort((a, b) => (a.mtime < b.mtime ? 1 : -1))
+}
 console.log(JSON.stringify({ generated_at: new Date().toISOString(), live, transcripts: PHRASE ? transcripts : transcripts.slice(0, 200) }))

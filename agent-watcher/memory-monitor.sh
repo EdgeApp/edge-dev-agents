@@ -40,6 +40,8 @@ vmstat_pages() {
 FREE_B=$(vmstat_pages "Pages free")
 COMPRESSOR_B=$(vmstat_pages "Pages occupied by compressor")
 PURGEABLE_B=$(vmstat_pages "Pages purgeable")
+INACTIVE_B=$(vmstat_pages "Pages inactive")
+SPECULATIVE_B=$(vmstat_pages "Pages speculative")
 
 # Parse swap "used = 0.00M" → bytes. printf %.0f, NOT print: awk's default OFMT
 # renders large non-integers in e-notation (1.26G → 1.26261e+09), which bash
@@ -54,10 +56,20 @@ SWAP_USED_B=$(sysctl -n vm.swapusage | awk -F'used = ' '{print $2}' | awk '{
   else printf "%.0f", num
 }')
 
-AVAIL_B=$(( FREE_B + PURGEABLE_B ))
+# Availability must count RECLAIMABLE cache, not just free+purgeable (2026-07-22
+# fix): on macOS most idle memory sits in inactive/speculative file-backed pages
+# that the kernel reclaims on demand. Counting only free+purgeable pinned this
+# monitor at "critical avail=3GB" while `memory_pressure -Q` reported 82% free
+# (128GB box; the real culprit was a 43.6GB fseventsd leak, since auto-guarded by
+# session-watchdog.js). free + purgeable + inactive + speculative tracks the
+# kernel's own free-percentage within a few points.
+AVAIL_B=$(( FREE_B + PURGEABLE_B + INACTIVE_B + SPECULATIVE_B ))
 
-# Hundredths-of-percent (4500 = 45.00%)
-pct() { echo $(( $1 * 100000 / TOTAL_BYTES )); }
+# Hundredths-of-percent (4500 = 45.00%). Scale bug fixed 2026-07-22: the old
+# multiplier (100000) produced THOUSANDTHS of a percent, so every threshold below
+# was applied 10x off — CRIT_COMP=5000 was meant as "compressor > 50% of RAM" but
+# fired at 5% (a normal dev-box compressor), which kept the level pinned critical.
+pct() { echo $(( $1 * 10000 / TOTAL_BYTES )); }
 AVAIL_P=$(pct $AVAIL_B)
 COMP_P=$(pct $COMPRESSOR_B)
 
@@ -68,14 +80,17 @@ WARN_COMP=2500
 
 LEVEL="green"
 REASON=""
-# Swap-in-use alone is a WARN signal, not critical: the box held "critical" for
-# hours with 57-70GB available because 1.3GB of swap lingered. Critical requires
-# genuinely low availability or a swamped compressor; swap escalates to critical
-# only when availability is ALSO below the warn floor.
-if [[ "$AVAIL_P" -lt "$CRIT_AVAIL" ]] || [[ "$COMP_P" -gt "$CRIT_COMP" ]] || { [[ "$SWAP_USED_B" -gt 0 ]] && [[ "$AVAIL_P" -lt "$WARN_AVAIL" ]]; }; then
+# Swap participates only above a significance floor (2026-07-22 fix): macOS never
+# proactively unswaps, so a few hundred MB of RESIDUAL swap lingers for weeks after
+# one pressure event and used to hold the level at warn ("swap>0") or critical
+# ("swap>0 && avail<warn") indefinitely. Real thrash writes GBs. Below the floor,
+# swap is ignored; above it, it warns, and escalates to critical only when
+# availability is ALSO below the warn floor.
+SWAP_SIGNIFICANT_B=$(( 2 * 1024 * 1024 * 1024 ))
+if [[ "$AVAIL_P" -lt "$CRIT_AVAIL" ]] || [[ "$COMP_P" -gt "$CRIT_COMP" ]] || { [[ "$SWAP_USED_B" -gt "$SWAP_SIGNIFICANT_B" ]] && [[ "$AVAIL_P" -lt "$WARN_AVAIL" ]]; }; then
   LEVEL="critical"
   REASON="avail=$((AVAIL_B/1024/1024/1024))GB comp=$((COMPRESSOR_B/1024/1024/1024))GB swap=$((SWAP_USED_B/1024/1024))MB"
-elif [[ "$AVAIL_P" -lt "$WARN_AVAIL" ]] || [[ "$COMP_P" -gt "$WARN_COMP" ]] || [[ "$SWAP_USED_B" -gt 0 ]]; then
+elif [[ "$AVAIL_P" -lt "$WARN_AVAIL" ]] || [[ "$COMP_P" -gt "$WARN_COMP" ]] || [[ "$SWAP_USED_B" -gt "$SWAP_SIGNIFICANT_B" ]]; then
   LEVEL="warn"
   REASON="avail=$((AVAIL_B/1024/1024/1024))GB comp=$((COMPRESSOR_B/1024/1024/1024))GB swap=$((SWAP_USED_B/1024/1024))MB"
 fi

@@ -15,6 +15,10 @@
 #      notes are allowed — that is the one case worth flagging, per template).
 #   2. Em dashes (U+2014): banned in run reports (writing-style em-dash-free list).
 #   3. Missing "## " sections vs the template.
+#   4. Undeclared hack-forced screenshots: this run captured a HACKED-named
+#      proof frame (build-and-test hack-verify-visual-changes) but the report
+#      never marks it. A forced frame reads as organic evidence unless it is
+#      labelled, so the label is mechanical, not a matter of recollection.
 #
 # FORMATTER-READY: these checks define the form contract a future form-only
 # formatter subagent would enforce (draft in, facts immutable, form normalized).
@@ -69,6 +73,15 @@ if [ -f "$TEMPLATE" ]; then
     grep -qF "$h" "$REPORT" || MISSING+="$h, "
   done < <(grep -E '^## ' "$TEMPLATE")
   [ -n "$MISSING" ] && FAIL+="- Missing template sections: ${MISSING%, } (use \`_None observed._\` for empty ones, never omit)
+"
+fi
+
+# 4. Hack-forced screenshots must be declared with the 🩹 marker.
+HACKED_SHOTS="$(ls /tmp/agent-proof-"$AGENT_TASK_GID"-*HACKED*.png 2>/dev/null || true)"
+if [ -n "$HACKED_SHOTS" ] && ! grep -qE '🩹|HACK-FORCED' "$REPORT"; then
+  FAIL+="- Hack-forced screenshots are not declared in the report. This run captured:
+$(echo "$HACKED_SHOTS" | head -5 | sed 's/^/    /')
+    Add a 🩹 line in the Testing section per one-shot step 7: the file, the exact hack, that it was reverted (clean git status), and what the frame does NOT prove (the trigger).
 "
 fi
 

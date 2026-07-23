@@ -237,13 +237,15 @@ JC_SECTION_GID=$(curl -sf --max-time 20 "${AUTH[@]}" \
     'first(.data[] | select((.name | ascii_downcase) == ($w | ascii_downcase))).gid // empty')
 [[ -n "$JC_SECTION_GID" ]] || { echo "ERROR: jon-claude board has no section named \"$JC_SECTION\"" >&2; exit 1; }
 
+# Custom fields are applied AFTER the addProject calls: fields sourced from the
+# Engineering board (e.g. Repo) are rejected at create time, when the task is
+# only on the Master board.
 PAYLOAD=$(jq -n \
   --arg name "$NAME" \
   --rawfile notes "$NOTES_FILE" \
   --arg ws "$WORKSPACE_GID" \
   --arg master "$MASTER_BOARD_GID" \
-  --argjson cf "$CF" \
-  '{data: {name: $name, notes: $notes, workspace: $ws, projects: [$master], custom_fields: $cf}}')
+  '{data: {name: $name, notes: $notes, workspace: $ws, projects: [$master]}}')
 
 if $DRY_RUN; then
   echo "DRY_RUN payload:"
@@ -275,6 +277,13 @@ curl -sf --max-time 20 -X POST "$API/tasks/$TASK_GID/addProject" "${AUTH[@]}" \
   -d "{\"data\": {\"project\": \"$JON_CLAUDE_BOARD_GID\", \"section\": \"$JC_SECTION_GID\"}}" > /dev/null \
   || { echo "ERROR: addProject jon-claude failed" >&2; exit 1; }
 echo "ADDED: jon-claude / $JC_SECTION"
+
+if [[ "$CF" != "{}" ]]; then
+  curl -sf --max-time 20 -X PUT "$API/tasks/$TASK_GID" "${AUTH[@]}" \
+    -H "Content-Type: application/json" \
+    -d "$(jq -n --argjson cf "$CF" '{data: {custom_fields: $cf}}')" > /dev/null \
+    || { echo "ERROR: setting custom fields failed (task exists: $TASK_URL)" >&2; exit 1; }
+fi
 
 for line in "${FIELD_ECHO[@]:-}"; do [[ -n "$line" ]] && echo "$line"; done
 
