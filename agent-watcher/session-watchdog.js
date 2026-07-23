@@ -416,28 +416,28 @@ function reapOrphanMetros(liveSessions) {
   }
 }
 
-// Manual-hold escalation: pool entries allocated with a NON-NUMERIC task_gid
-// (operator hand-labels like "qr-login-manual") are invisible to every sweep —
-// the completion sweep keys off Asana status for numeric gids, and dirty/free
-// reclaim never touches in_use. A forgotten manual hold keeps a sim booted
-// indefinitely (found 2026-07-23: pool-2 booted-idle under "qr-login-manual",
-// no log trail). Never auto-release (a human owns it, and release destroys
-// their manual state); escalate ONCE after the threshold so the operator
-// decides. Boot state is re-checked live so a shutdown hold stays quiet.
-const MANUAL_HOLD_ESCALATE_MS = 4 * 60 * 60 * 1000
-function escalateManualPoolHolds(state) {
+// Manual-hold reaping: pool entries allocated with a NON-NUMERIC task_gid
+// (operator hand-labels like "qr-login-manual") are invisible to every other
+// sweep — the completion sweep keys off Asana status for numeric gids, and
+// dirty/free reclaim never touches in_use. A forgotten manual hold keeps a sim
+// (and a pool capacity unit) held indefinitely (found 2026-07-23: pool-2
+// booted-idle under "qr-login-manual"). Operator policy: humans never hold
+// state on this machine, so AUTO-RELEASE after the threshold — the release
+// marks the entry dirty and ensure-sim-pool recycles it (delete + re-clone
+// from master), which is safe because manual holds are one-shot errands
+// (QR-provisioning a device), never durable state.
+const MANUAL_HOLD_RELEASE_MS = 4 * 60 * 60 * 1000
+function reapManualPoolHolds(state) {
   let pool = []
   try { pool = JSON.parse(fs.readFileSync(path.join(slots.STATE_DIR, 'pool.json'), 'utf8')).pool || [] } catch { return }
   for (const e of pool) {
     if (e.state !== 'in_use' || !e.task_gid || /^\d+$/.test(e.task_gid)) continue
     const key = `manual-hold-${e.task_gid}`
-    const prior = state[key]
-    if (!prior) { state[key] = { since: Date.now(), escalated: false }; continue }
-    const booted = sh(`xcrun simctl list devices 2>/dev/null | grep "${e.udid}" | grep -c Booted`) === '1'
-    if (!booted) continue
-    if (!prior.escalated && Date.now() - prior.since > MANUAL_HOLD_ESCALATE_MS) {
-      log(`[pool] manual hold "${e.task_gid}" has kept sim ${e.udid} booted >${Math.round(MANUAL_HOLD_ESCALATE_MS / 3600000)}h — operator attention: shutdown it, or release with release-pool-entry.sh --task-gid "${e.task_gid}". Not auto-releasing.`)
-      prior.escalated = true
+    if (!state[key]) { state[key] = { since: Date.now() }; continue }
+    if (Date.now() - state[key].since > MANUAL_HOLD_RELEASE_MS) {
+      log(`[pool] manual hold "${e.task_gid}" exceeded ${Math.round(MANUAL_HOLD_RELEASE_MS / 3600000)}h — auto-releasing sim ${e.udid} (operator policy: manual holds are one-shot errands, never durable state)`)
+      sh(`"${DIR}/release-pool-entry.sh" --task-gid "${e.task_gid}"`)
+      delete state[key]
     }
   }
   // Entries that left in_use reset their tracking.
@@ -915,8 +915,8 @@ function main() {
   // Drop watchman roots for worktrees with no session (fseventsd leak mitigation).
   reapStaleWatchmanRoots(sessions)
 
-  // Surface booted sims held by hand-labeled (non-numeric-gid) pool allocations.
-  escalateManualPoolHolds(state)
+  // Auto-release stale hand-labeled (non-numeric-gid) pool allocations.
+  reapManualPoolHolds(state)
 
   // Restart a bloated fseventsd when the sudoers rule permits; log otherwise.
   guardFseventsd(state, now)

@@ -11,12 +11,19 @@
 #                                                      tsc/jest, never a sim,
 #                                                      regardless of target repo)
 #
-# Decision: union of `capabilities.sh detect` over the repos. ANY ios-sim member
-# -> keep (exit 0, no action). No sim member -> release the pool sim
-# (release-pool-entry.sh, idempotent). couch members -> reported so the run
-# fail-louds if the host lacks couch. UNCERTAINTY KEEPS THE SIM: empty/missing
-# repo list, unknown repo, detect failure -> keep. The cheap error is keeping a
-# sim; the expensive one is releasing what a later phase needs.
+# Decision precedence:
+#   1. OPERATOR OVERRIDE: the task's `agent_lane` multi-select field, read LIVE.
+#      Any selection is authoritative (a task may select several: comparison /
+#      parity / QR-provisioning work): "iOS Sim" in the selection -> keep the
+#      sim; a non-empty selection WITHOUT "iOS Sim" -> release (Android Sim /
+#      Android Device / None need no iOS slot sim). Unset -> fall through to 2.
+#   2. Union of `capabilities.sh detect` over the repos. ANY ios-sim member
+#      -> keep (exit 0, no action). No sim member -> release the pool sim
+#      (release-pool-entry.sh, idempotent). couch members -> reported so the run
+#      fail-louds if the host lacks couch. UNCERTAINTY KEEPS THE SIM: empty/
+#      missing repo list, unknown repo, detect failure, field fetch failure ->
+#      keep. The cheap error is keeping a sim; the expensive one is releasing
+#      what a later phase needs.
 #
 # The decision is recorded at $STATE/lanes/<gid>.json for eval audit.
 # Exit: 0 always on a completed decision (keep or release), 2 on usage error.
@@ -36,8 +43,24 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n "$GID" ]] || { echo "usage: lane-release.sh --task-gid <gid> (--repos <a,b,c> | --land)" >&2; exit 2; }
 
+# Operator override: agent_lane multi-select, read live (empty on unset/error).
+LANE_FIELD=""
+TOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$DIR/credentials.json" 2>/dev/null)}"
+if [[ -n "$TOKEN" ]]; then
+  LANE_FIELD=$(curl -sf --max-time 20 -H "Authorization: Bearer $TOKEN" \
+    "https://app.asana.com/api/1.0/tasks/$GID?opt_fields=custom_fields.name,custom_fields.display_value" 2>/dev/null \
+    | jq -r 'first(.data.custom_fields[]? | select(.name == "agent_lane") | .display_value) // empty' 2>/dev/null || true)
+fi
+
 LANES=() DECISION="keep" REASON=""
-if [[ "$LAND" == 1 ]]; then
+if [[ -n "$LANE_FIELD" && "$LAND" != 1 ]]; then
+  LANES=("operator:$LANE_FIELD")
+  if [[ "$LANE_FIELD" == *"iOS Sim"* ]]; then
+    DECISION="keep"; REASON="operator agent_lane selects iOS Sim ($LANE_FIELD)"
+  else
+    DECISION="release"; REASON="operator agent_lane set without iOS Sim ($LANE_FIELD) — no iOS slot sim needed"
+  fi
+elif [[ "$LAND" == 1 ]]; then
   DECISION="release"; REASON="land-only task: pr-land verifies via repo checks, never a sim"
   LANES=("none")
 elif [[ -n "$REPOS" ]]; then

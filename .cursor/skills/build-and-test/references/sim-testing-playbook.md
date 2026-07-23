@@ -5,6 +5,27 @@ phase; it is cheap context that saves expensive UI churn. This is a LIVING doc:
 when a run teaches you something durable about driving the app, append a concise
 entry (the human audits and prunes it periodically — keep entries dense).
 
+## Flow library — compose these, never re-derive them
+Parameterized subflows in `~/.cursor/skills/build-and-test/maestro/common/`
+(compose via `runFlow` with `env:`; copy next to your task flow). Re-deriving
+any of these inline is wasted derivation — two 2026-07 sessions independently
+rebuilt the entire swap-pair sequence tap-by-tap that `select-swap-pair`
+already encodes, params and gotchas included.
+
+| Flow | Params | Does |
+|---|---|---|
+| `common/login-if-needed.yaml` | (YOLO env) | Land in a logged-in account, incl. PIN entry |
+| `common/dismiss-startup-modals.yaml` | - | Clear survey/notification/update modals |
+| `common/select-swap-pair.yaml` | SRC_WALLET, DST_WALLET, FIAT_AMOUNT, PROVIDER | Exchange tab → pick wallets → amount → quote (+ provider force, amount-field eraseText gotcha) |
+| `common/confirm-slider.yaml` | - | The confirm slider gesture (SOLVED — never re-derive) |
+| `buy-quote-input.yaml` / `buy-quote.yaml` | (see file) | Canonical Buy $500 proof flow |
+| `swap-quote-input.yaml` / `swap-confirm.yaml` | (see file) | Swap quote + confirm proof pair |
+
+Wrote a NEW sequence a future task will plausibly need? Propose it for the
+library with a `[flow]`-tagged bullet in your run report's Dev Notes (name,
+params, what it does) and keep the yaml in your worktree — the operator
+promotes it into `common/`. Same contract as `[playbook]` bullets.
+
 ## Money / accounts
 - **App installs must preserve the account — never `simctl uninstall` or
   `simctl erase`.** The sim's logged-in account lives in the app's DATA
@@ -187,6 +208,38 @@ entry (the human audits and prunes it periodically — keep entries dense).
   My Base 4 (0.35 ETH, ~$600), My Zano (~$460), L3USD on Fantom (~$240),
   My MAYAChain (CACAO). EVM chains block a SECOND send while one is unconfirmed —
   wait for confirmation before chaining sends. (2026-07-09 eval, Houdini run)
+
+## Android physical device
+Promoted from the 3-way login-perf run (2026-07-21, Samsung Galaxy S9, task
+1216773266141895 — full method and raw data in its report gist).
+
+- **Builds**: `gradlew` lives under `android/`, not repo root; `sfw ./gradlew`
+  fails (spawn ENOENT) — run gradle directly (it spawns `node`, not npx, so the
+  sfw hook does not block it). Release APK lands at
+  `android/app/build/outputs/apk/release/app-release.apk`.
+- **Account survives build swaps**: re-sign RELEASE builds with the Android
+  debug keystore (the key the pre-provisioned app already carries); then
+  `adb install -r` updates in place and preserves `/data/data`, so the
+  logged-in account outlives every swap, no password needed. Device
+  provisioning itself is a one-time QR login from a logged-in sim
+  (allocate a pool sim for the errand; holds auto-release after 4h).
+- **Warm-login measurement**: YOLO auto-login (`YOLO_USERNAME`/`YOLO_PIN`) +
+  `DEBUG_VERBOSE_LOGGING=true`; one iteration = force-stop, clear logcat,
+  launch, capture. The FIRST iteration after a build swap is a cache-populate
+  pass, never a measurement.
+- **Segment markers** (edge-core, all builds): `Login: decrypted keys` = PIN
+  entry t0; `enabledTokenIds ... loaded modern file` = per-wallet file read;
+  `Login: emitted account from cache` = cache seed. `Login: complete` is a BAD
+  TTI proxy — it waits on the account-repo network sync (7-30s, network
+  noise). Anchor TTI to the cache-emit marker plus a confirming screenshot;
+  uiautomator dump does not reliably expose the RN-rendered Total Balance node.
+- **Stale global HTTP proxy** fails every app fetch fast while ping passes:
+  `adb shell settings put global http_proxy :0` before any test.
+- **Fast core-pin swap**: extract the committed `edge-core-js-*.tgz`, `cp -R`
+  over `node_modules/edge-core-js`, then `sfw npx patch-package` — skips a full
+  reinstall for a single-dep change.
+- **Flashlight** (get.flashlight.dev) ships x86_64-only on macOS: needs
+  Rosetta 2 (`softwareupdate --install-rosetta --agree-to-license`).
 
 ## Navigation
 - **Gift Card Marketplace (EdgeSpend):** reachable in-app from Home → 'Spend

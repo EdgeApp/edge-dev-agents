@@ -58,12 +58,12 @@ $(echo "$REV" | head -5 | sed 's/^/    /')
 "
 fi
 
-# 2. Em dashes.
-EMD="$(grep -n $'—' "$REPORT" | head -5 || true)"
-if [ -n "$EMD" ]; then
-  FAIL+="- Em dashes (banned in run reports; use a comma, colon, or parentheses):
-$(echo "$EMD" | sed 's/^/    /')
-"
+# 2. Em dashes: REWRITTEN in place instead of blocked — the top hook-block
+#    source across the fleet (10/24 runs in the 2026-07-23 scorecard) and the
+#    fix is fully mechanical, so blocking only cost a report-regeneration cycle.
+if grep -q $'—' "$REPORT"; then
+  sed -i '' -e $'s/ — /: /g' -e $'s/—/-/g' "$REPORT"
+  echo ">> require-clean-run-report: auto-rewrote em dashes in $REPORT (spaced -> colon, bare -> hyphen)" >&2
 fi
 
 # 3. Missing template sections (headings read live from the template).
