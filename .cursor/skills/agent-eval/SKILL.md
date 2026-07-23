@@ -14,7 +14,12 @@ description: Evaluate one orchestrated agent run for process compliance (did it 
 <rule id="targeted-reads">Transcripts are large. Use targeted greps and line-range reads driven by what each dimension needs (e.g. `grep -n "lint-commit.sh\|git commit" <transcript>`); never read a whole transcript JSONL into context.</rule>
 <rule id="use-probe-index">The manifest's `probe_index` is the pre-computed first pass (per-probe counts + sample line numbers, and the full update-status ladder for A4): verify at those lines instead of re-deriving discovery greps. Counts are advisory (skill bodies quoted into the transcript inflate them) — confirm hits before citing. The manifest's `auto_na` entries are manifest-derived NA determinations: accept each unless evidence contradicts it, and note the contradiction when you override.</rule>
 <rule id="plain-language-dimensions">Every emitted finding carries BOTH the dimension id and its rubric name (`A14` + `review-response`), and any human-facing output (standalone report file, chat summary) never shows a bare code without its name.</rule>
+<rule id="targeted-profiles">When invoked with a profile from `<profiles>` (via /eval-run `--profile` or standalone args), grade ONLY that profile's dimensions. Every other dimension is OUT OF SCOPE: not emitted (not even NA), no evidence gathered for it. Everything else about grading (evidence-or-not-captured, citations, probe_index use) is unchanged for the in-profile dimensions.</rule>
 </rules>
+
+<profiles description="Named dimension subsets for cheap targeted evals between full cohorts. A profile answers ONE operator question with a fraction of the reads.">
+<profile id="sim-testing">The "did testing actually happen, honestly, and how hard did the run grind" cluster: A16 (halt/workaround discipline), A18 (testing-report), A22 (tested field), A25 (live-diff scaffolding leaks), A26 (attempt-log truthfulness), A27 (provider forcing), A29 (process-friction). Pairs with `friction-scorecard.sh` (zero-LLM) which /eval-run embeds in targeted reports.</profile>
+</profiles>
 
 <step id="1" name="Get the manifest">
 If not handed one, run `~/.cursor/skills/resolve-run/scripts/resolve-run.sh --gid <gid>` (60000ms+ timeout). Honor `skip-in-flight`.

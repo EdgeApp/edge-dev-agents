@@ -26,7 +26,7 @@
 #                                   # spawn-test-session keep the summary default.)
 #   resume-agent.sh <term> --latest # skip the ambiguity guard: silently take the
 #                                   # newest transcript among multi-task matches
-#   resume-agent.sh --uuid <id> [--chat [--in-place]]
+#   resume-agent.sh --uuid <id> [--chat [--in-place]] [--chrome]
 #                                   # exact transcript selection (any kind, any project
 #                                   # dir - chat forks/interactive transcripts have no
 #                                   # /one-shot signature and only resolve this way;
@@ -56,6 +56,7 @@ CHAT=false
 LATEST=false
 SUMMARY=false
 IN_PLACE=false
+CHROME=false
 UUID=""
 TERM=""
 while [ $# -gt 0 ]; do
@@ -66,6 +67,7 @@ while [ $# -gt 0 ]; do
     --latest) LATEST=true; shift ;;
     --summary) SUMMARY=true; shift ;;
     --in-place) IN_PLACE=true; shift ;;         # with --chat: continue the SAME conversation (no fork).
+    --chrome) CHROME=true; shift ;;             # spawn with the Chrome extension bridge enabled.
                                                 # For resuming a DEAD DISCUSSION FORK: forking a fork
                                                 # duplicates history again and pollutes future search.
     --uuid) UUID="${2:-}"; shift 2 ;;           # exact transcript selection; bypasses matching entirely
@@ -314,7 +316,9 @@ if $CHAT; then
   BEFORE_LIST=$(ls "$PROJ_DIR"/*.jsonl 2>/dev/null || true)
   tmux new-session -d -s "$TMUX_NAME" -c "$CHAT_CWD"
   tmux send-keys -t "$TMUX_NAME" C-u   # clear any stray typed text before the command
-  tmux send-keys -t "$TMUX_NAME" "claude --resume $LATEST_UUID $FORK_FLAG --dangerously-skip-permissions --remote-control chat-$SLUG" Enter
+  CHROME_FLAG=""
+  $CHROME && CHROME_FLAG="--chrome"
+  tmux send-keys -t "$TMUX_NAME" "claude --resume $LATEST_UUID $FORK_FLAG $CHROME_FLAG --dangerously-skip-permissions --remote-control chat-$SLUG" Enter
   # Auto-answer the resume-summary menu (option 1, pre-selected) when it appears.
   for _ in $(seq 1 30); do
     sleep 2

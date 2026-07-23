@@ -57,7 +57,7 @@
       ]
     },
     "one-shot:report-as-attachment": {
-      "hash": "4826fc4c5c8d",
+      "hash": "9ada08dfe540",
       "dims": [
         "A9"
       ]
@@ -137,7 +137,7 @@
       ]
     },
     "pr-create:attach-test-evidence": {
-      "hash": "409a0c6eea79",
+      "hash": "cd7c05b4df65",
       "dims": [
         "A13"
       ]
@@ -203,7 +203,7 @@
       ]
     },
     "one-shot:finalize-gate": {
-      "hash": "04579b8772a2",
+      "hash": "a777804ad54c",
       "dims": [
         "A3"
       ]
@@ -257,13 +257,13 @@
       ]
     },
     "file:memory-monitor.sh": {
-      "hash": "f47b7c2a09b7",
+      "hash": "b78368785d18",
       "dims": [
         "O3"
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "d1aa4184d571",
+      "hash": "c7252c0f3ca5",
       "dims": [
         "O4",
         "O5",
@@ -284,7 +284,7 @@
       ]
     },
     "one-shot:followup-reopens-status": {
-      "hash": "718322aeb1bb",
+      "hash": "591b641176b6",
       "dims": [
         "A24"
       ]
@@ -308,7 +308,7 @@
       ]
     },
     "one-shot:pr-watch-loop-amend-pattern": {
-      "hash": "edd7de1c68b3",
+      "hash": "924adabbe0bd",
       "dims": [
         "A12"
       ]
@@ -422,7 +422,7 @@
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "db207c1dae0d",
+      "hash": "3f3774121ba5",
       "dims": [
         "A9"
       ]
@@ -509,6 +509,20 @@
       "hash": "b1311b20a1b0",
       "dims": [
         "A29"
+      ]
+    },
+    "one-shot:non-owner-pr-completion": {
+      "hash": "ba8754d30973",
+      "dims": [
+        "A12",
+        "A24",
+        "A3"
+      ]
+    },
+    "pr-address:one-fixup-per-target-per-turn": {
+      "hash": "a3d1968e39bc",
+      "dims": [
+        "A24"
       ]
     }
   },
@@ -650,16 +664,16 @@
       "hash": "59ae13d6ba0f"
     },
     "build-and-test:unrunnable-asset-proxy-verification": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "3d76677f9d80"
+      "reason": "2026-07-23: edit only adds the visual-surface carve-out pointing at hack-verify-visual-changes; the proxy+unit-test expectation is unchanged and graded by the testing-depth dimension",
+      "hash": "e54df9d8c6b4"
     },
     "build-and-test:maestro-flows-are-shortcuts": {
       "reason": "2026-07-03: exploration/proof guidance; device+proof substance graded via A21/A22/O10, driver-port compliance hook-enforced (require-maestro-device.sh)",
       "hash": "94b5f370735f"
     },
     "build-and-test:proof-screenshots-for-pr": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "42b510117cac"
+      "reason": "2026-07-23: edit only adds the HACKED filename-token cross-reference; the screenshot-evidence expectation itself is graded by A13",
+      "hash": "6769bb66b04a"
     },
     "build-and-test:executable-pair-must-complete": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1260,6 +1274,10 @@
     "workflow-halt-on-error:companion-script-nonzero-contracts": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "c32f66511e88"
+    },
+    "build-and-test:hack-verify-visual-changes": {
+      "reason": "2026-07-23: graded through existing dimensions rather than its own: A7 grades the concession side via the concession-validator taxonomy (which now denies a visual concession with no hack-forced frame), A9 grades the report declaration, A13 grades the PR marker",
+      "hash": "30c181905375"
     }
   },
   "excluded_skills": {

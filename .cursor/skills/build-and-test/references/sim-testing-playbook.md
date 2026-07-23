@@ -6,6 +6,17 @@ when a run teaches you something durable about driving the app, append a concise
 entry (the human audits and prunes it periodically — keep entries dense).
 
 ## Money / accounts
+- **App installs must preserve the account — never `simctl uninstall` or
+  `simctl erase`.** The sim's logged-in account lives in the app's DATA
+  container; `simctl uninstall` deletes it and re-provisioning needs a manual
+  login (a hook blocks both commands). In-place `simctl install` upgrades the
+  app and KEEPS the account. If an in-place install fails ("Could not hardlink
+  copy"), run `~/.config/agent-watcher/sim-app-reinstall.sh --udid <udid>
+  --app <path/to/Edge.app>` — it retries after a sim reboot and only ever
+  uninstalls with an automatic account restore from a healthy donor sim. If the
+  app already shows ONBOARDING (account container gone), restore it with
+  `~/.config/agent-watcher/restore-sim-app-container.sh --to <udid>` — never
+  onboard by hand and never hand-copy container dirs.
 - **Centralized-provider swaps need ~$10+ per side.** Below that, quotes fail or
   error opaquely ("amount too low" at best, provider errors at worst). Don't burn
   cycles trying to swap $2; fund to >$10 first. (DEX-style providers vary; the
@@ -184,6 +195,33 @@ entry (the human audits and prunes it periodically — keep entries dense).
   productIds for a per-brand test come from `GET <phaze baseUrl>/gift-cards/full/US`
   with header `API-Key: <key>` (the on-disk `brands-us.json` cache is encrypted and
   unreadable, so hit the API for live ids).
+
+## "My edit isn't applying" — ownership triage FIRST
+The moment you think "my change isn't showing / the app isn't loading my
+bundle", STOP — that is an OWNERSHIP question before it is a cache question, and
+it has a one-call deterministic answer:
+
+```bash
+~/.config/agent-watcher/bundle-ownership.sh --udid <udid> --worktree <your-repo-worktree>
+```
+
+It reports which port the app will actually fetch from (RCT_jsLocation pin or
+default 8081), who is listening there and from which directory, and a verdict:
+- **MISMATCH** — another directory's Metro owns the app's port (the app silently
+  loads THAT bundle, no error anywhere). Kill the squatter and start YOUR Metro
+  on the port the app already reads. Never redirect the app instead.
+- **NO_METRO** — start your Metro on the app's effective port.
+- **OK** — only now is it a reload/cache question: cold-launch first, then
+  `--reset-cache` (a hook requires a fresh triage marker before cache resets).
+
+Hard rules enforced by hooks: hand-writing `RCT_jsLocation` is blocked
+(packager pinning belongs to ios-rn-build.sh's cached-launch path, which pins +
+terminates + relaunches so it takes effect); cache resets without a fresh triage
+are blocked. And when MCP screenshots contradict what the logs say the app is
+doing (e.g. "won't foreground" while JS runs), verify with direct
+`xcrun simctl io <udid> screenshot` before building theories — the maestro
+daemon can drift to another sim, and the 2026-07-22 swapter run spent an hour
+debugging screenshots of the wrong device.
 
 ## Investigate cheap before driving the UI
 - **Crawl the code and run `/debugger` EARLY**, not as a last resort. A grinding

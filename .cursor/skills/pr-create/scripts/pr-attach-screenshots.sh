@@ -14,6 +14,14 @@
 # Each image may carry a caption via its filename: 01-quote-rendered.png →
 # caption "quote rendered". Order on the comment = argument order.
 #
+# HACK-FORCED evidence: a filename carrying the literal token HACKED (e.g.
+# agent-proof-<gid>-01-HACKED-empty-state.png, per build-and-test
+# `hack-verify-visual-changes`) captured a state forced by an uncommitted local
+# hack, not by the natural trigger. Such an image is captioned with a 🩹 marker
+# and the comment carries a banner, so a reviewer can never mistake it for an
+# organically reproduced state. Detection is on the filename alone — no caller
+# flag, no agent judgement.
+#
 # Exit codes: 0 = comment posted, 1 = error, 2 = no images given.
 
 set -euo pipefail
@@ -95,15 +103,32 @@ gh api -X PATCH "repos/$ASSETS_REPO/git/refs/heads/$ASSETS_BRANCH" -f sha="$NEW_
 log "committed $NEW_COMMIT to $ASSETS_BRANCH"
 
 # ── Post ONE PR comment embedding all images ──────────────────────────────────
+ANY_HACKED=false
+for f in "${IMAGES[@]}"; do
+  [[ "$(basename "$f")" == *HACKED* ]] && ANY_HACKED=true
+done
+
 BODY=$(mktemp)
 {
-  echo "## 📸 $TITLE"
+  if $ANY_HACKED; then
+    echo "## 📸🩹 $TITLE"
+    echo
+    echo "> 🩹 **Some screenshots below are HACK-FORCED.** The marked frames show a state forced by a temporary uncommitted local edit (the natural trigger could not be reproduced on the sim). The hack is not in this PR's diff; the pixels prove the rendering, not the trigger."
+  else
+    echo "## 📸 $TITLE"
+  fi
   echo
   i=0
   for f in "${IMAGES[@]}"; do
     base="$(basename "$f")"
-    # caption: filename minus extension and leading order-prefix, dashes → spaces
-    cap="$(printf '%s' "${base%.*}" | sed -E 's/^[0-9]+[-_]//; s/[-_]+/ /g')"
+    # caption: filename minus extension, minus the agent-proof-<gid>- and
+    # order-number prefixes, dashes → spaces
+    cap="$(printf '%s' "${base%.*}" | sed -E 's/^agent-proof-[0-9]+-//; s/^[0-9]+[-_]//; s/[-_]+/ /g')"
+    if [[ "$base" == *HACKED* ]]; then
+      # Strip the marker out of the words and re-add it as an explicit label:
+      cap="$(printf '%s' "$cap" | sed -E 's/[[:space:]]*HACKED[[:space:]]*/ /g; s/^ +| +$//g')"
+      cap="🩹 HACK-FORCED: ${cap}"
+    fi
     echo "**${cap}**"
     echo
     echo "<img src=\"${URLS[$i]}\" width=\"360\" alt=\"${cap}\" />"

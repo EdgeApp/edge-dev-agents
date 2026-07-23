@@ -89,10 +89,19 @@ lines.forEach((line, i) => {
   if (/\b(TBD|TODO|FIXME|XXX:)\b/.test(line)) findings.push(`placeholder: line ${i + 1} contains a deferred-work marker`)
 })
 
-// Mermaid fences non-empty.
+// Mermaid fences non-empty, and quoted node brackets must match:
+// a node like X{"text"] (open brace, close bracket) is a GitHub render error.
 const mermaid = src.match(/```mermaid\n([\s\S]*?)```/g) ?? []
+const pairs = { "[": "]", "{": "}", "(": ")" }
 mermaid.forEach(block => {
   if (block.replace(/```(mermaid)?/g, "").trim() === "") findings.push("mermaid: empty diagram block")
+  const nodeRe = /([\[{(])"[^"]*"([\]})])/g
+  let nm
+  while ((nm = nodeRe.exec(block)) != null) {
+    if (pairs[nm[1]] !== nm[2]) {
+      findings.push("mermaid: mismatched node brackets " + nm[1] + "\"...\"" + nm[2] + " (renders as a parse error)")
+    }
+  }
 })
 
 if (findings.length === 0) {

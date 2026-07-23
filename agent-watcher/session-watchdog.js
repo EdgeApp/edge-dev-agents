@@ -53,6 +53,27 @@ const IDLE_THRESHOLD_MS = 20 * 60 * 1000
 // Named discussion anchors (main/eval/pokemon/...) are NOT chat- prefixed and
 // are never reaped.
 const CHAT_IDLE_REAP_MS = 48 * 60 * 60 * 1000
+// Android emulators are NOT slot resources: nothing tracks their spawn (agents boot
+// them ad hoc via `emulator -avd ...`) and qemu reparents to launchd immediately, so
+// ownership can't come from ancestry or slots.json. Ownership signal instead: a
+// maestro client (--device emulator-<port>), since all agent device driving goes
+// through maestro-mcp. A serial with no maestro client for this long is orphaned.
+//
+// KNOWN GAP — deferred 2026-07-22: true iOS parity would make Android slot-tracked
+// (an ensure-android-emulator.sh spawn helper records emulator_serial/avd in
+// slots.json; freeSimAndMetro() then releases it deterministically at retire/block,
+// like sim_udid + metro_port). Deferred because NO managed spawn path exists yet —
+// no skill or script boots emulators, tasks do it ad hoc — so there is nothing to
+// hook. If Android becomes a regular task resource, build the spawn helper FIRST,
+// then wire the release; the 2h grace reap below is the interim safety net.
+const ANDROID_EMU_UNATTENDED_MS = 2 * 60 * 60 * 1000
+// Anchor panes (claude-asana-<word>: non-gid, non-chat) whose claude died sit as bare
+// bash shells forever — the completion sweep can't see them (no task gid) and the
+// chat reaper skips them. Deleting a bridged desktop session SIGKILLs the CLI, so a
+// dead anchor pane usually means the operator already discarded the conversation;
+// reap after a grace that covers a manual restart-in-place.
+const DEAD_ANCHOR_REAP_MS = 10 * 60 * 1000
+const ANDROID_SDK = '/opt/homebrew/share/android-commandlinetools'
 // After this long parked at a human-choice prompt, emit ONE escalation line (instead
 // of the per-tick park log) so an operator notices; never auto-sheds.
 const PARK_ESCALATE_MS = 60 * 60 * 1000
@@ -295,6 +316,24 @@ function freeSimAndMetro(taskGid) {
     sh(`"${DIR}/release-pool-entry.sh" --task-gid "${taskGid}"`)
   }
   freeMetroPort(slot?.metro_port ?? null)
+  freeWorktreeListeners(taskGid)
+}
+
+// Ad-hoc Metros (agent-started, untracked in slots.json, possibly on a non-slot
+// port) survive the tracked-port kill: the 2026-07-22 swapter run inherited slot
+// port 8181 still held by the PREVIOUS task's untracked Metro 1.5h after its
+// retirement, and the app silently loaded the wrong bundle. Kill by WORKTREE
+// CWD: any listener serving from this task's worktree dies with the task.
+function freeWorktreeListeners(taskGid) {
+  const root = `${WORKTREES_ROOT}/${taskGid}`
+  const pids = sh('lsof -iTCP -sTCP:LISTEN -t 2>/dev/null').split('\n').filter(Boolean)
+  for (const pid of [...new Set(pids)]) {
+    const cwd = sh(`lsof -a -p ${pid} -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'`).split('\n')[0] || ''
+    if (cwd === root || cwd.startsWith(`${root}/`)) {
+      sh(`kill ${pid}`)
+      log(`  [metro] killed listener pid ${pid} (cwd ${cwd} under retired worktree ${taskGid})`)
+    }
+  }
 }
 
 // Operator-escalation surface for the Stop hook's livelock bound. CONTINUATION itself
@@ -346,25 +385,164 @@ function reclaimIdlePoolSims() {
   }
 }
 
-// Reap orphan Metro bundlers: a Metro whose cwd is an .agent-worktrees/<gid> dir
-// that no longer exists (the slot was torn down but its Metro lingered, squatting a
-// port the next slot reuses → the "foreign Metro on my port" failures). Only kills
-// Metros whose cwd is under the worktrees root AND gone; spares live-worktree Metros
-// and any Metro outside the worktrees root (e.g. a manual one in ~/git/<repo>).
-function reapOrphanMetros() {
+// Reap orphan Metro bundlers, two orphan shapes: (a) cwd is an .agent-worktrees/<gid>
+// dir that no longer exists (the slot was torn down but its Metro lingered, squatting
+// a port the next slot reuses → the "foreign Metro on my port" failures); (b) the
+// worktree still exists (retention keeps up to keep_completed_worktrees on disk) but
+// the gid has NO tmux session left in either prefix — nothing can be using that Metro.
+// Only touches Metros whose cwd is under the worktrees root; spares live-session
+// Metros and any Metro outside the worktrees root (e.g. a manual one in ~/git/<repo>).
+function reapOrphanMetros(liveSessions) {
   const out = sh('pgrep -fl "react-native.*start|node_modules/metro"')
   if (!out) return
+  const sessionGids = new Set([
+    ...liveSessions.map((s) => s.slice(SESSION_PREFIX.length)),
+    ...listRetiredSessions().map((s) => s.gid),
+  ])
   for (const line of out.split('\n').filter(Boolean)) {
     const pid = parseInt(line.trim().split(/\s+/)[0], 10)
     if (!Number.isFinite(pid)) continue
     const cwdRaw = sh(`lsof -a -p ${pid} -d cwd -Fn`).split('\n').map((s) => s.replace(/^n/, '')).filter(Boolean).pop() || ''
     const cwd = cwdRaw.replace(/ \(deleted\)$/, '')
     if (!cwd || !cwd.startsWith(WORKTREES_ROOT)) continue // only worktree Metros
+    const gid = cwd.slice(WORKTREES_ROOT.length + 1).split('/')[0]
     if (!fs.existsSync(cwd)) {
       sh(`kill ${pid}`)
       log(`[reaper] killed orphan Metro pid ${pid} (worktree gone: ${cwd})`)
+    } else if (gid && !sessionGids.has(gid)) {
+      sh(`kill ${pid}`)
+      log(`[reaper] killed orphan Metro pid ${pid} (no session for gid ${gid}; worktree retained: ${cwd})`)
     }
   }
+}
+
+// Manual-hold escalation: pool entries allocated with a NON-NUMERIC task_gid
+// (operator hand-labels like "qr-login-manual") are invisible to every sweep —
+// the completion sweep keys off Asana status for numeric gids, and dirty/free
+// reclaim never touches in_use. A forgotten manual hold keeps a sim booted
+// indefinitely (found 2026-07-23: pool-2 booted-idle under "qr-login-manual",
+// no log trail). Never auto-release (a human owns it, and release destroys
+// their manual state); escalate ONCE after the threshold so the operator
+// decides. Boot state is re-checked live so a shutdown hold stays quiet.
+const MANUAL_HOLD_ESCALATE_MS = 4 * 60 * 60 * 1000
+function escalateManualPoolHolds(state) {
+  let pool = []
+  try { pool = JSON.parse(fs.readFileSync(path.join(slots.STATE_DIR, 'pool.json'), 'utf8')).pool || [] } catch { return }
+  for (const e of pool) {
+    if (e.state !== 'in_use' || !e.task_gid || /^\d+$/.test(e.task_gid)) continue
+    const key = `manual-hold-${e.task_gid}`
+    const prior = state[key]
+    if (!prior) { state[key] = { since: Date.now(), escalated: false }; continue }
+    const booted = sh(`xcrun simctl list devices 2>/dev/null | grep "${e.udid}" | grep -c Booted`) === '1'
+    if (!booted) continue
+    if (!prior.escalated && Date.now() - prior.since > MANUAL_HOLD_ESCALATE_MS) {
+      log(`[pool] manual hold "${e.task_gid}" has kept sim ${e.udid} booted >${Math.round(MANUAL_HOLD_ESCALATE_MS / 3600000)}h — operator attention: shutdown it, or release with release-pool-entry.sh --task-gid "${e.task_gid}". Not auto-releasing.`)
+      prior.escalated = true
+    }
+  }
+  // Entries that left in_use reset their tracking.
+  for (const k of Object.keys(state)) {
+    if (!k.startsWith('manual-hold-')) continue
+    const gid = k.slice('manual-hold-'.length)
+    if (!pool.some((e) => e.state === 'in_use' && e.task_gid === gid)) delete state[k]
+  }
+}
+
+// Watchman GC: watchman accumulates a root per task worktree (Metro adds it; nothing
+// removes it) and every root holds a live fsevents subscription. That churn is a
+// primary driver of the fseventsd RSS leak on this box (43.6GB, PID 29 up 56 days,
+// observed 2026-07-22). Del roots under the worktrees tree whose dir is gone OR whose
+// gid has no session in either prefix. Never touches the main-repo root or any
+// non-worktree root. Safe: a resumed task's Metro re-creates its watch on demand.
+function reapStaleWatchmanRoots(liveSessions) {
+  const out = sh('watchman watch-list 2>/dev/null')
+  if (!out) return
+  let roots = []
+  try { roots = JSON.parse(out).roots || [] } catch { return }
+  const sessionGids = new Set([
+    ...liveSessions.map((s) => s.slice(SESSION_PREFIX.length)),
+    ...listRetiredSessions().map((s) => s.gid),
+  ])
+  for (const r of roots) {
+    if (!r.startsWith(WORKTREES_ROOT)) continue
+    const gid = r.slice(WORKTREES_ROOT.length + 1).split('/')[0]
+    const dirGone = !fs.existsSync(r)
+    if (dirGone || (gid && !sessionGids.has(gid))) {
+      sh(`watchman watch-del "${r}"`)
+      log(`[reaper] watchman watch-del ${r} (${dirGone ? 'dir gone' : `no session for gid ${gid}`})`)
+    }
+  }
+}
+
+// fseventsd leak guard. fseventsd (root-owned) leaks RSS under heavy fs churn
+// (worktree/sim-clone/node_modules cycles): 43.6GB after 56 days, observed
+// 2026-07-22. Only root can restart it, so this guard is INERT until the operator
+// adds a narrow sudoers rule via `sudo visudo`:
+//   eddy ALL=(root) NOPASSWD: /usr/bin/pkill -x fseventsd
+// With the rule: past the RSS limit, `sudo -n` restarts it (launchd respawns it
+// clean; watchman/Spotlight recrawl once, first Metro rebuild after is slower).
+// Without it: sudo -n fails silently and we log the manual instruction, throttled
+// to once per 24h via watchdog state.
+const FSEVENTSD_RSS_LIMIT_KB = 16 * 1024 * 1024 // 16GB
+function guardFseventsd(state, now) {
+  const pid = parseInt(sh('pgrep -x fseventsd').split('\n')[0], 10)
+  if (!Number.isFinite(pid)) return
+  const rssKb = parseInt(sh(`ps -p ${pid} -o rss=`), 10)
+  if (!Number.isFinite(rssKb) || rssKb < FSEVENTSD_RSS_LIMIT_KB) return
+  if (state.fseventsdLastAttempt && now - state.fseventsdLastAttempt < 24 * 3600 * 1000) return
+  state.fseventsdLastAttempt = now
+  sh('sudo -n /usr/bin/pkill -x fseventsd 2>/dev/null')
+  sh('sleep 3')
+  if (!sh(`ps -p ${pid} -o pid=`)) {
+    log(`[fseventsd] RSS ${Math.round(rssKb / 1024 / 1024)}GB over limit → restarted via sudo -n (launchd respawns it)`)
+  } else {
+    log(`[fseventsd] RSS ${Math.round(rssKb / 1024 / 1024)}GB over ${Math.round(FSEVENTSD_RSS_LIMIT_KB / 1024 / 1024)}GB limit — cannot restart without sudo. One-time setup (sudo visudo): eddy ALL=(root) NOPASSWD: /usr/bin/pkill -x fseventsd`)
+  }
+}
+
+// Android reaping — see ANDROID_EMU_UNATTENDED_MS for the ownership model. Two passes:
+//   1. crashpad_handler whose --monitor-pid target is dead: kill on sight. Its only
+//      job is watching that pid; orphaned ones spin hot (observed ~99% CPU for a
+//      week, 2026-07-14→21).
+//   2. emulator with no maestro client for the grace window (first-unattended time
+//      tracked per-serial in watchdog state): graceful `adb emu kill`, hard-kill
+//      fallback. Its crashpad child dies with it (or pass 1 catches it next tick).
+// PHYSICAL DEVICES ARE NEVER TOUCHED: pass 2 targets qemu-system pids and their
+// emulator-<port> serials only; adb is never invoked against any other serial.
+function reapOrphanAndroid(state, now) {
+  const adb = fs.existsSync(`${ANDROID_SDK}/platform-tools/adb`) ? `${ANDROID_SDK}/platform-tools/adb` : 'adb'
+  for (const line of sh('pgrep -fl "emulator/crashpad_handler"').split('\n').filter(Boolean)) {
+    const pid = parseInt(line.trim().split(/\s+/)[0], 10)
+    const mon = line.match(/--monitor-pid=(\d+)/)?.[1]
+    if (!Number.isFinite(pid) || !mon) continue
+    if (sh(`ps -p ${mon} -o pid=`)) continue // monitored emulator still alive
+    sh(`kill ${pid}`)
+    log(`[reaper] killed orphan crashpad_handler pid ${pid} (monitored pid ${mon} dead)`)
+  }
+  const tracked = state.android_emus || {}
+  const next = {}
+  for (const line of sh('pgrep -fl "qemu-system-"').split('\n').filter(Boolean)) {
+    const pid = parseInt(line.trim().split(/\s+/)[0], 10)
+    if (!Number.isFinite(pid) || !/ -avd /.test(line)) continue
+    // serial = emulator-<console-port>: the lowest port qemu LISTENs on in adb's
+    // console range (console is always allocated one below the adb port).
+    const ports = (sh(`lsof -a -p ${pid} -iTCP -sTCP:LISTEN -Fn`).match(/:(\d+)$/gm) || []).map((s) => parseInt(s.slice(1), 10))
+    const consolePort = ports.filter((p) => p >= 5554 && p <= 5682).sort((a, b) => a - b)[0]
+    const serial = consolePort ? `emulator-${consolePort}` : null
+    const avd = line.match(/ -avd (\S+)/)?.[1] || '?'
+    if (serial && sh(`pgrep -f "maestro.*--device ${serial}( |$)"`)) continue // attended → not tracked
+    const key = serial || `pid-${pid}`
+    const since = tracked[key] ?? now
+    if (now - since >= ANDROID_EMU_UNATTENDED_MS) {
+      if (serial) { sh(`"${adb}" -s ${serial} emu kill`); sh('sleep 5') }
+      if (sh(`ps -p ${pid} -o pid=`)) sh(`kill ${pid}`)
+      log(`[reaper] killed orphan Android emulator ${avd} (${key}) — no maestro client for ${Math.round((now - since) / 3600000)}h`)
+    } else {
+      next[key] = since
+      if (!(key in tracked)) log(`[reaper] tracking unattended Android emulator ${avd} (${key}) — reap after ${Math.round(ANDROID_EMU_UNATTENDED_MS / 3600000)}h without a maestro client`)
+    }
+  }
+  state.android_emus = next
 }
 
 // Full teardown of one retained worktree: remove the worktree + branch (and any
@@ -497,7 +675,19 @@ function writeReleaseReceipt(taskGid, slot, metroPort) {
 // the newest keep_completed_sessions; kill the older ones outright.
 function pruneRetiredSessions() {
   const keep = getKeepCompletedSessions()
-  const retired = listRetiredSessions()
+  let retired = listRetiredSessions()
+  // A retired pane is kept alive ONLY so its claude stays attachable / re-engageable;
+  // with claude gone (e.g. the operator deleted the bridged desktop session) it's a
+  // bare shell with no value — reap it now instead of letting it squat the cap.
+  const dead = retired.filter((s) => {
+    const pid = getPanePid(s.name)
+    return pid !== null && !claudeRunningUnder(pid)
+  })
+  for (const s of dead) {
+    sh(`tmux kill-session -t "${s.name}"`)
+    log(`[${s.name}] retired pane's claude gone → killed`)
+  }
+  if (dead.length) retired = retired.filter((s) => !dead.includes(s))
   if (retired.length <= keep) {
     if (retired.length > 0) log(`Retired sessions: ${retired.length}/${keep} kept; none pruned`)
     return
@@ -614,6 +804,21 @@ function main() {
         delete state.sessions[session]
         continue
       }
+      if (!/^\d+$/.test(taskGid)) {
+        // Anchor pane (see DEAD_ANCHOR_REAP_MS): desktop-delete propagation. The
+        // grace period is tracked in state; a claude restart in the pane clears it
+        // (the live path below rewrites the state entry without deadSince).
+        const deadSince = state.sessions[session]?.deadSince ?? now
+        if (now - deadSince >= DEAD_ANCHOR_REAP_MS) {
+          log(`[${session}] anchor pane's claude gone ${Math.round((now - deadSince) / 60000)}m → reaped (transcript survives; resurrect via /resume-session)`)
+          sh(`tmux kill-session -t "${session}"`)
+          delete state.sessions[session]
+        } else {
+          if (!state.sessions[session]?.deadSince) log(`[${session}] anchor pane's claude gone → reaping in ${Math.round(DEAD_ANCHOR_REAP_MS / 60000)}m unless it comes back`)
+          state.sessions[session] = { ...state.sessions[session], deadSince }
+        }
+        continue
+      }
       log(`[${session}] claude not detected under pane (pid ${panePid}). NOT auto-resuming (death-path removed). Leaving for manual handling.`)
       delete state.sessions[session]
       continue
@@ -701,8 +906,20 @@ function main() {
   // the watcher is load-gated and won't run ensure-sim-pool. Breaks the high-load loop.
   reclaimIdlePoolSims()
 
-  // Kill Metro bundlers whose worktree was torn down (orphans squatting slot ports).
-  reapOrphanMetros()
+  // Kill Metro bundlers whose worktree was torn down or whose task session is gone.
+  reapOrphanMetros(sessions)
+
+  // Kill orphaned Android emulators + dead-monitor crashpad handlers.
+  reapOrphanAndroid(state, now)
+
+  // Drop watchman roots for worktrees with no session (fseventsd leak mitigation).
+  reapStaleWatchmanRoots(sessions)
+
+  // Surface booted sims held by hand-labeled (non-numeric-gid) pool allocations.
+  escalateManualPoolHolds(state)
+
+  // Restart a bloated fseventsd when the sudoers rule permits; log otherwise.
+  guardFseventsd(state, now)
 
   // Enforce the worktree retention cap (keep newest N completed/retired worktrees).
   pruneRetainedWorktrees(sessions)

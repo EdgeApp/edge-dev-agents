@@ -16,6 +16,7 @@ metadata:
 <rule id="this-file-wins">If any other instruction conflicts with this file, **this file wins** for `pr-address`.</rule>
 <rule id="commit-via-script">Commit fixups using `~/.cursor/skills/lint-commit.sh --no-reorder -m "fixup! {headline}" [files...]`. `--no-reorder` is required — the default reorder runs `rebase --autosquash` which squashes fixups immediately, conflicting with step 4's conditional autosquash. Do NOT manually run eslint — the commit script handles it.</rule>
 <rule id="slot-after-each-fixup">Immediately after every successful `lint-commit.sh` call, run `~/.cursor/skills/slot-fixup.sh` to slot the new fixup next to its target's group. This keeps the "every fixup sits next to its target" invariant continuously. If `slot-fixup.sh` exits non-zero (rebase conflict), report and STOP — do not continue the address-pass.</rule>
+<rule id="one-fixup-per-target-per-turn">Produce at most ONE `fixup! <target-headline>` per target commit per address-pass (one human-review turn), NOT one per comment: the first fix landing on a target creates its fixup; every later fix this pass that targets the SAME commit amends into that existing fixup (`lint-commit.sh --no-reorder -m "fixup! {targetHeadline}"` targeting it, or `--fixup <its-sha>`) rather than adding another. Reviewer-bot churn (a bot re-reviewing on each push and posting fresh findings) condenses into the same per-target fixup — never a new commit per finding. A finding you REJECT (invalid / out-of-scope / infra-layer / an intentional documented design choice) is handled by reply + resolve with NO code change, so it does not push a commit and re-trigger the review loop. Distinct human-review turns stay separable because `step 1.5` squash-stale folds the prior turn's fixups before this turn's begins.</rule>
 <rule id="script-timeouts">GitHub API scripts can take up to 30s. Set `block_until_ms: 60000` when invoking `pr-address.sh`.</rule>
 <rule id="reply-before-resolve">ALWAYS reply explaining how a comment was addressed BEFORE resolving or marking it. No silent resolutions.</rule>
 <rule id="non-owner-reply-only">If you do NOT author the PR (`isOwner: false` in `fetch` output — i.e. `currentUser !== prAuthor`), you may reply to threads and push fixups, but you must NEVER resolve threads (`resolve-thread`) or post `mark-addressed` markers. Resolving/marking mutates the owner's PR state; leave every thread unresolved for the owner. This pairs with the finalize ownership guard (non-owner ⇒ `preserve` mode, never autosquash) — on a PR you don't own: push fixups + reply, never rewrite history, never resolve.</rule>
@@ -113,21 +114,22 @@ git log -1 --format='%s' <commit_sha>
 </sub-step>
 
 <sub-step name="Apply fixes">
-For each comment (one fixup at a time):
+Group the comments by fixup target, and process one TARGET at a time — producing exactly ONE fixup per target per `one-fixup-per-target-per-turn` (not one per comment):
 
-1. Read the file
-2. Apply changes — comment hunks can be narrower than intent; apply consistently within the function/file
-3. Commit using `lint-commit.sh`:
+1. Read the file(s) for every comment on this target
+2. Apply all of that target's fixes — comment hunks can be narrower than intent; apply consistently within the function/file
+3. Commit ONE fixup for the target with `lint-commit.sh`:
    ```bash
    ~/.cursor/skills/lint-commit.sh --no-reorder -m "fixup! {targetHeadline}" [files...]
    ```
-4. **Immediately slot the new fixup next to its target's group** (preserves the "every fixup sits next to its target" invariant continuously):
+   If this pass already pushed a fixup for the SAME target (reviewer-bot churn arriving after a re-push), do NOT add a second — amend the new fix into that existing fixup (`git commit --amend --no-edit` when it is HEAD, else `lint-commit.sh --fixup <its-sha>` and let a later autosquash fold it), so the target keeps one fixup.
+4. **Immediately slot the fixup next to its target's group**:
    ```bash
    ~/.cursor/skills/slot-fixup.sh
    ```
    If `slot-fixup.sh` reports a conflict, STOP — do not continue the address-pass. The user must resolve.
 
-Repeat steps 1–4 for each remaining comment. Do not batch fixes across multiple comments before slotting.
+Repeat for each remaining target. A REJECTED finding gets no fix and no commit — reply + resolve it in step 3.
 </sub-step>
 </step>
 

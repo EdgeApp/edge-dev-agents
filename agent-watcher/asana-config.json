@@ -41,17 +41,33 @@
         "Android Sim": "1215788237370038",
         "Unit Tests": "1215645627282793",
         "Other": "1215645627282796",
-        "Untested": "1215645627282794"
+        "Untested": "1215645627282794",
+        "CouchDB": "1216219577215531"
       }
     },
     "agent_model": {
       "gid": "1216249098365971",
       "options": {
-        "Fable 5": { "gid": "1216250578601966", "model": "claude-fable-5[1m]" },
-        "Opus 4.8": { "gid": "1216249098365972", "model": "claude-opus-4-8[1m]" },
-        "Opus 4.7": { "gid": "1216249098365973", "model": "claude-opus-4-7[1m]" },
-        "Sonnet 5": { "gid": "1216249114532968", "model": "claude-sonnet-5[1m]" },
-        "Sonnet 4.6": { "gid": "1216249098365974", "model": "claude-sonnet-4-6[1m]" }
+        "Fable 5": {
+          "gid": "1216250578601966",
+          "model": "claude-fable-5[1m]"
+        },
+        "Opus 4.8": {
+          "gid": "1216249098365972",
+          "model": "claude-opus-4-8[1m]"
+        },
+        "Opus 4.7": {
+          "gid": "1216249098365973",
+          "model": "claude-opus-4-7[1m]"
+        },
+        "Sonnet 5": {
+          "gid": "1216249114532968",
+          "model": "claude-sonnet-5[1m]"
+        },
+        "Sonnet 4.6": {
+          "gid": "1216249098365974",
+          "model": "claude-sonnet-4-6[1m]"
+        }
       }
     },
     "agent_effort": {

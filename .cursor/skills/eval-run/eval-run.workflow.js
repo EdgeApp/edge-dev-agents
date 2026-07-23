@@ -25,6 +25,10 @@ if (!manifests.length) return { error: 'no manifests passed in args.manifests' }
 // optional: per-manifest m.cohort (label) and m.eval_notes (free-text instructions appended to eval prompts)
 const cohortSplitDate = (input && input.cohortSplitDate) || null
 const cohortInstructions = (input && input.cohortInstructions) || null
+// optional targeted profile (named in agent-eval's <profiles>): grade ONLY that
+// dimension subset. Profiles are agent-side clusters, so orch-eval is skipped
+// entirely — that is what makes the run cheap.
+const profile = (input && input.profile) || null
 
 const evaluable = manifests.filter(m => !m.in_flight && m.transcript)
 const skipped = manifests.filter(m => m.in_flight || !m.transcript)
@@ -78,7 +82,11 @@ const evalPrompt = (skill, m) =>
   `The manifest carries probe_index (pre-computed transcript probe hits: counts + sample line numbers, plus the update-status ladder) ` +
   `and auto_na (manifest-derived NA determinations). START from them: verify at the indexed lines instead of re-deriving discovery greps ` +
   `(counts are advisory — quoted skill bodies inflate them), and accept each auto_na entry unless evidence contradicts it.\n` +
-  `Return every rubric dimension exactly once, each with BOTH its id and its rubric name (e.g. A14 + review-response).` +
+  (profile
+    ? `TARGETED PROFILE "${profile}": grade ONLY the dimensions that profile names in your skill's <profiles> block. ` +
+      `Every other dimension is OUT OF SCOPE for this run — do not emit it (not even as NA), do not gather its evidence. ` +
+      `Return each in-profile dimension exactly once, with BOTH its id and its rubric name.`
+    : `Return every rubric dimension exactly once, each with BOTH its id and its rubric name (e.g. A14 + review-response).`) +
   (m.eval_notes ? `\nRUN-SPECIFIC NOTES (read carefully, these override defaults for this run only): ${m.eval_notes}` : '')
 
 // Evaluate + verify per run, pipelined (no cross-run barrier)
@@ -86,7 +94,7 @@ const results = await pipeline(
   evaluable,
   m => parallel([
     () => agent(evalPrompt('agent-eval', m), { label: `agent-eval:${m.gid}`, phase: 'Evaluate', schema: FINDINGS_SCHEMA, ...MOPT }),
-    () => agent(evalPrompt('orch-eval', m), { label: `orch-eval:${m.gid}`, phase: 'Evaluate', schema: FINDINGS_SCHEMA, ...MOPT }),
+    ...(profile ? [] : [() => agent(evalPrompt('orch-eval', m), { label: `orch-eval:${m.gid}`, phase: 'Evaluate', schema: FINDINGS_SCHEMA, ...MOPT })]),
   ]),
   async (pair, m) => {
     const [agentF, orchF] = pair
