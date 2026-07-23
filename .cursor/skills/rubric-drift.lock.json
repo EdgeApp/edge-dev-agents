@@ -27,7 +27,7 @@
       ]
     },
     "one-shot:pr-watch-bounded-poll": {
-      "hash": "8f27a0fd742b",
+      "hash": "f549ae63db32",
       "dims": [
         "A5"
       ]
@@ -203,7 +203,7 @@
       ]
     },
     "one-shot:finalize-gate": {
-      "hash": "a777804ad54c",
+      "hash": "ef6aaf54ea26",
       "dims": [
         "A3"
       ]
@@ -668,8 +668,8 @@
       "hash": "e54df9d8c6b4"
     },
     "build-and-test:maestro-flows-are-shortcuts": {
-      "reason": "2026-07-03: exploration/proof guidance; device+proof substance graded via A21/A22/O10, driver-port compliance hook-enforced (require-maestro-device.sh)",
-      "hash": "94b5f370735f"
+      "reason": "2026-07-23: Adds flow-update tag + embedded-yaml requirement and defers all promotion to eval consolidation; still proposal-channel mechanics, not run-graded behavior; a flow-reuse dimension remains the future candidate once consolidation produces promotion data",
+      "hash": "133b3c48f3a5"
     },
     "build-and-test:proof-screenshots-for-pr": {
       "reason": "2026-07-23: edit only adds the HACKED filename-token cross-reference; the screenshot-evidence expectation itself is graded by A13",
