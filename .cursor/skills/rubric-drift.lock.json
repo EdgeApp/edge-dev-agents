@@ -1295,6 +1295,7 @@
     "agent-eval": "2026-07-19: the eval layer itself; grades orch runs, is not one",
     "orch-eval": "2026-07-19: the eval layer itself; grades orch runs, is not one",
     "eval-run": "2026-07-19: the eval layer itself; grades orch runs, is not one",
-    "resolve-run": "2026-07-19: the eval layer itself; grades orch runs, is not one"
+    "resolve-run": "2026-07-19: the eval layer itself; grades orch runs, is not one",
+    "coinhub": "2026-07-24: Standalone operator-invocable coinhub maintenance skill; domain-procedure rules (snapshot regen, safe force-push, theme drift), not orchestration-gating behavior. Not wired into one-shot delegation, so not an orch dependent the agent-eval/orch-eval rubrics grade. Re-evaluate if one-shot ever delegates to /coinhub."
   }
 }

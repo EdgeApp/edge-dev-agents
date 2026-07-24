@@ -237,9 +237,20 @@ Promoted from the 3-way login-perf run (2026-07-21, Samsung Galaxy S9, task
   uiautomator dump does not reliably expose the RN-rendered Total Balance node.
 - **Stale global HTTP proxy** fails every app fetch fast while ping passes:
   `adb shell settings put global http_proxy :0` before any test.
-- **Fast core-pin swap**: extract the committed `edge-core-js-*.tgz`, `cp -R`
-  over `node_modules/edge-core-js`, then `sfw npx patch-package` — skips a full
-  reinstall for a single-dep change.
+- **Fast core-pin swap — IN YOUR WORKTREE ONLY, never `~/git/<repo>`**: extract
+  the committed `edge-core-js-*.tgz`, `cp -R` over
+  `node_modules/edge-core-js` **inside `~/git/.agent-worktrees/<gid>/<repo>`**,
+  then `sfw npx patch-package` — skips a full reinstall for a single-dep change.
+  NEVER in the shared main checkout: `refresh-master-build.sh` builds the master
+  sim from `~/git/<repo>`, and every slot sim is an APFS clone of that image, so
+  an unpublished package there ships fleet-wide. It happened (2026-07-21):
+  wallet-cache v2 core was copied into `~/git/edge-react-gui`, the next master
+  build embedded it, and unrelated PR runs hit
+  `wallet.otherMethods.getFioAddresses is not a function` for two days (v2 core
+  under clean GUI JS, whose engine-readiness gating is still unmerged). Tell:
+  a hand-copied package has no `_resolved` in its package.json — the master
+  refresh now preflights that and runs `npm ci` instead of baking it. If you do
+  dirty the main checkout, restore it with `sfw npm ci` there.
 - **Flashlight** (get.flashlight.dev) ships x86_64-only on macOS: needs
   Rosetta 2 (`softwareupdate --install-rosetta --agree-to-license`).
 

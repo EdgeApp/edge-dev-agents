@@ -208,6 +208,31 @@ log "checking out $DEVELOP_REF in $REPO_DIR (${TARGET_SHA:0:9})"
 git -C "$REPO_DIR" checkout --quiet "$BRANCH" 2>/dev/null || git -C "$REPO_DIR" checkout --quiet -B "$BRANCH" "$DEVELOP_REF"
 git -C "$REPO_DIR" reset --hard --quiet "$DEVELOP_REF" || build_failed "could not reset $REPO_DIR to $DEVELOP_REF"
 
+# 1b. DEPENDENCY PROVENANCE PREFLIGHT (2026-07-24). The master image is cloned to
+#     every slot, so ANY unpublished dependency sitting in this checkout's
+#     node_modules gets baked in fleet-wide. The sim playbook's fast core-pin
+#     recipe (`cp -R` an unpublished tarball over node_modules) mutates exactly
+#     this directory, and it happened: wallet-cache v2 core was hand-copied into
+#     ~/git/edge-react-gui on 2026-07-21, the 07-22 master build embedded it, and
+#     unrelated PR runs on cloned sims hit
+#     `wallet.otherMethods.getFioAddresses is not a function` for two days,
+#     because the app's CORE was v2 while its GUI JS was clean.
+#     An npm-installed package records `_resolved`; a hand-copied one does not.
+#     Restore with `npm ci` rather than baking an image nobody can reproduce.
+for pkg in "$REPO_DIR"/node_modules/edge-*/package.json; do
+  [[ -f "$pkg" ]] || continue
+  if [[ "$(jq -r '._resolved // empty' "$pkg" 2>/dev/null)" == "" ]]; then
+    name="$(jq -r '.name // "?"' "$pkg" 2>/dev/null)"
+    log "WARN — $name in $REPO_DIR has no _resolved (hand-copied, not npm-installed): running npm ci to restore published deps before baking the master image"
+    if ( cd "$REPO_DIR" && sfw npm ci >/dev/null 2>&1 ); then
+      log "npm ci OK — dependency provenance restored"
+    else
+      build_failed "npm ci failed while restoring $REPO_DIR — refusing to bake a master image with unpublished deps"
+    fi
+    break
+  fi
+done
+
 # 2. Boot the master so ios-rn-build can install onto it.
 log "booting master $MASTER"
 xcrun simctl boot "$MASTER" >/dev/null 2>&1 || true
