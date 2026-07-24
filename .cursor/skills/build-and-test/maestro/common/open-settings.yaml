@@ -1,0 +1,13 @@
+# common/open-settings.yaml — side menu -> Settings list. Promoted 2026-07-24:
+# 2 corpus sessions (open-exchange-settings, nym-enable) independently
+# re-derived this navigation before diverging into their own settings subpage.
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+---
+- tapOn:
+    id: "sideMenuButton"
+- extendedWaitUntil:
+    visible: "Settings"
+    timeout: 15000
+- tapOn: "Settings"
