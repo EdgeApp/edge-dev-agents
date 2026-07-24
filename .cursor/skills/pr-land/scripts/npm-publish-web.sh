@@ -24,8 +24,19 @@ set -uo pipefail
 #   PUBLISHED <name>@<version>
 #   FAILED <phase> <reason>
 #
-# Interactive sessions surface AUTH_URL in chat; orchestrated runs deliver it
-# via push notification (never Slack — self-sent Slacks do not notify).
+# DELIVERY IS A MESSAGE, NOT A TOOL RESULT (2026-07-24): an AUTH_URL that only
+# appears in command output is INVISIBLE — the operator reads the assistant's
+# MESSAGE text, not tool results, and a session that "relayed" a link by running
+# a grep has delivered nothing (this cost a publish cycle). Every session type,
+# interactive included, must (1) write the bare url into its next MESSAGE as a
+# CLICKABLE link — bare url or [text](url), NEVER inside backticks, since code
+# spans are not linkified (writing-style `Reference links must be clickable`) —
+# AND (2) fire a push notification carrying the url. Orchestrated runs: push is
+# mandatory, never Slack (self-sent Slacks do not notify).
+#
+# LINKS EXPIRE IN ~5 MIN (measured; see PHASE_TIMEOUT). Relay each fresh
+# AUTH_URL as it prints — an older link in an earlier message is already dead,
+# so never tell the operator to "use the link above".
 #
 # All npm invocations go through the `sfw` wrapper (Socket Firewall shim
 # machines reject bare npm).
@@ -35,8 +46,23 @@ set -uo pipefail
 #       timed out or were declined)
 
 REPO_DIR=""
-PHASE_TIMEOUT=420
-MAX_ATTEMPTS=2
+# MEASURED 2026-07-24: an unclaimed npm auth session dies at ~4m52s (the doneUrl
+# poll flips 202 -> 404 "not found"); npm publishes no TTL anywhere, so this is
+# empirical. The old 420s timeout therefore left a ~2-min window every cycle
+# where the relayed link was already dead but no fresh one had been minted —
+# that, not slow operators, is what burned five link cycles on the
+# edge-exchange-plugins 2.52.1 publish. Remint BEFORE expiry: 240s < ~292s TTL.
+# Re-measure with: curl -s -o /dev/null -w '%{http_code}' "<doneUrl>" in a loop
+# until it stops returning 202.
+PHASE_TIMEOUT=240
+# Auth links expire server-side in minutes, and every relay round-trip through
+# chat/push burns most of that window — with 2 attempts the operator has ~14
+# min total and a link is usually stale by the time they open it (the
+# 2026-07-24 edge-exchange-plugins publish burned five link cycles this way).
+# Default to a LONG remint window instead: each attempt prints a FRESH link, so
+# whenever the operator looks, a live one exists. Cost of waiting is one idle
+# PTY; cost of expiry is another full relay cycle.
+MAX_ATTEMPTS=20
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -79,6 +105,15 @@ run_phase() {
         echo "AUTH_URL $phase $url"
         url_seen=1
       fi
+    fi
+    # Expiry is also detectable directly: npm's own poll of the session's
+    # doneUrl 404s the moment it dies. Reacting to that beats waiting out the
+    # timer when npm surfaces the failure early.
+    if grep -qiE "WebLoginInvalidResponse|Invalid response from web login|not found" "$out" 2>/dev/null; then
+      kill "$CHILD_PID" 2>/dev/null
+      wait "$CHILD_PID" 2>/dev/null
+      CHILD_PID=""
+      return 124
     fi
     if [ "$waited" -ge "$PHASE_TIMEOUT" ]; then
       kill "$CHILD_PID" 2>/dev/null
