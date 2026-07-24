@@ -1,0 +1,35 @@
+# common/find-wallet.yaml — Assets tab -> Search Wallets -> open a specific
+# wallet's detail scene (Send/Receive/Trade visible). Promoted 2026-07-24: 3
+# corpus sessions (check-metadata, zcash-wallet-proof, send-spacing-flow)
+# independently re-derived this tap-by-tap before driving Send/Receive/tx-list
+# actions from the landed scene.
+# PARAMS:
+#   SEARCH_TERM — text typed into "Search Wallets" (e.g. "Ethereum", "Dash")
+#   MATCH_INDEX — index into filtered results when SEARCH_TERM matches >1
+#                 wallet (default 0 — the top/first result)
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  SEARCH_TERM: "Bitcoin"
+  MATCH_INDEX: "0"
+---
+- tapOn: "Assets"
+- extendedWaitUntil:
+    visible: "Search Wallets"
+    timeout: 20000
+- tapOn: "Search Wallets"
+- inputText: ${SEARCH_TERM}
+- runFlow:
+    when:
+      visible: "Not Now"
+    commands:
+      - tapOn: "Not Now"
+- extendedWaitUntil:
+    visible: ".*${SEARCH_TERM}.*"
+    timeout: 15000
+- tapOn:
+    text: ".*${SEARCH_TERM}.*"
+    index: ${MATCH_INDEX}
+- extendedWaitUntil:
+    visible: "Receive"
+    timeout: 15000

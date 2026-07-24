@@ -2,7 +2,8 @@
 # enter fiat amount → Next → wait for a quote → optionally force a provider.
 # Assumes logged-in app (compose login-if-needed + dismiss-startup-modals first).
 # PARAMS:
-#   SRC_WALLET / DST_WALLET — regex matched in the wallet pickers (e.g. ".*Bitcoin.*")
+#   SRC_WALLET / DST_WALLET — text typed into "Search Wallets" AND the regex
+#                             matched against the filtered result (e.g. ".*Bitcoin.*")
 #   FIAT_AMOUNT             — fiat number typed into the amount field
 #   PROVIDER                — exact provider name to force (e.g. "Maya Protocol").
 #                             Forcing works by SELECTING it in the provider sheet;
@@ -14,6 +15,11 @@
 #                             Exchange, which is account-synced and thrashes under
 #                             parallel sessions.
 # GOTCHA: amount field retains prior text — eraseText before input.
+# 2026-07-24 consolidation: added the "Search Wallets" step both wallet-picker
+# blocks were missing — 5 corpus flows across 3 sessions independently
+# re-derived this whole file from scratch because waiting for the wallet text
+# directly (no search/filter) times out once the account holds more than a
+# screenful of wallets. No caller impact (grepped: zero live runFlow callers).
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
@@ -31,6 +37,13 @@ env:
       visible: "Select Source Wallet"
     commands:
       - tapOn: "Select Source Wallet"
+      - tapOn: "Search Wallets"
+      - inputText: ${SRC_WALLET}
+      - runFlow:
+          when:
+            visible: "Not Now"
+          commands:
+            - tapOn: "Not Now"
       - extendedWaitUntil:
           visible: ${SRC_WALLET}
           timeout: 15000
@@ -42,6 +55,13 @@ env:
       visible: "Select Receiving Wallet"
     commands:
       - tapOn: "Select Receiving Wallet"
+      - tapOn: "Search Wallets"
+      - inputText: ${DST_WALLET}
+      - runFlow:
+          when:
+            visible: "Not Now"
+          commands:
+            - tapOn: "Not Now"
       - extendedWaitUntil:
           visible: ${DST_WALLET}
           timeout: 15000

@@ -16,7 +16,9 @@ already encodes, params and gotchas included.
 |---|---|---|
 | `common/login-if-needed.yaml` | (YOLO env) | Land in a logged-in account, incl. PIN entry |
 | `common/dismiss-startup-modals.yaml` | - | Clear survey/notification/update modals |
-| `common/select-swap-pair.yaml` | SRC_WALLET, DST_WALLET, FIAT_AMOUNT, PROVIDER | Exchange tab → pick wallets → amount → quote (+ provider force, amount-field eraseText gotcha) |
+| `common/select-swap-pair.yaml` | SRC_WALLET, DST_WALLET, FIAT_AMOUNT, PROVIDER | Exchange tab → pick wallets (via Search Wallets) → amount → quote (+ provider force, amount-field eraseText gotcha) |
+| `common/find-wallet.yaml` | SEARCH_TERM, MATCH_INDEX | Assets tab → search → open a wallet's detail scene (Receive/Send/Trade) |
+| `common/open-settings.yaml` | - | Side menu → Settings list (compose your own subpage nav after) |
 | `common/confirm-slider.yaml` | - | The confirm slider gesture (SOLVED — never re-derive) |
 | `buy-quote-input.yaml` / `buy-quote.yaml` | (see file) | Canonical Buy $500 proof flow |
 | `swap-quote-input.yaml` / `swap-confirm.yaml` | (see file) | Swap quote + confirm proof pair |
