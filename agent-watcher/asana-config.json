@@ -133,6 +133,11 @@
     "reviewer_bots": [
       "cursor[bot]",
       "cursor"
+    ],
+    "persistent_anchors": [
+      "main",
+      "eval-run",
+      "pokemon"
     ]
   }
 }
