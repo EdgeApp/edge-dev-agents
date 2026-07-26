@@ -67,6 +67,10 @@
         "Sonnet 4.6": {
           "gid": "1216249098365974",
           "model": "claude-sonnet-4-6[1m]"
+        },
+        "Opus 5": {
+          "gid": "1216901482929726",
+          "model": "claude-opus-5[1m]"
         }
       }
     },
