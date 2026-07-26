@@ -53,6 +53,16 @@ const IDLE_THRESHOLD_MS = 20 * 60 * 1000
 // Named discussion anchors (main/eval/pokemon/...) are NOT chat- prefixed and
 // are never reaped.
 const CHAT_IDLE_REAP_MS = 48 * 60 * 60 * 1000
+// Sessions exempt from the idle reaper, BY EXPLICIT NAME (watcher.persistent_anchors
+// in asana-config.json; matched against the name after the claude-asana-/claude-
+// prefix). Everything else — chats AND ad-hoc anchor-named sessions — reaps at
+// CHAT_IDLE_REAP_MS. Operator policy 2026-07-26: only deliberately-named sessions
+// (main, eval-run, pokemon) stay alive.
+let PERSISTENT_ANCHORS = ['main', 'eval-run', 'pokemon']
+try {
+  const cfgAnchors = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8'))?.watcher?.persistent_anchors
+  if (Array.isArray(cfgAnchors)) PERSISTENT_ANCHORS = cfgAnchors
+} catch { /* keep defaults */ }
 // Android emulators are NOT slot resources: nothing tracks their spawn (agents boot
 // them ad hoc via `emulator -avd ...`) and qemu reparents to launchd immediately, so
 // ownership can't come from ancestry or slots.json. Ownership signal instead: a
@@ -843,8 +853,19 @@ function main() {
     // Chat-session idle reaper (see CHAT_IDLE_REAP_MS). Runs after the pane
     // capture so `changed` is fresh; RC revive below still applies to chat
     // sessions younger than the reap threshold.
-    if (taskGid.startsWith('chat-') && !changed && now - (prior?.lastChange ?? now) > CHAT_IDLE_REAP_MS) {
-      log(`[${session}] chat session idle ${Math.round((now - prior.lastChange) / 3600000)}h > 48h → reaped (transcript survives; resurrect: resume-agent <term> --chat)`)
+    // Reap idle CHATS and idle UNLISTED ANCHORS alike. Exemption is an EXPLICIT
+    // allowlist (watcher.persistent_anchors), not a naming accident: any session
+    // named claude-asana-<word> used to be permanently exempt, so a one-off task
+    // session became immortal just by being named (flow-consolidation, idle 55h;
+    // nym/resume, idle 16d), while a genuinely persistent anchor resurrected
+    // under chat naming got reaped (main, 2026-07-26). Name no longer decides —
+    // the operator's list does. Transcripts always survive.
+    const isChat = taskGid.startsWith('chat-')
+    const anchorName = isChat ? null : session.replace(/^claude-(asana-)?/, '')
+    const exempt = anchorName != null && PERSISTENT_ANCHORS.includes(anchorName)
+    if (!exempt && !changed && now - (prior?.lastChange ?? now) > CHAT_IDLE_REAP_MS) {
+      const kind = isChat ? 'chat session' : `unlisted anchor '${anchorName}'`
+      log(`[${session}] ${kind} idle ${Math.round((now - prior.lastChange) / 3600000)}h > 48h → reaped (transcript survives; resurrect: resume-agent --uuid <id> --chat${isChat ? '' : ' --name <name>'}; keep one permanently via watcher.persistent_anchors)`)
       sh(`tmux kill-session -t "${session}"`)
       delete state.sessions[session]
       continue
