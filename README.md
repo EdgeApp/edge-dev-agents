@@ -118,7 +118,7 @@ flowchart TD
 - **Per-task model and effort.** Both spawn and resume route through
   `spawn-test-session.sh`, which pins the session model and reasoning effort
   from the task's `agent_model` / `agent_effort` Asana fields (models all
-  1M-context: Fable 5, Opus 4.8, Opus 4.7, Sonnet 5, Sonnet 4.6; effort
+  1M-context: Opus 5, Fable 5, Opus 4.8, Opus 4.7, Sonnet 5, Sonnet 4.6; effort
   low/medium/high/xhigh/max). Unset falls back to config defaults
   (`.watcher.agent_model` = Opus 4.8 1M, `.watcher.agent_effort` = high).
 - **Version stamp.** Every spawn and resume segment records which orch version
