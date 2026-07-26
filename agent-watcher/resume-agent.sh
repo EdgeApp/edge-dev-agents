@@ -57,6 +57,7 @@ LATEST=false
 SUMMARY=false
 IN_PLACE=false
 CHROME=false
+ANCHOR_NAME=""
 UUID=""
 TERM=""
 while [ $# -gt 0 ]; do
@@ -68,6 +69,7 @@ while [ $# -gt 0 ]; do
     --summary) SUMMARY=true; shift ;;
     --in-place) IN_PLACE=true; shift ;;         # with --chat: continue the SAME conversation (no fork).
     --chrome) CHROME=true; shift ;;             # spawn with the Chrome extension bridge enabled.
+    --name) ANCHOR_NAME="$2"; shift 2 ;;        # with --chat: resurrect as the NAMED ANCHOR claude-asana-<name> (never idle-reaped) instead of a chat.
                                                 # For resuming a DEAD DISCUSSION FORK: forking a fork
                                                 # duplicates history again and pollutes future search.
     --uuid) UUID="${2:-}"; shift 2 ;;           # exact transcript selection; bypasses matching entirely
@@ -297,10 +299,22 @@ if $CHAT; then
   #     sweep from retiring it when the task is Complete (same pattern as the
   #     main/eval discussion sessions).
   #   - --remote-control chat-<slug>: reachable from the phone session list.
+  # --name <anchor> resurrects a session as a NAMED ANCHOR (claude-asana-<name>,
+  # RC <name>) instead of a chat. This matters because the watchdog's idle
+  # reaper kills `claude-asana-chat-*` after 48h and exempts anchors BY NAME:
+  # resurrecting a persistent anchor (main/eval/pokemon/...) with the default
+  # chat naming silently DEMOTES it into the reap pool, which is how the "main"
+  # chat died 2026-07-26 exactly 48h after its resurrection. Resurrecting an
+  # anchor? Pass --name <its original name>.
   SLUG=$(printf '%s' "${TERM:-${UUID:-latest}}" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-' | cut -c1-24)
+  RC_NAME="chat-${SLUG}"
   TMUX_NAME="claude-asana-chat-${SLUG}"
+  if [[ -n "$ANCHOR_NAME" ]]; then
+    RC_NAME="$ANCHOR_NAME"
+    TMUX_NAME="claude-asana-${ANCHOR_NAME}"
+  fi
   if tmux has-session -t "$TMUX_NAME" 2>/dev/null; then
-    echo ">> resume-agent: chat session $TMUX_NAME already exists — attach: tmux attach -t $TMUX_NAME (or find 'chat-$SLUG' in your remote session list)" >&2
+    echo ">> resume-agent: chat session $TMUX_NAME already exists — attach: tmux attach -t $TMUX_NAME (or find '$RC_NAME' in your remote session list)" >&2
     exit 0
   fi
   CHAT_CWD="$PWD"   # the cwd resolution above already ran
@@ -318,7 +332,7 @@ if $CHAT; then
   tmux send-keys -t "$TMUX_NAME" C-u   # clear any stray typed text before the command
   CHROME_FLAG=""
   $CHROME && CHROME_FLAG="--chrome"
-  tmux send-keys -t "$TMUX_NAME" "claude --resume $LATEST_UUID $FORK_FLAG $CHROME_FLAG --dangerously-skip-permissions --remote-control chat-$SLUG" Enter
+  tmux send-keys -t "$TMUX_NAME" "claude --resume $LATEST_UUID $FORK_FLAG $CHROME_FLAG --dangerously-skip-permissions --remote-control $RC_NAME" Enter
   # Auto-answer the resume-summary menu (option 1, pre-selected) when it appears.
   for _ in $(seq 1 30); do
     sleep 2
@@ -365,7 +379,7 @@ if $CHAT; then
     fi
   fi
   MODE_DESC="fork of"; $IN_PLACE && MODE_DESC="continuing"
-  echo ">> resume-agent: chat session up — tmux: $TMUX_NAME | remote: chat-$SLUG | $MODE_DESC $LATEST_UUID"
+  echo ">> resume-agent: chat session up — tmux: $TMUX_NAME | remote: $RC_NAME | $MODE_DESC $LATEST_UUID"
   exit 0
 fi
 
