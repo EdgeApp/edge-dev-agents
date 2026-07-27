@@ -179,7 +179,7 @@
       ]
     },
     "pr-land:asana-last": {
-      "hash": "af3e35286071",
+      "hash": "721e2f89af5c",
       "dims": [
         "A15"
       ]
@@ -410,7 +410,7 @@
       ]
     },
     "one-shot:land-on-approval": {
-      "hash": "23569abff87c",
+      "hash": "6ad156c7b63f",
       "dims": [
         "A8"
       ]
@@ -1278,10 +1278,6 @@
     "build-and-test:hack-verify-visual-changes": {
       "reason": "2026-07-23: graded through existing dimensions rather than its own: A7 grades the concession side via the concession-validator taxonomy (which now denies a visual concession with no hack-forced frame), A9 grades the report declaration, A13 grades the PR marker",
       "hash": "30c181905375"
-    },
-    "asana-task-update:agent-authored-markers": {
-      "reason": "2026-07-27: Fully mechanical: MCP writes rewritten by hooks/mark-agent-authored-asana.sh and script writes wrapped by agent-authored-text.sh, both idempotent, so an agent cannot violate it and there is no behavior to grade; a missing marker would be a hook/script regression, caught by the marker check, not an agent finding",
-      "hash": "6f80f41ae425"
     }
   },
   "excluded_skills": {

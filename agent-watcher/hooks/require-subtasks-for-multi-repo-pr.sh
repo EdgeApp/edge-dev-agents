@@ -12,8 +12,11 @@ set -euo pipefail
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
 
-# Only gate pr-create invocations.
-case "$CMD" in *pr-create*) ;; *) exit 0 ;; esac
+# Only gate pr-create.sh invocations. Match the SCRIPT, not the directory: a bare
+# *pr-create* also matched sibling helpers that live under skills/pr-create/scripts/
+# (pr-attach-screenshots.sh), which do not attach anything to Asana and were blocked
+# with no compliant way through.
+case "$CMD" in *pr-create.sh*) ;; *) exit 0 ;; esac
 # The compliant multi-repo paths are explicitly allowed.
 printf '%s' "$CMD" | grep -q -- '--no-asana-attach' && exit 0
 printf '%s' "$CMD" | grep -q -- '--create-subtask' && exit 0
