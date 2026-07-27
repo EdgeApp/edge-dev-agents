@@ -110,13 +110,6 @@ _None observed._
      should have + a concrete suggested fix. Feeds /author. -->
 _None observed._
 
-## Task-Drafting Feedback
-<!-- cat: task-drafting -->
-<!-- What the task description got right or wrong. Info the agent had to guess or hunt
-     for (creds, paths, acceptance criteria, scope bounds, push/no-push, required
-     account/KYC/funds preconditions). What to include in the next task of this kind. -->
-_None observed._
-
 ## Follow-ups & Risks
 <!-- cat: follow-ups -->
 <!-- Forward-looking items the task surfaced but did not (and should not) resolve:
