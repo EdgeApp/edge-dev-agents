@@ -45,7 +45,7 @@ TOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$DIR/credentials.json" 2>
 
 API="https://app.asana.com/api/1.0"
 ATT="$(curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" \
-  "$API/tasks/$TASK_GID/attachments?opt_fields=name,created_at")" || { echo "check-followup-scope: attachments fetch failed" >&2; exit 1; }
+  "$API/tasks/$TASK_GID/attachments?opt_fields=name,created_at,gid")" || { echo "check-followup-scope: attachments fetch failed" >&2; exit 1; }
 STORIES="$(curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" \
   "$API/tasks/$TASK_GID/stories?opt_fields=created_at,resource_subtype,text,created_by.name")" || { echo "check-followup-scope: stories fetch failed" >&2; exit 1; }
 echo "$ATT" | jq -e '.data' >/dev/null 2>&1 || { echo "check-followup-scope: attachments response invalid: $(echo "$ATT" | head -c 200)" >&2; exit 1; }
@@ -53,6 +53,7 @@ echo "$STORIES" | jq -e '.data' >/dev/null 2>&1 || { echo "check-followup-scope:
 
 # Watermark: newest agent-run-report*.md attachment. ISO-8601 sorts lexically.
 WATERMARK="$(echo "$ATT" | jq -r '[.data[] | select(.name | test("^agent-run-report.*\\.md$")) | .created_at] | sort | last // empty')"
+WATERMARK_GID="$(echo "$ATT" | jq -r --arg w "$WATERMARK" 'first(.data[] | select(.name | test("^agent-run-report.*\\.md$")) | select(.created_at == $w) | .gid) // empty')"
 
 # Comments newer than the watermark (all comments when no report was ever attached).
 NEWER="$(echo "$STORIES" | jq --arg w "$WATERMARK" \
@@ -135,3 +136,40 @@ else
   echo ">>   field deltas: $DELTA_STATUS"
 fi
 echo ">>   marker written: $MARKER"
+
+# PRIOR-REPORT RECALL. Every resume compacts the session, and the summary is
+# lossy exactly where the report is dense (what was verified vs assumed, rejected
+# review findings, deferred follow-ups). The report is the durable record and was
+# never being re-read — runs re-litigated settled questions from paraphrased
+# memory. Print a BOUNDED excerpt of the watermark report here, at the one call
+# every followup makes while establishing scope. Best-effort: any failure is
+# silent, this must never break the comment enumeration above.
+if [[ -n "$WATERMARK_GID" ]]; then
+  DL="$(curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" \
+    "$API/attachments/$WATERMARK_GID?opt_fields=download_url,name" 2>/dev/null \
+    | jq -r '.data.download_url // empty' 2>/dev/null || true)"
+  if [[ -n "$DL" ]]; then
+    BODY="$(curl -sSL --max-time 30 "$DL" 2>/dev/null || true)"
+    if [[ -n "$BODY" ]]; then
+      echo ">>"
+      echo ">> PRIOR RUN REPORT (watermark $WATERMARK) — the durable record of what the"
+      echo ">> last segment did. Your compacted memory is a lossy paraphrase of this;"
+      echo ">> trust these lines over recollection, and do NOT re-derive what they settle."
+      # Frontmatter (outcome/verified/verify_blockers) then the sections a followup
+      # most often re-litigates. Each section capped so a long report cannot flood
+      # the context this call exists to protect.
+      printf '%s\n' "$BODY" | awk '
+        /^---$/ { fm++; if (fm<=2) { print "     " $0; next } }
+        fm==1 { print "     " $0; next }
+      ' | head -12
+      for SEC in "Testing" "Decisions" "Follow-ups & Risks"; do
+        printf '%s\n' "$BODY" | awk -v sec="## $SEC" '
+          index($0, sec)==1 { inSec=1; print "     " $0; next }
+          /^## / { inSec=0 }
+          inSec && NF { print "     " $0 }
+        ' | head -14
+      done
+      echo ">>   (full report: the newest agent-run-report*.md attachment on the task)"
+    fi
+  fi
+fi
