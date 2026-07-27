@@ -175,6 +175,16 @@ fi
 [[ -n "$NAME" ]] || { echo "ERROR: --name is required" >&2; exit 1; }
 [[ -n "$NOTES_FILE" ]] || { echo "ERROR: --notes-file is required" >&2; exit 1; }
 [[ -f "$NOTES_FILE" ]] || { echo "ERROR: notes file not found: $NOTES_FILE" >&2; exit 1; }
+
+# Agent-authored description: mark it (🥋 / 👊) so a human scanning the task can
+# tell orch prose from operator prose. Idempotent, so a pre-marked notes file is
+# left alone. Same markers the MCP write path gets via
+# hooks/mark-agent-authored-asana.sh.
+_MARKER="$HOME/.config/agent-watcher/agent-authored-text.sh"
+if [[ -x "$_MARKER" ]]; then
+  _MARKED_NOTES="$(mktemp "${TMPDIR:-/tmp}/asana-notes.XXXXXX")"
+  "$_MARKER" < "$NOTES_FILE" > "$_MARKED_NOTES" && NOTES_FILE="$_MARKED_NOTES"
+fi
 for f in "${ATTACH_FILES[@]:-}"; do
   [[ -z "$f" || -f "$f" ]] || { echo "ERROR: attach file not found: $f" >&2; exit 1; }
 done

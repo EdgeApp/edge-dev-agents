@@ -162,6 +162,10 @@ IMPLEMENTOR_GID="$CURRENT_USER_GID"
 IMPLEMENTOR_NAME="current user"
 
 # Phase 3: Create the task
+# Mark agent-authored description (🥋 / 👊), idempotently — same markers the MCP
+# write path gets via hooks/mark-agent-authored-asana.sh.
+_MARKER="$HOME/.config/agent-watcher/agent-authored-text.sh"
+[[ -x "$_MARKER" ]] && TASK_NOTES="$("$_MARKER" <<< "$TASK_NOTES")"
 NOTES_JSON=$(python3 -c "import json; print(json.dumps('''$TASK_NOTES'''))")
 
 # Build projects list from comma-separated GIDs
