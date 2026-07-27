@@ -200,7 +200,17 @@ async function publishRepo(repo, branch) {
       if (pkg.scripts?.verify) {
         execSync(`"${pmScript}" run verify`, { cwd: repoDir, stdio: "inherit" });
       } else {
-        execSync(`"${pmScript}" run tsc && "${pmScript}" run lint`, { cwd: repoDir, stdio: "inherit" });
+        // Not every repo exposes standalone `tsc`/`lint` scripts. edge-login-ui-rn,
+        // for example, type-checks inside `prepare` and defines no `tsc` script, so
+        // `npm run tsc` here died with "Missing script" and failed an otherwise-clean
+        // publish. Run each only when it exists so a missing script is a skip, not a
+        // hard failure (mirrors verify-repo.sh's per-script guarding).
+        if (pkg.scripts?.tsc) {
+          execSync(`"${pmScript}" run tsc`, { cwd: repoDir, stdio: "inherit" });
+        }
+        if (pkg.scripts?.lint) {
+          execSync(`"${pmScript}" run lint`, { cwd: repoDir, stdio: "inherit" });
+        }
       }
     } catch (e) {
       results.error = "Verification failed";
