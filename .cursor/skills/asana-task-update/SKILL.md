@@ -6,10 +6,6 @@ metadata:
   author: j0ntz
 ---
 
-<rules description="Non-negotiable constraints.">
-<rule id="agent-authored-markers">Every piece of Asana prose the orch writes (comments, task descriptions, subtask notes) carries authorship markers: `🥋` alone on the first line, `👊` alone on the last. This is MECHANICAL, not something to hand-type: MCP Asana writes are rewritten by `hooks/mark-agent-authored-asana.sh`, and scripts pipe their text through `~/.config/agent-watcher/agent-authored-text.sh`. Both are idempotent, so never add the markers yourself — text you pre-mark is passed through unchanged, and text you forget is marked for you. A new Asana write path MUST route through one of the two (check with `agent-authored-text.sh --check`).</rule>
-</rules>
-
 <goal>Perform Asana task mutations through one shared command and one shared script, so all callers use the same field mappings and prompts.</goal>
 
 <rules description="Non-negotiable constraints.">

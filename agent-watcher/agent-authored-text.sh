@@ -6,8 +6,8 @@
 # subtask notes) is marked so a human scanning a task can tell agent output from
 # operator output at a glance:
 #
-#   🥋            <- first line, alone
-#   <the text>
+#   🥋 <the text starts inline, after one space>
+#   <...>
 #   👊            <- last line, alone
 #
 # Deterministic, not prose: scripts pipe their text through here, and the
@@ -34,11 +34,11 @@ MODE="wrap"
 
 if [[ $# -gt 0 ]]; then TEXT="$*"; else TEXT="$(cat)"; fi
 
-# Already wrapped? First non-empty line is the open marker AND last non-empty
-# line is the close marker.
+# Already wrapped? First non-empty line STARTS WITH the open marker (it sits
+# inline with the text) AND the last non-empty line is the close marker alone.
 first_ne="$(printf '%s\n' "$TEXT" | grep -m1 -v '^[[:space:]]*$' || true)"
 last_ne="$(printf '%s\n' "$TEXT" | grep -v '^[[:space:]]*$' | tail -1 || true)"
-if [[ "$(printf '%s' "$first_ne" | tr -d '[:space:]')" == "$OPEN" \
+if [[ "$first_ne" == "$OPEN"* \
    && "$(printf '%s' "$last_ne" | tr -d '[:space:]')" == "$CLOSE" ]]; then
   [[ "$MODE" == "check" ]] && exit 0
   printf '%s' "$TEXT"
@@ -46,4 +46,4 @@ if [[ "$(printf '%s' "$first_ne" | tr -d '[:space:]')" == "$OPEN" \
 fi
 
 [[ "$MODE" == "check" ]] && exit 1
-printf '%s\n%s\n%s' "$OPEN" "$TEXT" "$CLOSE"
+printf '%s %s\n%s' "$OPEN" "$TEXT" "$CLOSE"

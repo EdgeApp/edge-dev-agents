@@ -24,9 +24,9 @@ esac
 UPDATED=$(printf '%s' "$INPUT" | jq -c '
   def marked: (. // "") | (
     (split("\n") | map(select(test("^\\s*$") | not))) as $ne
-    | ($ne[0] // "" | gsub("\\s"; "")) == "🥋" and ($ne[-1] // "" | gsub("\\s"; "")) == "👊"
+    | (($ne[0] // "") | startswith("🥋")) and (($ne[-1] // "" | gsub("\\s"; "")) == "👊")
   );
-  def mark: if (. == null or . == "" or marked) then . else "🥋\n" + . + "\n👊" end;
+  def mark: if (. == null or . == "" or marked) then . else "🥋 " + . + "\n👊" end;
   .tool_input
   | (.text?          |= mark)
   | (.html_text?     |= mark)

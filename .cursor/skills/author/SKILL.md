@@ -10,22 +10,69 @@ Skills (`~/.cursor/skills/*/SKILL.md`): The standard unit. Can be invoked explic
 </commands-vs-skills>
 
 <authoring-principles>
+
+<group name="Voice and shape" purpose="How a rule reads, and where it sits.">
+
 <principle id="prescriptive">Be prescriptive, not descriptive. Commands tell the agent what to DO, not what things ARE.</principle>
-<principle id="no-incident-narration">Rules carry the imperative, never the incident that motivated it. No audit statistics, no dated incident tags ("the FooProvider run, 2031-01-05"), no history of how a behavior used to work ("this flipped from off-by-default"). The evidence trail lives in eval reports and git history; a rule that narrates its origin grows on every incident and buries its own imperative. When patching a rule after an incident, write the counter-imperative the incident taught — not the incident.</principle>
-<principle id="rationale-once">A rationale is stated ONCE, in the rule that owns it; every dependent rule cross-references the id without restating the why. Restated rationale is the main way related rules balloon in lockstep.</principle>
-<principle id="brief-examples">Examples must be brief and hypothetical. Never use real data from conversations. Keep examples to 3-5 lines max.</principle>
-<principle id="dry">DRY across commands. If two commands share logic, extract it into a shared file and have both reference it.</principle>
-<principle id="ordering">Order of operations matters. The agent reads top-to-bottom. Put context-setting steps before action steps.</principle>
+
 <principle id="rules-first">Hard rules at the top. Non-negotiable constraints go right after the Goal so they're read before any steps.</principle>
+
+<principle id="ordering">Order of operations matters. The agent reads top-to-bottom: context-setting steps before action steps.</principle>
+
 <principle id="escape-hatches">Escape hatches over assumptions. When ambiguity exists, tell the agent to ask — don't let it guess.</principle>
-<principle id="scripts-over-reasoning">Offload all deterministic logic to companion scripts. If an operation has a known, repeatable sequence of steps (API calls, git commands, file parsing, linting, data fetching), it belongs in a `.sh` script — not inline in the `.md` as shell blocks the agent must reason about. The `.md` file should only handle semantic decisions, user interaction, and interpreting script output. This eliminates context bloat and prevents the agent from re-deriving logic it doesn't need to understand.</principle>
-<principle id="enforcement-over-prose">Prose documents; hooks enforce. When a rule constrains an orchestrated agent's in-the-moment tool behavior (a "never do X mid-flow": raw commits, coordinate taps, PR creation without test evidence), do not stop at prose — under mid-flow momentum agents violate rules they have read. Pair the rule with a PreToolUse hook whenever the violation is mechanically detectable from tool inputs (command string, file path/content, tool name). Hook conventions: scripts live in `~/.config/agent-watcher/hooks/` (the existing scripts there are the pattern exemplars); no-op unless `AGENT_TASK_GID` is set; block via exit 2 with stderr naming the violated rule id AND the compliant path; provide an auditable escape-hatch file (`/tmp/agent-<concern>-<gid>.md`, audited by /eval-run — an unjustified note is a finding); pipe-test EVERY vector with synthetic stdin payloads before wiring; register in `~/.claude/settings.json` under matcher group(s) covering ALL vectors that can express the action (a Bash heredoc can author the same content Write/Edit can — cover both). Rules governing judgment, sequencing, or report content stay prose-only — hooks are for mechanically checkable actions.</principle>
-<principle id="batch-tool-calls">Minimize round-trips. When a step requires multiple independent pieces of information (e.g., git status + git log + git diff), instruct the agent to gather them all in parallel tool calls within a single message/script — not sequentially. Group independent reads, searches, and shell commands together. Only sequence calls when one depends on the output of another.</principle>
-<principle id="no-duplicate-automation">Don't duplicate in semantic rules what companion scripts already automate. If a script handles linting, formatting, localization, or other post-processing, the command should reference the script — not also instruct the agent to perform those steps. Duplication risks the agent running a step twice or conflicting with the script's output.</principle>
-<principle id="gh-cli-over-curl">For GitHub API operations in companion scripts, use `gh api` and `gh api graphql` over raw `curl` + `$GITHUB_TOKEN`. `gh` handles authentication, pagination (`--paginate`), and API versioning automatically. Use GraphQL (`gh api graphql -f query="..."`) to fetch only required fields in a single request, reducing API calls and context size. Fall back to REST (`gh api repos/...`) only when GraphQL doesn't expose the needed data (e.g., file patches).</principle>
-<principle id="node-over-python">When companion scripts need capabilities beyond bash (JSON manipulation, complex regex, structured data processing, async I/O), embed Node.js inline via `exec node -e '...'` rather than depending on Python. Node is already a required dependency for other scripts; adding Python creates an unnecessary second runtime dependency. This keeps scripts as single `.sh` files while unlocking full-featured processing. Avoid single quotes inside the inline node code (bash single-quoted string boundary); use `\x27` in regex to match literal single quotes.</principle>
-<principle id="name-tracks-scope">A skill's or script's NAME must keep describing what it actually does. Names silently drift out of truth as responsibilities accrete — a thing named for its original single purpose quietly grows three (e.g. an `rc-watchdog` that also runs a completion sweep and worktree GC; RC is now one of three jobs). When an edit broadens, narrows, or shifts what a skill/script does, treat the name as part of the diff: if it no longer accurately and clearly reflects the current responsibilities, the rename belongs in this change, not a someday-cleanup. Never rename silently — renames ripple through callers, launchd jobs, and docs — so propose the clearer name and have the user confirm first. Operationalized in the `<revision-checklist>` name-accuracy item; see also `<companion-scripts>` ("name by what it DOES").</principle>
-<principle id="minimize-context">Companion scripts must minimize context consumption. Return structured, filtered summaries — never raw API responses or full file contents. When a script processes large inputs (logs, exports, API payloads), extract only the fields the command needs and discard the rest. Commands should instruct the agent to use targeted reads (grep, line ranges) over full file reads for large files. Every token of script output that the agent reads costs context — design outputs to be as compact as possible while remaining parseable.</principle>
+
+<principle id="brief-examples">Examples are brief and hypothetical, 3-5 lines max. Never real data from conversations.</principle>
+
+</group>
+
+<group name="Keep it lean" purpose="Every line an agent must read costs context and dilutes the rest. These are the anti-bloat rules.">
+
+<principle id="no-prose-for-mechanical">If a hook or script ALREADY makes the behavior deterministic, write NO agent-facing prose for it.
+A rule exists to change what an agent decides. When the outcome cannot vary — a PreToolUse hook rewrites the payload, a script wraps the text, a gate blocks the call — there is no decision left to instruct, so the rule is pure bloat and one more thing to drift out of date.
+- Explanation goes in the HOOK or SCRIPT header, where whoever changes the mechanism will read it.
+- Rewriting (idempotent, `updatedInput`) beats blocking beats prose. Prefer the mechanism the agent cannot even notice.
+- `rubric-drift.sh --ack <skill>:<rule> --reason "mechanically enforced by <path>"` when a rule is deliberately mechanism-only.
+- Prose IS still needed when the agent must supply judgment the mechanism can't: which flag to pass, when the step applies, what a non-obvious verdict means.
+Test: "if the agent read nothing about this, would the outcome differ?" No → no prose.</principle>
+
+<principle id="no-incident-narration">Rules carry the imperative, never the incident that motivated it. No audit statistics, no dated incident tags ("the FooProvider run, 2031-01-05"), no history of how a behavior used to work. The evidence trail lives in eval reports and git history; a rule that narrates its origin grows on every incident and buries its own imperative. When patching a rule after an incident, write the counter-imperative the incident taught — not the incident.</principle>
+
+<principle id="rationale-once">A rationale is stated ONCE, in the rule that owns it; dependent rules cross-reference the id without restating the why. Restated rationale is the main way related rules balloon in lockstep.</principle>
+
+<principle id="dry">DRY across commands. If two commands share logic, extract it into a shared file and have both reference it.</principle>
+
+<principle id="no-duplicate-automation">Don't restate in prose what a companion script already automates. Reference the script instead — duplication risks the agent running a step twice or fighting the script's output.</principle>
+
+<principle id="minimize-context">Scripts return structured, filtered summaries — never raw API responses or whole files. Extract the fields the command needs and discard the rest; instruct targeted reads (grep, line ranges) over full reads for large files. Every token of script output costs context.</principle>
+
+</group>
+
+<group name="Determinism" purpose="Push work out of the agent's reasoning and into code, which cannot forget.">
+
+<principle id="scripts-over-reasoning">Offload all deterministic logic to companion scripts. A known, repeatable sequence (API calls, git commands, file parsing, linting, data fetching) belongs in a `.sh` script — not inline in the `.md` as shell blocks the agent must reason about. The `.md` handles semantic decisions, user interaction, and interpreting script output.</principle>
+
+<principle id="enforcement-over-prose">Prose documents; hooks enforce. When a rule constrains in-the-moment tool behavior (a "never do X mid-flow": raw commits, coordinate taps, PR creation without test evidence), do not stop at prose — under mid-flow momentum agents violate rules they have read. Pair the rule with a PreToolUse hook whenever the violation is mechanically detectable from tool inputs (command string, file path/content, tool name). Hook conventions:
+- Scripts live in `~/.config/agent-watcher/hooks/` (existing ones are the exemplars); no-op unless `AGENT_TASK_GID` is set.
+- Block via exit 2, with stderr naming the violated rule id AND the compliant path.
+- Give an auditable escape hatch (`/tmp/agent-<concern>-<gid>.md`, audited by /eval-run — an unjustified note is a finding).
+- Pipe-test EVERY vector with synthetic stdin payloads before wiring.
+- Register in `~/.claude/settings.json` under matcher group(s) covering ALL vectors that can express the action (a Bash heredoc can author what Write/Edit can — cover both).
+Rules governing judgment, sequencing, or report content stay prose-only; hooks are for mechanically checkable actions. Once a hook fully determines the outcome, drop the prose per `no-prose-for-mechanical`.</principle>
+
+<principle id="batch-tool-calls">Minimize round-trips. When a step needs several independent facts (git status + log + diff), instruct parallel tool calls in ONE message — sequence only when one call depends on another's output.</principle>
+
+</group>
+
+<group name="Script craft" purpose="Conventions for the companion scripts the principles above keep sending work to.">
+
+<principle id="gh-cli-over-curl">For GitHub API work use `gh api` / `gh api graphql`, never raw `curl` + `$GITHUB_TOKEN` — `gh` handles auth, pagination (`--paginate`), and versioning. Prefer GraphQL to fetch only the needed fields in one request; fall back to REST when GraphQL lacks the data (e.g. file patches).</principle>
+
+<principle id="node-over-python">Need more than bash (JSON manipulation, complex regex, structured data, async I/O)? Embed Node inline via `exec node -e '...'` rather than adding a Python dependency — Node is already required. Avoid single quotes inside the inline code (bash string boundary); use `\x27` to match a literal quote in regex.</principle>
+
+<principle id="name-tracks-scope">A skill's or script's NAME must keep describing what it actually does. Names drift as responsibilities accrete — a thing named for one purpose quietly grows three. When an edit broadens, narrows, or shifts scope, treat the name as part of the diff: if it no longer fits, the rename belongs in THIS change. Never rename silently (renames ripple through callers, launchd jobs, docs) — propose the clearer name and get confirmation. Operationalized in `<revision-checklist>`; see also `<companion-scripts>`.</principle>
+
+</group>
+
 </authoring-principles>
 
 <formatting>
@@ -93,6 +140,7 @@ When revising an existing command, **every item below is mandatory** — not a s
 
 1. Read the full file before making changes
 2. Check for duplicated logic across other commands — consolidate if found
+2b. **Delete prose a mechanism already determines** (`no-prose-for-mechanical`): for each rule you touch, ask whether a hook/script now fully decides the outcome. If so, remove the rule, move the explanation into the mechanism's header, and `--ack` it in rubric-drift. Adding a mechanism WITHOUT deleting the prose it replaces is how skills accrete dead weight.
 3. **Check behavioral dependencies**: Search for other commands, skills, and rules that perform similar operations or share domain overlap with the one being edited. If command A has a step that is a lightweight version of command B's core behavior (e.g., `/pr-land` addressing comments vs `/pr-address`), verify that A's step is consistent with B's rules — missing rules in A are likely bugs.
    - Extract domain-specific verbs and nouns from the step being edited (e.g., a step about handling PR comments yields: `comment`, `reply`, `resolve`, `address`, `fixup`, `thread`)
    - Search each term across commands, skills, and rules:
