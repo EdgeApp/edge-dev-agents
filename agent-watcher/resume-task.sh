@@ -73,11 +73,17 @@ if [[ -z "$SESSION_ID" ]]; then
   # cross-task references, watcher output — must NOT match.)
   first_gid_of() { grep -oE "asana\.com/0/[0-9]+/[0-9]+" "$1" 2>/dev/null | head -1 | grep -oE '[0-9]+$' || true; }
 
+  # RUN SIGNATURE required: without this gate a `resume-agent --chat` discussion
+  # fork (which inherits the run's first asana URL and is always newer) would be
+  # resumed as the run. Rationale and implementation scars live in the lib.
+  . "$DIR/lib/run-signature.sh"
+
   RESUMABLE_DIR="$PROJECTS/-Users-eddy-git"
   NEWEST=""; NEWEST_MT=0
   if [[ -d "$RESUMABLE_DIR" ]]; then
     for f in "$RESUMABLE_DIR"/*.jsonl; do
       [[ -f "$f" ]] || continue
+      has_run_signature "$f" || continue
       if [[ "$(first_gid_of "$f")" == "$TASK_GID" ]]; then
         MT=$(stat -f %m "$f" 2>/dev/null || echo 0)
         if [[ "$MT" -gt "$NEWEST_MT" ]]; then NEWEST_MT="$MT"; NEWEST="$f"; fi
