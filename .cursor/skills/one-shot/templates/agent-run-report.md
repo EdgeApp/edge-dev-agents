@@ -3,6 +3,10 @@ task_gid: ""
 task_name: ""
 agent_session_uuid: ""   # $AGENT_SESSION_UUID — the orchestration session that produced this run
 orch_version: ""         # $AGENT_ORCH_VERSION — digest of the orch (skills/rules/watcher/hooks) governing this segment
+# The three below are auto-filled at attach by require-clean-run-report.sh. Leave blank.
+claude_session_id: ""
+generated: ""
+tdd_doc: ""
 repo: ""
 branch: ""
 base: origin/develop

@@ -57,13 +57,13 @@
       ]
     },
     "one-shot:report-as-attachment": {
-      "hash": "9ada08dfe540",
+      "hash": "1188946d249f",
       "dims": [
         "A9"
       ]
     },
     "file:agent-run-report.md": {
-      "hash": "91ec5bcb8e5a",
+      "hash": "109b1be77a10",
       "dims": [
         "A18",
         "A20",
@@ -137,7 +137,7 @@
       ]
     },
     "pr-create:attach-test-evidence": {
-      "hash": "cd7c05b4df65",
+      "hash": "4a7512dbe6ca",
       "dims": [
         "A13"
       ]
@@ -422,7 +422,7 @@
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "732bdd69484c",
+      "hash": "8801a011fe50",
       "dims": [
         "A9"
       ]
@@ -506,7 +506,7 @@
       ]
     },
     "one-shot:pr-body-current-before-complete": {
-      "hash": "b1311b20a1b0",
+      "hash": "18f4153ae4da",
       "dims": [
         "A29"
       ]
@@ -523,6 +523,12 @@
       "hash": "a3d1968e39bc",
       "dims": [
         "A24"
+      ]
+    },
+    "file:no-slop-lint.sh": {
+      "hash": "86ba887f9570",
+      "dims": [
+        "A9"
       ]
     }
   },
@@ -1276,8 +1282,8 @@
       "hash": "c32f66511e88"
     },
     "build-and-test:hack-verify-visual-changes": {
-      "reason": "2026-07-23: graded through existing dimensions rather than its own: A7 grades the concession side via the concession-validator taxonomy (which now denies a visual concession with no hack-forced frame), A9 grades the report declaration, A13 grades the PR marker",
-      "hash": "30c181905375"
+      "reason": "2026-07-28: hack provenance is graded via A13 (HACKED token + specific --hack-note banner) and A9 (Testing-section declaration); the rule body is capture procedure the validator/concession layer enforces",
+      "hash": "f12ed2e6a7ae"
     }
   },
   "excluded_skills": {
