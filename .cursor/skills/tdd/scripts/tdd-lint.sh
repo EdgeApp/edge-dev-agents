@@ -111,3 +111,11 @@ if (findings.length === 0) {
   process.exit(1)
 }
 ' "$FILE"
+RC=$?
+
+# Shared prose checks (em dashes, banned vocabulary, count-announcement
+# openers) — see no-slop-lint.sh for tiers and the v2 semantic-judge note.
+"$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh" "$FILE"
+RC2=$?
+[ "$RC" -ne 0 ] || [ "$RC2" -ne 0 ] && exit 1
+exit 0
