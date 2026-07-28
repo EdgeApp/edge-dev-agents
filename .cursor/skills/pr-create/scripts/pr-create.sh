@@ -299,6 +299,25 @@ if (asanaTask) {
   }
 }
 
+// Inject the TDD doc link if this branch carries one and the body omits it.
+// Branch-HEAD form (never a commit permalink): a reviewer opening the PR must
+// land on the doc as it stands with the code. The pinned form belongs to the run
+// report, which freezes at the state it audited. Both come from tdd-doc-links.sh
+// so the two surfaces cannot format the URL differently.
+try {
+  const links = execSync(
+    `${os.homedir()}/.cursor/skills/tdd/scripts/tdd-doc-links.sh`,
+    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }
+  );
+  const tddUrl = links.match(/^TDD_BRANCH_URL=(.+)$/m)?.[1];
+  if (tddUrl && !body.includes(tddUrl)) {
+    const link = `[Technical design doc](${tddUrl})`;
+    body =
+      insertAfterHeading(body, "### Description", link) ??
+      appendDescriptionSection(body, link);
+  }
+} catch {}
+
 // Create PR via gh CLI — write body to a temp file to avoid arg length issues
 const tmpBody = path.join(os.tmpdir(), `pr-body-${process.pid}.md`);
 fs.writeFileSync(tmpBody, body, "utf8");

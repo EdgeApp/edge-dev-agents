@@ -19,7 +19,7 @@ metadata:
 <rule id="flag-contract">`--asana-attach` only runs when a task GID is available from chat context or explicit `--asana-task <gid>`. If no task GID is available, fail fast and skip the attach.</rule>
 <rule id="script-timeouts">Asana updates can take up to 90s. Use `block_until_ms: 120000` for `asana-task-update.sh` calls.</rule>
 <rule id="repo-template-required">If the repo has `.github/PULL_REQUEST_TEMPLATE.md`, the PR body must preserve that template's section headings. Do NOT substitute generic sections like `Summary` or `Test plan`.</rule>
-<rule id="attach-test-evidence">When proof screenshots of the change exist (an orchestrated run's `/build-and-test` saves them as `/tmp/agent-proof-<task-gid>-NN-<slug>.png`, or the caller names files), attach them to the PR after creation via `~/.cursor/skills/pr-create/scripts/pr-attach-screenshots.sh --repo <owner/repo> --pr <num> <png...>` — it uploads them to the public assets branch (`edge-dev-agents@agent-pr-assets`) and posts ONE comment embedding the images inline (filename slug → caption; argument order → display order; a `HACKED` token in a filename → 🩹 caption + banner, per build-and-test `hack-verify-visual-changes`). GitHub has NO API for uploading images directly into comments — do NOT inline base64, commit images onto the PR branch, or link local paths. If no proof screenshots exist, skip silently (not every PR is app-testable).</rule>
+<rule id="attach-test-evidence">When proof screenshots of the change exist (an orchestrated run's `/build-and-test` saves them as `/tmp/agent-proof-<task-gid>-NN-<slug>.png`, or the caller names files), attach them to the PR after creation via `~/.cursor/skills/pr-create/scripts/pr-attach-screenshots.sh --repo <owner/repo> --pr <num> <png...>` — it downscales copies for upload, uploads them to the public assets branch (`edge-dev-agents@agent-pr-assets`), and posts ONE comment embedding the images inline (filename slug → caption; argument order → display order; a `HACKED` token in a filename → 🪓 caption + a banner stating what was hacked, per build-and-test `hack-verify-visual-changes`). When ANY attached file carries the `HACKED` token, you MUST pass `--hack-note "<one short line: what was hacked>"` (e.g. "hard-coded the empty-state branch true in WalletList") — the script refuses to post without it, so the banner names the actual hack instead of a generic paragraph. Reuse the same hack description you wrote for the report's Testing section. GitHub has NO API for uploading images directly into comments — do NOT inline base64, commit images onto the PR branch, or link local paths. If no proof screenshots exist, skip silently (not every PR is app-testable).</rule>
 </rules>
 
 <step id="1" name="Push branch">
@@ -78,7 +78,7 @@ Per `attach-test-evidence`: if proof screenshots exist for this change (`ls /tmp
   /tmp/agent-proof-<task-gid>-01-<slug>.png [more...]
 ```
 
-Pass them in narrative order (NN prefix). No screenshots → skip silently. Never rename a `HACKED`-marked file to hide the marker — the script keys the 🩹 caption and banner off that token (build-and-test `hack-verify-visual-changes`).
+Pass them in narrative order (NN prefix). If ANY file carries the `HACKED` token, add `--hack-note "<one short line: what was hacked>"` per `attach-test-evidence`. No screenshots → skip silently. Never rename a `HACKED`-marked file to hide the marker — the script keys the 🪓 caption and banner off that token (build-and-test `hack-verify-visual-changes`).
 </step>
 
 <step id="5" name="Optional Asana PR attach">

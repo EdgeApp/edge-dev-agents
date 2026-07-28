@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# ensure-tdd-pr-link.sh — PreToolUse(Bash).
+# On a TDD-flagged task, make sure each PR body links the TDD doc at the BRANCH
+# HEAD before the run reports Complete.
+#
+# Why a rewrite and not a gate: the doc is written AFTER at least one dev turn
+# (tdd write-after-building), so it almost never exists when /pr-create builds
+# the body. Something has to add the link later, and "the agent remembers to
+# re-edit the body" is exactly the class of obligation that dies in compaction.
+# Appending one link to the run's own PR is fully determined, so it is done here
+# instead of asked for.
+#
+# BRANCH url, never a commit permalink: the PR must follow the branch so a
+# reviewer always sees the doc as it stands with the code. The run report carries
+# the pinned form (require-clean-run-report.sh) — operator ruling 2026-07-28.
+#
+# Never blocks. Any failure (no PR, no doc, gh error, PR owned by someone else)
+# leaves the body untouched and the run continues.
+set -euo pipefail
+exec 3>&2   # keep a handle for notes; all paths exit 0
+
+[ -n "${AGENT_TASK_GID:-}" ] || exit 0
+CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
+[ -n "$CMD" ] || exit 0
+printf '%s' "$CMD" | grep -qE 'update-status\.sh[^|;&]*[[:space:]]Complete([[:space:]]|$)' || exit 0
+
+FIELD=$("$HOME/.cursor/skills/asana-field-value.sh" "$AGENT_TASK_GID" "TDD?" 2>/dev/null || echo "none")
+[ "$FIELD" = "tdd" ] || exit 0
+
+for REPO_DIR in "$HOME/git/.agent-worktrees/$AGENT_TASK_GID"/*/; do
+  [ -d "$REPO_DIR" ] || continue
+  URL=$("$HOME/.cursor/skills/tdd/scripts/tdd-doc-links.sh" "$REPO_DIR" 2>/dev/null | sed -n 's/^TDD_BRANCH_URL=//p') || true
+  [ -n "${URL:-}" ] || continue
+
+  PR=$(cd "$REPO_DIR" && gh pr view --json number,body 2>/dev/null) || continue
+  NUM=$(printf '%s' "$PR" | jq -r '.number // empty')
+  BODY=$(printf '%s' "$PR" | jq -r '.body // ""')
+  [ -n "$NUM" ] || continue
+  case "$BODY" in *"$URL"*) continue ;; esac
+
+  LINK="[Technical design doc]($URL)"
+  TMP="/tmp/pr-body-tdd-$AGENT_TASK_GID-$NUM.md"
+  if printf '%s' "$BODY" | grep -q '^### Description'; then
+    printf '%s' "$BODY" | awk -v l="$LINK" '
+      { print }
+      !done && /^### Description/ { print ""; print l; done=1 }
+    ' > "$TMP"
+  else
+    { printf '%s\n\n### Description\n\n%s\n' "$BODY" "$LINK"; } > "$TMP"
+  fi
+
+  if (cd "$REPO_DIR" && gh pr edit "$NUM" --body-file "$TMP" >/dev/null 2>&1); then
+    echo ">> ensure-tdd-pr-link: added TDD link to PR #$NUM ($URL)" >&3
+  fi
+  rm -f "$TMP"
+done
+
+exit 0
