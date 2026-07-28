@@ -12,7 +12,9 @@
 #   resume-agent.sh <term> [term..] # filter; ALL words must appear (case-insensitive)
 #                                   # in the transcript HEAD (task URL/name/prompt
 #                                   # region), so generic words don't match everything
-#   resume-agent.sh --list          # list candidates; do not resume
+#   resume-agent.sh --list          # list candidates as "Asana: <task name>"
+#                                   # (the same title the desktop session list
+#                                   # shows); do not resume
 #   resume-agent.sh <term> --chat   # DISCUSSION MODE: fork the matched transcript into
 #                                   # a watchdog-covered tmux session with remote
 #                                   # control armed (talk to a past run from anywhere,
@@ -163,6 +165,138 @@ fi
 
 first_gid_of() { head -c 16384 "$1" | grep -oE 'app\.asana\.com[A-Za-z0-9/._-]*' | head -1 | grep -oE '[0-9]{12,}' | tail -1 || true; }
 
+# ─── Asana task-name resolution (shared by --list and term matching) ──────────
+# A transcript records only the task URL, never the name, so a human-readable
+# title has to come from Asana. ONE batch call covers the agent project's recent
+# tasks; anything older (or in another project) falls back to a single per-gid
+# GET, memoized so a repeat lookup in the same run is free. Every failure path
+# yields "" so callers degrade to transcript-derived text instead of erroring —
+# --list must still work offline.
+GID_NAMES=""
+GID_NAMES_LOADED=false
+GID_NAME_CACHE="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/asana-task-names.tsv"
+GID_NAME_CACHE_TTL=21600   # 6h — task names are near-static; staleness costs nothing
+
+# Append gid<TAB>name to the on-disk cache (newest wins on read).
+cache_gid_name() {
+  [[ -n "$1" && -n "$2" ]] || return 0
+  mkdir -p "$(dirname "$GID_NAME_CACHE")" 2>/dev/null || return 0
+  printf '%s\t%s\n' "$1" "$2" >> "$GID_NAME_CACHE" 2>/dev/null || true
+}
+
+load_gid_names() {
+  $GID_NAMES_LOADED && return 0
+  GID_NAMES_LOADED=true
+  # Warm from the disk cache FIRST, so a network stall degrades to slightly stale
+  # names rather than to no names at all. A cold/stale cache then refreshes below.
+  local now age=999999
+  now=$(date +%s)
+  if [[ -f "$GID_NAME_CACHE" ]]; then
+    GID_NAMES=$(cat "$GID_NAME_CACHE" 2>/dev/null || true)
+    age=$(( now - $(stat -f %m "$GID_NAME_CACHE" 2>/dev/null || echo 0) ))
+  fi
+  [[ $age -lt $GID_NAME_CACHE_TTL ]] && return 0
+
+  local cred="$DIR/credentials.json" cfg="$DIR/asana-config.json" token proj
+  token="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$cred" 2>/dev/null)}"
+  proj=$(jq -r '.project_gid // empty' "$cfg" 2>/dev/null)
+  [[ -n "$token" && -n "$proj" ]] || return 0
+  # Paginate: one page is only the newest ~100 tasks, which left every older
+  # session falling through to a serial per-gid GET. Each page gets one retry —
+  # a single timed-out page (Asana returns HTTP 000 on a stall) used to abort the
+  # whole map and silently degrade --list into 59 sequential requests.
+  local url="https://app.asana.com/api/1.0/projects/$proj/tasks?opt_fields=name&limit=100"
+  local resp page=0 offset fresh=""
+  while [[ -n "$url" && $page -lt 8 ]]; do
+    resp=$(curl -sf --max-time 10 "$url" -H "Authorization: Bearer $token" 2>/dev/null || true)
+    [[ -n "$resp" ]] || resp=$(curl -sf --max-time 10 "$url" -H "Authorization: Bearer $token" 2>/dev/null || true)
+    [[ -n "$resp" ]] || break
+    fresh=$(printf '%s\n%s' "$fresh" "$(printf '%s' "$resp" | jq -r '.data[]? | .gid + "\t" + .name' 2>/dev/null || true)")
+    offset=$(printf '%s' "$resp" | jq -r '.next_page.offset // empty' 2>/dev/null || true)
+    [[ -n "$offset" ]] || break
+    url="https://app.asana.com/api/1.0/projects/$proj/tasks?opt_fields=name&limit=100&offset=$offset"
+    page=$((page + 1))
+  done
+  [[ -n "${fresh//[[:space:]]/}" ]] || return 0
+  # Fresh entries first so `!seen` keeps the current name for a renamed task.
+  GID_NAMES=$(printf '%s\n%s' "$fresh" "$GID_NAMES" | awk -F'\t' 'NF==2 && !seen[$1]++')
+  mkdir -p "$(dirname "$GID_NAME_CACHE")" 2>/dev/null || return 0
+  printf '%s\n' "$GID_NAMES" > "$GID_NAME_CACHE.tmp" 2>/dev/null && mv "$GID_NAME_CACHE.tmp" "$GID_NAME_CACHE" 2>/dev/null || true
+}
+
+name_of_gid() { # $1=gid → Asana task name ("" when unresolvable)
+  local g="$1" nm="" token
+  [[ -n "$g" ]] || return 0
+  load_gid_names
+  [[ -n "$GID_NAMES" ]] && nm=$(printf '%s\n' "$GID_NAMES" | awk -F'\t' -v g="$g" '$1==g {print $2; exit}')
+  if [[ -z "$nm" ]]; then
+    token="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$DIR/credentials.json" 2>/dev/null)}"
+    if [[ -n "$token" ]]; then
+      nm=$(curl -sf --max-time 10 "https://app.asana.com/api/1.0/tasks/$g?opt_fields=name" \
+        -H "Authorization: Bearer $token" 2>/dev/null | jq -r '.data.name // empty' 2>/dev/null || true)
+      if [[ -n "$nm" ]]; then
+        GID_NAMES=$(printf '%s\n%s\t%s' "$GID_NAMES" "$g" "$nm")
+        cache_gid_name "$g" "$nm"   # a task outside the project window resolves once, not every run
+      fi
+    fi
+  fi
+  printf '%s' "$nm"
+}
+
+# ─── Live tmux state (for --list) ────────────────────────────────────────────
+# A listed run can be in one of four states, and they are NOT interchangeable:
+#   running (claude-asana-<gid>)  watched, holds a concurrency slot
+#   retired (done-asana-<gid>)    completion sweep renamed it; claude still alive
+#                                 and attachable, slot/sim/Metro already freed
+#   dead    (pane, no claude)     the watchdog logs these and deliberately does
+#                                 NOT auto-resume (that was the OOM fork-storm)
+#   none                          transcript on disk only
+# The fork subtlety: a pane launched with --fork-session WRITES to a new uuid, not
+# the one in its argv, so "some pane is resuming this uuid" does NOT mean this
+# transcript is live. Attributing a live discussion to the pristine run transcript
+# is what makes an operator resume the pre-fork state and create a second
+# divergent copy, so the child is resolved from the fork registry and reported as
+# a fork of the run, never as the run itself being live.
+FORK_REGISTRY="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/chat-forks.jsonl"
+TMUX_STATE=""   # gid \t state \t rc_name
+TMUX_FORKS=""   # parent_uuid \t child_uuid \t rc_name
+TMUX_LOADED=false
+load_tmux_state() {
+  $TMUX_LOADED && return 0
+  TMUX_LOADED=true
+  tmux list-sessions -F '#{session_name}' >/dev/null 2>&1 || return 0
+  local name pid args a c rc ruuid fork alive gid child st
+  while IFS= read -r name; do
+    [[ -n "$name" ]] || continue
+    pid=$(tmux list-panes -t "$name" -F '#{pane_pid}' 2>/dev/null | head -1 || true)
+    args=""; alive=false
+    if [[ -n "$pid" ]]; then
+      for c in $(pgrep -P "$pid" 2>/dev/null || true); do
+        a=$(ps -ww -o command= -p "$c" 2>/dev/null || true)
+        case "$a" in *claude*) args="$a"; alive=true; break ;; esac
+      done
+    fi
+    rc=$(printf '%s' "$args" | grep -oE -- '--remote-control [^ ]+' | awk '{print $2}' | head -1 || true)
+    ruuid=$(printf '%s' "$args" | grep -oE -- '--resume [0-9a-f-]{36}' | awk '{print $2}' | head -1 || true)
+    fork=false; printf '%s' "$args" | grep -q -- '--fork-session' && fork=true
+    gid=""
+    if [[ "$name" =~ ^claude-asana-([0-9]{12,})$ ]]; then
+      gid="${BASH_REMATCH[1]}"; st=running
+    elif [[ "$name" =~ ^done-asana-([0-9]{12,})$ ]]; then
+      gid="${BASH_REMATCH[1]}"; st=retired
+    fi
+    if [[ -n "$gid" ]]; then
+      $alive || st=dead
+      TMUX_STATE=$(printf '%s\n%s\t%s\t%s' "$TMUX_STATE" "$gid" "$st" "$rc")
+    fi
+    if $alive && $fork && [[ -n "$ruuid" ]]; then
+      child=$(grep -F "\"parent\":\"$ruuid\"" "$FORK_REGISTRY" 2>/dev/null | tail -1 \
+        | sed -E 's/.*"child":"([0-9a-f-]{36})".*/\1/' || true)
+      TMUX_FORKS=$(printf '%s\n%s\t%s\t%s' "$TMUX_FORKS" "$ruuid" "${child:-unknown}" "$rc")
+    fi
+  done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null || true)
+}
+
 # Optionally filter by search term(s): every word must match, case-insensitively,
 # against the session's TASK IDENTITY — its gid + its Asana task NAME (fetched in
 # ONE batch call for the whole agent project). Transcript-body matching is
@@ -171,18 +305,9 @@ first_gid_of() { head -c 16384 "$1" | grep -oE 'app\.asana\.com[A-Za-z0-9/._-]*'
 # HEAD carries only the task URL, never the name. Falls back to head-region
 # matching only if the Asana lookup is unavailable.
 if [[ -n "$TERM" ]]; then
-  GID_NAMES=""
-  cred="$DIR/credentials.json"; cfg="$DIR/asana-config.json"
-  token="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$cred" 2>/dev/null)}"
-  proj=$(jq -r '.project_gid // empty' "$cfg" 2>/dev/null)
-  if [[ -n "$token" && -n "$proj" ]]; then
-    GID_NAMES=$(curl -sf --max-time 20 "https://app.asana.com/api/1.0/projects/$proj/tasks?opt_fields=name&limit=100" \
-      -H "Authorization: Bearer $token" 2>/dev/null | jq -r '.data[] | .gid + "\t" + .name' 2>/dev/null || true)
-  fi
   identity_of() { # $1=file → "gid<space>task name" (falls back to head region)
     local g; g=$(first_gid_of "$1")
-    local nm=""
-    [[ -n "$GID_NAMES" && -n "$g" ]] && nm=$(printf '%s\n' "$GID_NAMES" | awk -F'\t' -v g="$g" '$1==g {print $2; exit}')
+    local nm; nm=$(name_of_gid "$g")
     if [[ -n "$nm" ]]; then printf '%s %s' "$g" "$nm"; else printf '%s %s' "$g" "$(head -c 65536 "$1" | tr -d '\0')"; fi
   }
   FILTERED=()
@@ -216,28 +341,60 @@ if [[ -n "$TERM" ]] && ! $LATEST && ! $DO_LIST; then
   fi
 fi
 
-# Sort by mtime desc; emit one line per candidate with timestamp + UUID + first prompt preview.
+# Sort by mtime desc; emit one line per candidate: mtime + UUID + gid + prompt preview.
 emit_candidates() {
   for f in "${CANDIDATES[@]}"; do
     mtime=$(stat -f "%m" "$f")
     uuid=$(basename "$f" .jsonl)
+    gid=$(first_gid_of "$f")
     # Find the first user `/one-shot ...` line and pull a short preview of the prompt.
     # `grep -m1` closes the pipe early; head/sed upstream die SIGPIPE (141), which
     # `set -eo pipefail` turns into a silent abort mid-listing. Absorb it.
     preview=$( (head -30 "$f" | grep -m1 '"/one-shot --yolo' | sed -E 's/.*"(\/one-shot --yolo [^"]{0,80})[^"]*".*/\1/' | head -c 100) 2>/dev/null || true)
-    printf "%s\t%s\t%s\n" "$mtime" "$uuid" "$preview"
+    printf "%s\t%s\t%s\t%s\n" "$mtime" "$uuid" "$gid" "$preview"
   done | sort -rn
 }
 
+# --list renders the SAME title the desktop session list shows: resume-task.sh
+# labels a spawned session "Asana: <task name>", so reconstructing that string
+# from the gid makes the two lists say the same thing. The raw `/one-shot --yolo
+# <url>` preview identifies nothing at a glance, so it is only the fallback for
+# when Asana is unreachable or the task is gone.
 if $DO_LIST; then
+  load_tmux_state
   echo "Watcher-spawned sessions (newest first):"
-  emit_candidates | awk -F'\t' '{
-    t=$1; u=$2; p=$3
-    cmd="date -r " t " +\"%Y-%m-%d %H:%M:%S\""
-    cmd | getline ts
-    close(cmd)
-    printf "  %s  %s  %s\n", ts, u, p
-  }'
+  echo "  ● running   ◐ retired (alive, attachable)   ✗ dead pane"
+  while IFS=$'\t' read -r mtime uuid gid preview; do
+    [[ -n "$mtime" ]] || continue
+    ts=$(date -r "$mtime" '+%Y-%m-%d %H:%M:%S')
+    nm=$(name_of_gid "$gid")
+    if [[ -n "$nm" ]]; then title="Asana: $nm"; else title="${preview:-(title unavailable)}"; fi
+
+    state=""; rc=""
+    if [[ -n "$gid" ]]; then
+      row=$(printf '%s\n' "$TMUX_STATE" | awk -F'\t' -v g="$gid" '$1==g {print; exit}')
+      state=$(printf '%s' "$row" | cut -f2); rc=$(printf '%s' "$row" | cut -f3)
+    fi
+    fork_child=$(printf '%s\n' "$TMUX_FORKS" | awk -F'\t' -v u="$uuid" '$1==u {print $2; exit}')
+    fork_rc=$(printf '%s\n' "$TMUX_FORKS" | awk -F'\t' -v u="$uuid" '$1==u {print $3; exit}')
+
+    case "$state" in
+      running) sym="●" ;;
+      retired) sym="◐" ;;
+      dead)    sym="✗" ;;
+      *)       sym=" " ;;
+    esac
+    notes="$state"
+    [[ -n "$rc" ]] && notes="${notes:+$notes }rc=$rc"
+    # A live fork means THIS transcript is frozen and the conversation moved on;
+    # say so with the child uuid, which is what --uuid must be given to reach it.
+    # When the fork runs in THIS session's own pane, its rc is the same string
+    # already printed above — don't say it twice.
+    [[ -n "$fork_rc" && "$fork_rc" == "$rc" ]] && fork_rc=""
+    [[ -n "$fork_child" ]] && notes="${notes:+$notes }-> live fork $fork_child${fork_rc:+ rc=$fork_rc}"
+    [[ -n "$notes" ]] && notes="   [$notes]"
+    printf "  %s %s  %s  %s%s\n" "$sym" "$ts" "$uuid" "$title" "$notes"
+  done < <(emit_candidates)
   exit 0
 fi
 

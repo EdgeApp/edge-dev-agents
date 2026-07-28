@@ -101,3 +101,24 @@ These are fine in technical/code contexts but banned in prose:
 | landscape | actual geography | "the AI landscape" |
 | robust | engineering specs | "a robust approach to leadership" |
 | seamless | UX descriptions with data | "a seamless experience" (vague) |
+
+## Banned Phrases
+
+Multiword strings with no legitimate technical sense; the shared lint
+(no-slop-lint.sh) matches these mechanically, same as the words above.
+
+| Banned | Use Instead |
+|---|---|
+| at its core | (delete; state the point) |
+| the real question is | the question is |
+| what really matters is | (state the thing directly) |
+| the heart of the matter | (delete) |
+| here's the thing | (delete; say the thing) |
+| without further ado | (delete) |
+| in order to | to |
+| at this point in time | now |
+| due to the fact that | because |
+| has the ability to | can |
+| it is important to note | (delete; note it) |
+| exciting times | (delete) |
+| step in the right direction | (state the concrete outcome) |

@@ -141,8 +141,7 @@
     "persistent_anchors": [
       "main",
       "eval-run",
-      "pokemon",
-      "flapwatch"
+      "pokemon"
     ]
   }
 }
