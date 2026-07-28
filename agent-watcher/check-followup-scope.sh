@@ -130,7 +130,7 @@ if [[ "$DELTA_STATUS" == "ok" ]]; then
   else
     echo ">>   $DELTA_COUNT field change(s) since previous segment snapshot ($BASELINE_TS) — operator intent, NOT a spurious re-fire:"
     echo "$FIELD_DELTAS" | jq -r '.[] | "     \(.field): \(if .was == null then "(unset)" else (.was|tostring) end) -> \(if .now == null then "(unset)" else (.now|tostring) end)"'
-    echo ">>   re-confirm the finalize gate — its LIVE reads (asana-build-field.sh, asana-force-land.sh) consume these values"
+    echo ">>   act on each: a field flip can mean ROUTING (Build/Force Land — re-confirm the finalize gate, whose live reads consume them) or WORK OWED (e.g. 'TDD?' -> TDD means the TDD is owed NOW, per one-shot tdd-when-flagged). Resolve each changed field against its owning rule before finalizing."
   fi
 else
   echo ">>   field deltas: $DELTA_STATUS"
