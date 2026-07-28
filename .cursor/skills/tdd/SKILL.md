@@ -22,7 +22,7 @@ metadata:
 <rule id="post-impl-retro">After implementation lands, append a `## Post-implementation retrospective` section with four subsections: Estimate vs. actuals (table), Where this document was wrong or silent (numbered, each anchored to the section it corrects), What held, Verification highlights (real measurements, links to PR evidence). Body sections that reality contradicted get a pointer to the retro item; never silently rewrite the design history. Exception: code blocks update to shipped code per `diagrams-and-signatures`, since they document the contract, not the prediction.</rule>
 <rule id="length-discipline">Every section earns its place; prune rather than pad. State a rationale once and anchor-link to it elsewhere. If a section restates another section, delete it.</rule>
 <rule id="draft-gate">For a NEW TDD, present the section outline plus the Decisions list in chat and get the user's go-ahead before first publish. Updates to an existing TDD publish directly and report the new revision. Before updating a doc this session did not write, fetch the live content first (`git pull` for a committed doc, gist fetch otherwise); never clobber revisions you have not read.</rule>
-<rule id="style">Plain markdown, sentence-case headings, zero em dashes, /no-slop. The lint checks em dashes; the rest is on you.</rule>
+<rule id="style">Plain markdown, sentence-case headings, /no-slop. The lint mechanically enforces em dashes, banned vocabulary, and count-announcement openers; the judgment-only patterns (promotional tone, self-grading, courtesy enders) remain yours.</rule>
 </rules>
 
 <template description="Section skeleton for a new TDD. Keep headings numbered exactly like this; omit sections that genuinely do not apply, renumbering the rest.">
