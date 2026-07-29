@@ -172,7 +172,7 @@ Agent sessions are gated by two PreToolUse hooks in `~/.claude/settings.json`
 `AGENT_TASK_GID` is set, so interactive sessions are unaffected. Add to the
 `hooks.PreToolUse` block (matcher `Bash`):
 
-    { "type": "command", "command": "~/.config/agent-watcher/hooks/block-raw-git-commit.sh", "timeout": 10 },
+    { "type": "command", "command": "~/.config/agent-watcher/hooks/git-history-gate.sh", "timeout": 10 },
     { "type": "command", "command": "~/.config/agent-watcher/hooks/require-test-evidence-before-pr.sh", "timeout": 10 }
 
 block-raw-git-commit: commits must go through lint-commit.sh (--amend allowed, --no-verify never).
