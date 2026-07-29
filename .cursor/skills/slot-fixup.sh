@@ -157,7 +157,11 @@ if ! SLOT_HEAD_SHA="$HEAD_SHA_FULL" SLOT_HEADLINE="$HEADLINE" \
     GIT_EDITOR=true \
     git rebase --autostash -i "$BASE" >/dev/null 2>&1; then
   echo "Error: rebase failed during slotting" >&2
-  if [[ -d .git/rebase-merge ]] || [[ -d .git/rebase-apply ]]; then
+  # Resolve the rebase state dirs through git: in a WORKTREE `.git` is a file
+  # (gitdir pointer), so a literal `.git/rebase-merge` test is always false and
+  # the abort silently never ran — the second slot-fixup defect the houdini run
+  # found (2026-07-29), after the regex one.
+  if [[ -d "$(git rev-parse --git-path rebase-merge)" ]] || [[ -d "$(git rev-parse --git-path rebase-apply)" ]]; then
     echo "Aborting rebase to leave working tree clean" >&2
     git rebase --abort 2>&1 | sed 's/^/  /' >&2 || true
   fi
