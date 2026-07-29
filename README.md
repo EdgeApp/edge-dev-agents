@@ -169,7 +169,16 @@ resumes), so watchdog and watcher stay decoupled.
 #### 5. Hands-off enforcement (hooks)
 
 The hands-off contract is enforced by deterministic PreToolUse and Stop hooks
-(active only when `AGENT_TASK_GID` is set), not merely documented:
+(active only when `AGENT_TASK_GID` is set), not merely documented.
+
+One hook uses a stricter boundary: `mark-agent-authored-asana.sh` wraps Asana
+prose in the 🥋/👊 authorship markers only inside an IN-FLIGHT run, judged by
+`agent-watcher/orch-run-context.sh` (`AGENT_TASK_GID` set AND the pane's
+current tmux name is exactly `claude-asana-<gid>`; the watchdog's completion
+rename to `done-asana-<gid>` flips the answer). Operator-context text (direct
+chats, always-on consoles, chat forks, retired sessions) stays unmarked: it is
+operator instruction that a later run must read as followup scope. Script-path
+writes get the same boundary via `agent-watcher/agent-authored-text.sh`.
 
 ```mermaid
 flowchart LR
