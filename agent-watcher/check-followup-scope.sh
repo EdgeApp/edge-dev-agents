@@ -21,8 +21,21 @@
 #      says WHY the task came back. Best-effort: no baseline (pre-feature segments) or
 #      a failed fetch degrades to "unavailable", never fails the comment check. The
 #      snapshot is a delta baseline only — decisions keep reading fields live.
-#   4. Print them, and write the marker /tmp/agent-followup-scope-<gid>.json recording
-#      what was fetched and when (the hook checks marker freshness against live comments).
+#   4. Fetch GITHUB-side scope for every PR attached to the task (view_url on
+#      external attachments): unresolved review threads from ANY author, and the
+#      reviewDecision. A re-arm is often triggered by a human PR review with ZERO
+#      Asana activity — the Maya miss (2026-07-29): peachbits requested changes on
+#      PR #459, the re-fired run saw "0 new comments", filtered threads to
+#      __typename==Bot per the old gate wording, and re-set Complete past an OPEN
+#      human thread. Scope lives where the reviewer wrote it, not where the
+#      watermark lives. Ownership-aware: unresolved threads BLOCK on a PR the gh
+#      user authors (reply+resolve owed); on a non-owned PR they are surfaced but
+#      non-blocking (reply-only, per pr-address non-owner-reply-only). Draft PRs
+#      are skipped (finalize-gate excludes draft dep PRs). Best-effort: gh/network
+#      failure degrades to "unavailable", never fails the Asana enumeration.
+#   5. Print them, and write the marker /tmp/agent-followup-scope-<gid>.json recording
+#      what was fetched and when (the hook checks marker freshness against live
+#      comments, and blocks Complete while owned-PR unresolved threads are recorded).
 #
 # Usage: check-followup-scope.sh --task-gid <gid>
 # Exit: 0 = check completed (marker written; newer scope MAY exist — read the output),
@@ -96,6 +109,39 @@ elif [[ -f "$VERSIONS_FILE" ]]; then
   fi
 fi
 
+# GitHub-side scope: unresolved threads + reviewDecision per attached PR.
+GH_STATUS="unavailable: gh not on PATH"
+GH_SCOPE="[]"
+GH_BLOCKING=0
+if command -v gh >/dev/null 2>&1; then
+  GH_STATUS="ok"
+  GH_USER=$(gh api user -q .login 2>/dev/null || true)
+  [[ -n "$GH_USER" ]] || GH_STATUS="unavailable: gh auth failed"
+  PR_URLS=$(echo "$ATT" | jq -r '[.data[] | .view_url // "" | select(test("github\\.com/.+/pull/[0-9]+$"))] | unique | .[]' 2>/dev/null || true)
+  # view_url needs its own fetch when the first attachments call lacked it.
+  if [[ -z "$PR_URLS" ]]; then
+    ATT2="$(curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" \
+      "$API/tasks/$TASK_GID/attachments?opt_fields=view_url" 2>/dev/null || true)"
+    PR_URLS=$(echo "$ATT2" | jq -r '[.data[]? | .view_url // "" | select(test("github\\.com/.+/pull/[0-9]+$"))] | unique | .[]' 2>/dev/null || true)
+  fi
+  if [[ "$GH_STATUS" == "ok" ]]; then
+    while IFS= read -r url; do
+      [[ -n "$url" ]] || continue
+      OWNER=$(sed -E 's#https://github.com/([^/]+)/([^/]+)/pull/([0-9]+)#\1#' <<<"$url")
+      RNAME=$(sed -E 's#https://github.com/([^/]+)/([^/]+)/pull/([0-9]+)#\2#' <<<"$url")
+      NUM=$(sed -E 's#https://github.com/([^/]+)/([^/]+)/pull/([0-9]+)#\3#' <<<"$url")
+      PRJ=$(gh api graphql -f query="query{repository(owner:\"$OWNER\",name:\"$RNAME\"){pullRequest(number:$NUM){state isDraft author{login} reviewDecision reviewThreads(first:100){nodes{isResolved comments(first:1){nodes{author{login} createdAt body}}}}}}}" 2>/dev/null \
+        | jq -c --arg me "$GH_USER" --arg url "$url" '.data.repository.pullRequest
+          | select(.state == "OPEN" and (.isDraft | not))
+          | {url: $url, owned: (.author.login == $me), review_decision: (.reviewDecision // "none"),
+             unresolved: [.reviewThreads.nodes[] | select(.isResolved | not) | .comments.nodes[0]
+                          | {by: (.author.login // "?"), at: .createdAt, text: (.body // "" | .[0:200])}]}' 2>/dev/null || true)
+      [[ -n "$PRJ" ]] && GH_SCOPE=$(jq -c --argjson p "$PRJ" '. + [$p]' <<<"$GH_SCOPE")
+    done <<<"$PR_URLS"
+    GH_BLOCKING=$(jq '[.[] | select(.owned) | .unresolved | length] | add // 0' <<<"$GH_SCOPE")
+  fi
+fi
+
 MARKER="/tmp/agent-followup-scope-$TASK_GID.json"
 jq -n \
   --arg gid "$TASK_GID" \
@@ -107,8 +153,12 @@ jq -n \
   --arg delta_status "$DELTA_STATUS" \
   --arg baseline_ts "$BASELINE_TS" \
   --argjson field_deltas "$FIELD_DELTAS" \
+  --arg gh_status "$GH_STATUS" \
+  --argjson gh_scope "$GH_SCOPE" \
+  --argjson gh_blocking "$GH_BLOCKING" \
   '{task_gid: $gid, checked_at: $checked_at, watermark: $watermark, newest_comment_at: $newest_comment_at, newer_count: $newer_count, comments: $comments,
-    field_delta_status: $delta_status, field_baseline_ts: $baseline_ts, field_deltas: $field_deltas}' \
+    field_delta_status: $delta_status, field_baseline_ts: $baseline_ts, field_deltas: $field_deltas,
+    github_status: $gh_status, github_prs: $gh_scope, github_blocking_threads: $gh_blocking}' \
   > "$MARKER"
 
 echo ">> check-followup-scope: task $TASK_GID"
@@ -134,6 +184,20 @@ if [[ "$DELTA_STATUS" == "ok" ]]; then
   fi
 else
   echo ">>   field deltas: $DELTA_STATUS"
+fi
+if [[ "$GH_STATUS" == "ok" ]]; then
+  PR_COUNT=$(jq 'length' <<<"$GH_SCOPE")
+  if [[ "$PR_COUNT" -eq 0 ]]; then
+    echo ">>   github: no open non-draft PRs attached"
+  else
+    jq -r '.[] | ">>   github: \(.url) [\(if .owned then "OWNED" else "not owned" end), reviewDecision: \(.review_decision)] — \(.unresolved | length) unresolved thread(s)"' <<<"$GH_SCOPE"
+    jq -r '.[] | .unresolved[] | "     [\(.at)] \(.by): \(.text | gsub("\\s+"; " ") | .[0:160])"' <<<"$GH_SCOPE"
+    if [[ "$GH_BLOCKING" -gt 0 ]]; then
+      echo ">>   $GH_BLOCKING unresolved thread(s) on OWNED PR(s) — THIS RUN'S SCOPE regardless of Asana silence (a human review IS the re-arm reason; scope lives where the reviewer wrote it). Address per pr-address reply-then-resolve; Complete is gate-blocked until a re-check records zero."
+    fi
+  fi
+else
+  echo ">>   github: $GH_STATUS"
 fi
 echo ">>   marker written: $MARKER"
 

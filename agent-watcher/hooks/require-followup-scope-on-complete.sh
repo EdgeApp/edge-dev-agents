@@ -12,7 +12,12 @@
 #
 # Requires: /tmp/agent-followup-scope-<gid>.json written by check-followup-scope.sh,
 # AND its newest_comment_at matching the live newest comment (one cheap curl) so a
-# marker from a previous cycle cannot cover comments that arrived after it.
+# marker from a previous cycle cannot cover comments that arrived after it,
+# AND zero github_blocking_threads in the marker — unresolved review threads on
+# an OWNED open PR (ANY author: the Maya re-fire re-Completed past an OPEN human
+# thread on 2026-07-29 because the old gate wording filtered to Bot authors).
+# Resolving them updates the marker via a re-run of the check, which is the
+# retry path the deny message prescribes.
 # Fail-open on API/network errors WHEN a marker exists (Asana being down should not
 # wedge the fleet; without network update-status.sh would fail anyway).
 #
@@ -51,6 +56,14 @@ if [ -n "$TOKEN" ]; then
     echo "BLOCKED: stale followup-scope check for task $GID — comment(s) landed after your last check (marker knows $MARKER_NEWEST, live newest is $LIVE_NEWEST). Re-run: $CHECK — address any new operator asks per followup-scope-is-the-deliverable, then retry Complete." >&2
     exit 2
   fi
+fi
+
+# GitHub-side scope: the marker's own record blocks. No live re-fetch here — the
+# check script owns that; a re-run after resolving threads refreshes the count.
+GH_BLOCKING="$(jq -r '.github_blocking_threads // 0' "$MARKER" 2>/dev/null || echo 0)"
+if [ "$GH_BLOCKING" -gt 0 ] 2>/dev/null; then
+  echo "BLOCKED: your followup-scope check recorded $GH_BLOCKING unresolved review thread(s) on an OWNED open PR — that is THIS run's scope (human threads count: a reviewer's comments are the re-arm reason even with zero Asana activity). Address each per pr-address reply-then-resolve, re-run: $CHECK — then retry Complete once it records zero blocking threads." >&2
+  exit 2
 fi
 
 exit 0
