@@ -16,6 +16,16 @@
 # Travis still exits 1 (red is signal, queued is not). Landing paths are
 # unaffected: pr-land's auto-merge + BLOCKED_ON_REVIEW require full green.
 #
+# WIP-GUARD CLASSIFICATION (2026-07-28): a red `block-wip-pr` is EXPECTED
+# BY DESIGN while the branch carries fixup! commits under an active human
+# review — pr-address's preserve mode REQUIRES those commits to stay, so the
+# check cannot go green until the review resolves and the fixups legitimately
+# squash. Presenting it as a plain failure created a contract contradiction
+# that a run resolved by autosquashing mid-review (swapter PR #475). The
+# classifier consults the SAME oracle the squash decision uses
+# (pr-address.sh review-mode): mode=preserve + fixups present -> expected;
+# mode=autosquash -> the red is actionable (squash via pr-finalize-fixups.sh).
+#
 # Usage: watch-pr.sh --pr <num> [--repo <owner/name>] [--task-gid <gid>]
 #                    [--budget-seconds 1800] [--interval 30]
 # Exit: 0   green — final stdout line distinguishes:
@@ -23,6 +33,13 @@
 #             RESULT: green-travis-pending    (all but Travis passed; Travis
 #                                              queued/running — report its state
 #                                              in the Finalize Gate checklist)
+#             RESULT: green-wip-preserve      (all passed except the wip-guard
+#                                              check, red only because preserved
+#                                              fixup commits are on the branch
+#                                              during an active review — never
+#                                              squash to clear it; it goes green
+#                                              at finalize when pr-finalize-fixups
+#                                              legitimately squashes)
 #       1   a check failed, Travis included (read `gh run view --log-failed`, fix)
 #       75  budget already exhausted — stop watching, take the blocked=Yes path
 #       124 this watch hit the remaining-budget timeout (same: budget is gone)
@@ -91,21 +108,50 @@ echo ">> watch-pr: ${REMAINING}s of budget remain; watching ${REPO:+$REPO }PR #$
 # Poll loop instead of `gh pr checks --watch`: --watch blocks on ALL checks with
 # no way to exempt the slow-CI check. Same budget contract as before.
 SLOW_CI_PATTERN="Travis CI"
+WIP_GUARD_PATTERN="block-wip-pr"
+WIP_MODE=""  # cached review-mode verdict; fetched at most once per invocation
+
+# wip_guard_expected: the wip-guard red is expected iff the branch actually
+# carries fixup! commits AND the squash oracle says preserve. Same oracle as
+# pr-finalize-fixups — no second derivation of "is a reviewer active".
+wip_guard_expected() {
+  [ -n "$REPO" ] || return 1
+  case "$WIP_MODE" in
+    preserve) return 0 ;;
+    autosquash|none) return 1 ;;
+  esac
+  local heads
+  heads=$(gh pr view "$PR" --repo "$REPO" --json commits -q '[.commits[].messageHeadline] | join("\n")' 2>/dev/null || true)
+  printf '%s' "$heads" | grep -q '^fixup!' || { WIP_MODE="none"; return 1; }
+  WIP_MODE=$("$HOME/.cursor/skills/pr-address/scripts/pr-address.sh" review-mode \
+    --owner "${REPO%%/*}" --repo "${REPO##*/}" --pr "$PR" 2>/dev/null \
+    | jq -r '.mode // empty' 2>/dev/null || true)
+  [ "$WIP_MODE" = "preserve" ]
+}
+
 while :; do
   NOW=$(date +%s)
   [ "$NOW" -ge "$DEADLINE" ] && { echo ">> watch-pr: remaining-budget timeout" >&2; exit 124; }
   JSON=$(gh pr checks "$PR" ${REPO:+--repo "$REPO"} --json name,bucket 2>/dev/null || true)
   [ -n "$JSON" ] || JSON="[]"
   TOTAL=$(jq 'length' <<<"$JSON" 2>/dev/null || echo 0)
-  FAILS=$(jq -r --arg p "" '[.[] | select(.bucket=="fail" or .bucket=="cancel") | .name] | join(", ")' <<<"$JSON" 2>/dev/null || true)
-  if [ -n "$FAILS" ]; then
-    echo ">> watch-pr: FAILED check(s): $FAILS" >&2
+  FAILS_REAL=$(jq -r --arg w "$WIP_GUARD_PATTERN" '[.[] | select(.bucket=="fail" or .bucket=="cancel") | .name | select(startswith($w) | not)] | join(", ")' <<<"$JSON" 2>/dev/null || true)
+  FAILS_WIP=$(jq -r --arg w "$WIP_GUARD_PATTERN" '[.[] | select(.bucket=="fail" or .bucket=="cancel") | .name | select(startswith($w))] | join(", ")' <<<"$JSON" 2>/dev/null || true)
+  if [ -n "$FAILS_REAL" ]; then
+    echo ">> watch-pr: FAILED check(s): $FAILS_REAL" >&2
+    exit 1
+  fi
+  if [ -n "$FAILS_WIP" ] && ! wip_guard_expected; then
+    echo ">> watch-pr: FAILED check(s): $FAILS_WIP (wip-guard, and review-mode is NOT preserve — squash the fixups via ~/.cursor/skills/pr-finalize-fixups.sh, never by raw rebase)" >&2
     exit 1
   fi
   PENDING_OTHER=$(jq -r --arg p "$SLOW_CI_PATTERN" '[.[] | select(.bucket=="pending") | .name | select(startswith($p) | not)] | join(", ")' <<<"$JSON" 2>/dev/null || true)
   PENDING_SLOW=$(jq -r --arg p "$SLOW_CI_PATTERN" '[.[] | select(.bucket=="pending") | .name | select(startswith($p))] | join(", ")' <<<"$JSON" 2>/dev/null || true)
   if [ "$TOTAL" -gt 0 ] && [ -z "$PENDING_OTHER" ]; then
-    if [ -z "$PENDING_SLOW" ]; then
+    if [ -n "$FAILS_WIP" ]; then
+      echo ">> watch-pr: green except wip-guard ($FAILS_WIP): expected while fixups are PRESERVED for the active reviewer — do NOT squash to clear it" >&2
+      echo "RESULT: green-wip-preserve ($FAILS_WIP)"
+    elif [ -z "$PENDING_SLOW" ]; then
       echo "RESULT: green"
     else
       echo ">> watch-pr: every check green except still-pending: $PENDING_SLOW (non-blocking; red would block)" >&2

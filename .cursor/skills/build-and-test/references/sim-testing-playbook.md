@@ -290,6 +290,16 @@ daemon can drift to another sim, and the 2026-07-22 swapter run spent an hour
 debugging screenshots of the wrong device.
 
 ## Investigate cheap before driving the UI
+- **Pick the swap test pair via direct provider API before ANY in-sim quote
+  probing.** Trying pairs/amounts in the Exchange scene until one quotes is the
+  most expensive probe there is. Instead: (1) candidate assets in priority
+  order — high-mcap majors first (BTC, ETH, USDC, USDT; these quote reliably on
+  nearly every provider), then whatever the roster account already holds a
+  larger balance of; (2) confirm the pair + amount with ONE call to the
+  provider's public pair/quote endpoint (known endpoints under "Asset &
+  provider specifics"; the in-app below-limit error text also names floors);
+  (3) drive the sim ONCE with the known-good pair. The sim run is for proving
+  the app behavior, never for discovering whether a pair quotes.
 - **Crawl the code and run `/debugger` EARLY**, not as a last resort. A grinding
   UI loop is the most expensive probe there is. "Why is X missing/failing" is
   usually answerable from source (settings store, plugin registration, env.json
