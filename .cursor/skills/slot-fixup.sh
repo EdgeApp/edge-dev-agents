@@ -54,8 +54,15 @@ fi
 HEADLINE="${HEAD_MSG#fixup! }"
 HEAD_SHA_FULL="$(git rev-parse HEAD)"
 
+# Literal comparison, never a dynamic regex: subjects contain regex
+# metacharacters ("Fix send scene (Stealth Send)") that silently broke the
+# old `$0 ~ ("^[0-9a-f]+ " h "$")` match, and set -e then killed the script
+# before the not-found error below could fire. ENVIRON (not -v) also spares
+# the value awk's backslash-escape processing. %H is 40 chars, so the
+# subject starts at column 42. `|| true` keeps set -e out of it — the empty
+# check below owns the failure path and its error message.
 TARGET_FOUND="$(git log "$BASE..HEAD~1" --format='%H %s' \
-  | awk -v h="$HEADLINE" '$0 ~ ("^[0-9a-f]+ " h "$") { print $1; found=1 } END { exit !found }')"
+  | HEADLINE="$HEADLINE" awk 'substr($0, 42) == ENVIRON["HEADLINE"] { print $1; exit }' || true)"
 
 if [[ -z "$TARGET_FOUND" ]]; then
   echo "Error: target commit with subject \"$HEADLINE\" not found in $BASE..HEAD~1" >&2
