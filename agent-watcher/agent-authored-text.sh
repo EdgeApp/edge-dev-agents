@@ -34,6 +34,18 @@ MODE="wrap"
 
 if [[ $# -gt 0 ]]; then TEXT="$*"; else TEXT="$(cat)"; fi
 
+# ORCH-authored text only, same boundary the MCP-path hook enforces: the
+# in-flight-run test (AGENT_TASK_GID AND live tmux name, see
+# orch-run-context.sh) decides. Operator-context sessions, including RETIRED
+# post-completion sessions that still carry AGENT_TASK_GID, pass text through
+# unmarked: it is operator instruction. `--check` is exempt: it is a predicate
+# about the text, not a write, and callers use it to detect already-wrapped
+# input either way.
+if [[ "$MODE" == "wrap" ]] && ! "$(dirname "$0")/orch-run-context.sh"; then
+  printf '%s' "$TEXT"
+  exit 0
+fi
+
 # Already wrapped? First non-empty line STARTS WITH the open marker (it sits
 # inline with the text) AND the last non-empty line is the close marker alone.
 first_ne="$(printf '%s\n' "$TEXT" | grep -m1 -v '^[[:space:]]*$' || true)"

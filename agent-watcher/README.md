@@ -156,9 +156,34 @@ name/runtime, Metro defaults to 8081.
 | `slots.json` | slot state |
 | `gc-worktrees.sh` | manual orphan cleanup |
 | `session-index.sh` | inventory of live sessions + all transcripts (kind, task, lineage, content search with fork-echo demotion); feeds /resume-session |
-| `resume-agent.sh` | resume a session by task gid/name terms; `--chat` forks it into a watchdog-covered RC discussion session (no slot); `--recover` re-provisions a missing slot |
+| `resume-agent.sh` | resume a session by task gid/name terms; `--chat` forks it into a watchdog-covered RC discussion session (no slot); `--recover` re-provisions a missing slot; `--list` shows Asana task titles (same "Asana: <name>" string the desktop session list shows, 6h disk cache at `$XDG_STATE_HOME/agent-watcher/asana-task-names.tsv`) plus tmux state per run: `●` running, `◐` retired (attachable), `✗` dead pane, blank = transcript only, with live chat forks annotated by child uuid |
+| `orch-run-context.sh` | predicate: exit 0 iff this process is inside an IN-FLIGHT orch run (`AGENT_TASK_GID` set AND pane's current tmux name is exactly `claude-asana-<gid>`); the completion rename flips it to operator context |
+| `agent-authored-text.sh` | wrap Asana prose in the 🥋/👊 authorship markers, idempotently; wraps ONLY in orch-run context (via `orch-run-context.sh`), operator-context text passes through unmarked |
 | `asana-config.json` | project GIDs + `.watcher.*` knobs |
 | `update-status.sh` | set `agent_status` (+ kanban section move) |
+
+## Asana authorship markers (🥋/👊)
+
+Prose the ORCH writes to Asana (comments, task bodies) is wrapped in `🥋 ...
+👊` so a human scanning a task can tell agent output from operator output.
+Two write paths, one boundary:
+
+- MCP writes: PreToolUse hook `hooks/mark-agent-authored-asana.sh` rewrites
+  present prose fields in place (top-level and inside `tasks[]`/`subtasks[]`;
+  absent fields stay absent, since materializing them as null fails MCP schema
+  validation).
+- Script writes: callers pipe text through `agent-authored-text.sh`.
+
+Both consult `orch-run-context.sh`: markers apply ONLY inside an in-flight run
+(`claude-asana-<gid>` pane). Everything else is operator context, and its text
+is an operator INSTRUCTION a later run must read as scope: direct/desktop
+chats, always-on consoles (`claude-asana-main`, `-eval-run`), chat forks
+(`claude-asana-chat-*`), and RETIRED `done-asana-*` sessions, which keep
+`AGENT_TASK_GID` in their environment forever (the env var alone is the wrong
+test). Known boundary: between a run setting `Complete` and the watchdog's
+rename tick (≤120s), operator interjections still count as orch context. The
+behavior hooks (`block-*`, `require-*`) deliberately keep gating on the env
+var alone: this boundary is about text authorship, not agent conduct.
 
 ## Known limitations
 
