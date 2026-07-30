@@ -4,10 +4,13 @@
 # For each rubric dimension mentioned in the report (via rubric-drift.sh --map):
 #   1. linkify mentions: `A14 review-response` (and stray bare `A14`) become
 #      intra-document links to the glossary anchor
-#   2. append a `## Dimension glossary` section: per mentioned dimension, its
-#      name, the local rubric path:line (clickable in the Claude Code chat),
-#      and a GitHub permalink pinned to the synced repo's current HEAD SHA
-#      (clickable from Asana/gist/phone; the SHA pin keeps line anchors stable).
+#   2. append a `## Dimension glossary` section: per mentioned dimension, a
+#      heading whose TEXT is the link (SHA-pinned GitHub permalink with
+#      `?plain=1#L<n>` so it jumps to the actual row, not the top of the
+#      rendered page) and a REPRINT of the rubric row's own text as of this
+#      eval (Expects / BAD when / Grounding). A human reads the rule in place;
+#      the link is for provenance. No bare path:line lines (operator ruling
+#      2026-07-29: they carry nothing a reader can use).
 #
 # Usage: annotate-report.sh <report.md> [<report2.md> ...]
 # Idempotent: a report already carrying the glossary section is skipped.
@@ -61,13 +64,26 @@ for (const report of argv) {
 
   const entries = mentioned.sort().map((id) => {
     const { name, gate, file, line } = map[id]
-    const local = `${file}:${line}`
     const repoRel = file.startsWith(HOME + '/.cursor') ? '.cursor' + file.slice((HOME + '/.cursor').length) : null
-    const permalink = repoRel && sha && origin ? `${origin}/blob/${sha}/${repoRel}#L${line}` : null
-    return `### ${id} ${name}\n` +
-      (gate ? '- GATE dimension: a confirmed BAD hard-fails the run\n' : '') +
-      `- Rubric row: ${local}\n` +
-      (permalink ? `- [Rubric row on GitHub](${permalink})\n` : '')
+    // ?plain=1 forces GitHub's source view, where #L<n> anchors actually jump.
+    const permalink = repoRel && sha && origin ? `${origin}/blob/${sha}/${repoRel}?plain=1#L${line}` : null
+    const heading = permalink ? `### [${id} ${name}](${permalink})` : `### ${id} ${name}`
+    // Reprint the rubric row as it reads at eval time. Row shape:
+    // | id | name | expectation | bad anchors | grounding |
+    let body = ''
+    try {
+      const row = fs.readFileSync(file, 'utf8').split('\n')[line - 1] || ''
+      const cols = row.split('|').map((c) => c.trim())
+      if (cols.length >= 6) {
+        body =
+          (gate ? '**GATE**: a confirmed BAD hard-fails the run.\n\n' : '') +
+          `**Expects:** ${cols[3]}\n\n` +
+          `**BAD when:** ${cols[4]}\n\n` +
+          `**Grounding:** ${cols[5]}\n`
+      }
+    } catch {}
+    if (!body) body = (gate ? '**GATE**: a confirmed BAD hard-fails the run.\n' : '') + '(rubric row unavailable at annotation time)\n'
+    return heading + '\n\n' + body
   })
   text = text.replace(/\n*$/, '\n\n## Dimension glossary\n\n' + entries.join('\n') + '\n')
 

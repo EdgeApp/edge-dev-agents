@@ -48,8 +48,10 @@ const VERIFY_OPT = { ...(MODEL ? MOPT : { model: 'sonnet' }), effort: 'low' }
 const SYNTH_OPT = MOPT
 
 const needsTranscript = mode === 'transcript'
-const evaluable = manifests.filter(m => !m.in_flight && (needsTranscript ? m.transcript : m.run_report))
-const skipped = manifests.filter(m => m.in_flight || (needsTranscript ? !m.transcript : !m.run_report))
+// Thin references (__fetch_full) can't be pre-filtered here — the agent resolves
+// the manifest itself and honors skip-in-flight / reports no-report as escalation.
+const evaluable = manifests.filter(m => m.__fetch_full || (!m.in_flight && (needsTranscript ? m.transcript : m.run_report)))
+const skipped = manifests.filter(m => !m.__fetch_full && (m.in_flight || (needsTranscript ? !m.transcript : !m.run_report)))
   .map(m => ({ gid: m.gid, task_name: m.task_name, reason: m.in_flight ? 'in_flight' : (needsTranscript ? 'no_transcript' : 'no_run_report (escalation candidate: transcript-eval it)') }))
 log(`mode=${mode}: ${evaluable.length} evaluable runs, ${skipped.length} skipped (${skipped.map(s => s.reason).join(', ') || 'none'})`)
 
@@ -199,7 +201,12 @@ const cohort = await agent(
   `(e.g. "A14 review-response", "O6 resource-release"), and the FIRST mention of each dimension in the findings section adds a ` +
   `one-line plain-language gloss of what it checks (take it from the finding's evidence context). A reader who has never seen ` +
   `the rubric must be able to follow the report.\n` +
-  `Structure: 1) verdict summary table (gid, task, verdict, gate failures, confirmed-BAD count, coverage gaps); ` +
+  `TASK RENDERING (hard rule): never write a bare task gid anywhere in the report — a human reads this and gid numbers mean ` +
+  `nothing to them. Every run/task mention, in every table and list, is a markdown link whose BODY is the task name: ` +
+  `[<task_name>](https://app.asana.com/0/0/<gid>/f). When the task name is unknown (unresolvable gid), link the gid itself as ` +
+  `a last resort and say why. The verdict table's first column is the linked task name; do not add a separate raw-gid column ` +
+  `(machine consumers read results.json, not this report).\n` +
+  `Structure: 1) verdict summary table (linked task name, verdict, gate failures, confirmed-BAD count, coverage gaps); ` +
   `2) confirmed findings grouped by dimension WITH citations, so recurring patterns across runs are visible; ` +
   `3) infra issues (substrate, not per-run); 4) coverage gaps (NOT_CAPTURED patterns — note O1/O6 expected until capture hook ships); ` +
   `5) recommended skill/infra fixes ranked by recurrence; ` +
