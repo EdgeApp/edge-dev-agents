@@ -163,6 +163,16 @@ if [ -n "$ITER" ]; then
       !done && $0 == "---" && NR > 1 { print ""; print t; done=1 }
     ' "$REPORT" > "$REPORT.tmp" && mv "$REPORT.tmp" "$REPORT"
   fi
+  # Visible stamp under the H1: frontmatter is hidden by markdown previews
+  # (operator, 2026-07-30), so the traceability facts get one rendered line.
+  if ! grep -q '^_iteration ' "$REPORT"; then
+    fmv() { grep -m1 "^$1:" "$REPORT" | sed -E 's/^[^:]+: *"?([^"]*)"?.*/\1/'; }
+    STAMPLINE="_iteration $ITER · $(fmv model)@$(fmv effort) · generated $(fmv generated) · session $(fmv claude_session_id | cut -c1-8)$( [ "$(fmv tdd)" = "tdd" ] && printf ' · [TDD](%s)' "$(fmv tdd_doc)" )_"
+    awk -v s="$STAMPLINE" '
+      { print }
+      !done && /^# Run report / { print ""; print s; done=1 }
+    ' "$REPORT" > "$REPORT.tmp" && mv "$REPORT.tmp" "$REPORT"
+  fi
 fi
 
 # 0. Conflict narration policy (operator, 2026-07-29). Two tiers:
