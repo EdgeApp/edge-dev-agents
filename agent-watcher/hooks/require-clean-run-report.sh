@@ -126,16 +126,31 @@ if [ -n "$STAMP" ]; then
 fi
 set_frontmatter agent_lane "$("$HOME/.cursor/skills/asana-field-value.sh" "$AGENT_TASK_GID" "agent_lane" 2>/dev/null || echo "none")"
 
-# Iteration ordinal + normalized attach name + H1 title. Count is over the
-# task's existing agent-run-report* attachments (the same set the watermark
-# reads), so ordinals survive worktree pruning and ad-hoc local file names.
-ITER=""
+# Iteration ordinal + normalized attach name + H1 title.
+# RE-ATTACH STABILITY: a report already stamped with `iteration: N` KEEPS N —
+# the watermark rule legitimately re-attaches the same report after posting
+# owed comments, and recomputing minted a phantom ordinal (houdini 2026-07-30:
+# the same report attached as -17- then -18-, frontmatter still 17). Only an
+# unstamped report gets a fresh ordinal: max existing name ordinal + 1
+# (falling back to attachment count + 1 for the pre-scheme era), over the same
+# attachment set the watermark reads, so ordinals survive worktree pruning.
+ITER=$(grep -m1 -E '^iteration: "?[0-9]+' "$REPORT" 2>/dev/null | grep -oE '[0-9]+' | head -1 || true)
 ATOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null)}"
-if [ -n "$ATOKEN" ]; then
-  N=$(curl -sf --max-time 20 -H "Authorization: Bearer $ATOKEN" \
+if [ -z "$ITER" ] && [ -n "$ATOKEN" ]; then
+  NAMES=$(curl -sf --max-time 20 -H "Authorization: Bearer $ATOKEN" \
     "https://app.asana.com/api/1.0/tasks/$AGENT_TASK_GID/attachments?opt_fields=name" 2>/dev/null \
-    | jq -r '[.data[]? | select(.name | test("^agent-run-report.*\\.md$"))] | length' 2>/dev/null || true)
-  case "$N" in (*[!0-9]*|"") ;; (*) ITER=$((N + 1)) ;; esac
+    | jq -r '.data[]? | .name | select(test("^agent-run-report.*\\.md$"))' 2>/dev/null || true)
+  if [ -n "$NAMES" ]; then
+    MAXORD=$(printf '%s\n' "$NAMES" | sed -nE 's/^agent-run-report-([0-9]+)-.*/\1/p' | sort -n | tail -1)
+    if [ -n "$MAXORD" ]; then
+      ITER=$((MAXORD + 1))
+    else
+      N=$(printf '%s\n' "$NAMES" | grep -c . || true)
+      case "$N" in (*[!0-9]*|"") ;; (*) ITER=$((N + 1)) ;; esac
+    fi
+  else
+    ITER=1
+  fi
 fi
 if [ -n "$ITER" ]; then
   set_frontmatter iteration "$ITER"
