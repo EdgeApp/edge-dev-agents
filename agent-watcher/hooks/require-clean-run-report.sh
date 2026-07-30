@@ -150,6 +150,17 @@ if [ -n "$ITER" ]; then
   fi
 fi
 
+# 0. Upfront conflict-status narration. Conflicts are addressed at
+#    rebase/landing by pr-land (operator policy 2026-07-29) — a report telling
+#    the reader a PR is/was CONFLICTING is noise unless it describes the
+#    landing itself. Block with the lines; the fix is deletion, not rewording.
+CONFLICT_NOISE="$(grep -nE 'CONFLICTING|mergeStateStatus|merge[- ]?conflict' "$REPORT" | grep -viE 'pr-land|landing|land[- ]time|cherry.pick|rebased? at land' || true)"
+if [ -n "$CONFLICT_NOISE" ]; then
+  FAIL+="- Upfront conflict-status narration (conflicts are a landing-time concern owned by pr-land; delete these lines unless they describe the landing itself):
+$(echo "$CONFLICT_NOISE" | head -4 | sed 's/^/    /')
+"
+fi
+
 # 1. Reversibility annotations ("Irreversible"/"IRREVERSIBLE" allowed).
 REV="$(grep -nE '\bReversible\b' "$REPORT" | grep -viE 'irreversible' || true)"
 if [ -n "$REV" ]; then
