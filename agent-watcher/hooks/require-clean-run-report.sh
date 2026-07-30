@@ -20,8 +20,8 @@
 #      never marks it. A forced frame reads as organic evidence unless it is
 #      labelled, so the label is mechanical, not a matter of recollection.
 #
-# ALSO auto-fills three traceability fields before linting, since all three are
-# fully determined by state the hook can read and none by agent recollection:
+# ALSO auto-fills traceability fields before linting, since every one is fully
+# determined by state the hook can read and none by agent recollection:
 #   claude_session_id  the CC session that wrote the report, from the hook's own
 #                      stdin. Names the transcript exactly, so an eval stops
 #                      guessing at it (resolve-run's find_transcript is a
@@ -33,6 +33,21 @@
 #                      the doc state it audited even after the branch moves on.
 #                      The PR body carries the branch-HEAD form instead
 #                      (ensure-tdd-pr-link.sh) — operator ruling 2026-07-28.
+#   iteration          1-based report ordinal: count of agent-run-report*
+#                      attachments already on the task + 1. Also normalized into
+#                      the attach NAME (agent-run-report-NN-<slug>.md, via
+#                      updatedInput) and an H1 title (# Run report NN: <slug>,
+#                      inserted when the report has no H1), so which followup
+#                      turn a report belongs to is obvious from the attachment
+#                      list alone (operator request 2026-07-29; Maya's four
+#                      ad-hoc suffixes were unorderable at a glance).
+#   model / effort     what this segment actually ran, from the task's last
+#                      version stamp (versions/<gid>.jsonl) — ground truth, not
+#                      the Asana request fields.
+#   agent_lane / tdd   live Asana field values at attach (asana-field-value.sh);
+#                      tdd complements tdd_doc so "no TDD owed" (none) is
+#                      distinguishable from "owed but missing" (tdd + tdd_doc
+#                      none).
 #
 # FORMATTER-READY: these checks define the form contract a future form-only
 # formatter subagent would enforce (draft in, facts immutable, form normalized).
@@ -101,6 +116,39 @@ if [ "$TDD_FIELD" = "tdd" ]; then
   done
 fi
 set_frontmatter tdd_doc "$TDD_URL"
+set_frontmatter tdd "$TDD_FIELD"
+
+# Segment ground truth from the last version stamp; live lane field.
+STAMP=$(tail -1 "${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/versions/$AGENT_TASK_GID.jsonl" 2>/dev/null || true)
+if [ -n "$STAMP" ]; then
+  set_frontmatter model "$(printf '%s' "$STAMP" | jq -r '.model // empty' 2>/dev/null || true)"
+  set_frontmatter effort "$(printf '%s' "$STAMP" | jq -r '.effort // empty' 2>/dev/null || true)"
+fi
+set_frontmatter agent_lane "$("$HOME/.cursor/skills/asana-field-value.sh" "$AGENT_TASK_GID" "agent_lane" 2>/dev/null || echo "none")"
+
+# Iteration ordinal + normalized attach name + H1 title. Count is over the
+# task's existing agent-run-report* attachments (the same set the watermark
+# reads), so ordinals survive worktree pruning and ad-hoc local file names.
+ITER=""
+ATOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null)}"
+if [ -n "$ATOKEN" ]; then
+  N=$(curl -sf --max-time 20 -H "Authorization: Bearer $ATOKEN" \
+    "https://app.asana.com/api/1.0/tasks/$AGENT_TASK_GID/attachments?opt_fields=name" 2>/dev/null \
+    | jq -r '[.data[]? | select(.name | test("^agent-run-report.*\\.md$"))] | length' 2>/dev/null || true)
+  case "$N" in (*[!0-9]*|"") ;; (*) ITER=$((N + 1)) ;; esac
+fi
+if [ -n "$ITER" ]; then
+  set_frontmatter iteration "$ITER"
+  # H1 title when the report has none: "# Run report NN: <slug>".
+  SLUG=$(printf '%s' "$CMD" | sed -E 's/.*--attach-name[= ]+"?agent-run-report-?([^" ]*)\.md"?.*/\1/; s/^[0-9]+-//')
+  [ -n "$SLUG" ] && [ "$SLUG" != "$CMD" ] || SLUG=$(basename "$REPORT" .md | sed -E "s/^agent-run-report-?//; s/^$AGENT_TASK_GID-?//; s/^[0-9]+-//")
+  if ! grep -qE '^# Run report ' "$REPORT"; then
+    awk -v t="# Run report $ITER: ${SLUG:-report}" '
+      { print }
+      !done && $0 == "---" && NR > 1 { print ""; print t; done=1 }
+    ' "$REPORT" > "$REPORT.tmp" && mv "$REPORT.tmp" "$REPORT"
+  fi
+fi
 
 # 1. Reversibility annotations ("Irreversible"/"IRREVERSIBLE" allowed).
 REV="$(grep -nE '\bReversible\b' "$REPORT" | grep -viE 'irreversible' || true)"
@@ -149,7 +197,20 @@ $(echo "$HACKED_SHOTS" | head -5 | sed 's/^/    /')
 "
 fi
 
-[ -z "$FAIL" ] && exit 0
+if [ -z "$FAIL" ]; then
+  # Allow path: normalize the attach NAME to agent-run-report-NN-<slug>.md via
+  # updatedInput, so the attachment list orders itself. Idempotent: a name
+  # already carrying the computed ordinal passes untouched.
+  if [ -n "$ITER" ] && [ -n "${SLUG:-}" ]; then
+    WANT="agent-run-report-$ITER-$SLUG.md"
+    CUR=$(printf '%s' "$CMD" | sed -E 's/.*--attach-name[= ]+"?([^" ]+)"?.*/\1/')
+    if [ "$CUR" != "$CMD " ] && [ -n "$CUR" ] && [ "$CUR" != "$WANT" ]; then
+      NEW_CMD=$(printf '%s' "$CMD" | sed -E "s/(--attach-name[= ]+\"?)[^\" ]+(\"?)/\1$WANT\2/")
+      jq -n --arg c "$NEW_CMD" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {command: $c}}}'
+    fi
+  fi
+  exit 0
+fi
 
 echo "BLOCKED: run report $REPORT violates the template contract:
 ${FAIL}Fix: RE-READ the template ($TEMPLATE), rewrite the report against it, then retry the attach. Do not delete facts to pass the lint — fix the form only." >&2
