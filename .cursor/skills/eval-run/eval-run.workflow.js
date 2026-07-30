@@ -18,7 +18,7 @@ const sharedLogs = (input && input.logs) || null
 const manifests = ((input && input.manifests) || []).map(m => ({ ...m, logs: m.logs || sharedLogs }))
 const runDate = (input && input.runDate) || 'unknown-date'
 // optional model override for all evaluator/verifier/synthesis agents (e.g. 'opus');
-// omitted → agents inherit the session model
+// applies uniformly and beats the per-stage defaults below
 const MODEL = ['sonnet', 'opus', 'haiku', 'fable'].includes(input && input.model) ? input.model : undefined
 const MOPT = MODEL ? { model: MODEL } : {}
 if (!manifests.length) return { error: 'no manifests passed in args.manifests' }
@@ -36,6 +36,16 @@ const cohortInstructions = (input && input.cohortInstructions) || null
 // mode 'transcript': the full pass (agent-eval process dimensions + orch-eval).
 const mode = (input && input.mode) === 'transcript' ? 'transcript' : 'report'
 const profile = mode === 'report' ? 'report' : ((input && input.profile) || null)
+
+// Per-stage model defaults (operator policy 2026-07-29), each beaten by args.model:
+//   report-eval agents  -> sonnet (report-vs-API comparison; opus is wasted, haiku
+//                          risks the A3 timestamp-ordering judgment)
+//   verifiers           -> sonnet + low effort (re-open one citation apiece)
+//   transcript-eval agents + cohort synthesis -> inherit the session model
+//                          (whole-transcript pattern-finding is where tier shows)
+const EVAL_OPT = MODEL ? MOPT : (mode === 'report' ? { model: 'sonnet' } : {})
+const VERIFY_OPT = { ...(MODEL ? MOPT : { model: 'sonnet' }), effort: 'low' }
+const SYNTH_OPT = MOPT
 
 const needsTranscript = mode === 'transcript'
 const evaluable = manifests.filter(m => !m.in_flight && (needsTranscript ? m.transcript : m.run_report))
@@ -113,13 +123,21 @@ const evalPrompt = (skill, m) =>
 const results = await pipeline(
   evaluable,
   m => parallel([
-    () => agent(evalPrompt('agent-eval', m), { label: `agent-eval:${m.gid}`, phase: 'Evaluate', schema: FINDINGS_SCHEMA, ...MOPT }),
-    ...(profile ? [] : [() => agent(evalPrompt('orch-eval', m), { label: `orch-eval:${m.gid}`, phase: 'Evaluate', schema: FINDINGS_SCHEMA, ...MOPT })]),
+    () => agent(evalPrompt('agent-eval', m), { label: `agent-eval:${m.gid}`, phase: 'Evaluate', schema: FINDINGS_SCHEMA, ...EVAL_OPT }),
+    ...(profile ? [] : [() => agent(evalPrompt('orch-eval', m), { label: `orch-eval:${m.gid}`, phase: 'Evaluate', schema: FINDINGS_SCHEMA, ...EVAL_OPT })]),
   ]),
   async (pair, m) => {
     const [agentF, orchF] = pair
     const dims = [...((agentF && agentF.dimensions) || []), ...((orchF && orchF.dimensions) || [])]
-    const bads = dims.filter(d => d.verdict === 'BAD')
+    const allBads = dims.filter(d => d.verdict === 'BAD')
+    // Adversarial verify: every BAD in transcript mode (measured 2026-07-29:
+    // 8/106 cohort BADs refuted, ALL of them transcript-read errors — ladder
+    // timestamp misreads, friction miscounts). In report mode the evidence is
+    // an API response the evaluator just fetched, where the refutation rate is
+    // zero so far — verify only GATE findings there (a false FAIL is the one
+    // cost worth a second read); other report-mode BADs confirm directly.
+    const bads = mode === 'report' ? allBads.filter(b => GATES[b.id]) : allBads
+    const autoConfirmed = allBads.filter(b => !bads.includes(b))
     const verified = await parallel(bads.map(b => () =>
       agent(
         `Adversarially VERIFY this finding about agent run ${m.gid} (task: ${m.task_name}). ` +
@@ -129,10 +147,10 @@ const results = await pipeline(
           ? `Manifest was passed thin; if the citation alone is insufficient, run \`~/.cursor/skills/resolve-run/scripts/resolve-run.sh --gid ${m.gid}\` ` +
             `(timeout 90000ms+) for the full manifest. Thin reference: ${JSON.stringify(m)}`
           : `Manifest: ${JSON.stringify(m)}`),
-        { label: `verify:${m.gid}:${b.id}`, phase: 'Verify', schema: VERDICT_SCHEMA, effort: 'low', ...MOPT }
+        { label: `verify:${m.gid}:${b.id}`, phase: 'Verify', schema: VERDICT_SCHEMA, ...VERIFY_OPT }
       ).then(v => ({ ...b, refuted: v ? v.refuted : true, verify_reason: v ? v.reason : 'verifier died' }))
     ))
-    const confirmed = verified.filter(Boolean).filter(v => !v.refuted)
+    const confirmed = [...autoConfirmed, ...verified.filter(Boolean).filter(v => !v.refuted)]
     const refuted = verified.filter(Boolean).filter(v => v.refuted)
     // demote refuted BADs to MINOR-with-note rather than dropping silently
     const finalDims = dims.map(d => {
@@ -191,7 +209,7 @@ const cohort = await agent(
   `[playbook-proposal] each collected playbook_proposals bullet verbatim with its source run, ready for operator promotion to the sim-testing playbook; ` +
   `[skill-gap] the target skill/rule and one-line fix for /author; [infra-fix] the component and change. ` +
   `Derive actions ONLY from findings present above (no inventions); omit types with no instances. Return ONLY the markdown.`,
-  { label: 'cohort-report', phase: 'Synthesize', ...MOPT }
+  { label: 'cohort-report', phase: 'Synthesize', ...SYNTH_OPT }
 )
 
 return { runDate, runs, skipped, cohortReport: cohort }
