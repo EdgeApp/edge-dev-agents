@@ -53,6 +53,7 @@ set -euo pipefail
 
 DIR="$HOME/.config/agent-watcher"
 DO_LIST=false
+PORCELAIN=false
 RECOVER=false
 CHAT=false
 LATEST=false
@@ -65,6 +66,8 @@ TERM=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --list) DO_LIST=true; shift ;;
+    --porcelain) PORCELAIN=true; shift ;;       # with --list: machine-readable TSV (for session-tui.js)
+    --tui) exec node "$HOME/.config/agent-watcher/session-tui.js" ;;
     --recover) RECOVER=true; shift ;;
     --chat) CHAT=true; shift ;;
     --latest) LATEST=true; shift ;;
@@ -268,14 +271,17 @@ load_tmux_state() {
   local name pid args a c rc ruuid fork alive gid child st
   while IFS= read -r name; do
     [[ -n "$name" ]] || continue
-    pid=$(tmux list-panes -t "$name" -F '#{pane_pid}' 2>/dev/null | head -1 || true)
     args=""; alive=false
-    if [[ -n "$pid" ]]; then
-      for c in $(pgrep -P "$pid" 2>/dev/null || true); do
+    # All panes across ALL windows (-s), and children resolved via ps, NOT
+    # pgrep -P: macOS pgrep silently excludes the caller's own ancestors, so a
+    # --list run from inside a claude pane reported its own session as dead.
+    for pid in $(tmux list-panes -s -t "$name" -F '#{pane_pid}' 2>/dev/null || true); do
+      for c in $(ps -axo pid=,ppid= | awk -v p="$pid" '$2==p {print $1}'); do
         a=$(ps -ww -o command= -p "$c" 2>/dev/null || true)
-        case "$a" in *claude*) args="$a"; alive=true; break ;; esac
+        case "$a" in claude\ *|*/claude\ *|claude) args="$a"; alive=true; break ;; esac
       done
-    fi
+      $alive && break
+    done
     rc=$(printf '%s' "$args" | grep -oE -- '--remote-control [^ ]+' | awk '{print $2}' | head -1 || true)
     ruuid=$(printf '%s' "$args" | grep -oE -- '--resume [0-9a-f-]{36}' | awk '{print $2}' | head -1 || true)
     fork=false; printf '%s' "$args" | grep -q -- '--fork-session' && fork=true
@@ -362,6 +368,28 @@ emit_candidates() {
 # when Asana is unreachable or the task is gone.
 if $DO_LIST; then
   load_tmux_state
+  # --porcelain: one TSV row per transcript, newest first, no header. Contract
+  # (consumed by session-tui.js — update both together):
+  #   mtime_epoch \t uuid \t gid \t state \t rc \t fork_child \t fork_rc \t title
+  # state is running/retired/dead/"" (same four states as the human list); title
+  # is the resolved "Asana: <name>" or the /one-shot preview fallback.
+  if $PORCELAIN; then
+    while IFS=$'\t' read -r mtime uuid gid preview; do
+      [[ -n "$mtime" ]] || continue
+      nm=$(name_of_gid "$gid")
+      if [[ -n "$nm" ]]; then title="Asana: $nm"; else title="${preview:-}"; fi
+      state=""; rc=""
+      if [[ -n "$gid" ]]; then
+        row=$(printf '%s\n' "$TMUX_STATE" | awk -F'\t' -v g="$gid" '$1==g {print; exit}')
+        state=$(printf '%s' "$row" | cut -f2); rc=$(printf '%s' "$row" | cut -f3)
+      fi
+      fork_child=$(printf '%s\n' "$TMUX_FORKS" | awk -F'\t' -v u="$uuid" '$1==u {print $2; exit}')
+      fork_rc=$(printf '%s\n' "$TMUX_FORKS" | awk -F'\t' -v u="$uuid" '$1==u {print $3; exit}')
+      printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+        "$mtime" "$uuid" "$gid" "$state" "$rc" "$fork_child" "$fork_rc" "$title"
+    done < <(emit_candidates)
+    exit 0
+  fi
   echo "Watcher-spawned sessions (newest first):"
   echo "  ● running   ◐ retired (alive, attachable)   ✗ dead pane"
   while IFS=$'\t' read -r mtime uuid gid preview; do

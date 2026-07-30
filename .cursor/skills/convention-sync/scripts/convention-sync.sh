@@ -138,6 +138,17 @@ EXTRA_TREES=(
 EXTRA_FILES=(
   "$HOME/.claude/link-shared-memory.sh|bin/link-shared-memory.sh"
 )
+# Claude settings PROJECTION (#6): hook REGISTRATIONS live inside
+# ~/.claude/settings.json, which is machine-local as a whole (model, theme,
+# notification prefs) — but the `hooks` block is part of the orchestration
+# system: the hook SCRIPTS sync via the agent-watcher tree, and without their
+# registrations a second machine gets scripts that never fire. So the `.hooks`
+# key ALONE is projected to the repo (claude-settings/hooks.json, key-sorted)
+# on user→repo, and merged back on repo→user / bootstrap by replacing ONLY the
+# `.hooks` key of the local settings.json — every other key stays untouched.
+# The projecting machine is canonical for the whole block (no per-hook merge).
+CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+HOOKS_REL="claude-settings/hooks.json"
 extra_json="[]"
 
 # Pull-before-push gate (user-to-repo only).
@@ -247,6 +258,7 @@ home_path_for_extra() {
     IFS='|' read -r sfile rel <<< "$pair"
     if [[ "$rp" == "$rel" ]]; then printf '%s\n' "$sfile"; return 0; fi
   done
+  if [[ "$rp" == "$HOOKS_REL" ]]; then printf '%s\n' "$CLAUDE_SETTINGS"; return 0; fi
   return 1
 }
 
@@ -402,6 +414,27 @@ process_extra() {
       fi
     fi
   done
+  # Hooks projection export (#6): settings.json .hooks → repo. Skipped when the
+  # local hooks block is missing/empty so an unconfigured machine can never
+  # blank the canonical registrations in the repo.
+  local hcur hrepo hrp
+  hrp="$REPO_DIR/$HOOKS_REL"
+  hcur=$(jq -S '.hooks // {}' "$CLAUDE_SETTINGS" 2>/dev/null || echo '{}')
+  if [[ "$hcur" != "{}" ]]; then
+    hrepo=$(jq -S . "$hrp" 2>/dev/null || echo '')
+    if [[ "$hcur" != "$hrepo" ]]; then
+      if [[ "$mode" == "stage" ]]; then
+        mkdir -p "$(dirname "$hrp")"
+        printf '%s\n' "$hcur" > "$hrp"
+        git -C "$REPO_DIR" add "$HOOKS_REL" >/dev/null 2>&1 || true
+        if ! git -C "$REPO_DIR" diff --cached --quiet -- "$HOOKS_REL" 2>/dev/null; then
+          extra_json=$(echo "$extra_json" | jq --arg f "$HOOKS_REL" '. + [$f]')
+        fi
+      else
+        extra_json=$(echo "$extra_json" | jq --arg f "$HOOKS_REL" '. + [$f]')
+      fi
+    fi
+  fi
 }
 
 # Reverse of process_extra (#5): pull the portable trees repo → home for
@@ -457,6 +490,27 @@ process_extra_reverse() {
       fi
     fi
   done
+  # Hooks projection restore (#6): repo hooks.json → local settings.json,
+  # replacing ONLY the .hooks key (all other keys are machine-local and stay).
+  # Creates settings.json with just {hooks} on a fresh machine. Written via
+  # temp+mv so a mid-write crash can't leave a truncated settings.json.
+  local hrp hcur merged
+  hrp="$REPO_DIR/$HOOKS_REL"
+  if [[ -f "$hrp" ]] && jq -e 'type == "object"' "$hrp" >/dev/null 2>&1; then
+    hcur=$(jq -S '.hooks // {}' "$CLAUDE_SETTINGS" 2>/dev/null || echo '{}')
+    if [[ "$(jq -S . "$hrp")" != "$hcur" ]]; then
+      if [[ "$mode" == "stage" ]]; then
+        if [[ -f "$CLAUDE_SETTINGS" ]]; then
+          merged=$(jq -S --slurpfile h "$hrp" '.hooks = $h[0]' "$CLAUDE_SETTINGS")
+        else
+          mkdir -p "$(dirname "$CLAUDE_SETTINGS")"
+          merged=$(jq -nS --slurpfile h "$hrp" '{hooks: $h[0]}')
+        fi
+        [[ -n "$merged" ]] && printf '%s\n' "$merged" > "$CLAUDE_SETTINGS.tmp.$$" && mv "$CLAUDE_SETTINGS.tmp.$$" "$CLAUDE_SETTINGS"
+      fi
+      extra_json=$(echo "$extra_json" | jq --arg f "$HOOKS_REL" '. + [$f]')
+    fi
+  fi
 }
 
 extra_deletion_warnings() {

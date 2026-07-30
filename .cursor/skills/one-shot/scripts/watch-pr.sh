@@ -33,6 +33,10 @@
 #             RESULT: green-travis-pending    (all but Travis passed; Travis
 #                                              queued/running — report its state
 #                                              in the Finalize Gate checklist)
+#             Any RESULT may carry a ` reviewer-unavailable:<name>` suffix,
+#             meaning that reviewer posted NO check-run on a HEAD whose other
+#             checks all completed. Proceed; record it as an unchecked box in
+#             the report's Finalize Gate rather than claiming reviewer-clean.
 #             RESULT: green-wip-preserve      (all passed except the wip-guard
 #                                              check, red only because preserved
 #                                              fixup commits are on the branch
@@ -108,6 +112,12 @@ echo ">> watch-pr: ${REMAINING}s of budget remain; watching ${REPO:+$REPO }PR #$
 # Poll loop instead of `gh pr checks --watch`: --watch blocks on ALL checks with
 # no way to exempt the slow-CI check. Same budget contract as before.
 SLOW_CI_PATTERN="Travis CI"
+# The reviewer bot's check-run NAME (not its login). A reviewer that never posts
+# a check-run on a HEAD whose other checks all completed is UNAVAILABLE, not
+# pending: it is out of quota, disabled for the repo, or down. That is a
+# different verdict from "found nothing", and only this script can tell them
+# apart, so it reports which one rather than leaving the caller to guess.
+REVIEWER_CHECK_PATTERN="${REVIEWER_CHECK_PATTERN:-Cursor Bugbot}"
 WIP_GUARD_PATTERN="block-wip-pr"
 WIP_MODE=""  # cached review-mode verdict; fetched at most once per invocation
 
@@ -148,14 +158,20 @@ while :; do
   PENDING_OTHER=$(jq -r --arg p "$SLOW_CI_PATTERN" '[.[] | select(.bucket=="pending") | .name | select(startswith($p) | not)] | join(", ")' <<<"$JSON" 2>/dev/null || true)
   PENDING_SLOW=$(jq -r --arg p "$SLOW_CI_PATTERN" '[.[] | select(.bucket=="pending") | .name | select(startswith($p))] | join(", ")' <<<"$JSON" 2>/dev/null || true)
   if [ "$TOTAL" -gt 0 ] && [ -z "$PENDING_OTHER" ]; then
+    REVIEWER_SEEN=$(jq -r --arg p "$REVIEWER_CHECK_PATTERN" '[.[] | .name | select(startswith($p))] | length' <<<"$JSON" 2>/dev/null || echo 0)
+    REVIEWER_NOTE=""
+    if [ "${REVIEWER_SEEN:-0}" -eq 0 ]; then
+      REVIEWER_NOTE=" reviewer-unavailable:$REVIEWER_CHECK_PATTERN"
+      echo ">> watch-pr: no '$REVIEWER_CHECK_PATTERN' check-run on HEAD while every other check completed — the reviewer is unavailable (quota/disabled/down), not pending. Proceed, and record it as an unchecked box in the run report's Finalize Gate." >&2
+    fi
     if [ -n "$FAILS_WIP" ]; then
       echo ">> watch-pr: green except wip-guard ($FAILS_WIP): expected while fixups are PRESERVED for the active reviewer — do NOT squash to clear it" >&2
-      echo "RESULT: green-wip-preserve ($FAILS_WIP)"
+      echo "RESULT: green-wip-preserve ($FAILS_WIP)$REVIEWER_NOTE"
     elif [ -z "$PENDING_SLOW" ]; then
-      echo "RESULT: green"
+      echo "RESULT: green$REVIEWER_NOTE"
     else
       echo ">> watch-pr: every check green except still-pending: $PENDING_SLOW (non-blocking; red would block)" >&2
-      echo "RESULT: green-travis-pending ($PENDING_SLOW)"
+      echo "RESULT: green-travis-pending ($PENDING_SLOW)$REVIEWER_NOTE"
     fi
     exit 0
   fi

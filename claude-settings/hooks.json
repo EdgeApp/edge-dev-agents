@@ -1,0 +1,195 @@
+{
+  "PostToolUse": [
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/mark-playbook-read.sh",
+          "type": "command"
+        }
+      ],
+      "matcher": "Read|Bash"
+    }
+  ],
+  "PreToolUse": [
+    {
+      "hooks": [
+        {
+          "command": "node ~/.agent-tools/socket-guard.mjs",
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/git-history-gate.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-test-evidence-before-pr.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/block-simctl-booted.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-plan-before-developing.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/block-raw-thread-resolve.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-maestro-device.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/block-coordinate-taps.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-concession-validation.sh",
+          "timeout": 15,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/block-piped-watcher-scripts.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-subtasks-for-multi-repo-pr.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-followup-scope-on-complete.sh",
+          "timeout": 30,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-clean-run-report.sh",
+          "timeout": 15,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/block-sim-wipe.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-bundle-triage.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-tdd-current.sh",
+          "timeout": 20,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/ensure-tdd-pr-link.sh",
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-playbook-before-drive.sh",
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/block-upfront-conflict-probe.sh",
+          "type": "command"
+        }
+      ],
+      "matcher": "Bash"
+    },
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/block-coordinate-taps.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-maestro-device.sh",
+          "timeout": 10,
+          "type": "command"
+        }
+      ],
+      "matcher": "Write|Edit"
+    },
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/no-interactive-prompt.sh",
+          "timeout": 10,
+          "type": "command"
+        }
+      ],
+      "matcher": "AskUserQuestion"
+    },
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/no-self-respawn.sh",
+          "timeout": 10,
+          "type": "command"
+        }
+      ],
+      "matcher": "Bash|ScheduleWakeup|CronCreate"
+    },
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/mark-agent-authored-asana.sh",
+          "timeout": 10,
+          "type": "command"
+        }
+      ],
+      "matcher": "mcp__claude_ai_Asana__.*"
+    },
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/require-maestro-device.sh",
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/block-coordinate-taps.sh",
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-playbook-before-drive.sh",
+          "type": "command"
+        }
+      ],
+      "matcher": "mcp__maestro__.*"
+    }
+  ],
+  "SessionStart": [
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/inject-no-slop-reminder.sh",
+          "timeout": 10,
+          "type": "command"
+        }
+      ]
+    }
+  ],
+  "Stop": [
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/require-continuation-or-block.sh",
+          "timeout": 15,
+          "type": "command"
+        }
+      ]
+    }
+  ]
+}
