@@ -48,7 +48,10 @@ Read it now (short file, one Read call unblocks every later drive):
 It holds the working knowledge that otherwise gets re-learned on the sim clock:
 $(grep -E '^## ' "$PLAYBOOK" 2>/dev/null | sed 's/^## /  - /')
 Start with "Investigate cheap before driving the UI": pick the swap pair via
-direct provider API + account holdings BEFORE any in-sim quote probing.
+direct provider API + account holdings BEFORE any in-sim quote probing, and on
+an asset/provider-scoped task apply the corePlugins force FIRST (navigation
+churn otherwise). Swipes: percentage coordinates + short strokes; the confirm
+slider is SOLVED in common/confirm-slider.yaml - never re-derive either.
 Then COMPOSE drives from ~/.cursor/skills/build-and-test/maestro/common/
 via runFlow instead of re-deriving taps:
   login-if-needed.yaml            logged-in account incl. PIN entry

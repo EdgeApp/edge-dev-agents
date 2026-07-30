@@ -215,6 +215,16 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
 Promoted from the 3-way login-perf run (2026-07-21, Samsung Galaxy S9, task
 1216773266141895 — full method and raw data in its report gist).
 
+- **Android emulator + slot Metro:** an RN debug build on an emulator connects
+  to the dev server at `10.0.2.2:8081` (the emulator's host-loopback alias) and
+  IGNORES `adb reverse`, so per-slot Metro ports do not reach it that way.
+  Slot-safe fix: leave Metro on the slot port and run a tiny host-side TCP
+  forwarder from `127.0.0.1:8081` to the slot port. Only one slot can hold
+  8081 — check `lsof -nP -iTCP:8081 -sTCP:LISTEN` first and skip the forwarder
+  if taken. Symptom when unfixed: red "Unable to load script" + repeating
+  logcat `Failed to connect to /10.0.2.2:8081`. (Promoted 2026-07-29, run
+  1216901482732656.)
+
 - **Builds**: `gradlew` lives under `android/`, not repo root; `sfw ./gradlew`
   fails (spawn ENOENT) — run gradle directly (it spawns `node`, not npx, so the
   sfw hook does not block it). Release APK lands at
@@ -290,6 +300,13 @@ daemon can drift to another sim, and the 2026-07-22 swapter run spent an hour
 debugging screenshots of the wrong device.
 
 ## Investigate cheap before driving the UI
+- **Asset/provider-scoped tasks: force the target via corePlugins BEFORE the
+  first drive.** When the task names specific asset(s) or provider(s), apply the
+  local corePlugins hack up front (disable competing `swapPlugins` per the
+  provider-forcing entry below, or trim to the target plugin for buy/sell), not
+  after quotes route elsewhere: with the full plugin set live, every attempt
+  re-navigates to re-find the target and the engine reverts to best-rate in
+  ~60s. Worktree-local and uncommitted, same rules as provider forcing.
 - **Pick the swap test pair via direct provider API before ANY in-sim quote
   probing.** Trying pairs/amounts in the Exchange scene until one quotes is the
   most expensive probe there is. Instead: (1) candidate assets in priority
@@ -300,6 +317,12 @@ debugging screenshots of the wrong device.
   provider specifics"; the in-app below-limit error text also names floors);
   (3) drive the sim ONCE with the known-good pair. The sim run is for proving
   the app behavior, never for discovering whether a pair quotes.
+- **Hack-verifying a state the sim cannot reach is cheap on JS-only surfaces:**
+  force the input state with an uncommitted edit, let Metro fast refresh apply
+  it with the app already on the target scene, capture, then swap the code
+  variant (`git checkout <ref> -- <file>` and re-apply the hack) for a matched
+  before/after pair from the same running app and live data. No relaunch, no
+  rebuild between frames. (Promoted 2026-07-29, run 1210166111258621.)
 - **Crawl the code and run `/debugger` EARLY**, not as a last resort. A grinding
   UI loop is the most expensive probe there is. "Why is X missing/failing" is
   usually answerable from source (settings store, plugin registration, env.json
@@ -347,6 +370,43 @@ debugging screenshots of the wrong device.
   (verification suite) — reference for selectors, but dev flows stay OURS/local.
 - **The confirm slider** is solved: `common/confirm-slider.yaml`. Do not spend
   calls re-deriving the gesture.
+- **Swipes generally: percentages, short strokes, never re-derived.** Vertical
+  scrolling is `swipe: start: "50%, 70%"  end: "50%, 30%"` — always percentage
+  coordinates (slot sims differ in scale; absolute pixels are why hand-derived
+  swipes fail across slots), repeated short strokes with a wait between beats
+  one long fling (momentum overshoots list targets). Start the gesture ON the
+  scrollable content: a stroke from the screen edge is an edge-swipe and opens
+  the drawer instead of scrolling. Any swipe you find yourself deriving twice
+  is a `[flow]` proposal for `common/`. (Piratechain 2026-07-29: repeated
+  hand-derived vertical-swipe and slider failures.)
+- **The "Verify your password" modal auto-opens on some launches and blocks
+  navigation.** Dismiss with `tapOn: id: "modal-close-button"` (testID exists on
+  `EdgeModal`); the dimmed backdrop is not addressable by text. (Promoted
+  2026-07-29, run 1211050361847785.)
+- **Do not drive the PIN keypad with `common/login-if-needed.yaml` when the
+  worktree `env.json` has `YOLO_*` set:** auto-login enters digits concurrently
+  and the subflow fails on digit 3. Wait for the logged-in shell, or drive the
+  already-running app. (Promoted 2026-07-29, run 1213213636561471.)
+- **Enroll/un-enroll sim biometry without the Simulator UI:**
+  `xcrun simctl spawn <udid> notifyutil -s com.apple.BiometricKit.enrollmentChanged 1`
+  then `notifyutil -p com.apple.BiometricKit.enrollmentChanged` (0 to
+  un-enroll, `-g` reads). The app reads biometry type ONCE at startup into
+  `state.touch.biometryType`, so terminate + launch after flipping; reload is
+  not enough. Parallel-safe (per-simulator). (Promoted 2026-07-29, run
+  1215939017452141.)
+- **Reaching the login scene on a slot sim:** YOLO auto-login fires from a
+  module-level `firstRun` flag in `LoginScene.tsx`, consumed once per bundle
+  load, so side-menu logout LANDS on the login scene and stays. To land there
+  straight from launch, null BOTH `YOLO_USERNAME` and `YOLO_PIN` in the
+  worktree `env.json` (nulling only the username hits a light-account fallback
+  that still auto-logs-in), then terminate + launch; restore after. (Promoted
+  2026-07-29, run 1215939017452141.)
+- **Maestro `visible:` matches the WHOLE text node.** "Powered by Maya
+  Protocol" renders inside a node whose text is
+  `Powered by Maya ProtocolTap to Change Provider`, so the exact match never
+  hits while `"Powered by .*"` does. Anchor quote-ready waits on
+  `Slide to Confirm` instead — it appears only once a quote resolves.
+  (Promoted 2026-07-29, run 1216518039073159.)
 - **Maestro economics:** each `maestro test` invocation pays ~2 min driver
   startup. For EXPLORATION (finding selectors, poking screens) use the **maestro
   MCP tools** (persistent driver, per-command tap/swipe/hierarchy/screenshot —
