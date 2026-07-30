@@ -61,6 +61,22 @@ if [[ -f "$REPO/bin/link-shared-memory.sh" ]]; then
   chmod +x "$HOME/.claude/link-shared-memory.sh"
 fi
 
+# 4b. Hook registrations: merge claude-settings/hooks.json into
+# ~/.claude/settings.json, replacing ONLY the .hooks key (model/theme/etc stay
+# machine-local). Without this the agent-watcher hook SCRIPTS installed in
+# step 2 are present but never fire. Written via temp+mv (no partial writes).
+if [[ -f "$REPO/claude-settings/hooks.json" ]]; then
+  say "Merging hook registrations into ~/.claude/settings.json"
+  mkdir -p "$HOME/.claude"
+  SJ="$HOME/.claude/settings.json"
+  if [[ -f "$SJ" ]]; then
+    MERGED=$(jq -S --slurpfile h "$REPO/claude-settings/hooks.json" '.hooks = $h[0]' "$SJ")
+  else
+    MERGED=$(jq -nS --slurpfile h "$REPO/claude-settings/hooks.json" '{hooks: $h[0]}')
+  fi
+  [[ -n "$MERGED" ]] && printf '%s\n' "$MERGED" > "$SJ.tmp.$$" && mv "$SJ.tmp.$$" "$SJ"
+fi
+
 # 5. Claude compat: ~/.claude/skills -> ~/.cursor/skills + regenerate CLAUDE.md
 if [[ -d "$HOME/.cursor/skills" ]]; then
   if [[ -L "$HOME/.claude/skills" || ! -e "$HOME/.claude/skills" ]]; then
