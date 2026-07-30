@@ -150,14 +150,23 @@ if [ -n "$ITER" ]; then
   fi
 fi
 
-# 0. Upfront conflict-status narration. Conflicts are addressed at
-#    rebase/landing by pr-land (operator policy 2026-07-29) — a report telling
-#    the reader a PR is/was CONFLICTING is noise unless it describes the
-#    landing itself. Block with the lines; the fix is deletion, not rewording.
-CONFLICT_NOISE="$(grep -nE 'CONFLICTING|mergeStateStatus|merge[- ]?conflict' "$REPORT" | grep -viE 'pr-land|landing|land[- ]time|cherry.pick|rebased? at land' || true)"
+# 0. Conflict narration policy (operator, 2026-07-29). Two tiers:
+#    a) UPFRONT conflict status (outside a landing context) is noise, always.
+#    b) Within a landing context, only NON-TRIVIAL conflicts are worth words —
+#       CHANGELOG conflicts happen on nearly every land and resolve
+#       mechanically (changelog-union-merge.sh), so narrating one is noise
+#       even mid-landing. Block with the lines; the fix is deletion.
+CONFLICT_LINES="$(grep -nE 'CONFLICTING|mergeStateStatus|merge[- ]?conflict' "$REPORT" || true)"
+CONFLICT_NOISE="$(printf '%s\n' "$CONFLICT_LINES" | grep -viE 'pr-land|landing|land[- ]time|cherry.pick|rebased? at land' || true)"
+CHANGELOG_NOISE="$(printf '%s\n' "$CONFLICT_LINES" | grep -iE 'changelog' || true)"
 if [ -n "$CONFLICT_NOISE" ]; then
   FAIL+="- Upfront conflict-status narration (conflicts are a landing-time concern owned by pr-land; delete these lines unless they describe the landing itself):
 $(echo "$CONFLICT_NOISE" | head -4 | sed 's/^/    /')
+"
+fi
+if [ -n "$CHANGELOG_NOISE" ]; then
+  FAIL+="- CHANGELOG-conflict narration (trivial: it conflicts on nearly every land and changelog-union-merge.sh resolves it mechanically — delete; only NON-trivial conflicts earn a mention, and only in landing context):
+$(echo "$CHANGELOG_NOISE" | head -4 | sed 's/^/    /')
 "
 fi
 

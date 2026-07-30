@@ -422,7 +422,7 @@
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "27d50da9135f",
+      "hash": "06dd2993e223",
       "dims": [
         "A9"
       ]
@@ -910,8 +910,8 @@
       "hash": "7b0be0ec435a"
     },
     "pr-land:changelog-conflicts": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "775e5116b1ed"
+      "reason": "2026-07-30: narration ban added; grading surface is A9 report-discipline via the report gate, no new pr-land dimension owed",
+      "hash": "833162229956"
     },
     "pr-land:verification": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
