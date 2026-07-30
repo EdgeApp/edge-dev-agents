@@ -28,12 +28,20 @@ const cohortInstructions = (input && input.cohortInstructions) || null
 // optional targeted profile (named in agent-eval's <profiles>): grade ONLY that
 // dimension subset. Profiles are agent-side clusters, so orch-eval is skipped
 // entirely — that is what makes the run cheap.
-const profile = (input && input.profile) || null
+//
+// mode 'report' (the /eval-run DEFAULT): forces profile 'report' — one light
+// agent per run grading claims vs live APIs, transcript never opened. A
+// transcript is therefore NOT required to be evaluable (a report is; a run
+// with no report skips here and is an escalation candidate by definition).
+// mode 'transcript': the full pass (agent-eval process dimensions + orch-eval).
+const mode = (input && input.mode) === 'transcript' ? 'transcript' : 'report'
+const profile = mode === 'report' ? 'report' : ((input && input.profile) || null)
 
-const evaluable = manifests.filter(m => !m.in_flight && m.transcript)
-const skipped = manifests.filter(m => m.in_flight || !m.transcript)
-  .map(m => ({ gid: m.gid, task_name: m.task_name, reason: m.in_flight ? 'in_flight' : 'no_transcript' }))
-log(`${evaluable.length} evaluable runs, ${skipped.length} skipped (${skipped.map(s => s.reason).join(', ') || 'none'})`)
+const needsTranscript = mode === 'transcript'
+const evaluable = manifests.filter(m => !m.in_flight && (needsTranscript ? m.transcript : m.run_report))
+const skipped = manifests.filter(m => m.in_flight || (needsTranscript ? !m.transcript : !m.run_report))
+  .map(m => ({ gid: m.gid, task_name: m.task_name, reason: m.in_flight ? 'in_flight' : (needsTranscript ? 'no_transcript' : 'no_run_report (escalation candidate: transcript-eval it)') }))
+log(`mode=${mode}: ${evaluable.length} evaluable runs, ${skipped.length} skipped (${skipped.map(s => s.reason).join(', ') || 'none'})`)
 
 const FINDINGS_SCHEMA = {
   type: 'object',
@@ -56,6 +64,12 @@ const FINDINGS_SCHEMA = {
     },
     infra_issues: { type: 'array', items: { type: 'string' } },
     playbook_proposals: { type: 'array', items: { type: 'string' } },
+    escalate: {
+      type: 'object',
+      description: 'report-mode only: whether this run warrants a one-off transcript-eval, per the report profile heuristics',
+      required: ['suggested', 'reasons'],
+      properties: { suggested: { type: 'boolean' }, reasons: { type: 'array', items: { type: 'string' } } },
+    },
     notes: { type: 'string' },
   },
 }
@@ -85,7 +99,13 @@ const evalPrompt = (skill, m) =>
   (profile
     ? `TARGETED PROFILE "${profile}": grade ONLY the dimensions that profile names in your skill's <profiles> block. ` +
       `Every other dimension is OUT OF SCOPE for this run — do not emit it (not even as NA), do not gather its evidence. ` +
-      `Return each in-profile dimension exactly once, with BOTH its id and its rubric name.`
+      `Return each in-profile dimension exactly once, with BOTH its id and its rubric name.` +
+      (profile === 'report'
+        ? ` REPORT-EVAL HARD CONSTRAINT: the transcript is NEVER opened — not one grep. Evidence is the run-report ` +
+          `attachment + live GitHub/Asana APIs + the manifest's zero-LLM fields (friction, versions) only; anything ` +
+          `needing the transcript is NOT_CAPTURED. ALWAYS return the escalate object per the profile's heuristics ` +
+          `(reasons name the specific trigger, e.g. "hook_blocks=16" or "verified:partial with empty verify_blockers").`
+        : '')
     : `Return every rubric dimension exactly once, each with BOTH its id and its rubric name (e.g. A14 + review-response).`) +
   (m.eval_notes ? `\nRUN-SPECIFIC NOTES (read carefully, these override defaults for this run only): ${m.eval_notes}` : '')
 
@@ -122,9 +142,12 @@ const results = await pipeline(
     })
     const gateFails = confirmed.filter(c => GATES[c.id])
     const notCaptured = finalDims.filter(d => d.verdict === 'NOT_CAPTURED').map(d => d.id)
-    const verdict = gateFails.length ? 'FAIL' : confirmed.length ? 'PASS_WITH_FINDINGS' : 'GOLD'
+    // report-mode ceiling: a clean report-eval is REPORT_CLEAN, never GOLD (it cannot see process)
+    const verdict = gateFails.length ? 'FAIL' : confirmed.length ? 'PASS_WITH_FINDINGS' : (mode === 'report' ? 'REPORT_CLEAN' : 'GOLD')
     return {
       gid: m.gid, task_name: m.task_name, cohort: m.cohort || null, window_end: (m.window && m.window.end) || null, verdict,
+      eval_type: mode === 'report' ? 'report-eval' : 'transcript-eval',
+      escalate: (agentF && agentF.escalate) || null,
       gate_failures: gateFails.map(g => GATES[g.id]),
       confirmed_bad: confirmed.map(c => ({ id: c.id, evidence: c.evidence, citation: c.citation })),
       dimensions: finalDims,
@@ -141,7 +164,13 @@ const runs = results.filter(Boolean)
 phase('Synthesize')
 const cohort = await agent(
   `Write a cohort evaluation report (markdown) for ${runs.length} orchestrated agent runs evaluated on ${runDate}.\n` +
-  `Verdict policy: gates (${Object.values(GATES).join(', ')}) hard-fail; GOLD = all gates green AND zero confirmed BAD.\n` +
+  `EVAL TYPE: ${mode === 'report' ? 'report-eval (claims vs live state; transcripts never opened; ceiling REPORT_CLEAN)' : 'transcript-eval (full process pass)'} — say this in the report header.\n` +
+  (mode === 'report'
+    ? `ESCALATION SECTION (mandatory, right after the verdict table): every run whose escalate.suggested is true, ` +
+      `with its reasons — these are the suggested one-off transcript-evals; render each as an Actions row ` +
+      `[transcript-eval] with the gid. Include skipped runs whose reason names them escalation candidates.\n`
+    : '') +
+  `Verdict policy: gates (${Object.values(GATES).join(', ')}) hard-fail; GOLD = all gates green AND zero confirmed BAD${mode === 'report' ? '; report-evals top out at REPORT_CLEAN' : ''}.\n` +
   `Per-run results:\n${JSON.stringify(runs)}\nSkipped: ${JSON.stringify(skipped)}\n` +
   (cohortSplitDate ? `COHORT SPLIT (hard requirement): each run carries a "cohort" label and "window_end". Split EVERY friction statistic ` +
     `(process-friction A29 findings, hook_blocks/tool_errors/build_invocations counts from manifests, and any other friction metric) ` +
