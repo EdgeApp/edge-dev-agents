@@ -158,7 +158,7 @@ requires them.
 - completion sweep: `Complete` retires `claude-asana-(gid)` to
   `done-asana-(gid)`, frees sim/Metro/slot, keeps claude alive for
   re-engagement
-- blocked sweep: sheds sim/Metro while a human is needed
+- blocked = blocked COMPLETION (`Complete --blocked yes`): retires via the completion sweep; the shed-on-block branch is a legacy net for stray mid-run blocks
 - GC: keep newest `keep_completed_sessions` / `keep_completed_worktrees`
 - orphan-Metro reap, idle-dirty-sim reclaim, and operator escalation for
   parked prompts or stuck sessions
@@ -235,8 +235,9 @@ flowchart TD
   WALL -- yes --> ATTEMPT["log the attempt
   (failed:/blocked:/loss:)"] --> VALID{"concession-validator
   verdict [yolo-true-blockers]"}
-  VALID -- "legitimate: true" --> BLOCKED["blocked = Yes, park
-  (one-line comment, NO report doc)"]
+  VALID -- "legitimate: true" --> BLOCKED["blocked completion:
+  Complete --blocked yes (one-line
+  comment, report attached as normal)"]
   VALID -- "legitimate: false" --> RETRY["do what_to_try, continue"] --> TEST
 
   PR["Reviewing: /pr-create (verify green, clean tree,

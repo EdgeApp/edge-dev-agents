@@ -136,9 +136,13 @@ SLOT_IDX="$(echo "$SLOT_JSON" | jq -r '.slot_index')"
 METRO_PORT="$(echo "$SLOT_JSON" | jq -r '.metro_port')"
 echo ">> resume-task: slot $SLOT_IDX | sim $SIM_UDID | metro $METRO_PORT" >&2
 
-# 5. Move status off Complete so the board is honest and the watcher accounts for it.
-"$DIR/update-status.sh" "$TASK_GID" "$STATUS" >/dev/null 2>&1 \
-  && echo ">> resume-task: agent_status=$STATUS" >&2 \
+# 5. Move status off Complete so the board is honest and the watcher accounts for
+#    it. Also clear `blocked`: a block is a blocked COMPLETION (one-shot
+#    yolo-true-blockers), and the operator's re-arm to Pending IS the unblock
+#    signal — clearing here saves them a manual field flip and drops the stale
+#    concession-reason file.
+"$DIR/update-status.sh" "$TASK_GID" "$STATUS" --blocked no >/dev/null 2>&1 \
+  && echo ">> resume-task: agent_status=$STATUS (blocked cleared)" >&2 \
   || echo ">> resume-task: WARN — could not set agent_status=$STATUS" >&2
 
 # 6. Relaunch the agent's conversation with the FRESH slot env.
