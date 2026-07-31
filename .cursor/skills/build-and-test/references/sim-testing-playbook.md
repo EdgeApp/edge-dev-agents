@@ -130,12 +130,14 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   the wallet row's menu, or headlessly via `changeWalletStates`. A pirate/zcash
   task that needs its wallet active leaves ONE and archives the rest.
   The same hygiene applies to SYNCED SETTINGS: Privacy Settings mixnet
-  toggles (`networkPrivacy: 'nym'`, required ON for stealth-send testing)
+  toggles (`networkPrivacy: 'nym'`, toggled ON by NYM/mixfetch test plans)
   sync to every session on the account — a toggle left on routes that
   network's RPC through the flaky NYM mixnet for EVERY subsequent run and
-  surfaces as engine error drop-downs at login (the 2026-07-30 fleet-wide
-  incident: Sonic left on by stealth testing). Turn OFF every mixnet toggle
-  your test enabled before the run ends.
+  surfaces as engine error drop-downs at login (2026-07-30 fleet-wide
+  incident: Sonic found left on; author uncaptured). NYM mixfetch and the
+  send scene's mixnet spinner are UNRELATED to the Houdini stealth feature
+  (HoudiniSwap private routing) — do not conflate them. Turn OFF every
+  mixnet toggle your test enabled before the run ends.
 - **Debug builds crash on RN Fabric on several reliable triggers: rapid
   settings-row toggling, swap-amount keypad entry (SIGABRT to springboard), and
   `uiManagerDidDispatchCommand` (SIGSEGV).** The SIGSEGV variant ALSO wedges the
