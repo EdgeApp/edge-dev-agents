@@ -52,10 +52,12 @@ task that is blocked-or-in-flight in Asana but whose tmux session has died does
    the cloned sim, drop the slot, and retain the worktree. The oldest retired sessions beyond
    `keep_completed_sessions` (default 3) and worktrees beyond `keep_completed_worktrees`
    (default 5) are pruned. Set either to 0 for the old hard-kill/destroy behavior.
-4. **Shed-on-block** (`session-watchdog.js`): when a session's task has `blocked=Yes`, free its
-   heavy resources (sim + Metro) so it stops squatting while it waits on a human, but keep the
-   session + slot alive so it can resume on unblock. Done once and re-armed when unblocked.
-   (A resumed task re-provisions its sim/Metro via build-and-test, since the sim returns to the pool.)
+4. **Shed-on-block** (`session-watchdog.js`) — LEGACY NET: since 2026-07-30 a block is a
+   blocked COMPLETION (agents write `Complete --blocked yes` in one call, per one-shot
+   `yolo-true-blockers`), so blocked tasks retire through the normal completion sweep and
+   nothing parks blocked mid-orch. This branch only catches a stray mid-run `blocked=Yes` on
+   a phase status: sim + Metro shed once, session + slot kept. `resume-task.sh` clears the
+   `blocked` flag on every watcher re-engage (re-arm to Pending IS the unblock signal).
 5. **Un-retire** (`session-watchdog.js`): if a `done-asana-<gid>` (retired/Complete) session's task
    is moved back OFF `Complete` (a human re-engaged it for followup; the agent does this per
    one-shot `followup-reopens-status`), the watchdog renames it back to `claude-asana-<gid>` so it

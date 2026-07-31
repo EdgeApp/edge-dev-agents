@@ -839,10 +839,12 @@ function main() {
     const prior = state.sessions[session]
     const isBlocked = /^yes$/i.test(blocked || '')
 
-    // Blocked → shed heavy resources (sim + Metro) ONCE, but keep the session + slot
-    // alive so a human can unblock and resume. `heavyFreed` prevents re-freeing every
-    // tick; it's cleared automatically once the task is no longer blocked, so a later
-    // block re-arms the cleanup.
+    // LEGACY NET (policy 2026-07-30: a block is a BLOCKED COMPLETION — agents set
+    // `Complete --blocked yes` in one write, so blocked tasks retire through the
+    // normal completion sweep and never park here). This branch only catches a
+    // stray mid-run blocked=Yes on a phase status: shed heavy resources (sim +
+    // Metro) ONCE, keep the session + slot alive. `heavyFreed` prevents re-freeing
+    // every tick; it clears once the task is no longer blocked.
     if (isBlocked && !prior?.heavyFreed) {
       log(`[${session}] blocked=Yes → freeing sim + Metro (session kept alive for unblock)`)
       freeSimAndMetro(taskGid)
