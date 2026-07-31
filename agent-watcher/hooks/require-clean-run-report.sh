@@ -167,7 +167,13 @@ if [ -n "$ITER" ]; then
   # (operator, 2026-07-30), so the traceability facts get one rendered line.
   if ! grep -q '^_iteration ' "$REPORT"; then
     fmv() { grep -m1 "^$1:" "$REPORT" | sed -E 's/^[^:]+: *"?([^"]*)"?.*/\1/'; }
-    STAMPLINE="_iteration $ITER · $(fmv model)@$(fmv effort) · generated $(fmv generated) · session $(fmv claude_session_id | cut -c1-8)$( [ "$(fmv tdd)" = "tdd" ] && printf ' · [TDD](%s)' "$(fmv tdd_doc)" )_"
+    # TDD suffix computed OUTSIDE the substitution: a failing `[ ... ] &&` as
+    # the last substitution in an assignment returns 1 and set -e killed the
+    # whole hook on every non-TDD task (2026-07-31: fields filled, then no
+    # stamp, no name ordinal, and NO LINT — exit 1 does not even block).
+    TDD_SUFFIX=""
+    if [ "$(fmv tdd)" = "tdd" ]; then TDD_SUFFIX=" · [TDD]($(fmv tdd_doc))"; fi
+    STAMPLINE="_iteration $ITER · $(fmv model)@$(fmv effort) · generated $(fmv generated) · session $(fmv claude_session_id | cut -c1-8)${TDD_SUFFIX}_"
     awk -v s="$STAMPLINE" '
       { print }
       !done && /^# Run report / { print ""; print s; done=1 }
