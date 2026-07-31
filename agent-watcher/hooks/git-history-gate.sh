@@ -9,6 +9,13 @@
 #   `git commit --amend` (one-shot's pr-watch-loop-amend-pattern). Never
 #   allowed: `--no-verify`.
 #
+#   PUSHES (while a review is active) go through pr-finalize-fixups.sh too —
+#   one push per address round (2026-07-31 bugbot credit gate: reviewer bots
+#   bill per push, and mid-pass pushes buy reviews of known-incomplete HEADs).
+#   Raw `git push` is blocked only when the review-mode oracle says PRESERVE;
+#   pre-review pushes (the amend+watch loop on a draft) resolve to
+#   autosquash/none and stay raw and free.
+#
 #   SQUASHES go through pr-finalize-fixups.sh, whose review-mode oracle
 #   (pr-address.sh review-mode) owns squash-vs-preserve. A raw
 #   `git rebase --autosquash` (or a direct git-branch-ops.sh autosquash, the
@@ -50,8 +57,14 @@ if echo "$CMD" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+(-[^[:space:]]+[[:sp
   exit 2
 fi
 
-# ---- squash discipline ------------------------------------------------------
+# ---- squash + push discipline -----------------------------------------------
+NEEDS_MODE=""
 if echo "$CMD" | grep -qE -- '--autosquash|git-branch-ops\.sh[[:space:]]+autosquash'; then
+  NEEDS_MODE="squash"
+elif echo "$CMD" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+push([[:space:]]|$)'; then
+  NEEDS_MODE="push"
+fi
+if [ -n "$NEEDS_MODE" ]; then
   # Resolve the PR for the branch the command targets. Compound commands are
   # usually `cd <worktree> && git rebase ...` while the hook's own cwd is
   # elsewhere — honor the command's leading cd. Fail open when indeterminate.
@@ -71,7 +84,8 @@ if echo "$CMD" | grep -qE -- '--autosquash|git-branch-ops\.sh[[:space:]]+autosqu
     fi
   fi
   if [ "$MODE" = "preserve" ]; then
-    cat >&2 <<'MSG'
+    if [ "$NEEDS_MODE" = "squash" ]; then
+      cat >&2 <<'MSG'
 BLOCKED: autosquash while review-mode is PRESERVE (a human reviewer is active
 on this PR). Preserved fixup! commits are what let the reviewer see exactly
 what changed since their review — squashing now destroys that.
@@ -81,6 +95,16 @@ what changed since their review — squashing now destroys that.
     ~/.cursor/skills/pr-finalize-fixups.sh then — it re-checks the mode itself
     and squashes only when allowed.
 MSG
+    else
+      cat >&2 <<'MSG'
+BLOCKED: raw `git push` while review-mode is PRESERVE (a review is active on
+this PR). Reviewer bots bill PER PUSH (bugbot credit gate, 2026-07-31): finish
+the WHOLE address round locally (fixups + amends per one-fixup-per-target-per-
+turn), then push ONCE via ~/.cursor/skills/pr-finalize-fixups.sh — it owns the
+push (and the squash-vs-preserve decision). Never push mid-round to "see CI";
+that buys a bot review of a HEAD you already know is incomplete.
+MSG
+    fi
     exit 2
   fi
 fi

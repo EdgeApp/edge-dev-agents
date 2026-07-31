@@ -57,7 +57,7 @@
       ]
     },
     "one-shot:report-as-attachment": {
-      "hash": "1188946d249f",
+      "hash": "e8f2ab01ac56",
       "dims": [
         "A9"
       ]
@@ -167,7 +167,7 @@
       ]
     },
     "pr-land:publish-gating": {
-      "hash": "1d8d580dbd6c",
+      "hash": "f508ce8ab2cc",
       "dims": [
         "A15"
       ]
@@ -203,7 +203,7 @@
       ]
     },
     "one-shot:finalize-gate": {
-      "hash": "0ae635d1fb0a",
+      "hash": "920957bbfff7",
       "dims": [
         "A3"
       ]
@@ -263,7 +263,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "2bb3e72b1b6a",
+      "hash": "a5614baf3c2e",
       "dims": [
         "O4",
         "O5",
@@ -272,7 +272,7 @@
       ]
     },
     "file:setup-task-workspace.sh": {
-      "hash": "11882d4bf40a",
+      "hash": "f73b0803502c",
       "dims": [
         "O8"
       ]
@@ -308,7 +308,7 @@
       ]
     },
     "one-shot:pr-watch-loop-amend-pattern": {
-      "hash": "924adabbe0bd",
+      "hash": "b3d38094952e",
       "dims": [
         "A12"
       ]
@@ -410,7 +410,7 @@
       ]
     },
     "one-shot:land-on-approval": {
-      "hash": "6ad156c7b63f",
+      "hash": "6ad44ff286e3",
       "dims": [
         "A8"
       ]
@@ -529,6 +529,12 @@
       "hash": "86ba887f9570",
       "dims": [
         "A9"
+      ]
+    },
+    "pr-address:one-push-per-round": {
+      "hash": "fd3d2bfac1cc",
+      "dims": [
+        "A24"
       ]
     }
   },
@@ -814,8 +820,8 @@
       "hash": "c9e17c6df17e"
     },
     "one-shot:dep-pr-draft-vs-bump": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "5313517deadf"
+      "reason": "2026-07-31: draft-state disambiguation note (2026-07-31 credit gate); classification test unchanged, graded via A3 draft-dev prescription",
+      "hash": "a5e1cbb6e724"
     },
     "one-shot:task-gid-for-pr-body-link": {
       "reason": "2026-07-14: prose-only edit: dropped the deleted standup skill from the downstream-consumers list; rule behavior unchanged",
@@ -838,8 +844,8 @@
       "hash": "78bde95df09f"
     },
     "one-shot:bugbot-in-watch": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "b1f775e8c0c3"
+      "reason": "2026-07-31: two-phase ready-flip wording; bot gate itself unchanged, graded via A3",
+      "hash": "c52082b06712"
     },
     "pr-address:use-companion-script": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",

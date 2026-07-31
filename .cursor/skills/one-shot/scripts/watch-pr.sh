@@ -184,10 +184,20 @@ while :; do
     REVIEWER_REVIEWED=$(jq -r --arg p "$REVIEWER_CHECK_PATTERN" '[.[] | select(.name | startswith($p)) | select(.bucket != "skipping")] | length' <<<"$JSON" 2>/dev/null || echo 0)
     REVIEWER_NOTE=""
     if [ "${REVIEWER_REVIEWED:-0}" -eq 0 ] && ! reviewer_reviewed_head; then
-      REVIEWER_SEEN=$(jq -r --arg p "$REVIEWER_CHECK_PATTERN" '[.[] | .name | select(startswith($p))] | length' <<<"$JSON" 2>/dev/null || echo 0)
-      if [ "${REVIEWER_SEEN:-0}" -eq 0 ]; then WHY="no check-run"; else WHY="check-run skipped"; fi
-      REVIEWER_NOTE=" reviewer-unavailable:$REVIEWER_CHECK_PATTERN($WHY, no review on HEAD)"
-      echo ">> watch-pr: '$REVIEWER_CHECK_PATTERN' did not review this HEAD ($WHY, and it posted no review on the head commit) while every other check completed — out of quota, disabled, or down. Waiting cannot fix it. Proceed, and record it as an UNCHECKED box in the run report's Finalize Gate rather than as reviewer-clean." >&2
+      # DRAFT PRs (the 2026-07-31 bugbot-credit gate): reviewer bots skip drafts
+      # BY DESIGN — absence is the gate working, not an outage. Distinct suffix
+      # so the caller knows the finalize path is `gh pr ready` + re-watch, and
+      # the Finalize Gate box is "pending ready-flip", not reviewer-unavailable.
+      IS_DRAFT=$(gh pr view "$PR" ${REPO:+--repo "$REPO"} --json isDraft -q .isDraft 2>/dev/null || echo false)
+      if [ "$IS_DRAFT" = "true" ]; then
+        REVIEWER_NOTE=" draft-reviewer-skipped($REVIEWER_CHECK_PATTERN: bots skip drafts by design; run gh pr ready at finalize, then re-watch)"
+        echo ">> watch-pr: PR is DRAFT — '$REVIEWER_CHECK_PATTERN' skipping it is the credit gate working. CI is gated now; bots gate after 'gh pr ready' at finalize." >&2
+      else
+        REVIEWER_SEEN=$(jq -r --arg p "$REVIEWER_CHECK_PATTERN" '[.[] | .name | select(startswith($p))] | length' <<<"$JSON" 2>/dev/null || echo 0)
+        if [ "${REVIEWER_SEEN:-0}" -eq 0 ]; then WHY="no check-run"; else WHY="check-run skipped"; fi
+        REVIEWER_NOTE=" reviewer-unavailable:$REVIEWER_CHECK_PATTERN($WHY, no review on HEAD)"
+        echo ">> watch-pr: '$REVIEWER_CHECK_PATTERN' did not review this HEAD ($WHY, and it posted no review on the head commit) while every other check completed — out of quota, disabled, or down. Waiting cannot fix it. Proceed, and record it as an UNCHECKED box in the run report's Finalize Gate rather than as reviewer-clean." >&2
+      fi
     fi
     if [ -n "$FAILS_WIP" ]; then
       echo ">> watch-pr: green except wip-guard ($FAILS_WIP): expected while fixups are PRESERVED for the active reviewer — do NOT squash to clear it" >&2
