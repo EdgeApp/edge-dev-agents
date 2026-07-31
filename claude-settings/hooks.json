@@ -8,6 +8,16 @@
         }
       ],
       "matcher": "Read|Bash"
+    },
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/mark-agents-md-skill-read.sh",
+          "timeout": 10,
+          "type": "command"
+        }
+      ],
+      "matcher": "Skill|Read|Bash"
     }
   ],
   "PreToolUse": [
@@ -103,6 +113,11 @@
         {
           "command": "~/.config/agent-watcher/hooks/block-upfront-conflict-probe.sh",
           "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-agents-md-skill.sh",
+          "timeout": 10,
+          "type": "command"
         }
       ],
       "matcher": "Bash"
@@ -116,6 +131,11 @@
         },
         {
           "command": "~/.config/agent-watcher/hooks/require-maestro-device.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-agents-md-skill.sh",
           "timeout": 10,
           "type": "command"
         }

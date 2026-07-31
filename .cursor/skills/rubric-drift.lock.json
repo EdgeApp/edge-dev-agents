@@ -1309,6 +1309,7 @@
     "orch-eval": "2026-07-19: the eval layer itself; grades orch runs, is not one",
     "eval-run": "2026-07-19: the eval layer itself; grades orch runs, is not one",
     "resolve-run": "2026-07-19: the eval layer itself; grades orch runs, is not one",
-    "coinhub": "2026-07-24: Standalone operator-invocable coinhub maintenance skill; domain-procedure rules (snapshot regen, safe force-push, theme drift), not orchestration-gating behavior. Not wired into one-shot delegation, so not an orch dependent the agent-eval/orch-eval rubrics grade. Re-evaluate if one-shot ever delegates to /coinhub."
+    "coinhub": "2026-07-24: Standalone operator-invocable coinhub maintenance skill; domain-procedure rules (snapshot regen, safe force-push, theme drift), not orchestration-gating behavior. Not wired into one-shot delegation, so not an orch dependent the agent-eval/orch-eval rubrics grade. Re-evaluate if one-shot ever delegates to /coinhub.",
+    "agents-md": "2026-07-31: Non-orch: repo-authoring tooling invoked by the AGENTS.md write gate, not part of the one-shot delegation chain; its correctness is enforced by require-agents-md-skill.sh plus the skill's own checklist, not by a run-eval dimension."
   }
 }
