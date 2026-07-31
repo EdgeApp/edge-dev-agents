@@ -152,7 +152,8 @@ name/runtime, Metro defaults to 8081.
 | `asana-watcher.js` | spawner (multi-pick, cap, guardrail) |
 | `session-watchdog.js` | liveness + completion sweep (slot reaper) |
 | `spawn-test-session.sh` | start a `claude --rc` tmux session (slot mode + legacy mode) |
-| `setup-task-workspace.sh` / `cleanup-task-workspace.sh` | worktree create / teardown |
+| `setup-task-workspace.sh` / `cleanup-task-workspace.sh` | worktree create / teardown; APFS-clones node_modules from the main checkout and writes `.stale-node-modules` when the clone's lockfile mismatches the branch (ios-rn-build.sh hard-fails on the marker until `npm ci` runs) |
+| `refresh-main-checkouts.sh` | keep the ~/git main checkouts (the node_modules clone SOURCES) current: fast-forward the default branch + `npm ci` on lockfile change, ONLY when clean and on the default branch (dirty/feature/detached checkouts are reported and left alone). Manual / on-demand; not on launchd |
 | `clone-ios-sim.sh` / `delete-ios-sim.sh` | per-slot sim clone / delete |
 | `lib/slots.js` | atomic slot allocator (lib + CLI) |
 | `slots.json` | slot state |
