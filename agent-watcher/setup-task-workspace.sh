@@ -131,6 +131,25 @@ clone_node_modules() {
     echo ">> setup-task-workspace: WARN — node_modules clone failed; session will need a full npm install" >&2
     cat /tmp/setup-clone.log >&2
     rm -rf "$dst" 2>/dev/null || true
+    return 0
+  fi
+  # STALE-CLONE GUARD: the cloned modules match the MAIN checkout's lockfile,
+  # not necessarily the WORKTREE branch's. When the main checkout lags origin
+  # (accb once sat 64 commits behind, node_modules on stellar-sdk 0.11.0), a
+  # bundle built from the clone bakes months-old deps — the 2026-07-30 fleet
+  # wide "Horizon.Server undefined" toast shipped exactly this way. Detection
+  # only (an unconditional npm ci here would re-introduce the process storms
+  # the clone exists to avoid): write a marker build-and-test checks before
+  # building/baking a dep bundle, and log loudly.
+  if [[ -f "$MAIN_REPO/package-lock.json" && -f "$WT/package-lock.json" ]] \
+     && ! cmp -s "$MAIN_REPO/package-lock.json" "$WT/package-lock.json"; then
+    {
+      echo "cloned node_modules came from $MAIN_REPO whose package-lock.json"
+      echo "differs from this branch's. Run 'sfw npm ci' here BEFORE building,"
+      echo "bundling, or baking this repo — the clone carries the WRONG dep"
+      echo "versions for this branch."
+    } > "$WT/.stale-node-modules"
+    echo ">> setup-task-workspace: WARN — STALE node_modules clone (lockfile mismatch vs main checkout); marker written to $WT/.stale-node-modules — npm ci required before any build" >&2
   fi
 }
 

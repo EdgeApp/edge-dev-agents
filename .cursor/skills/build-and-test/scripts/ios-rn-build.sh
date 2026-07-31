@@ -62,6 +62,18 @@ done
 UDID="${UDID:-${AGENT_SIM_UDID:-}}"
 PORT="${PORT:-${AGENT_METRO_PORT:-8081}}"
 
+# STALE-CLONE GATE: setup-task-workspace writes .stale-node-modules when the
+# worktree's APFS-cloned node_modules came from a main checkout whose lockfile
+# differs from this branch's — building on top bakes WRONG dep versions into
+# native-embedded assets (the 2026-07-30 fleet-wide "Horizon.Server undefined"
+# toast was an accb WebView bundle built against stellar-sdk 0.11.0 this way).
+# Hard-fail with the fix; a build on known-wrong deps is never worth having.
+if [[ -f .stale-node-modules ]]; then
+  echo "ios-rn-build: BLOCKED — this worktree's node_modules are a STALE clone (see .stale-node-modules)." >&2
+  echo "Fix: run 'sfw npm ci' here, then 'rm .stale-node-modules', then re-run the build." >&2
+  exit 1
+fi
+
 [[ -n "$UDID" && -n "$BUNDLE_ID" ]] || {
   echo "Usage: ios-rn-build.sh --udid <UDID> --bundle-id <id> [--port <n>] [--force-rebuild]" >&2
   echo "  (--udid may instead come from \$AGENT_SIM_UDID)" >&2
