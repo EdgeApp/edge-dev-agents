@@ -118,6 +118,9 @@ SLOW_CI_PATTERN="Travis CI"
 # different verdict from "found nothing", and only this script can tell them
 # apart, so it reports which one rather than leaving the caller to guess.
 REVIEWER_CHECK_PATTERN="${REVIEWER_CHECK_PATTERN:-Cursor Bugbot}"
+# The same reviewer's GitHub LOGIN, for the review query below. GraphQL strips
+# the `[bot]` suffix, so Cursor's bots appear as plain `cursor`.
+REVIEWER_BOT_LOGIN="${REVIEWER_BOT_LOGIN:-cursor}"
 WIP_GUARD_PATTERN="block-wip-pr"
 WIP_MODE=""  # cached review-mode verdict; fetched at most once per invocation
 
@@ -139,6 +142,21 @@ wip_guard_expected() {
   [ "$WIP_MODE" = "preserve" ]
 }
 
+# reviewer_reviewed_head: did the reviewer bot post a REVIEW whose commit IS the
+# PR's current head? The check-run bucket alone lies in both directions — Cursor
+# Bugbot has reported `skipping` on a HEAD it had just reviewed and filed a
+# finding on, so trusting the bucket would have recorded a real finding as
+# "reviewer unavailable" and walked past it. A review pinned to the head commit
+# is the only proof of coverage.
+reviewer_reviewed_head() {
+  [ -n "$REPO" ] || return 1
+  local count
+  count=$(gh api graphql -f query="{repository(owner:\"${REPO%%/*}\",name:\"${REPO##*/}\"){pullRequest(number:$PR){headRefOid reviews(last:50){nodes{author{login} commit{oid}}}}}}" \
+    --jq ".data.repository.pullRequest | .headRefOid as \$h | [.reviews.nodes[] | select(.author.login == \"$REVIEWER_BOT_LOGIN\") | select(.commit.oid == \$h)] | length" \
+    2>/dev/null || echo 0)
+  [ "${count:-0}" -gt 0 ]
+}
+
 while :; do
   NOW=$(date +%s)
   [ "$NOW" -ge "$DEADLINE" ] && { echo ">> watch-pr: remaining-budget timeout" >&2; exit 124; }
@@ -158,11 +176,18 @@ while :; do
   PENDING_OTHER=$(jq -r --arg p "$SLOW_CI_PATTERN" '[.[] | select(.bucket=="pending") | .name | select(startswith($p) | not)] | join(", ")' <<<"$JSON" 2>/dev/null || true)
   PENDING_SLOW=$(jq -r --arg p "$SLOW_CI_PATTERN" '[.[] | select(.bucket=="pending") | .name | select(startswith($p))] | join(", ")' <<<"$JSON" 2>/dev/null || true)
   if [ "$TOTAL" -gt 0 ] && [ -z "$PENDING_OTHER" ]; then
-    REVIEWER_SEEN=$(jq -r --arg p "$REVIEWER_CHECK_PATTERN" '[.[] | .name | select(startswith($p))] | length' <<<"$JSON" 2>/dev/null || echo 0)
+    # A reviewer that did not actually review looks two ways: no check-run at
+    # all, or one whose bucket is "skipping". Neither is reviewed-and-clean, so
+    # neither may be reported as reviewer coverage — but neither PROVES absence
+    # either, so the check-run only raises the question. A review pinned to the
+    # head commit answers it, and that answer wins.
+    REVIEWER_REVIEWED=$(jq -r --arg p "$REVIEWER_CHECK_PATTERN" '[.[] | select(.name | startswith($p)) | select(.bucket != "skipping")] | length' <<<"$JSON" 2>/dev/null || echo 0)
     REVIEWER_NOTE=""
-    if [ "${REVIEWER_SEEN:-0}" -eq 0 ]; then
-      REVIEWER_NOTE=" reviewer-unavailable:$REVIEWER_CHECK_PATTERN"
-      echo ">> watch-pr: no '$REVIEWER_CHECK_PATTERN' check-run on HEAD while every other check completed — the reviewer is unavailable (quota/disabled/down), not pending. Proceed, and record it as an unchecked box in the run report's Finalize Gate." >&2
+    if [ "${REVIEWER_REVIEWED:-0}" -eq 0 ] && ! reviewer_reviewed_head; then
+      REVIEWER_SEEN=$(jq -r --arg p "$REVIEWER_CHECK_PATTERN" '[.[] | .name | select(startswith($p))] | length' <<<"$JSON" 2>/dev/null || echo 0)
+      if [ "${REVIEWER_SEEN:-0}" -eq 0 ]; then WHY="no check-run"; else WHY="check-run skipped"; fi
+      REVIEWER_NOTE=" reviewer-unavailable:$REVIEWER_CHECK_PATTERN($WHY, no review on HEAD)"
+      echo ">> watch-pr: '$REVIEWER_CHECK_PATTERN' did not review this HEAD ($WHY, and it posted no review on the head commit) while every other check completed — out of quota, disabled, or down. Waiting cannot fix it. Proceed, and record it as an UNCHECKED box in the run report's Finalize Gate rather than as reviewer-clean." >&2
     fi
     if [ -n "$FAILS_WIP" ]; then
       echo ">> watch-pr: green except wip-guard ($FAILS_WIP): expected while fixups are PRESERVED for the active reviewer — do NOT squash to clear it" >&2

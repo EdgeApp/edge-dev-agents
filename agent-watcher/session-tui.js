@@ -364,6 +364,12 @@ function quit () {
 
 // ─── main loop ───────────────────────────────────────────────────────────────
 
+// Importable as a library: orch-tui.js reuses buildModel() so the fleet/tmux
+// logic lives in exactly one place. The interactive loop only runs when this
+// file is the entrypoint.
+module.exports = { buildModel, fmtAgo, sh }
+if (require.main !== module) return
+
 if (process.argv.includes('--dump')) {
   const m = buildModel()
   console.log(JSON.stringify(m, null, 2))
