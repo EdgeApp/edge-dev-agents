@@ -108,6 +108,34 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
      recurs, note it as a known product blocker (link 1215619633542395), and
      fall back to an existing wallet. Do NOT spend the slot trying to "fix the
      sim."
+- **A SECOND ARRR/ZEC crash family: Rust-panic SIGABRT at app start**
+  (`Edge-*.ips` faulting stack: `RNZcash.initialize` → `ZcashRustBackend.initializeRust`
+  → `zcashlc_init_on_load` → `unwrap_failed` → `rust_panic` → abort).
+  `ZcashRustBackend` guards its one-time Rust init with a NON-thread-safe
+  static bool (`if !Self.rustInitialized`); when a login starts N ZEC wallet
+  engines concurrently, two initializers race the check and the loser calls
+  `zcashlc_init_on_load` twice → Rust panic → SIGABRT. Crash probability
+  scales with the number of ACTIVE ZEC/ARRR wallets on the logged-in account
+  (the 2026-07 diagnosis found 6 ZEC + 5 ARRR accumulated on `edge-funds` from
+  weeks of run testing; confirmed hits 2026-07-24 and 2026-07-30). It is a
+  PRODUCT bug (same fix venue as the SQLite race above: the SDK rewrite);
+  environment handling is ACCOUNT HYGIENE, below. Relaunch on hit — it is a
+  boot-time race, the retry usually survives.
+- **ACCOUNT HYGIENE (prevents both ARRR/ZEC crash families): roster accounts
+  carry at most ONE active ZEC and ZERO active ARRR wallets.** Every extra
+  active wallet multiplies the init race and adds a background scanner.
+  If your test CREATED a ZEC/ARRR wallet (or any wallet the task does not
+  deliver), ARCHIVE it before the run ends — archiving is reversible (keys
+  stay on the account; unarchive when a future task needs it) and is done in
+  the wallet row's menu, or headlessly via `changeWalletStates`. A pirate/zcash
+  task that needs its wallet active leaves ONE and archives the rest.
+  The same hygiene applies to SYNCED SETTINGS: Privacy Settings mixnet
+  toggles (`networkPrivacy: 'nym'`, required ON for stealth-send testing)
+  sync to every session on the account — a toggle left on routes that
+  network's RPC through the flaky NYM mixnet for EVERY subsequent run and
+  surfaces as engine error drop-downs at login (the 2026-07-30 fleet-wide
+  incident: Sonic left on by stealth testing). Turn OFF every mixnet toggle
+  your test enabled before the run ends.
 - **Debug builds crash on RN Fabric on several reliable triggers: rapid
   settings-row toggling, swap-amount keypad entry (SIGABRT to springboard), and
   `uiManagerDidDispatchCommand` (SIGSEGV).** The SIGSEGV variant ALSO wedges the
