@@ -16,19 +16,53 @@
 # package-lock.json (that's when the existing node_modules became wrong).
 #
 # Usage:
-#   refresh-main-checkouts.sh [--dry-run] [repo ...]
+#   refresh-main-checkouts.sh [--dry-run] [--require-idle] [--min-interval <sec>] [repo ...]
 # Default repo set: the GUI-dependency repos + the GUI itself.
+#
+# SCHEDULING (launchd, two jobs — never manual):
+#   com.jontz.refresh-main-checkouts-daily  04:15 daily, --require-idle
+#   com.jontz.refresh-main-checkouts-idle   every 30 min, --require-idle --min-interval 21600
+# --require-idle: refuse to touch checkouts while ANY sim-holding run session
+#   (tmux `claude-asana-<digits>`) is live or a pool sim is in_use — an npm ci
+#   racing a spawn's APFS clone would hand the new worktree a half-written tree.
+# --min-interval: skip when the last successful sweep (stamp file) is fresher
+#   than this, so the 30-min idle job costs nothing between real refreshes.
 # Exit: 0 always (per-repo outcomes in the report; this is maintenance, not a gate).
 set -uo pipefail
 
+STAMP="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/main-checkouts-refresh.stamp"
 DRY=false
+REQUIRE_IDLE=false
+MIN_INTERVAL=0
 REPOS=()
-for a in "$@"; do
-  case "$a" in
-    --dry-run) DRY=true ;;
-    *) REPOS+=("$a") ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY=true; shift ;;
+    --require-idle) REQUIRE_IDLE=true; shift ;;
+    --min-interval) MIN_INTERVAL="${2:-0}"; shift 2 ;;
+    *) REPOS+=("$1"); shift ;;
   esac
 done
+
+if [[ "$MIN_INTERVAL" -gt 0 && -f "$STAMP" ]]; then
+  age=$(( $(date +%s) - $(stat -f %m "$STAMP" 2>/dev/null || echo 0) ))
+  if [[ "$age" -lt "$MIN_INTERVAL" ]]; then
+    echo "SKIP: last sweep ${age}s ago (< ${MIN_INTERVAL}s)"
+    exit 0
+  fi
+fi
+
+if $REQUIRE_IDLE; then
+  if tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -qE '^claude-asana-[0-9]+$'; then
+    echo "SKIP: active run session(s) present (not idle)"
+    exit 0
+  fi
+  if jq -e '[.pool[]? | select(.state == "in_use")] | length > 0' \
+      "${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/pool.json" >/dev/null 2>&1; then
+    echo "SKIP: pool sims in_use (not idle)"
+    exit 0
+  fi
+fi
 [[ ${#REPOS[@]} -gt 0 ]] || REPOS=(edge-currency-accountbased edge-exchange-plugins edge-core-js edge-currency-plugins edge-login-ui-rn edge-react-gui)
 
 for r in "${REPOS[@]}"; do
@@ -72,3 +106,10 @@ for r in "${REPOS[@]}"; do
   fi
   echo "$r: FF'd $def by $behind commits$did_ci"
 done
+
+# Stamp a completed sweep (used by --min-interval). Written even when every
+# repo was OK/HOLD — the sweep ran; HOLDs are operator-owned, not retryable.
+if ! $DRY; then
+  mkdir -p "$(dirname "$STAMP")"
+  date -u +%Y-%m-%dT%H:%M:%SZ > "$STAMP"
+fi
