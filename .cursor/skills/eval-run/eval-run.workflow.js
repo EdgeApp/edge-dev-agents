@@ -207,6 +207,16 @@ const cohort = await agent(
   `a last resort and say why. The verdict table's first column is the linked task name; do not add a separate raw-gid column ` +
   `(machine consumers read results.json, not this report).\n` +
   `Structure: 1) verdict summary table (linked task name, verdict, gate failures, confirmed-BAD count, coverage gaps); ` +
+  `1b) "## Already fixed?" (mandatory, immediately after the verdict table): a cohort spans days while the orch ships fixes daily, ` +
+  `so for EVERY confirmed finding and gate failure, determine whether the CURRENT orch already prevents that failure class. ` +
+  `INSPECT, don't recall: the rubric rows carry dated carve-outs and hook names; the deterministic gates live in ` +
+  `~/.config/agent-watcher/hooks/ (read the relevant hook's header); recent fix history is git log of ~/git/edge-dev-agents since the ` +
+  `oldest run window. Emit a table: finding (linked run), failure class, fixed-by (named mechanism + ship date, or "not fixed"), ` +
+  `confidence + one-line basis. Confidence: HIGH only when a deterministic hook/gate/script shipped after that run's window and ` +
+  `mechanically blocks the class (name the file); MEDIUM when a rule/prose change or partial mechanical coverage addresses it; ` +
+  `LOW/not-fixed otherwise. Never claim fixed without naming the mechanism — this section is inspection-based and says so. ` +
+  `Findings whose class is already-fixed stay findings (the run still did it), but their Actions rows should note the fix so the ` +
+  `operator doesn't re-commission one; UNFIXED classes are where the Actions attention belongs.\n` +
   `2) confirmed findings grouped by dimension WITH citations, so recurring patterns across runs are visible; ` +
   `3) infra issues (substrate, not per-run); 4) coverage gaps (NOT_CAPTURED patterns — note O1/O6 expected until capture hook ships); ` +
   `5) recommended skill/infra fixes ranked by recurrence; ` +
