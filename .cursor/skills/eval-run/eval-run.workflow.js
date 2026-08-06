@@ -188,9 +188,10 @@ const cohort = await agent(
   `Write a cohort evaluation report (markdown) for ${runs.length} orchestrated agent runs evaluated on ${runDate}.\n` +
   `EVAL TYPE: ${mode === 'report' ? 'report-eval (claims vs live state; transcripts never opened; ceiling REPORT_CLEAN)' : 'transcript-eval (full process pass)'} — say this in the report header.\n` +
   (mode === 'report'
-    ? `ESCALATION SECTION (mandatory, right after the verdict table): every run whose escalate.suggested is true, ` +
-      `with its reasons — these are the suggested one-off transcript-evals; render each as an Actions row ` +
-      `[transcript-eval] with the gid. Include skipped runs whose reason names them escalation candidates.\n`
+    ? `ESCALATION DEMOTION (settled 2026-08-06): a non-empty Orchestration Issues section NEVER generates a ` +
+      `transcript-eval row — those disclosures feed [infra-fix] rows and Appendix C. The transcript-eval shortlist ` +
+      `contains ONLY finding-driven candidates: confirmed BADs, gate failures, and process anomalies visible from ` +
+      `outside (post-Complete force-pushes, unresolved reviewer disputes, missing reports).\n`
     : '') +
   `Verdict policy: gates (${Object.values(GATES).join(', ')}) hard-fail; GOLD = all gates green AND zero confirmed BAD${mode === 'report' ? '; report-evals top out at REPORT_CLEAN' : ''}.\n` +
   `Per-run results:\n${JSON.stringify(runs)}\nSkipped: ${JSON.stringify(skipped)}\n` +
@@ -208,27 +209,31 @@ const cohort = await agent(
   `[<task_name>](https://app.asana.com/0/0/<gid>/f). When the task name is unknown (unresolvable gid), link the gid itself as ` +
   `a last resort and say why. The verdict table's first column is the linked task name; do not add a separate raw-gid column ` +
   `(machine consumers read results.json, not this report).\n` +
-  `Structure: 1) verdict summary table (linked task name, verdict, gate failures, confirmed-BAD count, coverage gaps); ` +
-  `1b) "## Already fixed?" (mandatory, immediately after the verdict table): a cohort spans days while the orch ships fixes daily, ` +
-  `so for EVERY confirmed finding and gate failure, determine whether the CURRENT orch already prevents that failure class. ` +
-  `INSPECT, don't recall: the rubric rows carry dated carve-outs and hook names; the deterministic gates live in ` +
-  `~/.config/agent-watcher/hooks/ (read the relevant hook's header); recent fix history is git log of ~/git/edge-dev-agents since the ` +
-  `oldest run window. Emit a table: finding (linked run), failure class, fixed-by (named mechanism + ship date, or "not fixed"), ` +
-  `confidence + one-line basis. Confidence: HIGH only when a deterministic hook/gate/script shipped after that run's window and ` +
-  `mechanically blocks the class (name the file); MEDIUM when a rule/prose change or partial mechanical coverage addresses it; ` +
-  `LOW/not-fixed otherwise. Never claim fixed without naming the mechanism — this section is inspection-based and says so. ` +
-  `Findings whose class is already-fixed stay findings (the run still did it), but their Actions rows should note the fix so the ` +
-  `operator doesn't re-commission one; UNFIXED classes are where the Actions attention belongs.\n` +
-  `2) confirmed findings grouped by dimension WITH citations, so recurring patterns across runs are visible; ` +
-  `3) infra issues (substrate, not per-run); 4) coverage gaps (NOT_CAPTURED patterns — note O1/O6 expected until capture hook ships); ` +
-  `5) recommended skill/infra fixes ranked by recurrence; ` +
-  `6) "## Actions" — EVERY finding that admits a concrete remediation, as a checklist of typed, ready-to-execute DRAFTS the operator can approve row-by-row (the eval itself mutates nothing). Types and required content: ` +
-  `[field-correction] the exact \`~/.config/agent-watcher/set-tested.sh <gid> "<Option>" ...\` command with the evidence line justifying it; ` +
-  `[re-run] the task gid + the specific DoD gap and terminal bar for its followup comment (the operator stamps it from eval-run references/followup-comment-template.md) + \`~/.config/agent-watcher/update-status.sh <gid> Pending\`; ` +
-  `[playbook-proposal] each collected playbook_proposals bullet verbatim with its source run, ready for operator promotion to the sim-testing playbook; ` +
-  `[flow-proposal] each collected flow_proposals bullet verbatim with its source run — these feed the flow corpus and the manual --consolidate-flows pass, never direct promotion; ` +
-  `[skill-gap] the target skill/rule and one-line fix for /author; [infra-fix] the component and change. ` +
-  `Derive actions ONLY from findings present above (no inventions); omit types with no instances. Return ONLY the markdown.`,
+  `STRUCTURE (settled 2026-08-06, decision-first pyramid — every fact appears ONCE; findings are narrated in full ` +
+  `ONLY in Appendix A, and every upfront row LINKS down instead of restating): ` +
+  `Header paragraph: totals, one-line trend vs the prior cohort (read the newest earlier ~/agent-evals/*/results.json ` +
+  `when one exists), and the reading contract. ` +
+  `\"## Needs you\" — one consolidated approval checklist ordered by consequence, each row ONE line: ` +
+  `[re-run] rows (gid + DoD gap + terminal bar + the update-status Pending command); ` +
+  `[field-correction] rows (exact set-tested.sh command + one-line evidence); ` +
+  `the [transcript-eval] shortlist (finding-driven only, per the demotion rule above); ` +
+  `operator rulings the eval cannot settle; ` +
+  `[skill-gap]/[infra-fix] rows in recurrence order (top item first, full per-run evidence in Appendix C); ` +
+  `[playbook-proposal] one-liners and [flow-proposal] one-liners (verbatim texts in Appendix D). ` +
+  `\"## Open defect classes\" — the already-fixed inspection INVERTED: lead with NOT-FIXED and PARTIAL classes ` +
+  `(named mechanism or its absence, confidence, which upfront row closes it); fully-fixed classes collapse to one ` +
+  `reassurance line. Inspection rules: rubric dated carve-outs, hook headers in ~/.config/agent-watcher/hooks/, ` +
+  `git log of ~/git/edge-dev-agents since the oldest run window; HIGH confidence only for a deterministic gate ` +
+  `shipped after the run window that mechanically blocks the class (name the file); never claim fixed without ` +
+  `naming the mechanism. ` +
+  `\"## Fleet health\" — ONE paragraph: totals, hook-hardened-surface observations, the clean runs as a single ` +
+  `comma-separated line of linked task names (never a table of clean rows), coverage gaps in one line. ` +
+  `Then \"# Appendices\": A confirmed findings by dimension (the only full narration, with citations); ` +
+  `B the full verdict table (linked task name, verdict, gates, BAD count, gaps); ` +
+  `C orchestration friction (substrate prose + the demoted friction-only run mentions, feeding the infra-fix rows); ` +
+  `D playbook + flow proposal texts verbatim; E coverage gaps in full. ` +
+  `Derive every row ONLY from findings present in the results (no inventions); omit empty subsections. ` +
+  `Return ONLY the markdown.`,
   { label: 'cohort-report', phase: 'Synthesize', ...SYNTH_OPT }
 )
 
