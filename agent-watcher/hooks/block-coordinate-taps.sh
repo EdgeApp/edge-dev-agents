@@ -42,8 +42,16 @@ case "$TOOL" in
   *) exit 0 ;;
 esac
 
-printf '%s' "$PAYLOAD" | grep -qE 'tapOn|longPressOn' || exit 0
-printf '%s' "$PAYLOAD" | grep -q 'point:' || exit 0
+# STRUCTURAL match, not word co-occurrence: prose that merely mentions both
+# words ("...tapOn selectors... at some point: consider...") false-positived
+# twice in the 2026-08-06 cohort. A real coordinate tap is `tapOn:`/
+# `longPressOn:` with a `point:` sub-key within the next 3 lines.
+printf '%s' "$PAYLOAD" | awk '
+  /(tapOn|longPressOn):/ { arm=3; next }
+  arm > 0 && /^[[:space:]]*point:/ { found=1; exit }
+  arm > 0 { arm-- }
+  END { exit !found }
+' || exit 0
 
 if [ -s "/tmp/agent-coordtap-$AGENT_TASK_GID.md" ]; then
   exit 0

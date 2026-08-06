@@ -80,34 +80,47 @@ if [ -z "$REPO" ]; then
 fi
 command -v timeout >/dev/null || { echo "ERROR: timeout not on PATH (shim: ~/.cursor/skills/timeout.sh)" >&2; exit 2; }
 
-# Deadline is per task (falls back to per PR for ad-hoc use), shared across calls
-# WITHIN a run. A prior run of the same task leaves this file behind, so a re-run
-# would inherit a days-old deadline and falsely report "budget exhausted" on its
-# first call. Guard on the file's age: a legitimately live deadline is at most
-# BUDGET seconds old (the first call stamped it now+BUDGET); if the file is older
-# than BUDGET, it is a stale carryover from a prior run — discard and re-stamp.
-DEADLINE_FILE="/tmp/agent-watch-deadline-${TASK_GID:-pr$PR}"
+# BUDGET SEMANTICS (reworked 2026-08-06 per the cohort's watch-pr findings):
+# the budget bounds waiting PER HEAD/ROUND, not per task-lifetime, and it burns
+# only time this script actually spent watching:
+#   - The file stores REMAINING seconds + the HEAD it applies to. Each call
+#     measures its own runtime and decrements on exit (trap), so a call killed
+#     by the harness's foreground cap loses only the seconds it truly watched —
+#     the old wall-clock deadline burned ~5 idle minutes per kill.
+#   - A NEW HEAD (fix push, next review round) resets the budget to full: a
+#     legitimate 4-round review loop is 4 bounded waits, not one 30-min pool
+#     (the old semantics exhausted mid-loop and forced hand-rolled polling).
+#   - Staleness: a file older than 6h is a prior run's carryover; reset.
+BUDGET_FILE="/tmp/agent-watch-budget-${TASK_GID:-pr$PR}"
 NOW=$(date +%s)
-if [ -r "$DEADLINE_FILE" ]; then
-  FILE_MTIME=$(stat -f %m "$DEADLINE_FILE" 2>/dev/null || echo 0)
-  if [ $((NOW - FILE_MTIME)) -gt "$BUDGET" ]; then
-    echo ">> watch-pr: stale deadline file ($((NOW - FILE_MTIME))s old > ${BUDGET}s budget) from a prior run — resetting" >&2
-    rm -f "$DEADLINE_FILE"
+CUR_HEAD=$(gh pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefOid -q .headRefOid 2>/dev/null || echo "unknown")
+REMAINING="$BUDGET"
+if [ -r "$BUDGET_FILE" ]; then
+  FILE_MTIME=$(stat -f %m "$BUDGET_FILE" 2>/dev/null || echo 0)
+  SAVED_HEAD=$(sed -n '2p' "$BUDGET_FILE" 2>/dev/null || echo "")
+  if [ $((NOW - FILE_MTIME)) -gt 21600 ]; then
+    echo ">> watch-pr: stale budget file from a prior run — resetting" >&2
+  elif [ "$SAVED_HEAD" != "$CUR_HEAD" ]; then
+    echo ">> watch-pr: new HEAD ${CUR_HEAD:0:8} (was ${SAVED_HEAD:0:8}) — fresh round, budget reset" >&2
+  else
+    REMAINING=$(sed -n '1p' "$BUDGET_FILE" 2>/dev/null || echo "$BUDGET")
+    case "$REMAINING" in (*[!0-9-]*|"") REMAINING="$BUDGET" ;; esac
   fi
 fi
-if [ -r "$DEADLINE_FILE" ]; then
-  DEADLINE=$(cat "$DEADLINE_FILE")
-else
-  DEADLINE=$((NOW + BUDGET))
-  echo "$DEADLINE" > "$DEADLINE_FILE"
-fi
+printf '%s\n%s\n' "$REMAINING" "$CUR_HEAD" > "$BUDGET_FILE"
 
-REMAINING=$((DEADLINE - NOW))
 if [ "$REMAINING" -le 0 ]; then
-  echo ">> watch-pr: budget exhausted (deadline passed $((-REMAINING))s ago)" >&2
+  echo ">> watch-pr: budget exhausted for HEAD ${CUR_HEAD:0:8}" >&2
   exit 75
 fi
-echo ">> watch-pr: ${REMAINING}s of budget remain; watching ${REPO:+$REPO }PR #$PR" >&2
+WATCH_START=$(date +%s)
+persist_budget() {
+  local spent=$(( $(date +%s) - WATCH_START ))
+  printf '%s\n%s\n' "$(( REMAINING - spent ))" "$CUR_HEAD" > "$BUDGET_FILE" 2>/dev/null || true
+}
+trap persist_budget EXIT
+DEADLINE=$((NOW + REMAINING))
+echo ">> watch-pr: ${REMAINING}s of round budget remain (HEAD ${CUR_HEAD:0:8}); watching ${REPO:+$REPO }PR #$PR" >&2
 
 # Poll loop instead of `gh pr checks --watch`: --watch blocks on ALL checks with
 # no way to exempt the slow-CI check. Same budget contract as before.
@@ -203,6 +216,13 @@ while :; do
         REVIEWER_NOTE=" draft-reviewer-skipped($REVIEWER_CHECK_PATTERN: bots skip drafts by design; run gh pr ready at finalize, then re-watch)"
         echo ">> watch-pr: PR is DRAFT — '$REVIEWER_CHECK_PATTERN' skipping it is the credit gate working. CI is gated now; bots gate after 'gh pr ready' at finalize." >&2
       else
+        # Genuinely unavailable reviewer on a READY PR: write the waiver the
+        # Complete gate's bot check honors, so an outage blocks nothing while
+        # staying on the audit trail (the eval reads this file's reason).
+        if [ -n "$TASK_GID" ]; then
+          printf 'reviewer-unavailable: %s posted no check-run/review on ready HEAD %s at %s (other checks complete)\n' \
+            "$REVIEWER_CHECK_PATTERN" "${CUR_HEAD:0:12}" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "/tmp/agent-bot-unavailable-${TASK_GID}" 2>/dev/null || true
+        fi
         REVIEWER_SEEN=$(jq -r --arg p "$REVIEWER_CHECK_PATTERN" '[.[] | .name | select(startswith($p))] | length' <<<"$JSON" 2>/dev/null || echo 0)
         if [ "${REVIEWER_SEEN:-0}" -eq 0 ]; then WHY="no check-run"; else WHY="check-run skipped"; fi
         REVIEWER_NOTE=" reviewer-unavailable:$REVIEWER_CHECK_PATTERN($WHY, no review on HEAD)"

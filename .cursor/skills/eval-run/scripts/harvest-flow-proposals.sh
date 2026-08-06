@@ -97,13 +97,13 @@ if [ -n "$TOKEN" ]; then
     report=$(curl -sfL --max-time 30 "$url" 2>/dev/null) || continue
     # tagged bullets + their continuation lines (indented or fenced yaml)
     tagged=$(printf '%s\n' "$report" | awk '
-      /^[-*] *\[(playbook|flow|flow-update)\]/ { grab=1; print; next }
+      /^[-*] *`?\[(playbook|flow|flow-update)\]`?/ { grab=1; print; next }
       grab && (/^[[:space:]]/ || /^```/) { print; if (/^```$/ && fence) { grab=0; fence=0 }; if (/^```/ && !/^```$/) fence=1; next }
       grab { grab=0 }
     ')
     [ -n "$tagged" ] || { printf '<!-- harvested-from: %s -->\n<!-- no tagged bullets -->\n' "$created" > "$out"; continue; }
     { printf '<!-- harvested-from: %s -->\n# %s\n\n%s\n' "$created" "$gid" "$tagged"; } > "$out"
-    printf '%s\n' "$tagged" | grep -E '^[-*] *\[' | while IFS= read -r line; do
+    printf '%s\n' "$tagged" | grep -E '^[-*] *`?\[' | while IFS= read -r line; do
       tag=$(printf '%s' "$line" | sed -E 's/^[-*] *\[([a-z-]+)\].*/\1/')
       printf '%s\t%s\t%s\n' "$gid" "$tag" "$(printf '%s' "$line" | cut -c1-120)" >> "$PIDX"
     done

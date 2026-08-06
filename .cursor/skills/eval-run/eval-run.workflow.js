@@ -76,6 +76,7 @@ const FINDINGS_SCHEMA = {
     },
     infra_issues: { type: 'array', items: { type: 'string' } },
     playbook_proposals: { type: 'array', items: { type: 'string' } },
+    flow_proposals: { type: 'array', items: { type: 'string' }, description: '[flow]/[flow-update] tagged bullets verbatim INCLUDING embedded yaml — collection only; promotion happens solely in the manual --consolidate-flows pass' },
     escalate: {
       type: 'object',
       description: 'report-mode only: whether this run warrants a one-off transcript-eval, per the report profile heuristics',
@@ -174,6 +175,7 @@ const results = await pipeline(
       not_captured: notCaptured,
       infra_issues: [...((agentF && agentF.infra_issues) || []), ...((orchF && orchF.infra_issues) || [])],
       playbook_proposals: [...((agentF && agentF.playbook_proposals) || []), ...((orchF && orchF.playbook_proposals) || [])],
+      flow_proposals: [...((agentF && agentF.flow_proposals) || []), ...((orchF && orchF.flow_proposals) || [])],
       notes: [agentF && agentF.notes, orchF && orchF.notes].filter(Boolean).join(' | '),
     }
   }
@@ -224,6 +226,7 @@ const cohort = await agent(
   `[field-correction] the exact \`~/.config/agent-watcher/set-tested.sh <gid> "<Option>" ...\` command with the evidence line justifying it; ` +
   `[re-run] the task gid + the specific DoD gap and terminal bar for its followup comment (the operator stamps it from eval-run references/followup-comment-template.md) + \`~/.config/agent-watcher/update-status.sh <gid> Pending\`; ` +
   `[playbook-proposal] each collected playbook_proposals bullet verbatim with its source run, ready for operator promotion to the sim-testing playbook; ` +
+  `[flow-proposal] each collected flow_proposals bullet verbatim with its source run — these feed the flow corpus and the manual --consolidate-flows pass, never direct promotion; ` +
   `[skill-gap] the target skill/rule and one-line fix for /author; [infra-fix] the component and change. ` +
   `Derive actions ONLY from findings present above (no inventions); omit types with no instances. Return ONLY the markdown.`,
   { label: 'cohort-report', phase: 'Synthesize', ...SYNTH_OPT }

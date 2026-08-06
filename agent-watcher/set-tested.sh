@@ -12,8 +12,10 @@
 #   iOS Sim     — the change was driven in-app on the iOS sim (maestro / build +
 #                 simctl launch, real action to terminal success). DEFAULT sim
 #                 platform; quote it ("iOS Sim") since it contains a space.
-#   Android Sim — exercised on Android (gradle :app:assembleDebug for a build-only
-#                 fix, or an AVD/maestro in-app drive). Only for Android tasks.
+#   Android Sim — exercised on an Android EMULATOR (gradle :app:assembleDebug for a
+#                 build-only fix, or an AVD/maestro in-app drive). Android tasks only.
+#   Android Device — exercised on a PHYSICAL Android device (e.g. the S9). Never
+#                 record a physical drive as Android Sim.
 #   Unit Tests  — jest / mocha / `npm test` ran (verify-repo's test step)
 #   CouchDB     — a CouchDB-backed test ran (sync / server repos: edge-reports-
 #                 server, edge-core-js sync, a couch/pouch integration test)

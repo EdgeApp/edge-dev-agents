@@ -222,7 +222,7 @@
       ]
     },
     "file:set-tested.sh": {
-      "hash": "8df123a2ad4d",
+      "hash": "c352db4fdd98",
       "dims": [
         "A22"
       ]
@@ -423,7 +423,7 @@
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "15cfc587d7d3",
+      "hash": "be04910feac9",
       "dims": [
         "A9"
       ]
@@ -855,8 +855,8 @@
       "hash": "c7a0784aa196"
     },
     "one-shot:set-tested-field": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "60b34baf497f"
+      "reason": "2026-08-06: Android Device enum added 2026-08-06; graded via A22's dated physical-vs-emulator anchor",
+      "hash": "3ac88a279063"
     },
     "one-shot:yolo-no-silent-downgrade": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",

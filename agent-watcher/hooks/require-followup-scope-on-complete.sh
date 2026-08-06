@@ -66,4 +66,13 @@ if [ "$GH_BLOCKING" -gt 0 ] 2>/dev/null; then
   exit 2
 fi
 
+# Reviewer-bot completeness: Complete may not rest on a ready HEAD the bots
+# never ran on (the 2026-08-06 cohort's two A3 gate FAILs). watch-pr writes the
+# outage waiver when a reviewer is genuinely unavailable; its presence exempts.
+GH_BOTS="$(jq -r '.github_bots_incomplete // 0' "$MARKER" 2>/dev/null || echo 0)"
+if [ "$GH_BOTS" -gt 0 ] 2>/dev/null && [ ! -s "/tmp/agent-bot-unavailable-$GID" ]; then
+  echo "BLOCKED: $GH_BOTS reviewer-bot check(s) missing or not completed-clean on an OWNED ready PR HEAD. Complete requires the bots to have RUN AND CONCLUDED there (success/skipped): if the PR just flipped ready, run watch-pr.sh and let them finish; a red bot means findings to address first. A genuine bot outage is waived automatically when watch-pr records reviewer-unavailable. Re-run: $CHECK — then retry Complete." >&2
+  exit 2
+fi
+
 exit 0

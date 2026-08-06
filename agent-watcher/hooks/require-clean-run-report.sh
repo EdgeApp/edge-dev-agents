@@ -62,9 +62,13 @@ INPUT=$(cat)
 CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
 
-# Only gate: asana-task-update.sh ... --attach-file <path> with a run-report name.
+# Gate BOTH attach paths: asana-task-update.sh --attach-file, and direct curl
+# to the Asana attachments API (runs fall back to curl when the script or MCP
+# misbehaves — two 2026-08 reports reached Asana unlinted through that side
+# door, em dashes intact).
 case "$CMD" in
   *asana-task-update.sh*--attach-file*) ;;
+  *api.asana.com*attachments*) ;;
   *) exit 0 ;;
 esac
 case "$CMD" in
@@ -72,8 +76,9 @@ case "$CMD" in
   *) exit 0 ;;
 esac
 
-# Extract the attached file path (first token after --attach-file, tolerating quotes).
-REPORT="$(printf '%s' "$CMD" | sed -E 's/.*--attach-file[= ]+"?([^" ]+)"?.*/\1/')"
+# Extract the attached file path: --attach-file form, else curl's file=@ form.
+REPORT="$(printf '%s' "$CMD" | sed -nE 's/.*--attach-file[= ]+"?([^" ]+)"?.*/\1/p')"
+[ -n "$REPORT" ] || REPORT="$(printf '%s' "$CMD" | sed -nE 's/.*file=@"?([^";]+)"?.*/\1/p' | head -1)"
 REPORT="${REPORT/#\~/$HOME}"
 [ -s "$REPORT" ] || { echo "BLOCKED: --attach-file path '$REPORT' not readable — attach the actual report file." >&2; exit 2; }
 
