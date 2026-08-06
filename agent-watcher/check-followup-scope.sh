@@ -83,8 +83,8 @@ BASELINE_TS=""
 DELTA_STATUS="unavailable: no prior field snapshot"
 LIVE_FIELDS="null"
 RESP=$(curl -sf --max-time 20 -H "Authorization: Bearer $TOKEN" \
-  "$API/tasks/$TASK_GID?opt_fields=completed,custom_fields.name,custom_fields.display_value" 2>/dev/null) \
-  && LIVE_FIELDS=$(echo "$RESP" | jq -c '{completed: .data.completed}
+  "$API/tasks/$TASK_GID?opt_fields=name,completed,custom_fields.name,custom_fields.display_value" 2>/dev/null) \
+  && LIVE_FIELDS=$(echo "$RESP" | jq -c '{name: .data.name, completed: .data.completed}
        + ([.data.custom_fields[]? | {(.name // "?"): (.display_value // null)}] | add // {})' 2>/dev/null) \
   || LIVE_FIELDS="null"
 [[ -n "$LIVE_FIELDS" ]] || LIVE_FIELDS="null"
@@ -180,7 +180,7 @@ if [[ "$DELTA_STATUS" == "ok" ]]; then
   else
     echo ">>   $DELTA_COUNT field change(s) since previous segment snapshot ($BASELINE_TS) — operator intent, NOT a spurious re-fire:"
     echo "$FIELD_DELTAS" | jq -r '.[] | "     \(.field): \(if .was == null then "(unset)" else (.was|tostring) end) -> \(if .now == null then "(unset)" else (.now|tostring) end)"'
-    echo ">>   act on each: a field flip can mean ROUTING (Build/Force Land — re-confirm the finalize gate, whose live reads consume them) or WORK OWED (e.g. 'TDD?' -> TDD means the TDD is owed NOW, per one-shot tdd-when-flagged). Resolve each changed field against its owning rule before finalizing."
+    echo ">>   act on each: a field flip can mean ROUTING (Build/Force Land — re-confirm the finalize gate, whose live reads consume them) or WORK OWED (e.g. 'TDD?' -> TDD means the TDD is owed NOW, per one-shot tdd-when-flagged; a 'name' change is a RENAME — the new title's wording IS scope, diff it against the old title and deliver what it added). Resolve each changed field against its owning rule before finalizing."
   fi
 else
   echo ">>   field deltas: $DELTA_STATUS"

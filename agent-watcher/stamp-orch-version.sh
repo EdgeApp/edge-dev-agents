@@ -93,10 +93,15 @@ REPO_DIRTY=$([[ "$DIRTY_COMPONENTS" != "[]" ]] && echo true || echo false)
 FIELDS="null"
 TOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null)}"
 if [[ -n "$TOKEN" ]]; then
+  # `name` rides the snapshot so a task RENAME between segments surfaces in
+  # check-followup-scope's field-delta diff (a rename is often the new-scope
+  # signal itself — the 1217224633446931 deeplink task added "affiliate
+  # provider priority" by rename on 2026-08-05 with zero comments, invisible to
+  # the custom-fields-only snapshot; rename stories are not comment_added).
   RESP=$(curl -sf --max-time 20 \
-    "https://app.asana.com/api/1.0/tasks/$GID?opt_fields=completed,custom_fields.name,custom_fields.display_value" \
+    "https://app.asana.com/api/1.0/tasks/$GID?opt_fields=name,completed,custom_fields.name,custom_fields.display_value" \
     -H "Authorization: Bearer $TOKEN" 2>/dev/null) \
-    && FIELDS=$(echo "$RESP" | jq -c '{completed: .data.completed}
+    && FIELDS=$(echo "$RESP" | jq -c '{name: .data.name, completed: .data.completed}
          + ([.data.custom_fields[]? | {(.name // "?"): (.display_value // null)}] | add // {})' 2>/dev/null) \
     || FIELDS="null"
   [[ -n "$FIELDS" ]] || FIELDS="null"
