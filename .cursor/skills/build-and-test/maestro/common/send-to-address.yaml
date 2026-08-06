@@ -1,0 +1,28 @@
+# common/send-to-address.yaml
+# Assets -> search wallet -> Send -> address -> amount -> confirm slider.
+# Params: WALLET_SEARCH, ADDRESS, AMOUNT. Promoted 2026-08-06 (run 1217135300337949);
+# proof-frame tail steps intentionally dropped for reuse.
+appId: co.edgesecure.app
+---
+- extendedWaitUntil: {visible: "Assets", timeout: 90000}
+- runFlow: {when: {visible: "Not Now"}, commands: [{tapOn: "Not Now"}]}
+- runFlow: {when: {visible: {id: "modal-close-button"}}, commands: [{tapOn: {id: "modal-close-button"}}]}
+- tapOn: "Assets"
+- extendedWaitUntil: {visible: "Search Wallets", timeout: 20000}
+- tapOn: "Search Wallets"
+- inputText: ${WALLET_SEARCH}
+- extendedWaitUntil: {visible: ".*${WALLET_SEARCH}.*", timeout: 15000}
+- tapOn: {text: ".*${WALLET_SEARCH}.*", index: 0}
+- extendedWaitUntil: {visible: "Send", timeout: 15000}
+- tapOn: "Send"
+- extendedWaitUntil: {visible: ".*Enter.*", timeout: 15000}
+- tapOn: {text: ".*Enter.*"}
+- tapOn: "Address"
+- inputText: ${ADDRESS}
+- tapOn: "Next"
+- extendedWaitUntil: {visible: "Enter Value", timeout: 15000}
+- tapOn: "Enter Value"
+- inputText: ${AMOUNT}
+- tapOn: "Done"
+- extendedWaitUntil: {visible: "Slide to Confirm", timeout: 15000}
+- swipe: {from: {id: "confirmSliderThumb"}, direction: LEFT, duration: 1500}

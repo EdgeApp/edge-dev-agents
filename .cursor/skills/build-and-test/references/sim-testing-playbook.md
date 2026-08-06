@@ -20,6 +20,8 @@ already encodes, params and gotchas included.
 | `common/find-wallet.yaml` | SEARCH_TERM, MATCH_INDEX | Assets tab → search → open a wallet's detail scene (Receive/Send/Trade) |
 | `common/open-settings.yaml` | - | Side menu → Settings list (compose your own subpage nav after) |
 | `common/confirm-slider.yaml` | - | The confirm slider gesture (SOLVED — never re-derive) |
+| `common/ramp-set-region-fiat.yaml` | COUNTRY_ROW/SEARCH, STATE_ROW/SEARCH, FIAT_ROW/SEARCH | Set ramp region + fiat from Buy/Sell scene (row selectors are the COMBINED row string, e.g. "United States of America US") |
+| `common/send-to-address.yaml` | WALLET_SEARCH, ADDRESS, AMOUNT | Assets → wallet → Send → address → amount → confirm slider |
 | `buy-quote-input.yaml` / `buy-quote.yaml` | (see file) | Canonical Buy $500 proof flow |
 | `swap-quote-input.yaml` / `swap-confirm.yaml` | (see file) | Swap quote + confirm proof pair |
 

@@ -1,0 +1,47 @@
+# common/ramp-set-region-fiat.yaml
+# Sets the ramp region + fiat from the Buy/Sell scene. Row selectors must be the
+# COMBINED row string ("United States of America US"), not the inner label.
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  COUNTRY_SEARCH: "United States"
+  COUNTRY_ROW: "United States of America US"
+  STATE_SEARCH: "California"
+  STATE_ROW: "California CA"
+  FIAT_SEARCH: "USD"
+  FIAT_ROW: "USD United States Dollar"
+---
+- tapOn:
+    text: ".*(Select your region|USA|Germany|United Kingdom|Canada|Australia).*"
+- extendedWaitUntil:
+    visible: "Search region"
+    timeout: 10000
+- tapOn: "Search region"
+- inputText: ${COUNTRY_SEARCH}
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn: ${COUNTRY_ROW}
+# States modal only appears for countries that define stateProvinces.
+- runFlow:
+    when:
+      visible: "Search states"
+    commands:
+      - tapOn: "Search states"
+      - inputText: ${STATE_SEARCH}
+      - waitForAnimationToEnd:
+          timeout: 4000
+      - tapOn: ${STATE_ROW}
+- waitForAnimationToEnd:
+    timeout: 6000
+- tapOn:
+    id: "rampFiatDropdown"
+- extendedWaitUntil:
+    visible: "Select Fiat"
+    timeout: 10000
+- tapOn: "Choose a fiat currency"
+- inputText: ${FIAT_SEARCH}
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn: ${FIAT_ROW}
+- waitForAnimationToEnd:
+    timeout: 6000
