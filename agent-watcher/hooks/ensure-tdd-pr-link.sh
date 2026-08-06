@@ -10,6 +10,12 @@
 # Appending one link to the run's own PR is fully determined, so it is done here
 # instead of asked for.
 #
+# ONE DOC, EVERY PR: the task has a single TDD (tdd lives-in-the-pr puts it in
+# the primary repo), but a multi-repo task's OTHER PRs are covered by the same
+# doc and their reviewers need the pointer too. So the URL is resolved ONCE
+# from whichever worktree holds the doc, then appended to EVERY worktree's PR
+# body that lacks it (the doc-hosting repo's PR and each companion PR alike).
+#
 # BRANCH url, never a commit permalink: the PR must follow the branch so a
 # reviewer always sees the doc as it stands with the code. The run report carries
 # the pinned form (require-clean-run-report.sh) — operator ruling 2026-07-28.
@@ -27,10 +33,18 @@ printf '%s' "$CMD" | grep -qE 'update-status\.sh[^|;&]*[[:space:]]Complete([[:sp
 FIELD=$("$HOME/.cursor/skills/asana-field-value.sh" "$AGENT_TASK_GID" "TDD?" 2>/dev/null || echo "none")
 [ "$FIELD" = "tdd" ] || exit 0
 
+# Resolve the doc URL once, from whichever worktree hosts the doc.
+URL=""
 for REPO_DIR in "$HOME/git/.agent-worktrees/$AGENT_TASK_GID"/*/; do
   [ -d "$REPO_DIR" ] || continue
-  URL=$("$HOME/.cursor/skills/tdd/scripts/tdd-doc-links.sh" "$REPO_DIR" 2>/dev/null | sed -n 's/^TDD_BRANCH_URL=//p') || true
-  [ -n "${URL:-}" ] || continue
+  U=$("$HOME/.cursor/skills/tdd/scripts/tdd-doc-links.sh" "$REPO_DIR" 2>/dev/null | sed -n 's/^TDD_BRANCH_URL=//p') || true
+  if [ -n "${U:-}" ]; then URL="$U"; break; fi
+done
+[ -n "$URL" ] || exit 0
+
+# Append the link to every worktree PR that lacks it.
+for REPO_DIR in "$HOME/git/.agent-worktrees/$AGENT_TASK_GID"/*/; do
+  [ -d "$REPO_DIR" ] || continue
 
   PR=$(cd "$REPO_DIR" && gh pr view --json number,body 2>/dev/null) || continue
   NUM=$(printf '%s' "$PR" | jq -r '.number // empty')

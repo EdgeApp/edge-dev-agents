@@ -477,9 +477,9 @@
       ]
     },
     "one-shot:tdd-when-flagged": {
-      "hash": "f8bcb30f119e",
+      "hash": "6ad6c43a5a7d",
       "dims": [
-        "A29"
+        "A31"
       ]
     },
     "tdd:post-impl-retro": {
@@ -527,7 +527,7 @@
       ]
     },
     "file:no-slop-lint.sh": {
-      "hash": "86ba887f9570",
+      "hash": "122d09851fd5",
       "dims": [
         "A9"
       ]
@@ -536,6 +536,24 @@
       "hash": "fd3d2bfac1cc",
       "dims": [
         "A24"
+      ]
+    },
+    "tdd:output-target": {
+      "hash": "15d841b411fd",
+      "dims": [
+        "A33"
+      ]
+    },
+    "tdd:current-state-body-phases-in-one-section": {
+      "hash": "795e6e2123eb",
+      "dims": [
+        "A33"
+      ]
+    },
+    "file:tdd-doc-links.sh": {
+      "hash": "4ec1fd3ab576",
+      "dims": [
+        "A33"
       ]
     }
   },
@@ -1291,6 +1309,14 @@
     "build-and-test:hack-verify-visual-changes": {
       "reason": "2026-07-28: hack provenance is graded via A13 (HACKED token + specific --hack-note banner) and A9 (Testing-section declaration); the rule body is capture procedure the validator/concession layer enforces",
       "hash": "f12ed2e6a7ae"
+    },
+    "one-shot:description-current-state": {
+      "reason": "2026-08-06: new rule from the concurrent state-file/description-hygiene work; report-eval can grade it later as an A20 extension (description vs delivered scope at Complete) — dimension owed by that effort",
+      "hash": "93c0f6d8206d"
+    },
+    "one-shot:mid-run-state-file": {
+      "reason": "2026-08-06: same concurrent effort as description-current-state; state-file quality is transcript-visible only — candidate A-dimension owed by that effort",
+      "hash": "025f56ac5ac5"
     }
   },
   "excluded_skills": {
@@ -1309,6 +1335,7 @@
     "orch-eval": "2026-07-19: the eval layer itself; grades orch runs, is not one",
     "eval-run": "2026-07-19: the eval layer itself; grades orch runs, is not one",
     "resolve-run": "2026-07-19: the eval layer itself; grades orch runs, is not one",
-    "coinhub": "2026-07-24: Standalone operator-invocable coinhub maintenance skill; domain-procedure rules (snapshot regen, safe force-push, theme drift), not orchestration-gating behavior. Not wired into one-shot delegation, so not an orch dependent the agent-eval/orch-eval rubrics grade. Re-evaluate if one-shot ever delegates to /coinhub."
+    "coinhub": "2026-07-24: Standalone operator-invocable coinhub maintenance skill; domain-procedure rules (snapshot regen, safe force-push, theme drift), not orchestration-gating behavior. Not wired into one-shot delegation, so not an orch dependent the agent-eval/orch-eval rubrics grade. Re-evaluate if one-shot ever delegates to /coinhub.",
+    "agents-md": "2026-07-31: Non-orch: repo-authoring tooling invoked by the AGENTS.md write gate, not part of the one-shot delegation chain; its correctness is enforced by require-agents-md-skill.sh plus the skill's own checklist, not by a run-eval dimension."
   }
 }

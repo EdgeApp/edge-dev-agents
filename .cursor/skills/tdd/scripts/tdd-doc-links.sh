@@ -9,9 +9,15 @@
 #   PINNED url  -> run report. Frozen at the commit the report described, so a
 #                  report stays true to the state it audited.
 #
+# A gist-hosted doc (tdd output-target public-gist / secret-gist) has no
+# committed file to find, so when the repo carries none this falls back to the
+# pointer gist-doc-publish.sh writes for the task. Same three keys either way,
+# so callers never branch on where the doc lives: BRANCH_URL is the live gist,
+# PINNED_URL its frozen revision.
+#
 # Usage: tdd-doc-links.sh [repo-dir]        (default: cwd)
 # stdout: TDD_DOC / TDD_BRANCH_URL / TDD_PINNED_URL, one KEY=VALUE per line.
-# Exit: 0 = resolved, 3 = no committed doc (normal before the TDD is written),
+# Exit: 0 = resolved, 3 = no doc anywhere (normal before the TDD is written),
 #       1 = not a git repo / no github remote, 2 = usage.
 set -euo pipefail
 
@@ -35,7 +41,15 @@ while IFS= read -r f; do
   ts=$(git -C "$REPO_DIR" log -1 --format=%ct -- "$f" 2>/dev/null || echo 0)
   if [ "${ts:-0}" -ge "$LATEST" ]; then LATEST="$ts"; DOC="$f"; fi
 done < <(git -C "$REPO_DIR" ls-files 'src/docs/*.md' 2>/dev/null)
-[ -n "$DOC" ] || exit 3
+if [ -z "$DOC" ]; then
+  # No committed doc: fall back to a gist pointer for this task, if one exists.
+  PTR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/tdd-doc/${AGENT_TASK_GID:-}.env"
+  if [ -n "${AGENT_TASK_GID:-}" ] && [ -f "$PTR" ]; then
+    grep -E '^TDD_(DOC|BRANCH_URL|PINNED_URL)=' "$PTR"
+    exit 0
+  fi
+  exit 3
+fi
 
 BRANCH=$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 SHA=$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || echo "")

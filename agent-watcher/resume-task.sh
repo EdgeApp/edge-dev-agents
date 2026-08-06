@@ -111,7 +111,42 @@ if [[ -z "$SESSION_ID" ]]; then
   fi
   SESSION_ID="$(basename "$NEWEST" .jsonl)"
 fi
-echo ">> resume-task: resuming claude session $SESSION_ID (task $TASK_GID)" >&2
+
+# FRESH-VS-RESUME POLICY: a transcript past the degradation threshold is worth
+# less than the artifacts the run produced (report, TDD, PR, task comments).
+# Resuming it would either replay a summary-of-a-summary (the menu's default
+# "Resume from summary" literally runs /compact, on a summary that predates the
+# followup comment) or blow straight past the context window. Below the
+# threshold, full resume keeps everything and compacts nothing; above it,
+# fresh-spawn re-anchors from artifacts via one-shot's followup rules
+# (followup-reopens-status / followup-scope-is-the-deliverable), and the
+# SessionStart run-context hook injects live task state at boot either way.
+# There is deliberately NO summary tier: it is lossy like fresh but stale
+# unlike fresh. Thresholds: env-tunable; compactions are the sharper signal
+# (summary-of-summary depth), bytes the backstop.
+FRESH_MIN_BYTES="${FOLLOWUP_FRESH_MIN_BYTES:-8388608}"
+FRESH_MIN_COMPACTIONS="${FOLLOWUP_FRESH_MIN_COMPACTIONS:-3}"
+FRESH_SPAWN=false
+if [[ -n "$SESSION_ID" ]]; then
+  TR=$(ls "$HOME/.claude/projects/"*/"$SESSION_ID.jsonl" 2>/dev/null | head -1)
+  if [[ -n "$TR" ]]; then
+    TR_BYTES=$(stat -f %z "$TR" 2>/dev/null || echo 0)
+    # grep -c prints "0" AND exits 1 on no match, so `|| echo 0` double-printed
+    # "0\n0" and blew up the [[ -ge ]] below. `|| true` keeps set -e safe; the
+    # :-0 default covers an unreadable file (grep prints nothing).
+    TR_COMPACTS=$(grep -c '"subtype":"compact_boundary"' "$TR" 2>/dev/null || true)
+    TR_COMPACTS=${TR_COMPACTS:-0}
+    if [[ "$TR_BYTES" -ge "$FRESH_MIN_BYTES" || "$TR_COMPACTS" -ge "$FRESH_MIN_COMPACTIONS" ]]; then
+      FRESH_SPAWN=true
+      echo ">> resume-task: transcript past degradation threshold (${TR_COMPACTS} compactions, $((TR_BYTES / 1048576))MB) — FRESH-spawning from artifacts instead of resuming" >&2
+    fi
+  fi
+fi
+if $FRESH_SPAWN; then
+  SESSION_ID=""
+else
+  echo ">> resume-task: resuming claude session $SESSION_ID (task $TASK_GID)" >&2
+fi
 
 # 2. Task name → session label.
 TOKEN="$(jq -r '.asana_token // empty' "$DIR/credentials.json" 2>/dev/null || true)"
@@ -146,8 +181,29 @@ echo ">> resume-task: slot $SLOT_IDX | sim $SIM_UDID | metro $METRO_PORT" >&2
   || echo ">> resume-task: WARN — could not set agent_status=$STATUS" >&2
 
 # 6. Relaunch the agent's conversation with the FRESH slot env.
-echo ">> resume-task: spawning ${SESSION_PREFIX}${TASK_GID} (--resume $SESSION_ID)" >&2
-exec "$DIR/spawn-test-session.sh" $YOLO \
+if [[ -n "$SESSION_ID" ]]; then
+  echo ">> resume-task: spawning ${SESSION_PREFIX}${TASK_GID} (--resume $SESSION_ID)" >&2
+  exec "$DIR/spawn-test-session.sh" $YOLO \
+    --slot-index "$SLOT_IDX" --task-gid "$TASK_GID" \
+    --sim-udid "$SIM_UDID" --metro-port "$METRO_PORT" \
+    --worktree-path "$HOME/git" --resume "$SESSION_ID" --label "$LABEL"
+fi
+
+# FRESH-SPAWN FOLLOWUP (transcript past the degradation threshold): boot a new
+# conversation and send the /one-shot prompt ourselves, exactly like the
+# watcher does for first runs. one-shot's followup rules re-anchor from the
+# task's artifacts (report watermark, open PR branch, TDD), and the
+# SessionStart run-context hook injects live task state at boot.
+echo ">> resume-task: spawning ${SESSION_PREFIX}${TASK_GID} FRESH (artifact-anchored followup)" >&2
+"$DIR/spawn-test-session.sh" $YOLO \
   --slot-index "$SLOT_IDX" --task-gid "$TASK_GID" \
   --sim-udid "$SIM_UDID" --metro-port "$METRO_PORT" \
-  --worktree-path "$HOME/git" --resume "$SESSION_ID" --label "$LABEL"
+  --worktree-path "$HOME/git" --label "$LABEL"
+
+# Prompt-sending is the CALLER's job, exactly as on the resume path: the
+# watcher sends /one-shot to revisit spawns itself (with its RC-ready wait and
+# duplicate guard), so resume-task sending too produces a doubled prompt (a
+# queued re-fire the run then has to dismiss via ignore-refired-one-shot).
+# A manual operator invocation sends the prompt by hand after attaching.
+PROJECT_GID="$(jq -r '.project_gid // empty' "$DIR/asana-config.json")"
+echo ">> resume-task: fresh conversation booted for $TASK_GID; caller sends the /one-shot prompt (watcher does this automatically; manual runs: /one-shot --yolo https://app.asana.com/0/${PROJECT_GID:-0}/$TASK_GID)" >&2

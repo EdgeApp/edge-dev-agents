@@ -19,7 +19,9 @@
 #                                   # a watchdog-covered tmux session with remote
 #                                   # control armed (talk to a past run from anywhere,
 #                                   # no slot provisioning, original conversation
-#                                   # untouched). Session/RC name: chat-<slug>.
+#                                   # untouched). Session/RC name: chat-<slug>,
+#                                   # slugged from the search term, else the
+#                                   # transcript's Asana task name, else the uuid.
 #                                   # Resumes FULL-FIDELITY by default: chat exists to
 #                                   # continue the conversation's details (drafts, exact
 #                                   # wording), which a summary resume compresses away.
@@ -491,12 +493,50 @@ if $CHAT; then
   # chat naming silently DEMOTES it into the reap pool, which is how the "main"
   # chat died 2026-07-26 exactly 48h after its resurrection. Resurrecting an
   # anchor? Pass --name <its original name>.
-  SLUG=$(printf '%s' "${TERM:-${UUID:-latest}}" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-' | cut -c1-24)
+  # Slug precedence: explicit search term > the transcript's Asana task name >
+  # uuid. Term invocations already read fine; --uuid invocations (the TUI keys
+  # and /resume-session) used to mint opaque names like chat-52ebc085-..., so
+  # resolve the task name via name_of_gid (6h disk cache, then Asana, "" when
+  # offline) and slug from that. Any resolution failure falls back to the uuid
+  # — a spawn never blocks on Asana. Fork transcripts inherit the parent's
+  # history head, so a fork-of-a-run still resolves its task gid.
+  SLUG_SRC="$TERM"
+  if [[ -z "$SLUG_SRC" && -n "$UUID" && -n "$LATEST_JSONL" ]]; then
+    SLUG_SRC=$(name_of_gid "$(first_gid_of "$LATEST_JSONL")")
+  fi
+  SLUG=$(printf '%s' "${SLUG_SRC:-${UUID:-latest}}" \
+    | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-' | tr -s '-' | cut -c1-24 | sed 's/-*$//')
+  [[ -n "$SLUG" ]] || SLUG=$(printf '%s' "${UUID:-latest}" | cut -c1-24)
   RC_NAME="chat-${SLUG}"
   TMUX_NAME="claude-asana-chat-${SLUG}"
   if [[ -n "$ANCHOR_NAME" ]]; then
     RC_NAME="$ANCHOR_NAME"
     TMUX_NAME="claude-asana-${ANCHOR_NAME}"
+  fi
+  # Name-slugged forks of the same task collide on the tmux name while being
+  # genuinely different conversations. Disambiguate by the argv --resume uuid of
+  # the existing session's claude: same transcript → fall through to the
+  # already-exists report (that IS the answer); different transcript (or a dead
+  # pane with no claude) → append a short uuid suffix and spawn a distinct chat.
+  pane_resume_uuid() { # $1=tmux session name → its claude's --resume uuid ("" if none)
+    local pid c a
+    for pid in $(tmux list-panes -s -t "$1" -F '#{pane_pid}' 2>/dev/null || true); do
+      for c in $(ps -axo pid=,ppid= | awk -v p="$pid" '$2==p {print $1}'); do
+        a=$(ps -ww -o command= -p "$c" 2>/dev/null || true)
+        case "$a" in claude\ *|*/claude\ *|claude)
+          printf '%s' "$a" | grep -oE -- '--resume [0-9a-f-]{36}' | awk '{print $2}' | head -1
+          return 0 ;;
+        esac
+      done
+    done
+    return 0
+  }
+  if [[ -z "$ANCHOR_NAME" ]] && tmux has-session -t "$TMUX_NAME" 2>/dev/null; then
+    if [[ "$(pane_resume_uuid "$TMUX_NAME")" != "$LATEST_UUID" ]]; then
+      SLUG="${SLUG}-$(printf '%s' "$LATEST_UUID" | cut -c1-4)"
+      RC_NAME="chat-${SLUG}"
+      TMUX_NAME="claude-asana-chat-${SLUG}"
+    fi
   fi
   if tmux has-session -t "$TMUX_NAME" 2>/dev/null; then
     echo ">> resume-agent: chat session $TMUX_NAME already exists — attach: tmux attach -t $TMUX_NAME (or find '$RC_NAME' in your remote session list)" >&2

@@ -17,7 +17,7 @@
 // complementary, not redundant; do not re-add a general continue-prod here.
 //
 // Variants handled:
-//  - Variant 1 (RC bridge dead, claude alive): the pane footer ("Remote Control active") is the source of truth. Absent + idle past IDLE_THRESHOLD_MS → revive (wake message, wait, `/remote-control`, then Esc to dismiss the modal). Present → do NOT ping at all (a half-open bridge is left for the operator to reconnect on next attach). Keystroke-only; never spawns a new claude.
+//  - Variant 1 (RC bridge dead, claude alive): the pane footer ("Remote Control active") is the source of truth. Absent + idle past IDLE_THRESHOLD_MS → revive by RESPAWN: kill the pane's claude (verified dead first), relaunch in place with `--remote-control <name> --resume <live-id>` + the preserved argv flags. A fresh process arms RC at startup; the old keystroke re-arm (`/remote-control` typed into the pane) stopped existing as a slash command on CLI 2.1.220 and burned ~232 no-op attempts during the 2026-08-02/03 auth outage. Present → do NOT touch at all (a half-open bridge is left for the operator to reconnect on next attach). This is NOT the removed Variant 2 (see below): it only ever fires on a VERIFIED-ALIVE claude, kills it and confirms death before the one replacement spawn, and is bound by a per-session cooldown — process count is 1→0→1, never additive.
 //  - Completion sweep: if Asana agent_status is Complete for a session's task GID, RETIRE the session — rename claude-asana-<gid> → done-asana-<gid> and free the sim+Metro+slot, but leave claude alive so it stays attachable / re-engageable. Retired sessions no longer count toward the concurrency cap; the oldest beyond keep_completed_sessions are killed to bound memory.
 //  - Blocked sweep: if a session's task has blocked=Yes, shed its heavy resources (sim + Metro) so it stops squatting while it waits on a human — but keep the session + slot alive so it can resume on unblock (done once, re-armed when unblocked).
 //
@@ -260,22 +260,137 @@ function saveState(state) {
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2))
 }
 
-function attemptRcRevive(session) {
-  log(`[${session}] RC revive: wake ping + /remote-control + Esc-dismiss.`)
-  // C-u before each typed send: remote-control clients can sync drafts into
-  // the composer; typing without clearing concatenates the draft.
+// ─── RC revive by respawn (replaced the keystroke re-arm 2026-08-03) ─────────
+// The in-session `/remote-control` slash command no longer exists on current CLI
+// builds ("Unknown command"), so typing it can never re-arm a dead bridge. A fresh
+// process arms RC reliably at startup ("/remote-control is active" banner + "/rc"
+// footer token). The pane hosts a shell, so killing claude returns to a prompt and
+// the tmux session survives; we relaunch in the same pane with the same transcript.
+//
+// Storm guards (this is a spawn path in a file whose last spawn path OOM'd the box —
+// see the Variant 2 removal note in the header):
+//   - fires only on a VERIFIED-ALIVE claude whose argv we can read;
+//   - kills that claude and confirms it is DEAD before the single replacement spawn;
+//   - per-session cooldown (RC_RESPAWN_COOLDOWN_MS) bounds retries;
+//   - unresolvable live-id → log + leave for the operator, never guess.
+const RC_RESPAWN_COOLDOWN_MS = parseInt(process.env.RC_RESPAWN_COOLDOWN_MS || '', 10) || 6 * 60 * 60 * 1000
+const CHAT_FORKS_FILE = path.join(slots.STATE_DIR, 'chat-forks.jsonl')
+
+// Like claudeRunningUnder(), but returns {pid, args} of the claude found (comm is
+// `cli` on current builds — argv[0] is renamed — so match both, same as there).
+function claudeProcUnder(pid, depth = 4) {
+  if (depth <= 0) return null
+  const childOut = sh(`pgrep -P ${pid}`)
+  if (!childOut) return null
+  for (const child of childOut.split('\n').filter(Boolean).map((s) => parseInt(s, 10))) {
+    const comm = sh(`ps -o comm= -p ${child}`).trim()
+    if (/(^|\/)claude($|\s)/.test(comm) || comm === 'cli' || comm.endsWith('/cli')) {
+      return { pid: child, args: sh(`ps -ww -o command= -p ${child}`).trim() }
+    }
+    const deeper = claudeProcUnder(child, depth - 1)
+    if (deeper) return deeper
+  }
+  return null
+}
+
+// A `--fork-session` process WRITES to a new child id, not its --resume arg; the
+// child is recorded in chat-forks.jsonl by resume-agent. Last matching entry wins
+// (newest fork of that parent).
+function forkChildOf(parentId) {
+  let child = null
+  try {
+    for (const line of fs.readFileSync(CHAT_FORKS_FILE, 'utf8').split('\n')) {
+      if (!line.trim()) continue
+      try {
+        const j = JSON.parse(line)
+        if (j.parent === parentId && j.child) child = j.child
+      } catch { /* skip bad line */ }
+    }
+  } catch { /* no registry */ }
+  return child
+}
+
+// Returns true when a respawn was actually attempted (kill issued) — the caller
+// stamps the cooldown off that. Skips (unparseable argv, no live id, cooldown)
+// return false and cost nothing.
+function attemptRcRespawn(session, prior) {
+  const now = Date.now()
+  const last = prior?.respawnedAt ?? 0
+  if (now - last < RC_RESPAWN_COOLDOWN_MS) {
+    log(`[${session}] RC respawn skipped: last attempt ${Math.round((now - last) / 60000)}m ago (cooldown ${Math.round(RC_RESPAWN_COOLDOWN_MS / 3600000)}h).`)
+    return false
+  }
+  const panePid = getPanePid(session)
+  if (!panePid) return false
+  const proc = claudeProcUnder(panePid)
+  if (!proc) return false // liveness path above owns the dead-claude case
+  const resumeArg = (proc.args.match(/--resume\s+([0-9a-fA-F-]{36})/) || [])[1]
+  if (!resumeArg) {
+    log(`[${session}] RC respawn skipped: no --resume id in argv (prompt-spawned) — leaving for the operator.`)
+    return false
+  }
+  let liveId = resumeArg
+  if (/--fork-session\b/.test(proc.args)) {
+    const child = forkChildOf(resumeArg)
+    if (!child) {
+      log(`[${session}] RC respawn skipped: --fork-session with no child for ${resumeArg} in chat-forks.jsonl — leaving for the operator.`)
+      return false
+    }
+    liveId = child
+  }
+  // RC name: the --remote-control/--rc value (may be multi-word, e.g. "Asana: <title>";
+  // runs to the next --flag). Bare `--rc` or none → derive from the session name.
+  let rcName = ''
+  const nm = proc.args.match(/--(?:remote-control|rc)\s+(.+)$/)
+  if (nm) {
+    const cut = nm[1].search(/\s--[a-z]/)
+    const val = (cut === -1 ? nm[1] : nm[1].slice(0, cut)).trim()
+    if (val && !val.startsWith('-')) rcName = val
+  }
+  if (!rcName) rcName = session.replace(new RegExp(`^${SESSION_PREFIX}`), '')
+  // Flags worth carrying over from the old argv; everything else re-derives from
+  // settings.json. pane_current_path while claude is foreground = claude's cwd,
+  // which is also the project dir its transcript lives under — capture BEFORE kill.
+  const keep = ['--dangerously-skip-permissions']
+  if (/--chrome\b/.test(proc.args)) keep.push('--chrome')
+  const mcp = (proc.args.match(/--mcp-config\s+(\S+)/) || [])[1]
+  if (mcp) keep.push(`--mcp-config ${mcp}`)
+  const model = (proc.args.match(/--model\s+(\S+)/) || [])[1]
+  if (model) keep.push(`--model '${model}'`)
+  const effort = (proc.args.match(/--effort\s+(\S+)/) || [])[1]
+  if (effort) keep.push(`--effort ${effort}`)
+  const cwd = sh(`tmux display-message -p -t "${session}" '#{pane_current_path}'`) || HOME
+  // A pinned composer draft dies with the process — preserve its text in the log.
+  const draft = (capturePane(session).match(/^❯\s+(\S.*)$/m) || [])[1]
+  if (draft) log(`[${session}] composer draft lost with respawn (re-send by hand if still wanted): ${draft.trim()}`)
+  log(`[${session}] RC respawn: kill claude ${proc.pid}, relaunch --remote-control '${rcName}' --resume ${liveId}`)
+  sh(`kill ${proc.pid}`)
+  for (let i = 0; i < 15 && sh(`ps -o pid= -p ${proc.pid}`); i++) sh('sleep 1')
+  if (sh(`ps -o pid= -p ${proc.pid}`) || claudeProcUnder(panePid)) {
+    log(`[${session}] RC respawn ABORTED: claude ${proc.pid} survived SIGTERM 15s — NOT spawning on top of a live process (cooldown armed).`)
+    return true
+  }
+  const cmd = `cd '${cwd}' && claude ${keep.join(' ')} --remote-control '${rcName}' --resume ${liveId}`
+  const escaped = cmd.replace(/(["$\\`])/g, '\\$1')
   sh(`tmux send-keys -t "${session}" C-u`)
-  sh(`tmux send-keys -t "${session}" "<watchdog-revive-ping>" Enter`)
-  sh('sleep 8')
-  sh(`tmux send-keys -t "${session}" C-u`)
-  sh(`tmux send-keys -t "${session}" "/remote-control" Enter`)
-  // `/remote-control` opens a blocking modal (Continue / Esc). Left open it
-  // intercepts ALL keystrokes and wedges the session input — prompts and pings
-  // do nothing until dismissed, which is what made idle sessions look "hung".
-  // Dismiss it with Escape ("continue": keeps RC active, just closes the modal)
-  // so this revive probe can never leave the session stuck behind the dialog.
-  sh('sleep 2')
-  sh(`tmux send-keys -t "${session}" Escape`)
+  sh(`tmux send-keys -t "${session}" -l "${escaped}"`)
+  sh(`tmux send-keys -t "${session}" Enter`)
+  let armed = false
+  for (let i = 0; i < 45; i++) {
+    if (rcBridgeUp(capturePane(session))) { armed = true; break }
+    sh('sleep 1')
+  }
+  if (armed) {
+    log(`[${session}] RC respawn: bridge armed (/rc footer token present).`)
+    // Wake ping, same as the old revive: confirms the resumed session answers.
+    // C-u first: remote-control clients can sync drafts into the composer;
+    // typing without clearing concatenates the draft.
+    sh(`tmux send-keys -t "${session}" C-u`)
+    sh(`tmux send-keys -t "${session}" "<watchdog-revive-ping>" Enter`)
+  } else {
+    log(`[${session}] RC respawn: relaunched but no /rc token after 45s — leaving it; cooldown armed, re-check next ticks.`)
+  }
+  return true
 }
 
 function log(msg) {
@@ -873,9 +988,10 @@ function main() {
       continue
     }
     // Never revive a session that is DELIBERATELY idle waiting on a human: a blocked
-    // task, or one parked at an interactive choice prompt. The revive keystrokes
-    // (ping + /remote-control + Esc) would answer the dialog blindly. Both make the
-    // pane static, so the idle heuristic alone cannot tell them from a hang.
+    // task, or one parked at an interactive choice prompt. The revive is now a
+    // kill+respawn — firing it mid-decision would discard the pending dialog and any
+    // context behind it. Both make the pane static, so the idle heuristic alone
+    // cannot tell them from a hang.
     const awaitingChoice = paneAwaitingChoice(content)
     // Park tracking: a session parked at a human-choice prompt is correctly NOT
     // revived, but the per-tick log used to spam (~60 identical lines for a 2h park).
@@ -885,6 +1001,7 @@ function main() {
     let parkedSince = null
     let parkLogged = false
     let parkEscalated = false
+    let respawnedAt = prior?.respawnedAt ?? 0 // RC-respawn cooldown stamp, threaded across ticks
     if (awaitingChoice && !changed && now - (prior?.lastChange ?? now) > IDLE_THRESHOLD_MS) {
       parkedSince = prior?.parkedSince ?? now
       parkLogged = true
@@ -909,12 +1026,12 @@ function main() {
       // `rcUp && idle > RC_HALFOPEN_BACKSTOP_MS` branch here.]
       const idle = now - prior.lastChange
       log(`[${session}] RC indicator ABSENT + idle ${Math.round(idle / 60000)}m → reviving.`)
-      attemptRcRevive(session)
+      if (attemptRcRespawn(session, prior)) respawnedAt = now
       lastChange = now // reset so we don't re-fire until the pane settles
     }
     // On an unconfirmed fetch, preserve the prior heavyFreed rather than letting a
     // null-blocked blip reset it to false and re-free next tick.
-    state.sessions[session] = { lastContent: content, lastChange, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated }
+    state.sessions[session] = { lastContent: content, lastChange, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated, respawnedAt }
   }
 
   // Cap retired (completed-but-kept-alive) sessions so they don't accumulate in memory.
