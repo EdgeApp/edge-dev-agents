@@ -265,6 +265,34 @@ Promoted from the 3-way login-perf run (2026-07-21, Samsung Galaxy S9, task
   logged-in account outlives every swap, no password needed. Device
   provisioning itself is a one-time QR login from a logged-in sim
   (allocate a pool sim for the errand; holds auto-release after 4h).
+
+- **CHECK THE LOCK SCREEN FIRST — it is a hard stop for an agent.** `adb devices`
+  showing `device` proves USB debugging, NOT that the UI is reachable. The S9
+  carries a numeric lock-screen PIN, and while it is up every `input`/UI drive
+  lands on the bouncer: `adb shell dumpsys window | grep mCurrentFocus` reads
+  `Window{... Bouncer}` even though `mFocusedApp` already names
+  `co.edgesecure.app/.MainActivity` behind it, so a naive focus check reads as
+  "the app is running" when nothing is drivable. One call to classify it:
+  `adb -s <serial> shell dumpsys window | grep -E "Bouncer|showing="`.
+  The unlock PIN is operator-only and is NOT the Edge account PIN space
+  (`0000`/`1111`) — do not guess it, a wrong-guess streak escalates to lockout
+  and eventually a factory wipe, taking the provisioned account with it. When
+  the device is locked, the whole android errand (including "is edge-funds
+  logged in?", which needs the UI) is blocked on a user-only credential
+  (one-shot `yolo-true-blockers` (b)); say so and move on rather than grinding.
+  Ask the operator to unlock and leave the screen on, or to disable the lock on
+  the test device. (Hit 2026-08-03, task 1216926437132721.)
+
+- **QR login, sim → physical device** (the provisioning errand above, once the
+  device is unlocked): the LOGGED-IN device scans the QR that the logging-in
+  device displays. So the physical android shows the code (login scene →
+  "Scan QR code" / login-QR entry) and the SIM does the scanning. A simulator
+  has no camera, so drive the sim's scanner off an image: save the android's
+  QR with `adb -s <serial> exec-out screencap -p > /tmp/qr.png`, push it into
+  the sim's photo library with
+  `xcrun simctl addmedia "$AGENT_SIM_UDID" /tmp/qr.png`, then pick it from the
+  album in the sim's scan modal. Verify by watching the android land on the
+  wallet list under the seeded account.
 - **Warm-login measurement**: YOLO auto-login (`YOLO_USERNAME`/`YOLO_PIN`) +
   `DEBUG_VERBOSE_LOGGING=true`; one iteration = force-stop, clear logcat,
   launch, capture. The FIRST iteration after a build swap is a cache-populate

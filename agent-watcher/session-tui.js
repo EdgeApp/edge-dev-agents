@@ -20,6 +20,9 @@
 //   up/down/j/k  move       Enter/a  attach (switch-client inside tmux)
 //   c  fork a new RC'd chat from the row's transcript (resume-agent --chat)
 //   C  same, with --chrome
+//   s  resume a TRANSCRIPTS row in place — same conversation, NO fork
+//      (resume-agent --chat --in-place; run transcripts confirm first, since
+//      new turns write into the conversation evals and watcher resumes read)
 //   i  revive claude inside a DEAD chat/anchor pane (same conversation + RC)
 //   x  kill tmux session (y/n confirm)      r  refresh      q  quit
 //
@@ -105,10 +108,13 @@ function loadTmux () {
     if (!kids.has(m[2])) kids.set(m[2], [])
     kids.get(m[2]).push({ pid: m[1], cmd: m[3] })
   }
-  const out = sh(`tmux list-sessions -F '#{session_name}\t#{session_activity}\t#{session_created}' 2>/dev/null`)
+  // '|' delimiter, NOT \t: tmux 3.6+ sanitizes control chars in format output
+  // to '_', which glued "_<activity>_<created>" onto every session name and
+  // crashed classify() on done-asana-* rows (no pattern matched the mangled name).
+  const out = sh(`tmux list-sessions -F '#{session_name}|#{session_activity}|#{session_created}' 2>/dev/null`)
   for (const line of out.split('\n')) {
     if (!line.trim()) continue
-    const [name, activity, created] = line.split('\t')
+    const [name, activity, created] = line.split('|')
     if (!/^(claude|done)-asana-/.test(name)) continue
     // -s: all panes in ALL windows of the session, not just the active window.
     const pids = sh(`tmux list-panes -s -t '${name}' -F '#{pane_pid}' 2>/dev/null`).split('\n').filter(Boolean)
@@ -174,8 +180,13 @@ function buildModel () {
       const reg = forks.bySlug.get(c.slug)
       if (reg) {
         row.uuid = reg.child && reg.child !== 'unknown' ? reg.child : row.uuid
+        // Fork rows title by what they fork, not by their uuid-derived slug —
+        // the slug is still visible in the rc column. Parent outside the
+        // porcelain list (e.g. fork of an anchor chat) falls back to its uuid.
         const parent = transcripts.find(t => t.uuid === reg.parent)
-        if (parent) row.title = `${c.slug}  (of: ${parent.title.replace(/^Asana: /, '')})`
+        row.title = parent
+          ? `FORK: ${parent.title.replace(/^Asana: /, '')}`
+          : `FORK: ${String(reg.parent).slice(0, 8)}…`
       }
       if (!row.title) row.title = c.slug
     }
@@ -281,6 +292,7 @@ function render () {
   if (r) {
     if (r.kind !== 'transcript') { acts.push('⏎/a attach', 'x kill') }
     if (r.uuid) acts.push('c chat-fork', 'C chat+chrome')
+    if (r.kind === 'transcript' && r.uuid) acts.push('s resume (no fork)')
     if (r.state === 'dead' && r.kind !== 'run' && r.uuid) acts.push('i revive in pane')
   }
   acts.push('r refresh', 'q quit')
@@ -323,6 +335,25 @@ function chatFork (r, chrome) {
   if (chrome) args.push('--chrome')
   runVisible(RESUME, args)
   refresh('chat spawn attempted — refreshed')
+}
+
+// Resume a TRANSCRIPTS row in place: SAME conversation, no fork, in a new
+// watchdog-covered RC'd tmux session (resume-agent --chat --in-place). Run
+// transcripts get a confirm first: new turns append to the conversation that
+// evals and the watcher's own resumes read, unlike a fork which leaves it
+// pristine.
+function resumeInPlace (r) {
+  if (r.kind !== 'transcript') return
+  if (!r.uuid) { status = 'no transcript uuid resolved for this row'; render(); return }
+  const go = () => {
+    runVisible(RESUME, ['--uuid', r.uuid, '--chat', '--in-place'])
+    refresh('in-place resume attempted — refreshed')
+  }
+  if (r.gid) {
+    status = 'RUN transcript: in-place turns become part of the run conversation (evals/watcher resumes see them). Resume anyway? [y/n]'
+    confirmFn = (yes) => { if (yes) go(); else { status = ''; render() } }
+    render()
+  } else go()
 }
 
 // Revive claude INSIDE an existing dead pane (chat/anchor only; runs need
@@ -396,6 +427,7 @@ process.stdin.on('data', (b) => {
   else if (k === '\r' || k === 'a') { if (r) attach(r) }
   else if (k === 'c') { if (r) chatFork(r, false) }
   else if (k === 'C') { if (r) chatFork(r, true) }
+  else if (k === 's') { if (r) resumeInPlace(r) }
   else if (k === 'i') { if (r && r.state === 'dead') reviveInPane(r) }
   else if (k === 'x') { if (r) killSession(r) }
 })

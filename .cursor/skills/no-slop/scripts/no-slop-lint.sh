@@ -10,6 +10,11 @@
 #           1. colon-terminated count NP:   "Three things:" "A few points:"
 #           2. bare count-NP sentence:      "Two supporting facts." (no verb)
 #           3. existential:                 "There are two issues ..."
+#           4. mid-line counted padding header over a GENERIC-counter noun:
+#              "Two defects compound: the engine ..." (the colon does not end
+#              the line, so shape 1's label-colon exemption would pass it; the
+#              generic-noun list keeps precision vs the legit label idiom
+#              "One visible seam: the race ...")
 #         (also matched after a greeting clause: "Hi team, two issues on X.")
 #   WARN  count + contentless predicate:   "Two consequences are easy to miss."
 #         (finite predicate list; incomplete by nature, hence warn-only)
@@ -63,6 +68,9 @@ try {
 } catch {}
 
 const NUM = "(?:one|two|three|four|five|six|seven|eight|nine|ten|\\d+|a few|several|a couple of|some)"
+// Generic counter nouns: high-precision list for the mid-line padding-header
+// shape. Only nouns whose count+colon use is near-always structural padding.
+const COUNTNOUN = /^(?:changes?|defects?|issues?|things?|points?|reasons?|ways?|parts?|items?|fixes?|problems?|options?|notes?|steps?|cases?|goals?|aspects?|factors?|takeaways?|observations?|considerations?)\b/i
 const TIME = /^(?:day|days|week|weeks|month|months|hour|hours|minute|minutes|second|seconds|percent|ms|px)\b/i
 const VERBS = new Set(("is are was were has have had do does did start starts started take takes took run runs ran need needs use uses show shows fail fails work works go goes come comes mean means make makes get gets give gives keep keeps hold holds add adds drop drops call calls return returns throw throws pass passes block blocks land lands ship ships wait waits cover covers remain remains require requires").split(" "))
 const PRED = /\b(?:are|is)\s+(?:easy to miss|worth noting|worth calling out|worth mentioning|notable|important to note)\b|\bstands? out\b|\bdeserves? (?:mention|attention)\b/i
@@ -103,6 +111,11 @@ fs.readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
     // race is..." is the legitimate label-colon idiom, not an announcement.
     if (/:$/.test(s.trim()) && /:\s*$/.test(line) && toks.length <= 6 && !hasVerb)
       findings.push(["HARD", n, `count-announcement opener: "${s.trim().slice(0, 60)}"`])
+    // Shape 4: counted padding header whose colon does NOT end the line
+    // ("Two defects compound: the engine ..."). Restricted to generic
+    // counter nouns so the legitimate label-colon idiom stays exempt.
+    else if (/:$/.test(s.trim()) && !/:\s*$/.test(line) && COUNTNOUN.test(rest.trim()) && toks.length <= 4 && !hasVerb)
+      findings.push(["HARD", n, `counted padding header (mid-line): "${s.trim().slice(0, 60)}"`])
     // Shape 2 applies to PROSE sentences only: a bare-NP BULLET ("- One
     // EdgeCurrencyWallet implementation.") is normal list style.
     else if (!isListItem && /\.$/.test(s.trim()) && toks.length >= 1 && toks.length <= 8 && !hasVerb)
