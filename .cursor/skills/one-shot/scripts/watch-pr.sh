@@ -124,6 +124,16 @@ REVIEWER_BOT_LOGIN="${REVIEWER_BOT_LOGIN:-cursor}"
 WIP_GUARD_PATTERN="block-wip-pr"
 WIP_MODE=""  # cached review-mode verdict; fetched at most once per invocation
 
+# Backstop for the travis-draft-tag flow: a READY PR whose HEAD still carries
+# [skip travis] can never go Travis-green — the strip was skipped at the flip.
+# Warn loudly (do not fail; the watch itself still gates everything else).
+TAGCHK=$(gh pr view "$PR" ${REPO:+--repo "$REPO"} --json isDraft,commits \
+  -q '{d: .isDraft, m: .commits[-1].messageHeadline}' 2>/dev/null || true)
+if [ -n "$TAGCHK" ] && [ "$(jq -r '.d' <<<"$TAGCHK")" = "false" ] \
+   && jq -r '.m' <<<"$TAGCHK" | grep -q '\[skip travis\]'; then
+  echo ">> watch-pr: WARNING — PR is READY but HEAD still carries [skip travis]; Travis will never build this HEAD. Run ~/.cursor/skills/one-shot/scripts/travis-draft-tag.sh strip, force-push, then re-watch." >&2
+fi
+
 # wip_guard_expected: the wip-guard red is expected iff the branch actually
 # carries fixup! commits AND the squash oracle says preserve. Same oracle as
 # pr-finalize-fixups — no second derivation of "is a reviewer active".
