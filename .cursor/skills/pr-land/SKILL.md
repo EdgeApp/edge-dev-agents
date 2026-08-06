@@ -15,7 +15,7 @@ metadata:
 /pr-land edge-react-gui                           # Specific repo (branch-prefix scan)
 /pr-land edge-react-gui edge-core-js              # Multiple repos
 /pr-land edge-react-gui#123                       # Specific PR (shorthand)
-/pr-land https://github.com/EdgeApp/edge-react-gui/pull/123  # Specific PR (URL)
+/pr-land https://github.com/EdgeApp/edge-react-gui/pull/<num>  # Specific PR (URL)
 /pr-land https://app.asana.com/0/1234/5678        # Asana task → resolves linked PRs
 /pr-land https://app.asana.com/.../task/<parent>  # Parent task → walks subtasks
 /pr-land edge-react-gui#123 edge-core-js          # Mix: explicit PR + repo scan
@@ -83,7 +83,7 @@ Arguments are classified automatically:
 | `changelog-union-merge.sh` | Resolved (+continued) | No markers / continue failed | Usage | - | - |
 | `npm-publish-web.sh` | Published | Registry/other error | Auth never completed | - | - |
 
-(`pr-merge-watch.sh` exit 5 = timeout with PRs still pending: re-invoke to keep watching. Exit 6 = `BLOCKED_ON_REVIEW`: all checks green, only the approving review missing — handle per `force-land-review-bypass`.)
+(`pr-merge-watch.sh` exit 5 = overall timeout with PRs still pending. Exit 6 = `BLOCKED_ON_REVIEW`: all checks green, only the approving review missing — handle per `force-land-review-bypass`. Exit 7 = `CONTINUE`: the per-call cap hit (each invocation self-bounds under the Bash foreground limit) — re-invoke with the SAME args immediately; the overall --timeout budget persists across calls, so this is one bounded watch, not a fresh one.)
 
 **Any exit code not in this table = STOP immediately and report to user.**
 
@@ -230,7 +230,7 @@ Use:
 3. **Watch until merged or actionable (babysit):** run the watcher over every armed PR (background it for long CI). Do NOT walk away at `armed`:
 
    ```bash
-   ~/.cursor/skills/pr-land/scripts/pr-merge-watch.sh <repo#num> [more...] [--timeout 3600]
+   ~/.cursor/skills/pr-land/scripts/pr-merge-watch.sh <repo#num> [more...] [--timeout 3600]   # re-invoke on exit 7 (CONTINUE) until a terminal verdict; the 3600s budget spans the calls
    ```
 
    Act on the exit code — every non-zero exit is actionable, never a stop-and-wait:

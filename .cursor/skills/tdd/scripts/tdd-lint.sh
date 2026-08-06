@@ -8,7 +8,14 @@
 #   - every plain-text "section N"/"decision N" reference is inside a link
 #   - zero em dashes (U+2014)
 #   - no TBD/TODO/FIXME placeholders
-#   - mermaid fences are non-empty
+#   - mermaid fences are non-empty; quoted node brackets match; no participant
+#     ID spells a mermaid keyword. That last one shipped a broken diagram once:
+#     `participant Create as RampCreateScene` declares fine, then the first
+#     `X->>Create:` message fails ("Expecting ... 'ACTOR', got 'create'") and
+#     GitHub renders "Unable to render rich display" in place of the diagram.
+#     The error points at the message line, not the declaration, and nothing
+#     else in a repo parses mermaid, so this lint is the only thing between a
+#     reserved-word ID and a human opening the file on GitHub.
 #   - glossary: every "### Term" under "## Glossary" carries a source link
 #     (HARD); first use of each term in EVERY top-level section is linked, via
 #     tdd-glossary-link.sh --check (HARD); unexplained ALL-CAPS acronyms suggest
@@ -106,6 +113,22 @@ mermaid.forEach(block => {
     if (pairs[nm[1]] !== nm[2]) {
       findings.push("mermaid: mismatched node brackets " + nm[1] + "\"...\"" + nm[2] + " (renders as a parse error)")
     }
+  }
+})
+
+// A participant ID is lexed, so one that spells a mermaid keyword is read as
+// that keyword. Verified against mermaid 11: each ID below fails to parse, the
+// display label after "as" is unaffected, and no ID that merely STARTS with a
+// keyword breaks. Line-aware pass so the finding points at the declaration.
+const MERMAID_RESERVED = new Set(["create","destroy","participant","actor","activate","deactivate","note","loop","end","alt","else","opt","par","and","rect","box","link","links","autonumber","critical","option","break","title","over","properties","details"])
+let inMermaid = false
+lines.forEach((line, i) => {
+  if (/^\s*```mermaid\s*$/.test(line)) { inMermaid = true; return }
+  if (/^\s*```/.test(line)) { inMermaid = false; return }
+  if (!inMermaid) return
+  const pm = /^\s*(?:create\s+|destroy\s+)?(?:participant|actor)\s+([A-Za-z0-9_]+)\s*(?:\bas\b|$)/i.exec(line)
+  if (pm != null && MERMAID_RESERVED.has(pm[1].toLowerCase())) {
+    findings.push(`mermaid: line ${i + 1} declares participant "${pm[1]}", a mermaid keyword — the diagram fails to parse at the first message that names it. Rename the ID (the label after "as" can keep the old wording)`)
   }
 })
 

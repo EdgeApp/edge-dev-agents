@@ -459,6 +459,34 @@ debugging screenshots of the wrong device.
   worktree `env.json` (nulling only the username hits a light-account fallback
   that still auto-logs-in), then terminate + launch; restore after. (Promoted
   2026-07-29, run 1215939017452141.)
+- **Drive a deep link from cold start with `ENV.YOLO_DEEP_LINK` in the worktree
+  `env.json`** (read by `DeepLinkingManager` alongside `Linking.getInitialURL`),
+  then `simctl terminate` + `launch`. Deterministic, and avoids `simctl openurl`,
+  which pops an "Open in Edge?" system dialog that can background the app when
+  maestro taps it; maestro's own `openLink` also fails to deliver. (Promoted
+  2026-08-06, run 1217224633446931.)
+- **Nested `runFlow` with `env:` may NOT override a subflow's own `env:`
+  defaults** (maestro 2.x, this host): `select-swap-pair` ran its built-in
+  `.*Bitcoin.*` while the parent passed `.*Litecoin.*`, and `inputText` logged
+  the literal `${SRC_WALLET}`. When a composed flow behaves as if it ignored
+  your params, check this BEFORE debugging selectors; inlining the subflow body
+  with literal values is the reliable workaround. (Promoted 2026-08-06, run
+  1216571782597915.)
+- **A `.*<term>.*` regex in a wallet picker can match the SEARCH FIELD's own
+  text instead of the wallet row** — the picker silently stays open and the next
+  tap lands somewhere unintended (it set the source wallet to the intended
+  DESTINATION asset). Anchor wallet-row taps on the wallet NAME ("My Doge"),
+  never a substring that also appears in what you just typed. (Promoted
+  2026-08-06, run 1216571782597915.)
+- **The maestro MCP daemon and the maestro CLI fight over one sim's XCUITest
+  driver.** The wrapper pins the daemon to `$AGENT_SIM_UDID` on driver port
+  `$AGENT_METRO_PORT + 2000`, but when the CLI starts its own driver on `+1000`
+  the run dies mid-flow with `Connection refused` / `unexpected end of stream`
+  against the CLI's port while the app stays healthy — the live app is the tell
+  that it is a driver collision, not a crash. Before a CLI proof run on a sim
+  you explored through the MCP, kill that slot's daemon and its
+  `xcodebuild test-without-building` child (match both on YOUR udid, never
+  another slot's), then run the CLI. (Promoted 2026-08-06, run 1216251688512498.)
 - **Maestro `visible:` matches the WHOLE text node.** "Powered by Maya
   Protocol" renders inside a node whose text is
   `Powered by Maya ProtocolTap to Change Provider`, so the exact match never

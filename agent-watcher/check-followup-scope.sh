@@ -113,6 +113,7 @@ fi
 GH_STATUS="unavailable: gh not on PATH"
 GH_SCOPE="[]"
 GH_BLOCKING=0
+GH_BOTS_INCOMPLETE=0
 if command -v gh >/dev/null 2>&1; then
   GH_STATUS="ok"
   GH_USER=$(gh api user -q .login 2>/dev/null || true)
@@ -130,15 +131,34 @@ if command -v gh >/dev/null 2>&1; then
       OWNER=$(sed -E 's#https://github.com/([^/]+)/([^/]+)/pull/([0-9]+)#\1#' <<<"$url")
       RNAME=$(sed -E 's#https://github.com/([^/]+)/([^/]+)/pull/([0-9]+)#\2#' <<<"$url")
       NUM=$(sed -E 's#https://github.com/([^/]+)/([^/]+)/pull/([0-9]+)#\3#' <<<"$url")
-      PRJ=$(gh api graphql -f query="query{repository(owner:\"$OWNER\",name:\"$RNAME\"){pullRequest(number:$NUM){state isDraft author{login} reviewDecision reviewThreads(first:100){nodes{isResolved comments(first:1){nodes{author{login} createdAt body}}}}}}}" 2>/dev/null \
+      PRJ=$(gh api graphql -f query="query{repository(owner:\"$OWNER\",name:\"$RNAME\"){pullRequest(number:$NUM){state isDraft headRefOid author{login} reviewDecision reviewThreads(first:100){nodes{isResolved comments(first:1){nodes{author{login} createdAt body}}}}}}}" 2>/dev/null \
         | jq -c --arg me "$GH_USER" --arg url "$url" '.data.repository.pullRequest
           | select(.state == "OPEN" and (.isDraft | not))
-          | {url: $url, owned: (.author.login == $me), review_decision: (.reviewDecision // "none"),
+          | {url: $url, owned: (.author.login == $me), head: .headRefOid, review_decision: (.reviewDecision // "none"),
              unresolved: [.reviewThreads.nodes[] | select(.isResolved | not) | .comments.nodes[0]
                           | {by: (.author.login // "?"), at: .createdAt, text: (.body // "" | .[0:200])}]}' 2>/dev/null || true)
-      [[ -n "$PRJ" ]] && GH_SCOPE=$(jq -c --argjson p "$PRJ" '. + [$p]' <<<"$GH_SCOPE")
+      if [[ -n "$PRJ" ]]; then
+        # Reviewer-bot check-run state on the ready HEAD: Complete without the
+        # bots having run-and-concluded there is the cohort's repeat A3 FAIL
+        # class (2026-08-06). Count each required bot that is missing or not
+        # completed success/skipped. watch-pr's reviewer-unavailable waiver
+        # (/tmp/agent-bot-unavailable-<gid>) exempts genuine outages at the gate.
+        HEADSHA=$(jq -r '.head' <<<"$PRJ")
+        BOTS_INCOMPLETE=0
+        if [[ "$(jq -r '.owned' <<<"$PRJ")" == "true" && -n "$HEADSHA" ]]; then
+          CRS=$(gh api "repos/$OWNER/$RNAME/commits/$HEADSHA/check-runs" \
+            --jq '[.check_runs[] | {name, st: .status, c: (.conclusion // "")}]' 2>/dev/null || echo "[]")
+          for BOT in "Cursor Bugbot" "Cursor Security"; do
+            OK=$(jq --arg b "$BOT" '[.[] | select(.name | startswith($b)) | select(.st == "completed" and (.c == "success" or .c == "skipped"))] | length' <<<"$CRS" 2>/dev/null || echo 0)
+            [[ "${OK:-0}" -gt 0 ]] || BOTS_INCOMPLETE=$((BOTS_INCOMPLETE + 1))
+          done
+        fi
+        PRJ=$(jq -c --argjson bi "$BOTS_INCOMPLETE" '. + {bots_incomplete: $bi}' <<<"$PRJ")
+        GH_SCOPE=$(jq -c --argjson p "$PRJ" '. + [$p]' <<<"$GH_SCOPE")
+      fi
     done <<<"$PR_URLS"
     GH_BLOCKING=$(jq '[.[] | select(.owned) | .unresolved | length] | add // 0' <<<"$GH_SCOPE")
+    GH_BOTS_INCOMPLETE=$(jq '[.[] | select(.owned) | .bots_incomplete // 0] | add // 0' <<<"$GH_SCOPE")
   fi
 fi
 
@@ -156,9 +176,10 @@ jq -n \
   --arg gh_status "$GH_STATUS" \
   --argjson gh_scope "$GH_SCOPE" \
   --argjson gh_blocking "$GH_BLOCKING" \
+  --argjson gh_bots_incomplete "${GH_BOTS_INCOMPLETE:-0}" \
   '{task_gid: $gid, checked_at: $checked_at, watermark: $watermark, newest_comment_at: $newest_comment_at, newer_count: $newer_count, comments: $comments,
     field_delta_status: $delta_status, field_baseline_ts: $baseline_ts, field_deltas: $field_deltas,
-    github_status: $gh_status, github_prs: $gh_scope, github_blocking_threads: $gh_blocking}' \
+    github_status: $gh_status, github_prs: $gh_scope, github_blocking_threads: $gh_blocking, github_bots_incomplete: $gh_bots_incomplete}' \
   > "$MARKER"
 
 echo ">> check-followup-scope: task $TASK_GID"
@@ -192,6 +213,9 @@ if [[ "$GH_STATUS" == "ok" ]]; then
   else
     jq -r '.[] | ">>   github: \(.url) [\(if .owned then "OWNED" else "not owned" end), reviewDecision: \(.review_decision)] — \(.unresolved | length) unresolved thread(s)"' <<<"$GH_SCOPE"
     jq -r '.[] | .unresolved[] | "     [\(.at)] \(.by): \(.text | gsub("\\s+"; " ") | .[0:160])"' <<<"$GH_SCOPE"
+    if [[ "${GH_BOTS_INCOMPLETE:-0}" -gt 0 ]]; then
+      echo ">>   $GH_BOTS_INCOMPLETE reviewer-bot check(s) missing/incomplete on OWNED ready PR HEAD(s) — Complete is gate-blocked until they run and conclude (flip ready re-triggers them; a genuine bot outage is waived by watch-pr's reviewer-unavailable marker)."
+    fi
     if [[ "$GH_BLOCKING" -gt 0 ]]; then
       echo ">>   $GH_BLOCKING unresolved thread(s) on OWNED PR(s) — THIS RUN'S SCOPE regardless of Asana silence (a human review IS the re-arm reason; scope lives where the reviewer wrote it). Address per pr-address reply-then-resolve; Complete is gate-blocked until a re-check records zero."
     fi

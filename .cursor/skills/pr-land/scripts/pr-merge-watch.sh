@@ -51,12 +51,28 @@ done
 rm -f "$RESULT_FILE"
 
 finish() { # $1=verdict line, $2=exit code
+  # terminal verdicts clear the chunked-watch deadline; CONTINUE (7) keeps it
+  [ "$2" != 7 ] && rm -f "${DEADLINE_FILE:-}" 2>/dev/null
   echo "$1"
   printf "%s\n" "$1" > "$RESULT_FILE" 2>/dev/null || true
   exit "$2"
 }
 
-deadline=$(( $(date +%s) + TIMEOUT ))
+# CHUNKED WATCH (2026-08-06): a single call can never exceed the Bash tool's
+# foreground cap, so each invocation self-bounds to MAX_CALL seconds and exits
+# 7 (CONTINUE) with the overall deadline persisted per PR-set. The caller just
+# re-invokes with the same args until a terminal verdict; total wall time is
+# still bounded by --timeout across calls.
+MAX_CALL="${MAX_CALL:-540}"
+DEADLINE_FILE="/tmp/pr-merge-watch-deadline-$(printf "%s" "${PRS[*]}" | tr -c "A-Za-z0-9" "-" | cut -c1-80)"
+now=$(date +%s)
+if [ -r "$DEADLINE_FILE" ] && [ $(( now - $(stat -f %m "$DEADLINE_FILE" 2>/dev/null || echo 0) )) -le "$TIMEOUT" ]; then
+  deadline=$(cat "$DEADLINE_FILE")
+else
+  deadline=$(( now + TIMEOUT ))
+  echo "$deadline" > "$DEADLINE_FILE"
+fi
+call_deadline=$(( now + MAX_CALL ))
 # Consecutive-poll state tracking without associative arrays (macOS bash 3.2).
 PREV_STATES=""
 prev_state() { printf '%s\n' "$PREV_STATES" | grep -F "|$1=" | head -1 | cut -d= -f2; }
@@ -128,6 +144,9 @@ while :; do
   if [ -n "$red_pr" ]; then finish "CHECK_FAILED $red_pr" 4; fi
   if [ ${#rebase_prs[@]} -gt 0 ]; then finish "NEEDS_REBASE ${rebase_prs[*]}" 3; fi
   if [ ${#review_prs[@]} -gt 0 ]; then finish "BLOCKED_ON_REVIEW ${review_prs[*]}" 6; fi
-  if [ "$(date +%s)" -ge "$deadline" ]; then finish "TIMEOUT" 5; fi
+  if [ "$(date +%s)" -ge "$deadline" ]; then rm -f "$DEADLINE_FILE"; finish "TIMEOUT" 5; fi
+  if [ "$(date +%s)" -ge "$call_deadline" ]; then
+    finish "CONTINUE $(( deadline - $(date +%s) ))s of overall budget remain — re-invoke with the same args" 7
+  fi
   sleep "$INTERVAL"
 done
