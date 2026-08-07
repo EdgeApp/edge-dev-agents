@@ -1,0 +1,57 @@
+# common/delete-throwaway-account.yaml — delete the account that is currently
+# logged in, so a throwaway created by common/create-throwaway-account.yaml does
+# not accumulate on the sim image (every leftover account shows up in the login
+# scene's dropdown forever).
+#
+# ENTRY STATE: logged into the account you want gone. Deletion is irreversible;
+# never point this at a roster account (edge-funds, edge-rjqa2, edge-rjqa3,
+# test-funds).
+#
+# PARAMS
+#   DELETE_USERNAME  defaults to output.newAccountUsername (set by the create flow)
+#   DELETE_PASSWORD  defaults to output.newAccountPassword
+#
+# NOTE: the gui repo's maestro/common/delete-account.yaml confirms via
+# `pasteText`. The iOS "Edge would like to paste" permission dialog wedges the
+# XCUITest hierarchy fetch, so this flow types the username instead.
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  DELETE_USERNAME: ${output.newAccountUsername}
+  DELETE_PASSWORD: ${output.newAccountPassword}
+---
+- tapOn:
+    id: "sideMenuButton"
+- extendedWaitUntil:
+    visible: "Settings"
+    timeout: 15000
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible: "Delete Account"
+    timeout: 20000
+    optional: true
+- scrollUntilVisible:
+    element: "Delete Account"
+- tapOn: "Delete Account"
+
+# Password gate.
+- extendedWaitUntil:
+    visible: "Submit"
+    timeout: 15000
+- inputText: ${DELETE_PASSWORD}
+- pressKey: Enter
+
+# Confirmation: agree, then retype the username.
+- extendedWaitUntil:
+    visible: "I understand and agree to the terms"
+    timeout: 20000
+- tapOn: "I understand and agree to the terms"
+- tapOn: "Confirm & Finish"
+- extendedWaitUntil:
+    visible: ${".*" + DELETE_USERNAME + ".*"}
+    timeout: 20000
+- inputText: ${DELETE_USERNAME}
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: ${"Account " + DELETE_USERNAME + " deleted"}
+    timeout: 45000

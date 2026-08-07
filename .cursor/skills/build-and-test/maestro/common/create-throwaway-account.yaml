@@ -1,0 +1,220 @@
+# common/create-throwaway-account.yaml — create a fresh, empty Edge account to
+# test on, so a test never mutates a shared roster account's synced state
+# (activePromotions, referral/attribution writes, Exchange Settings, wallets).
+#
+# ENTRY STATE: the LOGIN scene (the one with Username / Password / "Create
+# account"). On a slot sim the app auto-logs-in, so get there first:
+#   1. null BOTH "YOLO_USERNAME" and "YOLO_PIN" in the worktree env.json
+#      (nulling only the username hits a light-account fallback that still
+#      auto-logs-in), then `simctl terminate` + `launch`
+#   2. the app lands on the PIN scene for the last account — this flow taps
+#      "Exit PIN" for you to reach the login scene
+# AFTER: point YOLO_USERNAME/YOLO_PIN at the new account so relaunches
+# auto-login into it, and restore the roster account when the test is done.
+#
+# NEVER `launchApp: clearState: true` (what the gui repo's maestro/common/
+# create-account.yaml does): that wipes the app DATA container, which is where
+# the sim's roster accounts live. They cannot be recreated from a PIN.
+#
+# PARAMS
+#   NEW_USERNAME  default "agent-tw-<random>"; must be unused
+#   NEW_PASSWORD  default meets the requirements (10+ chars, upper, lower, digit)
+#   NEW_PIN       default "1234" (deliberately outside the roster PIN space)
+#   NEW_WALLETS   JSON array of wallet names to end up with, e.g.
+#                 '["Ethereum"]'. "" (default) keeps the app's default set.
+#   DEFAULT_WALLETS  the app's own default toggles, used to compute the diff
+#   VERIFY_ACCOUNT_INFO  "true" expands the review dropdown and asserts the
+#                 username/password/PIN echo back. Default off: it is the gui
+#                 suite's job, and the assert chain is the brittlest part.
+#
+# OUTPUTS (for composing common/delete-account.yaml)
+#   output.newAccountUsername / output.newAccountPassword / output.newAccountPin
+#
+# NOTES
+# - Every text field is eraseText'd before inputText. Typing into the Confirm
+#   Password field without erasing left it longer than the first field and
+#   "Passwords must match" never went green.
+# - The Set Password scene's Next button sits under the keyboard, and
+#   `hideKeyboard` SIGABRTs this debug build, so it is submitted with Enter.
+# - The captcha (ALTCHA) and the modal gauntlet are all conditional here. The
+#   gui suite asserts them; a dev flow that hard-asserts them breaks whenever
+#   the copy or the captcha rollout changes.
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  NEW_USERNAME: ${"agent-tw-" + Math.floor(Math.random() * 1000000000)}
+  NEW_PASSWORD: "Agent3Throwaway1"
+  NEW_PIN: "1234"
+  NEW_WALLETS: ""
+  DEFAULT_WALLETS: '["Bitcoin", "Ethereum", "Litecoin", "Bitcoin Cash", "Dash"]'
+  VERIFY_ACCOUNT_INFO: ""
+---
+- evalScript: ${output.newAccountUsername = NEW_USERNAME}
+- evalScript: ${output.newAccountPassword = NEW_PASSWORD}
+- evalScript: ${output.newAccountPin = NEW_PIN}
+
+# Reach the login scene from wherever the app landed.
+- runFlow:
+    when:
+      visible: "Exit PIN"
+    commands:
+      - tapOn: "Exit PIN"
+      - waitForAnimationToEnd:
+          timeout: 8000
+- runFlow:
+    when:
+      visible: "Already have an account\\? Sign in"
+    commands:
+      - tapOn: "Already have an account\\? Sign in"
+      - waitForAnimationToEnd:
+          timeout: 8000
+- extendedWaitUntil:
+    visible: "Create account"
+    timeout: 20000
+- tapOn: "Create account"
+
+# Choose Username. The captcha may or may not appear; it self-solves.
+- extendedWaitUntil:
+    visible: "Choose Username"
+    timeout: 45000
+- waitForAnimationToEnd:
+    timeout: 10000
+- tapOn: "Username"
+- eraseText: 40
+- inputText: ${NEW_USERNAME}
+- extendedWaitUntil:
+    visible: "Username available"
+    timeout: 30000
+- tapOn: "Next"
+- waitForAnimationToEnd:
+    timeout: 8000
+
+# Set Password. Both fields, then Enter (Next is behind the keyboard).
+- extendedWaitUntil:
+    visible: "Set Password"
+    timeout: 20000
+- tapOn: "Password"
+- eraseText: 40
+- inputText: ${NEW_PASSWORD}
+- tapOn: "Confirm Password"
+- eraseText: 40
+- inputText: ${NEW_PASSWORD}
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible: "Passwords must match"
+- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 6000
+
+# Set PIN.
+- extendedWaitUntil:
+    visible: "Set PIN"
+    timeout: 20000
+- inputText: ${NEW_PIN}
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: "Next"
+- waitForAnimationToEnd:
+    timeout: 8000
+
+# Terms of Use: four circles. Anchored on short prefixes so a copy edit to the
+# tail of any clause does not break the flow.
+- extendedWaitUntil:
+    visible: "Review: Terms of Use.*"
+    timeout: 20000
+- tapOn: "I understand that my funds are held securely.*"
+- tapOn: "I understand that if I lose this device.*"
+- tapOn: "I understand that if I lose my username.*"
+- tapOn: "I understand that I am responsible.*"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: "Confirm"
+
+# Account creation runs on the server; the Create button fades in after.
+- extendedWaitUntil:
+    visible: "View account information.*"
+    timeout: 90000
+- runFlow:
+    when:
+      true: ${VERIFY_ACCOUNT_INFO}
+    commands:
+      - tapOn: "View account information.*"
+      - assertVisible: ${NEW_USERNAME}
+      - assertVisible: ${NEW_PASSWORD}
+      - assertVisible: ${NEW_PIN}
+# The Create button FADES IN, and a tap during the fade is swallowed with no
+# error — the flow reads COMPLETED and the scene never advances. Settle first,
+# then tap again if the Review scene is still up.
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn: "Create"
+- waitForAnimationToEnd:
+    timeout: 20000
+- runFlow:
+    when:
+      visible: "Tap the dropdown below to review your account information"
+    commands:
+      - tapOn: "Create"
+      - waitForAnimationToEnd:
+          timeout: 20000
+
+# iOS shows the notification-permission modal before the wallet picker.
+- runFlow:
+    when:
+      visible: "Security is Our Priority"
+    commands:
+      - tapOn: "Cancel"
+
+# Wallet picker. With NEW_WALLETS unset the app's defaults are kept.
+- extendedWaitUntil:
+    visible: "Choose Wallets to Add"
+    timeout: 45000
+- runFlow:
+    when:
+      true: ${NEW_WALLETS}
+    commands:
+      - evalScript: ${var wallets = JSON.parse(NEW_WALLETS)}
+      - evalScript: ${var defaults = JSON.parse(DEFAULT_WALLETS)}
+      - evalScript: ${var dropDefaults = defaults.filter(d => !wallets.includes(d))}
+      - evalScript: ${var addWallets = wallets.filter(w => !defaults.includes(w))}
+      - evalScript: ${var dropIndex = 0}
+      - repeat:
+          times: ${dropDefaults.length}
+          commands:
+            - tapOn: ${".*" + dropDefaults[dropIndex]}
+            - evalScript: ${dropIndex++}
+      - evalScript: ${var addIndex = 0}
+      - repeat:
+          times: ${addWallets.length}
+          commands:
+            - tapOn: "Search Wallets"
+            - eraseText: 30
+            - inputText: ${addWallets[addIndex]}
+            - tapOn:
+                text: ${".*" + addWallets[addIndex]}
+                index: 1
+            - evalScript: ${addIndex++}
+- tapOn:
+    id: "nextButton"
+
+# Landed in the new account. Creating the default wallets took ~70s on a slot
+# sim, so this wait is generous on purpose — 60s timed out on a passing run.
+- extendedWaitUntil:
+    visible: "Total Balance"
+    timeout: 180000
+- runFlow:
+    when:
+      visible: "Claim Your Web3 Handle"
+    commands:
+      - tapOn: "Not Now"
+- runFlow:
+    when:
+      visible: "How Did You Discover Edge\\?"
+    commands:
+      - tapOn: "Dismiss"
+- runFlow:
+    when:
+      visible: "Security is Our Priority"
+    commands:
+      - tapOn: "Cancel"
+- assertVisible: "Total Balance"
