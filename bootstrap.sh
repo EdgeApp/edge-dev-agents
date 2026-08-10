@@ -70,6 +70,21 @@ if [[ -f "$REPO/claude-settings/hooks.json" ]]; then
   mkdir -p "$HOME/.claude"
   SJ="$HOME/.claude/settings.json"
   if [[ -f "$SJ" ]]; then
+    # Whole-block replace: name any local-only registration it destroys (the
+    # matcher is unrecoverable afterwards) and keep a timestamped backup.
+    DROPPED=$(jq -n --slurpfile new "$REPO/claude-settings/hooks.json" --slurpfile old "$SJ" '
+      def flat: [ to_entries[] as $e | ($e.value // [])[] as $g | ($g.hooks // [])[] as $h
+                  | {event: $e.key, matcher: ($g.matcher // ""), command: ($h.command // "")} ];
+      ($new[0] | flat) as $n
+      | (($old[0].hooks // {}) | flat)
+      | map(select( . as $x | ($n | any(.event == $x.event and .command == $x.command)) | not ))
+    ' 2>/dev/null || echo '[]')
+    if [[ "$(printf '%s' "$DROPPED" | jq 'length')" -gt 0 ]]; then
+      say "WARNING: these local-only hook registrations are being replaced:"
+      printf '%s' "$DROPPED" | jq -r '.[] | "    [\(.event)] \(.matcher)  ->  \(.command)"'
+      say "Re-add them in ~/.claude/settings.local.json if they are machine-specific."
+    fi
+    cp "$SJ" "$SJ.bak.$(date +%Y%m%d-%H%M%S)"
     MERGED=$(jq -S --slurpfile h "$REPO/claude-settings/hooks.json" '.hooks = $h[0]' "$SJ")
   else
     MERGED=$(jq -nS --slurpfile h "$REPO/claude-settings/hooks.json" '{hooks: $h[0]}')
