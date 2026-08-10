@@ -150,6 +150,24 @@ EXTRA_FILES=(
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 HOOKS_REL="claude-settings/hooks.json"
 extra_json="[]"
+dropped_hooks_json="[]"
+settings_backup=""
+
+# Enumerate registrations a whole-block replace would DESTROY: present in $1
+# (the block being overwritten) but absent from $2 (the incoming block), keyed
+# on event+command so a re-grouped hook under a different matcher isn't a false
+# positive. The whole-block policy is deliberate, but a silent replace loses the
+# `matcher` of every local-only registration with no way to recover it, so the
+# matcher rides along in the report. Both args are hooks-object JSON.
+dropped_hooks_between() {
+  jq -n --argjson old "$1" --argjson new "$2" '
+    def flat: [ to_entries[] as $e | ($e.value // [])[] as $g | ($g.hooks // [])[] as $h
+                | {event: $e.key, matcher: ($g.matcher // ""), command: ($h.command // "")} ];
+    ($new | flat) as $n
+    | ($old | flat)
+    | map(select( . as $x | ($n | any(.event == $x.event and .command == $x.command)) | not ))
+  ' 2>/dev/null || echo '[]'
+}
 
 # Pull-before-push gate (user-to-repo only).
 # Fetches origin and detects whether the remote branch has commits we don't.
@@ -363,6 +381,7 @@ process_extra() {
   local mode="$1" tree src dest excludes destpath pair sfile rel rp pat line
   local exargs expats
   extra_json="[]"
+  dropped_hooks_json="[]"   # reset: a dryrun then stage must not double-report
   for tree in "${EXTRA_TREES[@]+"${EXTRA_TREES[@]}"}"; do
     IFS='|' read -r src dest excludes <<< "$tree"
     [[ -d "$src" ]] || continue
@@ -423,6 +442,13 @@ process_extra() {
   if [[ "$hcur" != "{}" ]]; then
     hrepo=$(jq -S . "$hrp" 2>/dev/null || echo '')
     if [[ "$hcur" != "$hrepo" ]]; then
+      # Mirror of the restore-side report: exporting this machine's block replaces
+      # the canonical one, so registrations only the REPO has would be destroyed
+      # for every other machine. The stale-local warning on HOOKS_REL blocks the
+      # stage; this names what would have been lost.
+      if [[ -n "$hrepo" ]]; then
+        dropped_hooks_json=$(dropped_hooks_between "$hrepo" "$hcur")
+      fi
       if [[ "$mode" == "stage" ]]; then
         mkdir -p "$(dirname "$hrp")"
         printf '%s\n' "$hcur" > "$hrp"
@@ -446,6 +472,7 @@ process_extra_reverse() {
   local mode="$1" tree src dest excludes destpath pair sfile rel rp pat line
   local exargs expats
   extra_json="[]"
+  dropped_hooks_json="[]"   # reset: a dryrun then stage must not double-report
   for tree in "${EXTRA_TREES[@]+"${EXTRA_TREES[@]}"}"; do
     IFS='|' read -r src dest excludes <<< "$tree"
     destpath="$REPO_DIR/$dest"
@@ -467,7 +494,16 @@ process_extra_reverse() {
           skipped_newer_json=$(echo "$skipped_newer_json" | jq --arg f "$dest/$line" '. + [$f]')
         fi
       done < <(rsync -rlptc -n -v "${exargs[@]}" "$destpath/" "$src/" 2>/dev/null)
-      rsync -rlptc "${exargs[@]}" "$destpath/" "$src/" >/dev/null
+      # Record what the real transfer actually moved (post newer-local excludes),
+      # so a restore that rewrites the whole tree can't report extraTotal 0 and
+      # read as "nothing happened". -v output is parsed, not discarded.
+      while IFS= read -r line; do
+        [[ -z "$line" || "$line" == */ ]] && continue
+        case "$line" in
+          "sending "*|"sent "*|"total "*|"created "*|"building "*|"delta"*|"Transfer "*|"transferred "*|"deleting "*|"deleting"|"."|"./") continue ;;
+        esac
+        extra_json=$(echo "$extra_json" | jq --arg f "$dest/$line" '. + [$f]')
+      done < <(rsync -rlptc -v "${exargs[@]}" "$destpath/" "$src/" 2>/dev/null)
     else
       while IFS= read -r line; do
         [[ -z "$line" || "$line" == */ ]] && continue
@@ -482,25 +518,31 @@ process_extra_reverse() {
     IFS='|' read -r sfile rel <<< "$pair"
     rp="$REPO_DIR/$rel"
     [[ -f "$rp" ]] || continue
-    if [[ "$mode" == "stage" ]]; then
-      mkdir -p "$(dirname "$sfile")"; cp "$rp" "$sfile"
-    else
-      if [[ ! -f "$sfile" ]] || ! diff -q "$rp" "$sfile" >/dev/null 2>&1; then
-        extra_json=$(echo "$extra_json" | jq --arg f "$rel" '. + [$f]')
+    if [[ ! -f "$sfile" ]] || ! diff -q "$rp" "$sfile" >/dev/null 2>&1; then
+      if [[ "$mode" == "stage" ]]; then
+        mkdir -p "$(dirname "$sfile")"; cp "$rp" "$sfile"
       fi
+      extra_json=$(echo "$extra_json" | jq --arg f "$rel" '. + [$f]')
     fi
   done
   # Hooks projection restore (#6): repo hooks.json → local settings.json,
   # replacing ONLY the .hooks key (all other keys are machine-local and stay).
   # Creates settings.json with just {hooks} on a fresh machine. Written via
   # temp+mv so a mid-write crash can't leave a truncated settings.json.
-  local hrp hcur merged
+  local hrp hcur hnew merged
   hrp="$REPO_DIR/$HOOKS_REL"
   if [[ -f "$hrp" ]] && jq -e 'type == "object"' "$hrp" >/dev/null 2>&1; then
     hcur=$(jq -S '.hooks // {}' "$CLAUDE_SETTINGS" 2>/dev/null || echo '{}')
-    if [[ "$(jq -S . "$hrp")" != "$hcur" ]]; then
+    hnew=$(jq -S . "$hrp")
+    if [[ "$hnew" != "$hcur" ]]; then
+      # Computed in BOTH modes so the dry run warns BEFORE anything is destroyed.
+      dropped_hooks_json=$(dropped_hooks_between "$hcur" "$hnew")
       if [[ "$mode" == "stage" ]]; then
         if [[ -f "$CLAUDE_SETTINGS" ]]; then
+          # Timestamped backup: the whole-block replace is unrecoverable
+          # otherwise, and droppedHooks alone can't restore hook ordering.
+          settings_backup="$CLAUDE_SETTINGS.bak.$(date +%Y%m%d-%H%M%S)"
+          cp "$CLAUDE_SETTINGS" "$settings_backup"
           merged=$(jq -S --slurpfile h "$hrp" '.hooks = $h[0]' "$CLAUDE_SETTINGS")
         else
           mkdir -p "$(dirname "$CLAUDE_SETTINGS")"
@@ -660,6 +702,20 @@ if [[ "$DO_STAGE" == "true" && "$DIRECTION" == "user-to-repo" && "$FORCE_WARN" !
     echo "To overwrite upstream anyway: re-run with --force." >&2
     exit 1
   fi
+
+  # Hook registrations the export would blank for every other machine. The
+  # stale-local warning above is mtime-based and misses this whenever the local
+  # settings.json was touched recently, so gate on the content diff directly.
+  dropped_n=$(echo "$dropped_hooks_json" | jq 'length')
+  if [[ "$dropped_n" -gt 0 ]]; then
+    echo "ERROR: exporting this machine's hooks block would drop $dropped_n canonical registration(s):" >&2
+    echo "$dropped_hooks_json" | jq -r '.[] | "  [\(.event)] \(.matcher)  ->  \(.command)"' >&2
+    echo "The projecting machine is canonical for the WHOLE block, so these would stop firing everywhere." >&2
+    echo "De-stale first: 'convention-sync --repo-to-user --stage', re-add any local-only hooks, then re-run." >&2
+    echo "Machine-specific hooks belong in ~/.claude/settings.local.json (never projected)." >&2
+    echo "To drop them anyway: re-run with --force." >&2
+    exit 1
+  fi
 fi
 
 if [[ "$DO_STAGE" == true ]] && (( total + extra_total > 0 )); then
@@ -758,6 +814,8 @@ jq -n \
   --argjson originAhead "$ORIGIN_AHEAD" \
   --arg originBranch "$ORIGIN_BRANCH" \
   --argjson skippedNewer "$skipped_newer_json" \
+  --argjson droppedHooks "$dropped_hooks_json" \
+  --arg settingsBackup "$settings_backup" \
   --arg staged "$DO_STAGE" \
   --arg committed "$DO_COMMIT" \
-  '{repoDir: $repoDir, originBranch: $originBranch, originAhead: $originAhead, total: $total, new: $new, modified: $modified, deleted: $deleted, ignored: $ignored, warnings: $warnings, extra: $extra, extraTotal: $extraTotal, skippedNewer: $skippedNewer, staged: ($staged == "true"), committed: ($committed == "true")}'
+  '{repoDir: $repoDir, originBranch: $originBranch, originAhead: $originAhead, total: $total, new: $new, modified: $modified, deleted: $deleted, ignored: $ignored, warnings: $warnings, extra: $extra, extraTotal: $extraTotal, skippedNewer: $skippedNewer, droppedHooks: $droppedHooks, settingsBackup: $settingsBackup, staged: ($staged == "true"), committed: ($committed == "true")}'
