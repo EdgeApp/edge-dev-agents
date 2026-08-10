@@ -1311,8 +1311,8 @@
       "hash": "f12ed2e6a7ae"
     },
     "one-shot:description-current-state": {
-      "reason": "2026-08-06: new rule from the concurrent state-file/description-hygiene work; report-eval can grade it later as an A20 extension (description vs delivered scope at Complete) — dimension owed by that effort",
-      "hash": "93c0f6d8206d"
+      "reason": "2026-08-07: format-only change (blank line before delimiter, TDD branch link first in section); write path still deterministic via agent-authored-text.sh pipe, eval-relevance unchanged from prior ack",
+      "hash": "a7d192d941af"
     },
     "one-shot:mid-run-state-file": {
       "reason": "2026-08-06: same concurrent effort as description-current-state; state-file quality is transcript-visible only — candidate A-dimension owed by that effort",

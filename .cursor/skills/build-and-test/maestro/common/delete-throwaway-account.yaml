@@ -17,8 +17,12 @@
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
-  DELETE_USERNAME: ${output.newAccountUsername}
-  DELETE_PASSWORD: ${output.newAccountPassword}
+  # The `X || ...` fallback is REQUIRED, not decoration: a subflow's own `env:`
+  # block SHADOWS the value a parent `runFlow: env:` passes in (maestro 2.x on
+  # this host). Without it a caller-supplied DELETE_PASSWORD is ignored and the
+  # modal is typed the literal string "undefined".
+  DELETE_USERNAME: ${DELETE_USERNAME || output.newAccountUsername}
+  DELETE_PASSWORD: ${DELETE_PASSWORD || output.newAccountPassword}
 ---
 - tapOn:
     id: "sideMenuButton"
@@ -34,12 +38,17 @@ env:
     element: "Delete Account"
 - tapOn: "Delete Account"
 
-# Password gate.
+# Password gate. The field must be tapped and erased first: typing straight
+# after the modal opens drops characters and lands on "Invalid Password".
 - extendedWaitUntil:
-    visible: "Submit"
+    visible: "Enter your password"
     timeout: 15000
+- tapOn: "Enter your password"
+- eraseText: 40
 - inputText: ${DELETE_PASSWORD}
-- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn: "Submit"
 
 # Confirmation: agree, then retype the username.
 - extendedWaitUntil:
