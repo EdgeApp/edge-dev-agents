@@ -5,6 +5,7 @@
 #   .cursor/            -> ~/.cursor/                 (skills, rules, scripts, README)
 #   agent-watcher/      -> ~/.config/agent-watcher/   (orchestration code + config)
 #   memory-shared/      -> ~/.claude/memory-shared/   (shared memory notes)
+#   claude-workflows/   -> ~/.claude/workflows/       (Workflow-tool scripts)
 #   bin/link-shared-memory.sh -> ~/.claude/link-shared-memory.sh
 # Then: links ~/.claude/skills -> ~/.cursor/skills, regenerates ~/.claude/CLAUDE.md,
 # and links shared memory into the standard entry points (~ and ~/git).
@@ -52,6 +53,12 @@ fi
 if [[ -d "$REPO/memory-shared" ]]; then
   say "Installing ~/.claude/memory-shared from repo/memory-shared"
   copy_tree "$REPO/memory-shared" "$HOME/.claude/memory-shared"
+fi
+
+# 3b. Workflow-tool scripts (model-invocable workflows, e.g. code-review-sonnet)
+if [[ -d "$REPO/claude-workflows" ]]; then
+  say "Installing ~/.claude/workflows from repo/claude-workflows"
+  copy_tree "$REPO/claude-workflows" "$HOME/.claude/workflows"
 fi
 
 # 4. Shared-memory link helper
