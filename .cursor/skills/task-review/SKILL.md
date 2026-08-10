@@ -30,14 +30,15 @@ This fetches task metadata, comments, and **automatically downloads and processe
 
 - **Text files** (`.md`, `.txt`, `.json`, `.csv`, `.log`, `.yaml`, `.yml`): Downloaded directly — read them.
 - **PDFs**: Text-extracted first (`PDF_TEXT:` output). If the PDF is image-based, converted to page images (`PDF_PAGES:` output).
-- **ZIPs**: Unpacked recursively (`UNPACKED:` output). Extracted files (including PDFs inside) are then processed by the same handlers.
+- **RTFs**: Converted to plain text via macOS `textutil` (`RTF_TEXT:` output).
+- **ZIPs**: Unpacked recursively (`UNPACKED:` output). Extracted files (including PDFs/RTFs inside) are then processed by the same handlers.
 - **Images** (`.png`, `.jpg`, `.gif`, `.webp`): Downloaded directly — read them.
 
 <sub-step name="Reading processed attachments">
 After the script completes, read the processed files based on the output:
 
 1. **`DOWNLOADED:` paths** — Read any `.txt`, `.md`, `.json`, `.csv`, `.yaml`, `.yml` files listed.
-2. **`PDF_TEXT:` paths** — Read the extracted `.txt` file. This is the full text content of the PDF.
+2. **`PDF_TEXT:` / `RTF_TEXT:` paths** — Read the extracted `.txt` file. This is the full text content of the PDF/RTF.
 3. **`PDF_PAGES:` directories** — Read the page images (`page-01.png`, `page-02.png`, etc.) using the Read tool. For large documents (>20 pages), read the first 10 pages, then skim the rest by reading every 3rd-5th page.
 4. **`UNPACKED:` directories** — List contents (`ls -R`), then read relevant files (text files, images, etc.). Skip macOS metadata (`__MACOSX/`, `.DS_Store`).
 </sub-step>

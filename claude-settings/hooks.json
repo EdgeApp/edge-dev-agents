@@ -188,6 +188,16 @@
         }
       ],
       "matcher": "mcp__maestro__.*"
+    },
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/nudge-asana-mcp.sh",
+          "timeout": 10,
+          "type": "command"
+        }
+      ],
+      "matcher": "mcp__.*__(get_task|get_tasks|get_task_stories|search_tasks|search_tasks_preview|search_objects|get_my_tasks)"
     }
   ],
   "SessionStart": [
