@@ -16,3 +16,6 @@ commands/github-pr-hudl.sh
 # "where do per-task yamls live" strategy is finalized, list those task-flow
 # families here so the leak can't recur.
 skills/build-and-test/maestro/swap-*.yaml
+
+# Third-party skill, local-only by request (banana-claude image gen)
+skills/banana/*
