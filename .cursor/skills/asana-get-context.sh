@@ -29,6 +29,7 @@
 #   UNPACKED: <zip> -> <dir> (<count> files)     [if ZIPs present]
 #   PDF_TEXT: <path> (from <file>, <chars> chars)  [if PDF has text]
 #   PDF_PAGES: <dir> (<count> pages from <file>)   [if PDF is image-based]
+#   RTF_TEXT: <path> (from <file>, <chars> chars)  [if RTFs present]
 set -euo pipefail
 
 # Parse arguments: accept positional, --task, or --task-url
@@ -185,6 +186,7 @@ if not data:
 DOWNLOAD_EXTS = {
     '.md', '.txt', '.json', '.csv', '.log', '.yaml', '.yml',
     '.pdf',
+    '.rtf',
     '.zip',
     '.png', '.jpg', '.jpeg', '.gif', '.webp',
 }
@@ -267,4 +269,30 @@ if [[ -d "$DOWNLOAD_DIR" ]]; then
   while IFS= read -r pdf; do
     process_pdf "$pdf"
   done < <(find "$DOWNLOAD_DIR" -name '*.pdf' -type f 2>/dev/null)
+fi
+
+# Phase 4: Convert RTFs to plain text (macOS textutil)
+process_rtf() {
+  local rtf="$1"
+  local base="${rtf%.rtf}"
+  local fname
+  fname="$(basename "$rtf")"
+
+  if command -v textutil &>/dev/null; then
+    if textutil -convert txt "$rtf" -output "${base}.txt" 2>/dev/null; then
+      local char_count
+      char_count=$(wc -c < "${base}.txt" | tr -d ' ')
+      echo "RTF_TEXT: ${base}.txt (from $fname, ${char_count} chars)"
+    else
+      echo "RTF_CONVERT_FAILED: $fname"
+    fi
+  else
+    echo "RTF_SKIPPED: $fname (textutil not available)"
+  fi
+}
+
+if [[ -d "$DOWNLOAD_DIR" ]]; then
+  while IFS= read -r rtf; do
+    process_rtf "$rtf"
+  done < <(find "$DOWNLOAD_DIR" -name '*.rtf' -type f 2>/dev/null)
 fi
