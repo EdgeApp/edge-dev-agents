@@ -133,6 +133,7 @@ LEGACY_REPO_README="$REPO_CURSOR/README.md"
 EXTRA_TREES=(
   "$HOME/.config/agent-watcher|agent-watcher|credentials.json,secrets,*.log,*.state,*.lock,pool.json,slots.json,watchdog-state.json,oom-repro/forensics,oom-repro/logs,.DS_Store,.git"
   "$HOME/.claude/memory-shared|memory-shared|.DS_Store,.git"
+  "$HOME/.claude/workflows|claude-workflows|.DS_Store,.git"
 )
 # Single committable files (home canonical) → repo relpath. Format: "SRC_FILE|REPO_RELPATH"
 EXTRA_FILES=(
