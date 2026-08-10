@@ -200,6 +200,31 @@ lines.forEach((line, i) => {
   }
 })
 
+// Code-block captions: exactly one per block, immediately above its fence, and
+// pinned to a commit rather than a branch. A hand-written branch caption left
+// beside a generated one shipped a doc with the same file linked twice; the
+// linker now collapses that run, and this catches any that slip in another way.
+const captionLine = /^\[`?([^`\]]+)`?\]\((https:\/\/github\.com\/[^/]+\/[^/]+\/blob\/\S+)\)\s*$/
+lines.forEach((line, i) => {
+  const m = captionLine.exec(line)
+  if (m == null) return
+  const [, labelPath, url] = m
+  if (!url.endsWith("/" + labelPath)) return
+  const next = lines[i + 1] || ""
+  if (captionLine.test(next)) {
+    findings.push(`codeblock caption: line ${i + 1} is followed by a second caption — one block, one caption (run tdd-codeblock-link.sh)`)
+    return
+  }
+  if (!/^```/.test(next)) {
+    findings.push(`codeblock caption: line ${i + 1} cites \`${labelPath}\` but no code fence follows it`)
+    return
+  }
+  const ref = url.slice(url.indexOf("/blob/") + 6, url.length - labelPath.length - 1)
+  if (!/^[0-9a-f]{7,40}$/.test(ref)) {
+    findings.push(`codeblock caption: line ${i + 1} pins \`${labelPath}\` to "${ref}" — a branch URL 404s once the branch is deleted, use a commit SHA (run tdd-codeblock-link.sh)`)
+  }
+})
+
 if (findings.length === 0 && warns.length === 0) {
   console.log("STRUCTURE_OK headings=" + headings.length + " mermaid=" + mermaid.length + " glossary=" + glossTerms.length)
 } else {

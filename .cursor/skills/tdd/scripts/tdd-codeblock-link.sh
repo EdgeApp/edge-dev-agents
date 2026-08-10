@@ -77,7 +77,20 @@ for (const row of fs.readFileSync(manifestPath, "utf8").split("\n")) {
 // A leading path comment: "// path", "# path", "-- path", with any trailing
 // qualifier after a comma dropped ("as landed" and friends).
 const pathComment = /^\s*(?:\/\/|#|--)\s*([A-Za-z0-9_./-]+\.[A-Za-z0-9]+)\s*(?:,.*)?$/
-const captionRe = /^\[`?([^`\]]+)`?\]\(https:\/\/github\.com\/[^/]+\/[^/]+\/blob\/([0-9a-f]{7,40})\/\S+\)\s*$/
+// A caption line. The ref is deliberately NOT restricted to a hex SHA: a
+// hand-written caption normally points at a BRANCH ("blob/develop/..."), and a
+// SHA-only pattern makes that line invisible here, so the script appends its
+// own caption and the block ends up with two. That is the duplicate-link bug.
+// Match any ref, then confirm the URL really addresses the labelled path.
+const captionRe = /^\[`?([^`\]]+)`?\]\((https:\/\/github\.com\/[^/]+\/[^/]+\/blob\/\S+)\)\s*$/
+const parseCaption = line => {
+  const m = captionRe.exec(line || "")
+  if (m == null) return null
+  const [, labelPath, url] = m
+  if (!url.endsWith("/" + labelPath)) return null
+  const ref = url.slice(url.indexOf("/blob/") + 6, url.length - labelPath.length - 1)
+  return { path: labelPath, ref }
+}
 
 const out = []
 const changes = []
@@ -102,8 +115,8 @@ for (let i = 0; i < lines.length; i++) {
   // so the path is recovered from the caption itself. Without this the SHA
   // could only ever be written once and a stale pin would never refresh.
   const prevIdx = out.length - 1
-  const prevCap = prevIdx >= 0 ? captionRe.exec(out[prevIdx] || "") : null
-  const p = pm != null ? pm[1] : (prevCap != null ? prevCap[1] : null)
+  const prevCap = prevIdx >= 0 ? parseCaption(out[prevIdx]) : null
+  const p = pm != null ? pm[1] : (prevCap != null ? prevCap.path : null)
   const slug = p != null ? slugByPath[p] : undefined
 
   if (p == null || slug === undefined) {
@@ -113,16 +126,24 @@ for (let i = 0; i < lines.length; i++) {
   const sha = shaBySlug[slug]
   const caption = "[`" + p + "`](https://github.com/" + slug + "/blob/" + sha + "/" + p + ")"
 
-  // Replace an existing caption directly above (possibly stale), else insert.
-  if (prevCap != null && prevCap[1] === p) {
-    if (out[prevIdx] !== caption) {
-      changes.push({ path: p, why: "sha " + prevCap[2].slice(0, 7) + " -> " + sha.slice(0, 7) })
-      out[prevIdx] = caption
-    }
-  } else {
-    changes.push({ path: p, why: "caption added" })
-    out.push(caption)
+  // Replace the existing caption(s) directly above, else insert. More than one
+  // can be stacked when a hand-written caption was left in place alongside a
+  // generated one; collapse the run rather than adding a third.
+  const stacked = []
+  while (out.length > 0) {
+    const cap = parseCaption(out[out.length - 1])
+    if (cap == null || cap.path !== p) break
+    stacked.unshift(cap)
+    out.pop()
   }
+  if (stacked.length === 0) {
+    changes.push({ path: p, why: "caption added" })
+  } else if (stacked.length > 1) {
+    changes.push({ path: p, why: stacked.length + " stacked captions collapsed to 1 at " + sha.slice(0, 7) })
+  } else if (stacked[0].ref !== sha) {
+    changes.push({ path: p, why: "ref " + stacked[0].ref.slice(0, 7) + " -> " + sha.slice(0, 7) })
+  }
+  out.push(caption)
 
   out.push(line, ...body.slice(pm != null ? 1 : 0))   // drop the in-fence comment only if present
   if (closed) out.push(lines[j])

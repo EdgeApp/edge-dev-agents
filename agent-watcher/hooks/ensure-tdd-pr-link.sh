@@ -13,8 +13,17 @@
 # ONE DOC, EVERY PR: the task has a single TDD (tdd lives-in-the-pr puts it in
 # the primary repo), but a multi-repo task's OTHER PRs are covered by the same
 # doc and their reviewers need the pointer too. So the URL is resolved ONCE
-# from whichever worktree holds the doc, then appended to EVERY worktree's PR
+# from whichever worktree holds the doc, then added to EVERY worktree's PR
 # body that lacks it (the doc-hosting repo's PR and each companion PR alike).
+#
+# PLACEMENT (operator ruling 2026-08-07): the link is the PR body's FIRST
+# section, so a reviewer sees the design before the description:
+#
+#   ### Technical Design Document
+#
+#   [<doc filename>](<branch url>)
+#
+# The label is the doc FILENAME (deterministic; no H1 parsing).
 #
 # BRANCH url, never a commit permalink: the PR must follow the branch so a
 # reviewer always sees the doc as it stands with the code. The run report carries
@@ -52,16 +61,9 @@ for REPO_DIR in "$HOME/git/.agent-worktrees/$AGENT_TASK_GID"/*/; do
   [ -n "$NUM" ] || continue
   case "$BODY" in *"$URL"*) continue ;; esac
 
-  LINK="[Technical design doc]($URL)"
+  FNAME="${URL##*/}"
   TMP="/tmp/pr-body-tdd-$AGENT_TASK_GID-$NUM.md"
-  if printf '%s' "$BODY" | grep -q '^### Description'; then
-    printf '%s' "$BODY" | awk -v l="$LINK" '
-      { print }
-      !done && /^### Description/ { print ""; print l; done=1 }
-    ' > "$TMP"
-  else
-    { printf '%s\n\n### Description\n\n%s\n' "$BODY" "$LINK"; } > "$TMP"
-  fi
+  { printf '### Technical Design Document\n\n[%s](%s)\n\n' "$FNAME" "$URL"; printf '%s\n' "$BODY"; } > "$TMP"
 
   if (cd "$REPO_DIR" && gh pr edit "$NUM" --body-file "$TMP" >/dev/null 2>&1); then
     echo ">> ensure-tdd-pr-link: added TDD link to PR #$NUM ($URL)" >&3

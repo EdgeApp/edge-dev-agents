@@ -311,10 +311,11 @@ try {
   );
   const tddUrl = links.match(/^TDD_BRANCH_URL=(.+)$/m)?.[1];
   if (tddUrl && !body.includes(tddUrl)) {
-    const link = `[Technical design doc](${tddUrl})`;
-    body =
-      insertAfterHeading(body, "### Description", link) ??
-      appendDescriptionSection(body, link);
+    // First section of the body, filename as the label — same shape
+    // ensure-tdd-pr-link.sh prepends at the Complete gate, so the two write
+    // paths cannot produce different formats.
+    const fname = tddUrl.split("/").pop();
+    body = `### Technical Design Document\n\n[${fname}](${tddUrl})\n\n${body}`;
   }
 } catch {}
 

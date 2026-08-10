@@ -22,6 +22,8 @@ already encodes, params and gotchas included.
 | `common/confirm-slider.yaml` | - | The confirm slider gesture (SOLVED — never re-derive) |
 | `common/ramp-set-region-fiat.yaml` | COUNTRY_ROW/SEARCH, STATE_ROW/SEARCH, FIAT_ROW/SEARCH | Set ramp region + fiat from Buy/Sell scene (row selectors are the COMBINED row string, e.g. "United States of America US") |
 | `common/send-to-address.yaml` | WALLET_SEARCH, ADDRESS, AMOUNT | Assets → wallet → Send → address → amount → confirm slider |
+| `common/create-throwaway-account.yaml` | NEW_USERNAME, NEW_PASSWORD, NEW_PIN, NEW_WALLETS, VERIFY_ACCOUNT_INFO | Login scene → new empty account, logged in (never `clearState`). For tests that would dirty a roster account's SYNCED state |
+| `common/delete-throwaway-account.yaml` | DELETE_USERNAME, DELETE_PASSWORD | Deletes the logged-in account. Cleanup is NOT required (throwaways are reusable) — keep it for when you do want one gone |
 | `buy-quote-input.yaml` / `buy-quote.yaml` | (see file) | Canonical Buy $500 proof flow |
 | `swap-quote-input.yaml` / `swap-confirm.yaml` | (see file) | Swap quote + confirm proof pair |
 
@@ -55,6 +57,16 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   mid-test is normal and expected** — check them for the asset you need before
   acquiring it, and BEFORE creating a new wallet ("no account holds X" is not a
   valid conclusion until each ROSTER account was actually checked).
+- **THROWAWAY accounts for tests that dirty SYNCED state.** `activePromotions`,
+  affiliate attribution (`installerId` / `CreationReason.json`), Exchange
+  Settings and mixnet toggles all sync to the account, so exercising them on a
+  roster account thrashes every parallel session. Create an empty one with
+  `common/create-throwaway-account.yaml` and log in the normal env.json way.
+  They are REUSABLE across sessions and need NOT be deleted — the ledger of live
+  ones (username / password / PIN / which sim) is
+  `references/throwaway-accounts.md`; check it before creating another, and
+  append a row when you do. Uniqueness is the only requirement; the flow's
+  default `agent-tw-<random>` username guarantees it.
 - **HOW to switch accounts: edit env.json, do NOT drive the UI.** The canonical
   switch is: set `YOLO_USERNAME`/`YOLO_PIN` in the WORKTREE's `env.json` (a
   local-only, gitignored copy) to the target roster account, then

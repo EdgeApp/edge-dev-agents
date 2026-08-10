@@ -42,12 +42,15 @@
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
-  NEW_USERNAME: ${"agent-tw-" + Math.floor(Math.random() * 1000000000)}
-  NEW_PASSWORD: "Agent3Throwaway1"
-  NEW_PIN: "1234"
-  NEW_WALLETS: ""
-  DEFAULT_WALLETS: '["Bitcoin", "Ethereum", "Litecoin", "Bitcoin Cash", "Dash"]'
-  VERIFY_ACCOUNT_INFO: ""
+  # The `X || default` form is REQUIRED on every overridable param: a subflow's
+  # own `env:` block SHADOWS the value a parent `runFlow: env:` passes in
+  # (maestro 2.x on this host), so a bare default silently wins over the caller.
+  NEW_USERNAME: ${NEW_USERNAME || "agent-tw-" + Math.floor(Math.random() * 1000000000)}
+  NEW_PASSWORD: ${NEW_PASSWORD || "Agent3Throwaway1"}
+  NEW_PIN: ${NEW_PIN || "1234"}
+  NEW_WALLETS: ${NEW_WALLETS || ""}
+  DEFAULT_WALLETS: ${DEFAULT_WALLETS || '["Bitcoin", "Ethereum", "Litecoin", "Bitcoin Cash", "Dash"]'}
+  VERIFY_ACCOUNT_INFO: ${VERIFY_ACCOUNT_INFO || ""}
 ---
 - evalScript: ${output.newAccountUsername = NEW_USERNAME}
 - evalScript: ${output.newAccountPassword = NEW_PASSWORD}
@@ -197,11 +200,15 @@ env:
 - tapOn:
     id: "nextButton"
 
-# Landed in the new account. Creating the default wallets took ~70s on a slot
-# sim, so this wait is generous on purpose — 60s timed out on a passing run.
+# Landed in the new account. Creating the default wallets takes 70s-3min on a
+# slot sim, hence the long wait.
+# SELECTOR: it must be the `.*Total Balance.*` REGEX. Maestro matches the whole
+# text node, and Home renders the balance as one node ("Total Balance $ 0.00
+# USD"), so the bare string never matches — it fails at ANY timeout, on a screen
+# that plainly shows the words.
 - extendedWaitUntil:
-    visible: "Total Balance"
-    timeout: 180000
+    visible: ".*Total Balance.*"
+    timeout: 300000
 - runFlow:
     when:
       visible: "Claim Your Web3 Handle"
@@ -217,4 +224,4 @@ env:
       visible: "Security is Our Priority"
     commands:
       - tapOn: "Cancel"
-- assertVisible: "Total Balance"
+- assertVisible: ".*Total Balance.*"

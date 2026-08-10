@@ -103,7 +103,15 @@ Run both linkers FIRST: they compute glossary link placement and code-block capt
 <step id="4" name="Publish">
 Resolve the target per `output-target` first, then take that branch.
 
-**`committed`:** write the doc to `src/docs/<slug>.md` in the PR's worktree (`mkdir -p src/docs`), commit it with the run's normal commit path (`~/.cursor/skills/lint-commit.sh`), and push to the PR branch. Cite the blob URL on that branch. Then link the doc from EVERY PR of the task: a `[Technical design doc](<TDD_BRANCH_URL>)` line under `### Description` in each PR body (`gh pr edit <num> --body-file` in place, existing template preserved) — on a multi-repo task the companion repos' PRs link the one doc too, since it documents their changes. Orchestrated runs self-heal any missed link at the Complete gate (`~/.config/agent-watcher/hooks/ensure-tdd-pr-link.sh`); do not rely on that outside orchestration. On later turns, edit that same file in place — body updated to current reality, phase entry appended (`current-state-body-phases-in-one-section`) — and amend/commit per the run's commit discipline.
+**`committed`:** write the doc to `src/docs/<slug>.md` in the PR's worktree (`mkdir -p src/docs`), commit it with the run's normal commit path (`~/.cursor/skills/lint-commit.sh`), and push to the PR branch. Cite the blob URL on that branch. Then link the doc from EVERY PR of the task, as the body's FIRST section so the reviewer sees the design before the description (`gh pr edit <num> --body-file` in place, existing template preserved below it):
+
+```markdown
+### Technical Design Document
+
+[<doc filename>](<TDD_BRANCH_URL>)
+```
+
+The link label is the doc FILENAME (`ramps-deeplink-provider-priority.md`), never the H1 title. On a multi-repo task the companion repos' PRs carry the same section, since the one doc documents their changes. Orchestrated runs self-heal any missed link at the Complete gate (`~/.config/agent-watcher/hooks/ensure-tdd-pr-link.sh`); do not rely on that outside orchestration. On later turns, edit that same file in place — body updated to current reality, phase entry appended (`current-state-body-phases-in-one-section`) — and amend/commit per the run's commit discipline.
 
 **`secret-gist` / `public-gist`:** apply `draft-gate` for a new doc, then:
 ```bash
