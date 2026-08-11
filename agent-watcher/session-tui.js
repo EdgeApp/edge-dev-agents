@@ -20,9 +20,12 @@
 //   up/down/j/k  move       Enter/a  attach (switch-client inside tmux)
 //   c  fork a new RC'd chat from the row's transcript (resume-agent --chat)
 //   C  same, with --chrome
-//   s  resume a TRANSCRIPTS row in place — same conversation, NO fork
-//      (resume-agent --chat --in-place; run transcripts confirm first, since
-//      new turns write into the conversation evals and watcher resumes read)
+//   s  resume a TRANSCRIPTS row in place — same conversation, NO fork, no
+//      confirm (resume-agent --chat --in-place; note in-place turns on a run
+//      transcript land in the conversation evals and watcher resumes read)
+//   /  content search over ALL transcripts on the machine (every kind and
+//      project dir, live or dead) via session-index.sh --grep; ⏎ runs it,
+//      Esc clears. Rows live in a pane attach; dead rows fork/resume.
 //   i  revive claude inside a DEAD chat/anchor pane (same conversation + RC)
 //   x  kill tmux session (y/n confirm)      r  refresh      q  quit
 //
@@ -127,8 +130,12 @@ function loadTmux () {
     }
     const rc = (claudeArgs.match(/--remote-control\s+(\S+)/) || [])[1] || ''
     const resumeUuid = (claudeArgs.match(/--resume\s+([0-9a-f-]{36})/) || [])[1] || ''
+    // Bridge state is checked from the pane footer for EVERY live claude, not
+    // just argv-named ones: on current CLI builds RC can be armed app-side with
+    // no --remote-control flag in argv, so an empty rc name says nothing about
+    // whether the bridge is up.
     let rcUp = false
-    if (rc) rcUp = rcBridgeUp(sh(`tmux capture-pane -p -t '${name}' 2>/dev/null`))
+    if (claudeArgs) rcUp = rcBridgeUp(sh(`tmux capture-pane -p -t '${name}' 2>/dev/null`))
     sessions.push({
       name,
       activity: Number(activity) || 0,
@@ -209,7 +216,7 @@ function buildModel () {
   const liveUuids = new Set(live.map(r => r.uuid).filter(Boolean))
   const dead = transcripts
     .filter(t => (!t.gid || !liveGids.has(t.gid)) && !liveUuids.has(t.uuid))
-    .slice(0, 20)
+    .slice(0, 50)
     .map(t => ({ kind: 'transcript', state: '', title: t.title, uuid: t.uuid, gid: t.gid, mtime: t.mtime, forkChild: t.forkChild, isForkOfLive: !!t.forkChild }))
 
   return { live, dead, cfg }
@@ -224,12 +231,48 @@ let items = []          // flattened selectable rows
 let sel = 0
 let status = ''
 let confirmFn = null    // pending y/n action
+let searchInput = null  // string while the operator types a query ('/' mode)
+let search = null       // {q, rows} while results are displayed
 
 function flatten () {
   items = []
-  for (const r of model.live) items.push(r)
-  for (const r of model.dead) items.push(r)
+  if (search) {
+    for (const r of search.rows) items.push(r)
+  } else {
+    for (const r of model.live) items.push(r)
+    for (const r of model.dead) items.push(r)
+  }
   if (sel >= items.length) sel = Math.max(0, items.length - 1)
+}
+
+// '/' search: content search over EVERY transcript on this machine (all kinds,
+// all project dirs, live or dead) via session-index.sh --grep — a superset of
+// the TRANSCRIPTS list, which only carries watcher-spawned runs. Rows whose
+// conversation is live in a pane attach; dead ones fork/resume like any
+// transcript row.
+function runSearch (q) {
+  status = `searching all transcripts for '${q}'…`; render()
+  let j
+  try {
+    const out = execFileSync(`${AW}/session-index.sh`, ['--grep', q], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    j = JSON.parse(out)
+  } catch (e) { search = null; status = `search failed: ${String(e).slice(0, 80)}`; render(); return }
+  const rows = (j.transcripts || []).filter(t => t.grep).map(t => ({
+    kind: 'transcript',
+    state: '',
+    title: (t.live_tmux ? '[LIVE] ' : '') + (t.task_name ? `Asana: ${t.task_name}` : `${t.kind} ${t.uuid.slice(0, 8)}`) +
+      (t.grep.inherited_from ? '  (fork echo — prefer parent)' : `  (${t.grep.authored} hits)`),
+    uuid: t.uuid,
+    gid: t.task_gid || '',
+    mtime: Math.floor(Date.parse(t.mtime) / 1000),
+    forkChild: null,
+    liveName: t.live_tmux || ''
+  }))
+  search = { q, rows }
+  sel = 0
+  flatten()
+  status = `${rows.length} matches for '${q}' — Esc clears, ranked originals-first`
+  render()
 }
 
 function glyph (r) {
@@ -242,7 +285,7 @@ function glyph (r) {
 function rcCell (r) {
   if (r.kind === 'transcript') return ''
   if (!r.claudeAlive) return `${clr.red}claude dead${clr.off}`
-  if (!r.rc) return `${clr.dim}no rc${clr.off}`
+  if (!r.rc) return r.rcUp ? `${clr.grn}rc:(in-app)${clr.off}` : `${clr.dim}no rc${clr.off}`
   return r.rcUp ? `${clr.grn}rc:${r.rc}${clr.off}` : `${clr.yel}rc:${r.rc} (bridge down)${clr.off}`
 }
 
@@ -267,10 +310,11 @@ function render () {
   const maxLines = rows - 7
   const startIdx = Math.max(0, sel - maxLines + 4)
   let printedLive = false; let printedDead = false
+  if (search) { out += `${clr.bold} SEARCH '${search.q}' — ${search.rows.length} transcript match(es), all kinds${clr.off}\n`; line++ }
   items.forEach((r, i) => {
     if (i < startIdx || line >= maxLines) return
-    if (i < model.live.length && !printedLive) { out += `${clr.bold} LIVE (tmux)${clr.off}\n`; printedLive = true; line++ }
-    if (i >= model.live.length && !printedDead) { out += `\n${clr.bold} TRANSCRIPTS (no live session — resumable)${clr.off}\n`; printedDead = true; line += 2 }
+    if (!search && i < model.live.length && !printedLive) { out += `${clr.bold} LIVE (tmux)${clr.off}\n`; printedLive = true; line++ }
+    if (!search && i >= model.live.length && !printedDead) { out += `\n${clr.bold} TRANSCRIPTS (no live session — resumable)${clr.off}\n`; printedDead = true; line += 2 }
     let l
     if (r.kind === 'transcript') {
       const d = new Date(r.mtime * 1000)
@@ -291,13 +335,17 @@ function render () {
   const acts = []
   if (r) {
     if (r.kind !== 'transcript') { acts.push('⏎/a attach', 'x kill') }
+    if (r.kind === 'transcript' && r.liveName) acts.push('⏎/a attach (live)')
     if (r.uuid) acts.push('c chat-fork', 'C chat+chrome')
-    if (r.kind === 'transcript' && r.uuid) acts.push('s resume (no fork)')
+    if (r.kind === 'transcript' && r.uuid && !r.liveName) acts.push('s resume (no fork)')
     if (r.state === 'dead' && r.kind !== 'run' && r.uuid) acts.push('i revive in pane')
   }
+  acts.push('/ search')
+  if (search) acts.push('Esc clear')
   acts.push('r refresh', 'q quit')
   out += `\n${ESC}${rows - 1};1H${clr.dim} ${acts.join('  ·  ')}${clr.off}`
-  if (status) out += `${ESC}${rows};1H${clr.yel} ${status.slice(0, cols - 2)}${clr.off}`
+  if (searchInput !== null) out += `${ESC}${rows};1H${clr.cyn} search: ${searchInput}▌${clr.off}`
+  else if (status) out += `${ESC}${rows};1H${clr.yel} ${status.slice(0, cols - 2)}${clr.off}`
   process.stdout.write(out)
 }
 
@@ -317,13 +365,16 @@ function runVisible (cmd, args) {
 }
 
 function attach (r) {
-  if (r.kind === 'transcript') return
+  // Search rows are transcripts, but one whose conversation is live in a pane
+  // attaches to that pane (resuming a live conversation would fork reality).
+  const target = r.kind === 'transcript' ? r.liveName : r.name
+  if (!target) return
   if (process.env.TMUX) {
-    sh(`tmux switch-client -t '${r.name}'`)
+    sh(`tmux switch-client -t '${target}'`)
     quit()   // this client moved to the target session; leave the TUI cleanly
   } else {
     suspendTui()
-    spawnSync('tmux', ['attach', '-t', r.name], { stdio: 'inherit' })
+    spawnSync('tmux', ['attach', '-t', target], { stdio: 'inherit' })
     resumeTui()
     refresh('detached — refreshed')
   }
@@ -345,15 +396,11 @@ function chatFork (r, chrome) {
 function resumeInPlace (r) {
   if (r.kind !== 'transcript') return
   if (!r.uuid) { status = 'no transcript uuid resolved for this row'; render(); return }
-  const go = () => {
-    runVisible(RESUME, ['--uuid', r.uuid, '--chat', '--in-place'])
-    refresh('in-place resume attempted — refreshed')
-  }
-  if (r.gid) {
-    status = 'RUN transcript: in-place turns become part of the run conversation (evals/watcher resumes see them). Resume anyway? [y/n]'
-    confirmFn = (yes) => { if (yes) go(); else { status = ''; render() } }
-    render()
-  } else go()
+  if (r.liveName) { status = `live in ${r.liveName} — attach (⏎) instead of resuming a live conversation`; render(); return }
+  // No confirm, by operator decree: in-place turns on a RUN transcript do land
+  // in the conversation evals/watcher resumes read — operator owns that risk.
+  runVisible(RESUME, ['--uuid', r.uuid, '--chat', '--in-place'])
+  refresh('in-place resume attempted — refreshed')
 }
 
 // Revive claude INSIDE an existing dead pane (chat/anchor only; runs need
@@ -383,6 +430,7 @@ function killSession (r) {
 function refresh (msg) {
   status = 'loading…'; render()
   model = buildModel()
+  search = null           // refresh always returns to the fleet view
   flatten()
   status = msg || ''
   render()
@@ -419,7 +467,16 @@ refresh()
 process.stdin.on('data', (b) => {
   const k = b.toString()
   if (confirmFn) { const f = confirmFn; confirmFn = null; f(k === 'y' || k === 'Y'); return }
+  if (searchInput !== null) {           // typing a query
+    if (k === '\x03' || k === '\x1b') { searchInput = null; status = ''; render(); return }
+    if (k === '\r') { const q = searchInput.trim(); searchInput = null; if (q) runSearch(q); else render(); return }
+    if (k === '\x7f' || k === '\b') { searchInput = searchInput.slice(0, -1); render(); return }
+    if (k.length === 1 && k >= ' ') { searchInput += k; render() }
+    return
+  }
   const r = items[sel]
+  if (k === '\x1b' && search) { search = null; sel = 0; flatten(); status = ''; render(); return }
+  if (k === '/') { searchInput = ''; render(); return }
   if (k === 'q' || k === '\x03') quit()
   else if (k === `${ESC}A` || k === 'k') { sel = Math.max(0, sel - 1); render() }
   else if (k === `${ESC}B` || k === 'j') { sel = Math.min(items.length - 1, sel + 1); render() }

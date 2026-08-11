@@ -86,6 +86,8 @@ validate_repo_dir() {
   return 1
 }
 
+ORIG_ARGS=("$@")
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --stage) DO_STAGE=true; shift ;;
@@ -108,6 +110,34 @@ fi
 
 if ! validate_repo_dir "$REPO_DIR"; then
   exit 1
+fi
+
+# Self-update before restoring: the extra-tree list is data inside this script,
+# so a machine whose script predates a tree addition would silently skip that
+# tree on --repo-to-user (the "run it twice" failure). If the repo carries a
+# different version of this script, install it first and re-exec with the
+# original args — the restored run then knows every tree the repo expects.
+# Guarded by CONVENTION_SYNC_SELF_UPDATED so a copy failure can't loop; the
+# canonical home path comes from CONVENTION_SYNC_HOME because $0 is the
+# stable temp copy, not the installed script.
+if [[ "$DIRECTION" == "repo-to-user" && -z "${CONVENTION_SYNC_SELF_UPDATED:-}" ]]; then
+  _repo_self="$REPO_DIR/.cursor/skills/convention-sync/scripts/convention-sync.sh"
+  _home_self="${CONVENTION_SYNC_HOME:-$HOME/.cursor/skills/convention-sync/scripts}/convention-sync.sh"
+  # Same newer-local rule as the rsync path: only replace when the repo copy's
+  # last commit postdates the local file's mtime, so unpushed local edits to
+  # this script survive (they'd be skippedNewer in the rsync too). Fallback to
+  # the repo file's mtime when git can't date it (non-checkout test fixtures).
+  _repo_self_time=$(git -C "$REPO_DIR" log -1 --format=%ct -- ".cursor/skills/convention-sync/scripts/convention-sync.sh" 2>/dev/null || true)
+  [[ -n "$_repo_self_time" ]] || _repo_self_time=$(stat -f %m "$_repo_self" 2>/dev/null || echo 0)
+  _home_self_time=$(stat -f %m "$_home_self" 2>/dev/null || echo 0)
+  if [[ -f "$_repo_self" && "$_repo_self_time" -gt "$_home_self_time" ]] && ! diff -q "$_repo_self" "$_home_self" >/dev/null 2>&1; then
+    echo "self-update: installing repo convention-sync.sh over $_home_self and re-executing" >&2
+    cp "$_repo_self" "$_home_self"
+    chmod +x "$_home_self"
+    rm -f "$0"   # this process's stable temp copy; the re-exec makes its own
+    CONVENTION_SYNC_SELF_UPDATED=1 CONVENTION_SYNC_STABLE="" \
+      exec bash "$_home_self" ${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}
+  fi
 fi
 
 if [[ "$DO_COMMIT" == true && -z "$COMMIT_MSG" ]]; then
