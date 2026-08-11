@@ -9,6 +9,10 @@
 #   reply          --owner <o> --repo <r> --pr <n> --comment-id <id> --body <text>
 #   resolve-thread --thread-id <node_id>                   Mark inline thread as resolved (GraphQL)
 #   mark-addressed --owner <o> --repo <r> --pr <n> --type <review|comment> --target-id <id> --body <text>
+#   comment        --owner <o> --repo <r> --pr <n> --body <text>|--body-file <path>
+#                                                          Post a standalone top-level PR comment (no
+#                                                          addressed-marker). For explainers not tied to
+#                                                          any existing thread, e.g. a proactive fixup.
 #   resolve-id     --owner <o> --repo <r> --pr <n> --node-id <id>
 #   headline       --owner <o> --repo <r> --sha <sha>
 #   fetch-pr-body  --owner <o> --repo <r> --pr <n>         Fetch current PR body → /tmp/pr-body.md
@@ -26,7 +30,7 @@ set -euo pipefail
 CMD="${1:-}"
 shift || true
 
-OWNER="" REPO="" PR="" COMMENT_ID="" NODE_ID="" BODY="" SHA="" THREAD_ID="" TARGET_TYPE="" TARGET_ID=""
+OWNER="" REPO="" PR="" COMMENT_ID="" NODE_ID="" BODY="" BODY_FILE="" SHA="" THREAD_ID="" TARGET_TYPE="" TARGET_ID=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --owner) OWNER="$2"; shift 2 ;;
@@ -35,6 +39,7 @@ while [[ $# -gt 0 ]]; do
     --comment-id) COMMENT_ID="$2"; shift 2 ;;
     --node-id) NODE_ID="$2"; shift 2 ;;
     --body) BODY="$2"; shift 2 ;;
+    --body-file) BODY_FILE="$2"; shift 2 ;;
     --sha) SHA="$2"; shift 2 ;;
     --thread-id) THREAD_ID="$2"; shift 2 ;;
     --type) TARGET_TYPE="$2"; shift 2 ;;
@@ -335,6 +340,25 @@ case "$CMD" in
       echo "marked: $ID ($MARKER)"
     else
       echo "Mark failed: $RESULT" >&2; exit 1
+    fi
+    ;;
+
+  comment)
+    require_gh
+    if [[ -n "$BODY_FILE" ]]; then
+      [[ -f "$BODY_FILE" ]] || { echo "Error: --body-file not found: $BODY_FILE" >&2; exit 1; }
+      BODY="$(cat "$BODY_FILE")"
+    fi
+    if [[ -z "$OWNER" || -z "$REPO" || -z "$PR" || -z "$BODY" ]]; then
+      echo "Error: --owner, --repo, --pr, and --body or --body-file required" >&2; exit 1
+    fi
+    RESULT=$(echo '{}' | jq --arg body "$BODY" '{body: $body}' | \
+      gh api "repos/$OWNER/$REPO/issues/$PR/comments" -X POST --input -)
+    URL=$(echo "$RESULT" | jq -r '.html_url // empty')
+    if [[ -n "$URL" ]]; then
+      echo "commented: $URL"
+    else
+      echo "Comment failed: $RESULT" >&2; exit 1
     fi
     ;;
 

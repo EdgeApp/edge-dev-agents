@@ -14,6 +14,6 @@ set -euo pipefail
 
 cat >/dev/null 2>&1 || true   # drain the hook JSON on stdin (unused)
 
-echo "[no-slop] Reply per ~/.cursor/skills/no-slop: zero em dashes; no courtesy enders or validation preambles; no structure announcements; lead with the answer; plain copulas; specific over general."
+echo "[no-slop] Reply per ~/.cursor/skills/no-slop: zero em dashes; no courtesy enders or validation preambles; no structure announcements; lead with the answer; plain copulas; specific over general. Ordering/race/state-machine explanation: one diagram per diagram-escalation (widget if present, else mermaid fence)."
 
 exit 0

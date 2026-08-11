@@ -63,10 +63,20 @@ case "$CMD" in
       exit 1
     }
 
+    # --- Call 3: Inline review comments (REST) — resolved threads included, so
+    # no-duplicate-feedback can be checked against EVERYTHING already raised,
+    # not just unresolved threads. Trimmed to the fields duplicate-checking
+    # needs; body capped to keep context cost bounded.
+    INLINE=$(gh api "repos/$_OWNER/$_REPO/pulls/$NUMBER/comments" --paginate 2>&1) || {
+      echo "Error: Failed to fetch PR inline comments. Output: $INLINE" >&2
+      exit 1
+    }
+
     # Merge into single structured JSON output
     jq -n \
       --argjson meta "$META" \
       --argjson files "$FILES" \
+      --argjson inline "$INLINE" \
       '{
         number: $meta.number,
         title: $meta.title,
@@ -75,6 +85,7 @@ case "$CMD" in
         baseRef: $meta.baseRefName,
         headSha: $meta.headRefOid,
         reviews: [($meta.reviews // [])[] | {user: .author.login, state: .state, body: .body}],
+        inlineComments: [$inline[] | {user: .user.login, path: .path, line: (.line // .original_line), body: (.body | .[0:400])}],
         files: [$files[] | {path: .filename, status: .status, additions: .additions, deletions: .deletions, patch: .patch}]
       }'
     ;;

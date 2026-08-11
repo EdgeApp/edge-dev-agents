@@ -1,0 +1,20 @@
+---
+description: Diagram escalation for chat explanations of ordering, races, and state machines
+alwaysApply: true
+---
+
+# Diagram Escalation (chat)
+
+When a chat explanation covers ordering, a race, or state-machine behavior — anything where the reader would otherwise simulate event interleavings in their head — carry the mechanism in ONE diagram and keep the surrounding prose tight. Same trigger and cap as pr-address/pr-review `diagram-escalation`; those rules own the PR-comment side, this rule owns chat.
+
+Delivery, one if/else (the fence branch is a Cursor-compat shim — see memory `cursor-first-migration-debt`):
+
+1. A visualize widget tool is present in-session (Claude Code app) → render the diagram with it.
+2. Otherwise (Cursor chat) → a plain ```mermaid fence inline; Cursor renders it, and it degrades to readable text anywhere else.
+
+Constraints:
+
+- One diagram per explanation, and only when the ordering trigger fires. Prose-only stays correct for everything else; never decorate.
+- Sequence diagram for cross-component ordering, flowchart for gates/branches, before/after pairs for behavior changes.
+- Participant IDs must not be mermaid keywords; tdd's `diagrams-and-signatures` owns the pitfall list.
+- The diagram carries the mechanism; the prose states the conclusion and the consequence. If the prose still walks the interleaving step by step, the diagram has not done its job.
