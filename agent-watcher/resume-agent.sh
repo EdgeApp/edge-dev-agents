@@ -168,7 +168,12 @@ if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
   exit 1
 fi
 
-first_gid_of() { head -c 16384 "$1" | grep -oE 'app\.asana\.com[A-Za-z0-9/._-]*' | head -1 | grep -oE '[0-9]{12,}' | tail -1 || true; }
+# 64KB, not 16KB: fresh-spawn conversations open with the SessionStart context
+# injection (up to ~15KB), which pushed the /one-shot task URL past a 16KB
+# window and left those transcripts gid-less (rendered "(untitled)" in lists).
+# First URL WITH a gid-length digit run, not first URL: injected run-context can
+# put digit-less asana asset URLs (/app/asana/-/get_asset) ahead of the task URL.
+first_gid_of() { head -c 65536 "$1" | grep -oE 'app\.asana\.com[A-Za-z0-9/._-]*' | grep -E '[0-9]{12,}' | head -1 | grep -oE '[0-9]{12,}' | tail -1 || true; }
 
 # ─── Asana task-name resolution (shared by --list and term matching) ──────────
 # A transcript records only the task URL, never the name, so a human-readable
@@ -359,7 +364,10 @@ emit_candidates() {
     # `grep -m1` closes the pipe early; head/sed upstream die SIGPIPE (141), which
     # `set -eo pipefail` turns into a silent abort mid-listing. Absorb it.
     preview=$( (head -30 "$f" | grep -m1 '"/one-shot --yolo' | sed -E 's/.*"(\/one-shot --yolo [^"]{0,80})[^"]*".*/\1/' | head -c 100) 2>/dev/null || true)
-    printf "%s\t%s\t%s\t%s\n" "$mtime" "$uuid" "$gid" "$preview"
+    # "-" placeholder, never an empty field: tab is IFS whitespace, so an empty
+    # gid COLLAPSES on `IFS=$'\t' read` and shifts the preview into the gid
+    # column (this blanked titles downstream). Consumers normalize "-" back.
+    printf "%s\t%s\t%s\t%s\n" "$mtime" "$uuid" "${gid:--}" "$preview"
   done | sort -rn
 }
 
@@ -378,6 +386,7 @@ if $DO_LIST; then
   if $PORCELAIN; then
     while IFS=$'\t' read -r mtime uuid gid preview; do
       [[ -n "$mtime" ]] || continue
+      [[ "$gid" == "-" ]] && gid=""   # emit_candidates placeholder (see comment there)
       nm=$(name_of_gid "$gid")
       if [[ -n "$nm" ]]; then title="Asana: $nm"; else title="${preview:-}"; fi
       state=""; rc=""
@@ -396,6 +405,7 @@ if $DO_LIST; then
   echo "  ● running   ◐ retired (alive, attachable)   ✗ dead pane"
   while IFS=$'\t' read -r mtime uuid gid preview; do
     [[ -n "$mtime" ]] || continue
+    [[ "$gid" == "-" ]] && gid=""   # emit_candidates placeholder (see comment there)
     ts=$(date -r "$mtime" '+%Y-%m-%d %H:%M:%S')
     nm=$(name_of_gid "$gid")
     if [[ -n "$nm" ]]; then title="Asana: $nm"; else title="${preview:-(title unavailable)}"; fi
