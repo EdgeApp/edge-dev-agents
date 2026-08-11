@@ -12,9 +12,10 @@ metadata:
 <rule id="standards-first">Read review standards BEFORE examining code. Load both `~/.cursor/rules/review-standards.mdc` and `~/.cursor/rules/typescript-standards.mdc` in parallel.</rule>
 <rule id="use-companion-script">Use `~/.cursor/skills/pr-review/scripts/github-pr-review.sh` for all GitHub API operations. Do not use raw `curl`, `gh`, or MCP tools inline.</rule>
 <rule id="no-script-bypass">If a companion script fails, report the error and STOP. Do NOT fall back to raw `gh`, `curl`, or other workarounds.</rule>
-<rule id="no-duplicate-feedback">Check existing reviews from the context output. Do not repeat feedback already given by another reviewer.</rule>
+<rule id="no-duplicate-feedback">Check existing reviews AND `inlineComments` from the context output (inline comments include resolved threads). Do not repeat feedback already given by another reviewer.</rule>
 <rule id="batch-reads">When reviewing changed files, batch independent Read/Grep calls in a single message.</rule>
 <rule id="script-timeouts">The companion script may take up to 30s. Set `block_until_ms: 60000` when invoking it.</rule>
+<rule id="diagram-escalation">Comments stay concise per the formatting sub-step. EXCEPTION: when a finding explains ordering, a race, or state-machine behavior — anything where the reader would otherwise simulate event interleavings — carry the mechanism in ONE ```mermaid block inside the comment (GitHub renders mermaid natively) and keep the surrounding prose concise. Sequence diagram for cross-component ordering, flowchart for gates. Participant IDs must not be mermaid keywords; tdd's `diagrams-and-signatures` rule owns the pitfall list. Never more than one diagram per comment; a finding that does not involve ordering stays prose-only.</rule>
 </rules>
 
 <step id="1" name="Gather PR context">
@@ -101,6 +102,7 @@ Use `"REQUEST_CHANGES"` for critical issues, `"COMMENT"` for suggestions only, `
 - Multi-line range: use both `start_line` (first) and `line` (last)
 - `side`: use `"RIGHT"` for new code (additions)
 - Keep comments concise, use backtick formatting for code, bold, or italics
+- Ordering/race findings: one mermaid block carries the mechanism (`diagram-escalation`)
 - 0 findings: No review needed
 - 1 inline comment: Leave `body` empty (`""`)
 - 2+ inline comments: Only add `body` if it provides necessary linking context
