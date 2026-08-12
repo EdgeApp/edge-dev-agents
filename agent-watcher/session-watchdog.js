@@ -46,17 +46,29 @@ const STATE_FILE = path.join(slots.STATE_DIR, 'watchdog-state.json')
 const CRED_FILE = path.join(HOME, '.config/agent-watcher/credentials.json')
 const CFG_FILE = path.join(HOME, '.config/agent-watcher/asana-config.json')
 const IDLE_THRESHOLD_MS = 20 * 60 * 1000
-// resume-agent --chat forks (claude-asana-chat-*) are discussion sessions: their
-// non-gid names exempt them from the completion sweep, so without a reaper they
-// accumulate (each idle claude holds 100s of MB). Reap after 48h without pane
-// change; the transcript survives, so `resume-agent <term> --chat` resurrects.
-// Named discussion anchors (main/eval/pokemon/...) are NOT chat- prefixed and
-// are never reaped.
-const CHAT_IDLE_REAP_MS = 48 * 60 * 60 * 1000
+// Shared idle-reap TTL (watcher.idle_reap_hours, default 72): one clock for
+// every non-run session class. Discussion sessions (chat-* forks + ad-hoc
+// named) reap after this long without pane-content change; retired
+// (done-asana-*) sessions use the SAME key in pruneRetiredSessions(), so the
+// count cap there is only a memory backstop. The clock is pane-content change,
+// not tmux activity — a session still streaming output counts as active, and
+// attaching/poking a session resets it. Transcripts survive every reap;
+// `resume-agent --uuid <id> --chat` resurrects.
+let _idleReapMs = null
+function IDLE_REAP_MS() {
+  if (_idleReapMs !== null) return _idleReapMs
+  let h = 72
+  try {
+    const n = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8'))?.watcher?.idle_reap_hours
+    if (Number.isFinite(n) && n > 0) h = n
+  } catch { /* keep default */ }
+  _idleReapMs = h * 60 * 60 * 1000
+  return _idleReapMs
+}
 // Sessions exempt from the idle reaper, BY EXPLICIT NAME (watcher.persistent_anchors
 // in asana-config.json; matched against the name after the claude-asana-/claude-
 // prefix). Everything else — chats AND ad-hoc anchor-named sessions — reaps at
-// CHAT_IDLE_REAP_MS. Operator policy 2026-07-26: only deliberately-named sessions
+// IDLE_REAP_MS(). Operator policy 2026-07-26: only deliberately-named sessions
 // (main, eval-run, pokemon) stay alive.
 let PERSISTENT_ANCHORS = ['main', 'eval-run', 'pokemon']
 try {
@@ -798,7 +810,7 @@ function writeReleaseReceipt(taskGid, slot, metroPort) {
 
 // Cap retired sessions kept alive (each holds a live claude → memory bound). Keep
 // the newest keep_completed_sessions; kill the older ones outright.
-function pruneRetiredSessions() {
+function pruneRetiredSessions(state) {
   const keep = getKeepCompletedSessions()
   let retired = listRetiredSessions()
   // A retired pane is kept alive ONLY so its claude stays attachable / re-engageable;
@@ -810,9 +822,32 @@ function pruneRetiredSessions() {
   })
   for (const s of dead) {
     sh(`tmux kill-session -t "${s.name}"`)
+    delete state.sessions[s.name]
     log(`[${s.name}] retired pane's claude gone → killed`)
   }
   if (dead.length) retired = retired.filter((s) => !dead.includes(s))
+  // Idle TTL — the SAME content-change clock and idle_reap_hours key as the
+  // discussion reaper. The clock starts at retirement (first prune tick seeds
+  // the baseline) and resets on any pane-content change, so a retiree the
+  // operator attaches to or re-engages stays alive; a truly stale one dies at
+  // the TTL regardless of the count cap below.
+  const now = Date.now()
+  const stale = []
+  for (const s of retired) {
+    const content = capturePane(s.name)
+    const prior = state.sessions[s.name]
+    const changed = !prior || prior.lastContent !== content
+    const lastChange = changed ? now : prior.lastChange
+    state.sessions[s.name] = { ...prior, lastContent: content, lastChange }
+    if (!changed && now - lastChange > IDLE_REAP_MS()) stale.push(s)
+  }
+  for (const s of stale) {
+    const idleH = Math.round((now - (state.sessions[s.name]?.lastChange ?? now)) / 3600000)
+    sh(`tmux kill-session -t "${s.name}"`)
+    delete state.sessions[s.name]
+    log(`[${s.name}] retired idle ${idleH}h > ${Math.round(IDLE_REAP_MS() / 3600000)}h TTL → killed (transcript survives)`)
+  }
+  if (stale.length) retired = retired.filter((s) => !stale.includes(s))
   if (retired.length <= keep) {
     if (retired.length > 0) log(`Retired sessions: ${retired.length}/${keep} kept; none pruned`)
     return
@@ -821,6 +856,7 @@ function pruneRetiredSessions() {
   log(`Retired sessions: ${retired.length} > cap ${keep} → killing ${toPrune.length} oldest`)
   for (const s of toPrune) {
     sh(`tmux kill-session -t "${s.name}"`)
+    delete state.sessions[s.name]
     log(`[${s.name}] retired beyond cap → killed`)
   }
 }
@@ -967,7 +1003,7 @@ function main() {
 
     const changed = !prior || prior.lastContent !== content
     let lastChange = changed ? now : prior.lastChange
-    // Chat-session idle reaper (see CHAT_IDLE_REAP_MS). Runs after the pane
+    // Discussion-session idle reaper (see IDLE_REAP_MS). Runs after the pane
     // capture so `changed` is fresh; RC revive below still applies to chat
     // sessions younger than the reap threshold.
     // Reap idle CHATS and idle UNLISTED ANCHORS alike. Exemption is an EXPLICIT
@@ -980,9 +1016,9 @@ function main() {
     const isChat = taskGid.startsWith('chat-')
     const anchorName = isChat ? null : session.replace(/^claude-(asana-)?/, '')
     const exempt = anchorName != null && PERSISTENT_ANCHORS.includes(anchorName)
-    if (!exempt && !changed && now - (prior?.lastChange ?? now) > CHAT_IDLE_REAP_MS) {
+    if (!exempt && !changed && now - (prior?.lastChange ?? now) > IDLE_REAP_MS()) {
       const kind = isChat ? 'chat session' : `unlisted anchor '${anchorName}'`
-      log(`[${session}] ${kind} idle ${Math.round((now - prior.lastChange) / 3600000)}h > 48h → reaped (transcript survives; resurrect: resume-agent --uuid <id> --chat${isChat ? '' : ' --name <name>'}; keep one permanently via watcher.persistent_anchors)`)
+      log(`[${session}] ${kind} idle ${Math.round((now - prior.lastChange) / 3600000)}h > ${Math.round(IDLE_REAP_MS() / 3600000)}h → reaped (transcript survives; resurrect: resume-agent --uuid <id> --chat${isChat ? '' : ' --name <name>'}; keep one permanently via watcher.persistent_anchors)`)
       sh(`tmux kill-session -t "${session}"`)
       delete state.sessions[session]
       continue
@@ -1037,7 +1073,7 @@ function main() {
   // Cap retired (completed-but-kept-alive) sessions so they don't accumulate in memory.
   // (Re-engagement of a finished task is the WATCHER's job now, via Pending → resume;
   // the un-retire sweep was removed 2026-06-25 — see its REMOVED note above.)
-  pruneRetiredSessions()
+  pruneRetiredSessions(state)
 
   // Surface any session the Stop hook gave up on (livelock bound) to the operator.
   escalateStuckSessions()
