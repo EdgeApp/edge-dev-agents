@@ -21,7 +21,6 @@ set -euo pipefail
 
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 MARKER="/tmp/agent-playbook-read-$AGENT_TASK_GID"
-[ -f "$MARKER" ] && exit 0
 
 INPUT=$(cat)
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
@@ -39,6 +38,24 @@ case "$TOOL" in
     ;;
 esac
 [ "$IS_DRIVE" = 1 ] || exit 0
+
+# Playbook already read: pass, but once per run inject the working-set check at
+# the FIRST post-read drive. Salience delivery, not availability — the playbook
+# is force-read (below) yet its working-set bullet was read-and-missed on an
+# asset task (HOOD, 2026-08-12). Fires only when corePlugins.ts is untouched;
+# a trimmed worktree or a non-gui repo sees nothing. Never blocks.
+if [ -f "$MARKER" ]; then
+  NUDGE_FLAG="/tmp/agent-coreplugins-nudge-$AGENT_TASK_GID"
+  [ -f "$NUDGE_FLAG" ] && exit 0
+  : > "$NUDGE_FLAG"
+  CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)
+  TOP=$(git -C "${CWD:-/nonexistent}" rev-parse --show-toplevel 2>/dev/null || true)
+  CP="$TOP/src/util/corePlugins.ts"
+  if [ -n "$TOP" ] && [ -f "$CP" ] && git -C "$TOP" diff --quiet HEAD -- src/util/corePlugins.ts 2>/dev/null; then
+    jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: "corePlugins.ts is untouched. If this task is asset/chain/provider-scoped, trim the plugin set to the task WORKING SET before driving: the target plugin(s) plus funding sources (BTC/ETH/USDC) plus every provider under test — playbook \"working set\" entry. Funding carve-out: if a funding route later needs a filtered-out asset/provider, widen or remove the trim, fund, re-trim if useful; a funding blocker caused by your own trim is self-inflicted (concession-validator denies it). If the full plugin set is intentional for this task, drive on."}}'
+  fi
+  exit 0
+fi
 
 PLAYBOOK="$HOME/.cursor/skills/build-and-test/references/sim-testing-playbook.md"
 cat >&2 <<MSG
