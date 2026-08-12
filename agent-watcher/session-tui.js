@@ -10,10 +10,11 @@
 //               (resumable; source = `resume-agent.sh --list --porcelain`)
 //
 // Reap display mirrors session-watchdog.js policy (the watchdog is the actor,
-// this is only a view): chats + ad-hoc anchors reap after 48h idle unless the
-// name is in watcher.persistent_anchors; retired (done-asana) sessions beyond
-// the newest keep_completed_sessions are killed oldest-first. Idle here is
-// tmux session_activity — an approximation of the watchdog's own pane-content
+// this is only a view): chats, ad-hoc names, AND retired (done-asana) sessions
+// share one idle TTL (watcher.idle_reap_hours, default 72h) unless the name is
+// in watcher.persistent_anchors; retirees additionally cap at the newest
+// keep_completed_sessions (oldest-first kill). Idle here is tmux
+// session_activity — an approximation of the watchdog's own pane-content
 // clock, close enough for a dashboard.
 //
 // Keys (context-sensitive, shown in the footer):
@@ -26,6 +27,7 @@
 //   /  content search over ALL transcripts on the machine (every kind and
 //      project dir, live or dead) via session-index.sh --grep; ⏎ runs it,
 //      Esc clears. Rows live in a pane attach; dead rows fork/resume.
+//      o  cycles search sort: rank (index order) → activity → spawn
 //   i  revive claude inside a DEAD chat/anchor pane (same conversation + RC)
 //   x  kill tmux session (y/n confirm)      r  refresh      q  quit
 //
@@ -43,7 +45,6 @@ const HOME = os.homedir()
 const AW = `${HOME}/.config/agent-watcher`
 const RESUME = `${AW}/resume-agent.sh`
 const FORKS = `${process.env.XDG_STATE_HOME || HOME + '/.local/state'}/agent-watcher/chat-forks.jsonl`
-const CHAT_REAP_MS = 48 * 60 * 60 * 1000
 
 const sh = (cmd) => { try { return execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) } catch { return '' } }
 
@@ -54,9 +55,12 @@ function loadConfig () {
     const c = JSON.parse(fs.readFileSync(`${AW}/asana-config.json`, 'utf8'))
     return {
       anchors: c.watcher?.persistent_anchors || [],
-      keepCompleted: c.watcher?.keep_completed_sessions ?? 3
+      keepCompleted: c.watcher?.keep_completed_sessions ?? 3,
+      // Shared idle-reap TTL (watcher.idle_reap_hours): one clock for chats,
+      // ad-hoc names, AND retired sessions — mirrors the watchdog.
+      reapMs: (c.watcher?.idle_reap_hours ?? 72) * 3600 * 1000
     }
-  } catch { return { anchors: [], keepCompleted: 3 } }
+  } catch { return { anchors: [], keepCompleted: 3, reapMs: 72 * 3600 * 1000 } }
 }
 
 function loadForks () {
@@ -157,6 +161,14 @@ function classify (s, cfg) {
   return { kind: anchor ? 'anchor' : 'adhoc', slug: m[1], state: s.claudeAlive ? 'alive' : 'dead' }
 }
 
+// Every datetime the TUI renders is PT, 12-hour ("8/11 4:17p").
+function fmtDate (epoch) {
+  if (!epoch) return '?'
+  return new Date(epoch * 1000)
+    .toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
+    .replace(',', '').replace(' AM', 'a').replace(' PM', 'p')
+}
+
 function fmtAgo (epoch) {
   if (!epoch) return '?'
   let s = Math.max(0, Math.floor(Date.now() / 1000 - epoch))
@@ -197,9 +209,12 @@ function buildModel () {
       }
       if (!row.title) row.title = c.slug
     }
-    // Reap exposure
-    if (c.kind === 'chat' || c.kind === 'adhoc') {
-      const left = CHAT_REAP_MS / 1000 - (Date.now() / 1000 - s.activity)
+    // Reap exposure — shared TTL for every non-run class (chats, ad-hoc,
+    // retired). Idle here is tmux activity, an approximation of the watchdog's
+    // pane-content clock; shown only inside the last 24h so the column stays
+    // quiet for fresh sessions.
+    if (c.kind === 'chat' || c.kind === 'adhoc' || c.state === 'retired') {
+      const left = cfg.reapMs / 1000 - (Date.now() / 1000 - s.activity)
       row.reap = left <= 0 ? 'REAPABLE now' : `reap in ${fmtAgo(Date.now() / 1000 - left)}`
       if (left > 24 * 3600) row.reap = ''
     }
@@ -245,6 +260,21 @@ function flatten () {
   if (sel >= items.length) sel = Math.max(0, items.length - 1)
 }
 
+// 'o' in search results: cycle sort order. 'rank' is session-index's own
+// ranking (originals first, authored count, recency); activity/spawn are
+// newest-first by transcript mtime/birth.
+function cycleSearchSort () {
+  if (!search) return
+  search.sort = search.sort === 'rank' ? 'act' : search.sort === 'act' ? 'spawn' : 'rank'
+  search.rows = search.sort === 'rank'
+    ? search.rank.slice()
+    : search.rank.slice().sort((a, b) => (search.sort === 'act' ? b.mtime - a.mtime : b.birth - a.birth))
+  sel = 0
+  flatten()
+  status = `sort: ${search.sort === 'rank' ? 'rank (index order)' : search.sort === 'act' ? 'last activity' : 'spawn date'}`
+  render()
+}
+
 // '/' search: content search over EVERY transcript on this machine (all kinds,
 // all project dirs, live or dead) via session-index.sh --grep — a superset of
 // the TRANSCRIPTS list, which only carries watcher-spawned runs. Rows whose
@@ -265,13 +295,14 @@ function runSearch (q) {
     uuid: t.uuid,
     gid: t.task_gid || '',
     mtime: Math.floor(Date.parse(t.mtime) / 1000),
+    birth: Math.floor(Date.parse(t.birth) / 1000) || 0,
     forkChild: null,
     liveName: t.live_tmux || ''
   }))
-  search = { q, rows }
+  search = { q, rows, rank: rows.slice(), sort: 'rank' }
   sel = 0
   flatten()
-  status = `${rows.length} matches for '${q}' — Esc clears, ranked originals-first`
+  status = `${rows.length} matches for '${q}' — Esc clears, o cycles sort (rank/activity/spawn)`
   render()
 }
 
@@ -303,24 +334,30 @@ function render () {
   const cols = process.stdout.columns || 120
   const rows = process.stdout.rows || 40
   let out = `${ESC}H${ESC}2J`
-  out += `${clr.bold} AGENT SESSIONS${clr.off}  ${clr.dim}${new Date().toLocaleTimeString()}  anchors never reap: ${(model.cfg.anchors || []).join(', ')}  retired kept: ${model.cfg.keepCompleted}${clr.off}\n\n`
+  out += `${clr.bold} AGENT SESSIONS${clr.off}  ${clr.dim}${new Date().toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour12: true })}  anchors never reap: ${(model.cfg.anchors || []).join(', ')}  retired kept: ${model.cfg.keepCompleted}${clr.off}\n\n`
 
   const titleW = Math.min(58, cols - 52)
   let line = 0
   const maxLines = rows - 7
   const startIdx = Math.max(0, sel - maxLines + 4)
   let printedLive = false; let printedDead = false
-  if (search) { out += `${clr.bold} SEARCH '${search.q}' — ${search.rows.length} transcript match(es), all kinds${clr.off}\n`; line++ }
+  if (search) {
+    out += `${clr.bold} SEARCH '${search.q}' — ${search.rows.length} transcript match(es), all kinds — sort: ${search.sort}${clr.off}\n`
+    out += `${clr.dim}   ${pad('LAST ACTIVITY', 15)}${pad('IDLE', 9)}${pad('SPAWNED', 15)}TITLE${clr.off}\n`
+    line += 2
+  }
   items.forEach((r, i) => {
     if (i < startIdx || line >= maxLines) return
     if (!search && i < model.live.length && !printedLive) { out += `${clr.bold} LIVE (tmux)${clr.off}\n`; printedLive = true; line++ }
     if (!search && i >= model.live.length && !printedDead) { out += `\n${clr.bold} TRANSCRIPTS (no live session — resumable)${clr.off}\n`; printedDead = true; line += 2 }
     let l
     if (r.kind === 'transcript') {
-      const d = new Date(r.mtime * 1000)
-      const ds = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
       const fork = r.isForkOfLive ? `${clr.dim} → has live fork${clr.off}` : ''
-      l = `   ${pad(ds, 12)}${pad(r.title, titleW)}${fork}`
+      if (search) {
+        l = `   ${pad(fmtDate(r.mtime), 15)}${pad(fmtAgo(r.mtime), 9)}${pad(fmtDate(r.birth), 15)}${pad(r.title, titleW)}${fork}`
+      } else {
+        l = `   ${pad(fmtDate(r.mtime), 12)}${pad(r.title, titleW)}${fork}`
+      }
     } else {
       const idle = `idle ${fmtAgo(r.activity)}`
       const reap = r.reap ? (r.reap.startsWith('REAPABLE') || r.reap.startsWith('overflow') ? `${clr.red}${r.reap}${clr.off}` : `${clr.yel}${r.reap}${clr.off}`) : ''
@@ -341,7 +378,7 @@ function render () {
     if (r.state === 'dead' && r.kind !== 'run' && r.uuid) acts.push('i revive in pane')
   }
   acts.push('/ search')
-  if (search) acts.push('Esc clear')
+  if (search) acts.push('o sort', 'Esc clear')
   acts.push('r refresh', 'q quit')
   out += `\n${ESC}${rows - 1};1H${clr.dim} ${acts.join('  ·  ')}${clr.off}`
   if (searchInput !== null) out += `${ESC}${rows};1H${clr.cyn} search: ${searchInput}▌${clr.off}`
@@ -477,6 +514,7 @@ process.stdin.on('data', (b) => {
   const r = items[sel]
   if (k === '\x1b' && search) { search = null; sel = 0; flatten(); status = ''; render(); return }
   if (k === '/') { searchInput = ''; render(); return }
+  if (k === 'o' && search) { cycleSearchSort(); return }
   if (k === 'q' || k === '\x03') quit()
   else if (k === `${ESC}A` || k === 'k') { sel = Math.max(0, sel - 1); render() }
   else if (k === `${ESC}B` || k === 'j') { sel = Math.min(items.length - 1, sel + 1); render() }

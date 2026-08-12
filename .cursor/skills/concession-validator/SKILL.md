@@ -11,6 +11,7 @@
 
 <deny-on-sight description="Known-false categories. The reason text alone convicts them — no attempt-log needed.">
 - **"no funds" / "no test account holds X" / "wallet not funded"** → funding is solvable: swap-to-fund from a sanctioned roster wallet (BTC/ETH/USDC) at the playbook's minimum-viable amount. DENY. Try: swap-to-fund, then attempt.
+- **"funding route unavailable" / "swap won't quote" / "provider disabled" WHILE the run's own corePlugins trim is live** → the trimmed plugin set is the run's OWN scaffolding, never a wall: the playbook's funding carve-out says widen/remove the filter, fund through the previously filtered asset/provider, then re-trim if useful. A funding blocker whose route is closed by the session's own filtering is self-inflicted. DENY. Try: revert/widen the corePlugins trim, fund, re-apply if useful, then attempt.
 - **"no maestro flow exists" / "no fixture" / "data comes from a remote server" / "feature not enabled by default"** → the test harness is yours to build (`build-the-test-harness`): author the flow, inject the fixture/seed/remote-config payload, force the flag. DENY. Try: build the scaffolding (local, uncommitted), then drive the real path.
 - **"can only verify statically" / "can't construct a repro"** → build the relevant flavor and drive the precise runtime repro. DENY. Try: the most-specific runtime repro.
 - **"unmerged dependency PR" / "dep not published"** → link it locally (updot / `--existing-branch`). DENY. Try: link the dep branch into the worktree.

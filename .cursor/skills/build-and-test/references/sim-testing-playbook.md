@@ -372,13 +372,26 @@ daemon can drift to another sim, and the 2026-07-22 swapter run spent an hour
 debugging screenshots of the wrong device.
 
 ## Investigate cheap before driving the UI
-- **Asset/provider-scoped tasks: force the target via corePlugins BEFORE the
-  first drive.** When the task names specific asset(s) or provider(s), apply the
-  local corePlugins hack up front (disable competing `swapPlugins` per the
-  provider-forcing entry below, or trim to the target plugin for buy/sell), not
-  after quotes route elsewhere: with the full plugin set live, every attempt
-  re-navigates to re-find the target and the engine reverts to best-rate in
-  ~60s. Worktree-local and uncommitted, same rules as provider forcing.
+- **Scoped tasks: trim the plugin set to the task's WORKING SET before the
+  first drive.** When a task names specific asset(s), chain(s), or provider(s),
+  apply the local corePlugins hack up front so the app boots with exactly what
+  the run needs: the target plugin(s), plus every asset/provider the run will
+  fund or swap through, plus nothing else. The working set is plural whenever
+  the task is (a multi-provider exploration keeps ALL providers under test
+  enabled). Deciding the working set is part of test planning, not a reaction
+  to churn: with the full set live, every attempt re-navigates to re-find the
+  target and the engine reverts to best-rate in ~60s. Worktree-local and
+  uncommitted, same rules as provider forcing.
+    - New-chain or single-chain task: enable the target chain + the funding
+      sources (e.g. BTC/ETH/USDC), disable the rest.
+    - Provider forcing: disable competing `swapPlugins` (provider-forcing entry
+      below); keep every provider the task itself is exploring.
+    - Buy/sell: trim to the ramp provider(s) under test.
+    - FUNDING CARVE-OUT: if funding turns out to need a filtered-out asset or
+      provider (a swap route, a source balance), WIDEN or remove the filter to
+      unblock, fund, then re-trim if useful. Filtering is a convenience, never
+      a constraint — "couldn't fund because the plugin set was trimmed" is a
+      self-inflicted blocker, not a concession.
 - **Pick the swap test pair via direct provider API before ANY in-sim quote
   probing.** Trying pairs/amounts in the Exchange scene until one quotes is the
   most expensive probe there is. Instead: (1) candidate assets in priority
