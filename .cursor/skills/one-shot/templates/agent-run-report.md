@@ -82,11 +82,35 @@ _None observed._
 
 ## Decisions
 <!-- cat: decisions -->
-<!-- Consequential / non-obvious choices only. Each: the decision, the rejected
-     alternative, and why. In --yolo this also captures auto-deferred decisions
-     (question, default chosen). Do NOT annotate a choice as reversible — that's
-     the default and saying it is noise; note reversibility ONLY when a choice was
+<!-- Consequential / non-obvious choices only, split by class below. Omit any
+     empty subsection. Do NOT annotate a choice as reversible — that's the
+     default and saying it is noise; note reversibility ONLY when a choice was
      IRREVERSIBLE. -->
+
+### Product calls
+<!-- The orch IS product: copy, naming, UX defaults, thresholds, error wording.
+     Each: the call, each rejected alternative with why it lost, and the trigger
+     that would reopen it. -->
+
+### Technical choices
+<!-- Implementation approach picked among real alternatives. Each: the choice,
+     the rejected alternative(s), and why. A choice with no alternative is a
+     description — leave it out. -->
+
+### Accepted risks
+<!-- Known consequences knowingly shipped: a review finding resolved by
+     NARROWING ("the residual is only X"), a scenario that breaks when an
+     external date/flag flips, a limitation the design tolerates on purpose.
+     Each entry MUST carry a reopen trigger (date, event, or observation) —
+     an accepted risk without a trigger is how the MoonPay Private Relay
+     residual died in a resolved review thread (2026-08-13). This is NOT a
+     testing gap: the behavior is verified and understood; what's recorded is
+     the decision to ship anyway. -->
+
+### Auto-deferred (--yolo)
+<!-- Questions a human would have been asked, answered with a defensible
+     default instead: the question, the default chosen. -->
+
 _None observed._
 
 ## Dev Notes & Gotchas

@@ -7,10 +7,11 @@ alwaysApply: true
 
 When a chat explanation covers ordering, a race, or state-machine behavior — anything where the reader would otherwise simulate event interleavings in their head — carry the mechanism in ONE diagram and keep the surrounding prose tight. Same trigger and cap as pr-address/pr-review `diagram-escalation`; those rules own the PR-comment side, this rule owns chat.
 
-Delivery, one if/else (the fence branch is a Cursor-compat shim — see memory `cursor-first-migration-debt`):
+Delivery, first match wins (the fence branch is a Cursor-compat shim — see memory `cursor-first-migration-debt`):
 
-1. A visualize widget tool is present in-session (Claude Code app) → render the diagram with it.
-2. Otherwise (Cursor chat) → a plain ```mermaid fence inline; Cursor renders it, and it degrades to readable text anywhere else.
+1. A visualize widget tool is present in-session (Claude Code desktop app) → render the diagram with it.
+2. No widget tool but SendUserFile exists (Claude Code CLI, incl. tmux-wrapped orch sessions) → write the diagram to a scratchpad `.md` file (mermaid fence inside) and SendUserFile with `display: 'render'`; it renders in the side panel. Do NOT also paste the fence in chat — one delivery per diagram.
+3. Otherwise (Cursor chat) → a plain ```mermaid fence inline; Cursor renders it, and it degrades to readable text anywhere else.
 
 Constraints:
 
