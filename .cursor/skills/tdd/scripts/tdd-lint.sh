@@ -16,6 +16,10 @@
 #     The error points at the message line, not the declaration, and nothing
 #     else in a repo parses mermaid, so this lint is the only thing between a
 #     reserved-word ID and a human opening the file on GitHub.
+#   - no semicolon in mermaid message/note text: mermaid lexes ";" as a
+#     statement terminator even mid-text, so the remainder parses as a bogus
+#     statement and GitHub shows "Unable to render rich display". Scoped to
+#     text after a ":" so flowchart statement-ending semicolons stay legal.
 #   - glossary: every "### Term" under "## Glossary" carries a source link
 #     (HARD); first use of each term in EVERY top-level section is linked, via
 #     tdd-glossary-link.sh --check (HARD); unexplained ALL-CAPS acronyms suggest
@@ -129,6 +133,14 @@ lines.forEach((line, i) => {
   const pm = /^\s*(?:create\s+|destroy\s+)?(?:participant|actor)\s+([A-Za-z0-9_]+)\s*(?:\bas\b|$)/i.exec(line)
   if (pm != null && MERMAID_RESERVED.has(pm[1].toLowerCase())) {
     findings.push(`mermaid: line ${i + 1} declares participant "${pm[1]}", a mermaid keyword — the diagram fails to parse at the first message that names it. Rename the ID (the label after "as" can keep the old wording)`)
+  }
+  // ";" is a statement terminator even inside message/note text: everything
+  // after it parses as a new (bogus) statement and the diagram fails to
+  // render. Only text after a ":" is checked, so flowchart lines that
+  // legitimately END statements with ";" (no colon) do not trip this.
+  const ci = line.indexOf(":")
+  if (ci >= 0 && line.indexOf(";", ci) >= 0) {
+    findings.push(`mermaid: line ${i + 1} has a semicolon in message/note text — mermaid lexes ";" as a statement terminator and the diagram fails to render. Use a comma`)
   }
 })
 
