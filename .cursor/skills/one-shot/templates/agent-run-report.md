@@ -106,7 +106,7 @@ _None observed._
      invisible by the day the external condition flips. This is NOT a testing
      gap: the behavior is verified and understood; what's recorded is the
      decision to ship anyway. e.g. "Provider X validates session IP; users
-     behind relay networks will fail once enforcement starts — reopen when
+     behind relay networks will fail once enforcement starts. Reopen when
      provider announces the enforcement date." -->
 
 ### Auto-deferred (--yolo)
