@@ -173,10 +173,10 @@ Agent sessions are gated by two PreToolUse hooks in `~/.claude/settings.json`
 `hooks.PreToolUse` block (matcher `Bash`):
 
     { "type": "command", "command": "~/.config/agent-watcher/hooks/git-history-gate.sh", "timeout": 10 },
-    { "type": "command", "command": "~/.config/agent-watcher/hooks/require-test-evidence-before-pr.sh", "timeout": 10 }
+    { "type": "command", "command": "~/.config/agent-watcher/hooks/pre-pr-gate.sh", "timeout": 10 }
 
 block-raw-git-commit: commits must go through lint-commit.sh (--amend allowed, --no-verify never).
-require-test-evidence-before-pr: pr-create.sh is blocked until a proof screenshot
+pre-pr-gate: pr-create.sh is blocked until a proof screenshot
 (/tmp/agent-proof-<gid>-*.png) or a justified blocker note (/tmp/agent-test-blocker-<gid>.md) exists.
     { "type": "command", "command": "~/.config/agent-watcher/hooks/block-simctl-booted.sh", "timeout": 10 },
 

@@ -33,7 +33,7 @@
           "type": "command"
         },
         {
-          "command": "~/.config/agent-watcher/hooks/require-test-evidence-before-pr.sh",
+          "command": "~/.config/agent-watcher/hooks/pre-pr-gate.sh",
           "timeout": 10,
           "type": "command"
         },
