@@ -101,11 +101,13 @@ _None observed._
 <!-- Known consequences knowingly shipped: a review finding resolved by
      NARROWING ("the residual is only X"), a scenario that breaks when an
      external date/flag flips, a limitation the design tolerates on purpose.
-     Each entry MUST carry a reopen trigger (date, event, or observation) —
-     an accepted risk without a trigger is how the MoonPay Private Relay
-     residual died in a resolved review thread (2026-08-13). This is NOT a
-     testing gap: the behavior is verified and understood; what's recorded is
-     the decision to ship anyway. -->
+     Each entry MUST carry a reopen trigger (date, event, or observation): a
+     risk accepted in a review reply and resolved without a trigger is
+     invisible by the day the external condition flips. This is NOT a testing
+     gap: the behavior is verified and understood; what's recorded is the
+     decision to ship anyway. e.g. "Provider X validates session IP; users
+     behind relay networks will fail once enforcement starts — reopen when
+     provider announces the enforcement date." -->
 
 ### Auto-deferred (--yolo)
 <!-- Questions a human would have been asked, answered with a defensible
