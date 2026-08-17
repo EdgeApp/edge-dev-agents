@@ -37,15 +37,31 @@ if printf '%s' "$CMD" | grep -qE '\.config/agent-watcher/(hooks/)?[A-Za-z0-9_.-]
   REWRITTEN=$(printf '%s' "$CMD" | sed -E 's/\|[[:space:]]*(tail|head)([[:space:]]+-[A-Za-z0-9]+)*([[:space:]]+[0-9]+)?[[:space:]]*($|\&\&|;)/\4/')
   if [ -n "$REWRITTEN" ] && [ "$REWRITTEN" != "$CMD" ] \
      && ! printf '%s' "$REWRITTEN" | grep -qE '\.config/agent-watcher/(hooks/)?[A-Za-z0-9_.-]+\.sh[^|]*\|'; then
-    jq -nc --arg cmd "$REWRITTEN" '{
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        permissionDecision: "allow",
-        permissionDecisionReason: "auto-rewrote piped agent-watcher call to bare (pipe breaks setgid on this host)",
-        updatedInput: { command: $cmd }
-      },
-      systemMessage: "Rewrote piped agent-watcher call to bare: piping these scripts through tail/head breaks their setgid and the write silently fails. The full stdout is returned instead of the truncated tail."
-    }'
+    # User-facing notice ONCE per task; later rewrites stay silent to the
+    # operator (26-72 fires/session made this the top chat-noise source,
+    # 2026-08-17). The model still gets permissionDecisionReason every time.
+    NOTICE_FLAG="/tmp/agent-pipe-rewrite-notice-$AGENT_TASK_GID"
+    if [ ! -f "$NOTICE_FLAG" ]; then
+      : > "$NOTICE_FLAG"
+      jq -nc --arg cmd "$REWRITTEN" '{
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          permissionDecision: "allow",
+          permissionDecisionReason: "auto-rewrote piped agent-watcher call to bare (pipe breaks setgid on this host)",
+          updatedInput: { command: $cmd }
+        },
+        systemMessage: "Auto-fixing piped agent-watcher calls to bare this run (pipes break their setgid). Further fixes are silent."
+      }'
+    else
+      jq -nc --arg cmd "$REWRITTEN" '{
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          permissionDecision: "allow",
+          permissionDecisionReason: "auto-rewrote piped agent-watcher call to bare (pipe breaks setgid on this host)",
+          updatedInput: { command: $cmd }
+        }
+      }'
+    fi
     exit 0
   fi
   # Rewrite did not cleanly apply (complex pipeline) — fall back to the block.

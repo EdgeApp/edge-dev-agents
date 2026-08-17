@@ -188,6 +188,28 @@ if (gids.size > 0) {
   } catch {}
 }
 
+// Fresh-spawn linkage: a pane launched WITHOUT --resume (fresh-conversation
+// spawns) writes a transcript whose uuid never appears in any argv, so the
+// argv-based liveByUuid join misses it — the transcript looks dead/resumable
+// while its conversation is live in the pane, which is divergence bait for
+// in-place resumes. Second pass: for run/retired panes with no argv uuid,
+// link by the pane name's task gid + a birth window (transcript born no
+// earlier than 60s before pane creation). Among candidates the latest-mtime
+// one wins: relaunch churn can leave several fresh transcripts, and the one
+// still being written is the live conversation.
+for (const s of live) {
+  if (s.resume_uuid || (s.kind !== 'run' && s.kind !== 'retired')) continue
+  const gid = (s.tmux.match(/(\d{12,})$/) || [])[1]
+  if (!gid || !s.created) continue
+  const createdMs = Date.parse(s.created)
+  const cands = transcripts.filter(t => t.task_gid === gid && !t.live_tmux && Date.parse(t.birth) >= createdMs - 60000)
+  if (!cands.length) continue
+  const c = cands.reduce((a, b) => (Date.parse(a.mtime) >= Date.parse(b.mtime) ? a : b))
+  c.live_tmux = s.tmux
+  s.resume_uuid = c.uuid
+  s.linked_by = 'birth'
+}
+
 // Lineage demotion for grep mode: a --fork-session child DUPLICATES the parent's
 // records verbatim (a 50MB fork is a full copy, not a compact summary), so its
 // hits look authored line-by-line. When a registered fork's parent also hits with

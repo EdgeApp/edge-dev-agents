@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Diagram Escalation (chat)
 
-When a chat explanation covers ordering, a race, or state-machine behavior — anything where the reader would otherwise simulate event interleavings in their head — carry the mechanism in ONE diagram and keep the surrounding prose tight. Same trigger and cap as pr-address/pr-review `diagram-escalation`; those rules own the PR-comment side, this rule owns chat.
+When a chat explanation covers ordering, a race, or state-machine behavior — anything where the reader would otherwise simulate event interleavings in their head — carry the mechanism in ONE diagram and keep the surrounding prose tight. The same trigger and cap are destination-independent: pr-review/pr-address restate them for their flows, and ANY PR or issue comment posted outside those skills (ad-hoc `gh` posting, curated findings from another finder) carries them directly — one ```mermaid fence, GitHub renders natively. This rule owns the chat delivery below.
 
 Delivery, first match wins (the fence branch is a Cursor-compat shim — see memory `cursor-first-migration-debt`):
 

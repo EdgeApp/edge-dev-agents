@@ -17,6 +17,7 @@ These words and phrases are statistically overrepresented in AI-generated text. 
 | underscore | show, prove, reinforce |
 | intricate / intricacies | complex, complicated, details |
 | interplay | interaction, relationship |
+| load-bearing / load bearing | name what depends on it ("X breaks without this") |
 | garner | get, earn, attract |
 | bolster / bolstered | support, strengthen, back |
 | foster / fostering | encourage, support, build |

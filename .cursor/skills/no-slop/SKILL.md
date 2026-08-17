@@ -77,7 +77,10 @@ destinations that render plain text (Asana comments), use hyphen bullets and
 blank lines; never markdown headers or bold there, since the syntax shows
 literally.
 
-- Do not bold excessively. Bold a term once at most when introducing it.
+- Bold for structure is fine wherever it helps scanning: list lead-ins, row
+  labels, key names, the term a section pivots on. What stays banned is
+  decorative bold: whole bolded sentences, mid-prose emphasis more than
+  rarely, or so much bold that nothing stands out.
 - Do not use emoji unless the user explicitly asks.
 - Do not use title case in headings beyond the first word and proper nouns (sentence case).
 - Do not create "key takeaways" sections.
@@ -89,6 +92,9 @@ literally.
 - Use contractions (don't, isn't, can't) in informal contexts.
 - Be specific over general. Numbers over adjectives. Evidence over claims.
 - It's OK to be blunt, dry, or even terse. Humans are.
+- American English spellings (behavior, honored, initialize, randomization).
+  British forms creep in when quoting partners who use them; a verbatim quote
+  keeps its original spelling, but your own prose around it does not inherit it.
 
 ## 14. State findings, don't grade or announce them
 
