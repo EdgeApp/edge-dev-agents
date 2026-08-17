@@ -23,6 +23,7 @@ delete.**
 | `agent-tw-65912400` | `Agent3Throwaway1` | `1234` | agent-sim-pool-0 | 2026-08-07 | BTC, ETH, LTC, BCH, DASH (app defaults) | Empty. Region unset. |
 | `agent-tw-571866930` | `Agent3Throwaway1` | `1234` | agent-sim-pool-0 | 2026-08-07 | app defaults | Empty. Region unset. |
 | `agent-tw-597658918` | `Agent3Throwaway1` | `1234` | agent-sim-pool-0 | 2026-08-07 | app defaults | Empty. Region unset. |
+| `agent-tw-307334222` | `Agent3Throwaway1` | `1234` | agent-sim-pool-0 | 2026-08-14 | app defaults + AVAX, COREUM, XMR | Region set to California/USA + USD. Carries promo code `agentramptest` in activePromotions (inert without a matching info-server entry). 2026-08-17 NYM run: added the three wallets above, held ~0.001 ETH dust in My Ether, and accepted the Nym-mixnet and scam-warning notices. All four Privacy Settings mixnet toggles were turned back OFF. |
 
 Notes on the sim column: the account's device stash lives on ONE simulator, so a
 row is only usable from that sim (or from any clone cut after it was created).

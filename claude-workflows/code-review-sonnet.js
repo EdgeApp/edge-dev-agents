@@ -1,45 +1,65 @@
 export const meta = {
   name: "code-review-sonnet",
   description: "Workflow-backed code review with Sonnet fan-out — one finder per correctness angle plus one finder covering all cleanup angles, an independent verifier for every distinct (file, line) location across the pooled candidates, then a ranked, capped findings report.",
-  whenToUse: "Model-invocable clone of the built-in /code-review workflow, pinned from Claude Code 2.1.222, with Find/Verify/Sweep forced onto Sonnet while Scope and Synthesize inherit the session model. Callable from a skill step or an orch task without the disable-model-invocation gate on /code-review. Pass args as \"<level> [target]\" — level is high, xhigh, or max; target is an optional PR number or URL, branch, ref range, path, or free-form review instructions.",
+  whenToUse: "Model-invocable clone of the built-in /code-review workflow, re-pinned for level parity with Claude Code 2.1.232, with Find/Verify/Sweep forced onto Sonnet while Scope and Synthesize inherit the session model. Callable from a skill step or an orch task without the disable-model-invocation gate on /code-review. Pass args as \"<level> [angles=N] [target]\" — level is low, medium, high, xhigh, or max and sets the fan-out agents' reasoning effort (level IS effort, as in the official build); angles=N overrides the correctness-angle count (1-5) independently of level; target is an optional PR number or URL, branch, ref range, path, or free-form review instructions.",
   phases: [{"title":"Scope","detail":"Pin the diff command, changed files, applicable CLAUDE.md files, and conventions"},{"title":"Find","detail":"One finder per correctness angle plus one finder covering all cleanup angles, pooled before verify"},{"title":"Verify","detail":"One independent verifier per distinct (file, line) location — CONFIRMED / PLAUSIBLE / REFUTED per candidate"},{"title":"Sweep","detail":"Fresh finder hunting only for gaps (xhigh/max)"},{"title":"Synthesize","detail":"Merge duplicates, rank, cap the report"}],
 }
 
 // code-review: Scope → Find (barrier) → group-by-location → Verify → Sweep (xhigh/max) → Synthesize
-// Effort parameterization mirrors the inline /code-review cells. Correctness
-// keeps one finder per angle; cleanup is one finder covering all cleanup
-// angles, capped at (cleanup-angle count × perAngle) so the merged finder
-// has the same total cleanup-candidate budget the old per-angle finders had.
-//   high  → 3 correctness + 1 cleanup (5 angles, ≤30 cands) → ≤10 findings
-//   xhigh → 5 correctness + 1 cleanup (5 angles, ≤40 cands) → sweep → ≤15 findings
-//   max   → same structure as xhigh (the API reasoning effort differs, not the fan-out)
+// Level parity with the official /code-review in Claude Code 2.1.232:
+//   - THE LEVEL IS THE EFFORT. The official build threads the typed level to
+//     the review run's reasoning effort verbatim (znn cell modelEffort:"typed");
+//     here each level sets `effort` on every fan-out agent (Find/Verify/Sweep).
+//     One official quirk mirrored: on claude-sonnet-5 the low cell runs at
+//     medium model effort — our fan-out IS sonnet, so low → effort "medium".
+//   - Pipeline shapes per level (official default cells):
+//       low    → 1 diff pass (single finder, all lenses) → no verify → ≤4 findings
+//       medium → 3+5 angles × 6 candidates → 1-vote verify (precision) → ≤8
+//       high   → 3+5 angles × 6 candidates → 1-vote verify (recall-biased) → ≤10
+//       xhigh  → 5+5 angles × 8 candidates → 1-vote verify (recall) → sweep → ≤15
+//       max    → same fan-out as xhigh; only the effort differs
+//     "3+5"/"5+5" = correctness angles + cleanup lenses. The official runs the
+//     five cleanup-family angles (3 cleanup + altitude + conventions) as
+//     separate finders; this clone deliberately merges them into ONE cleanup
+//     finder with the same total candidate budget (cleanup-lens count ×
+//     perAngle), trading angle isolation for four fewer Sonnet agents.
+//   - Verify framing parity: medium judges with the plain verdict ladder
+//     (precision); high and above append the recall-biased ladder.
+//   - NOT cloned: ultra (cloud multi-agent, user-triggered only), the official
+//     diff-size finder-budget hint, and per-model prompt cells other than the
+//     sonnet low quirk.
+// angles=N (1-5) overrides correctnessAngles independently of level, so depth
+// of reasoning (level/effort) and breadth of fan-out are separate dials.
 const LEVEL_PARAMS = {
-  high: { correctnessAngles: 3, perAngle: 6, maxFindings: 10, sweep: false },
-  xhigh: { correctnessAngles: 5, perAngle: 8, maxFindings: 15, sweep: true },
-  max: { correctnessAngles: 5, perAngle: 8, maxFindings: 15, sweep: true },
+  low: { correctnessAngles: 0, perAngle: 8, maxFindings: 4, sweep: false, effort: "medium", recall: false, singlePass: true },
+  medium: { correctnessAngles: 3, perAngle: 6, maxFindings: 8, sweep: false, effort: "medium", recall: false, singlePass: false },
+  high: { correctnessAngles: 3, perAngle: 6, maxFindings: 10, sweep: false, effort: "high", recall: true, singlePass: false },
+  xhigh: { correctnessAngles: 5, perAngle: 8, maxFindings: 15, sweep: true, effort: "xhigh", recall: true, singlePass: false },
+  max: { correctnessAngles: 5, perAngle: 8, maxFindings: 15, sweep: true, effort: "max", recall: true, singlePass: false },
 }
 const SWEEP_MAX = 8
-// Edge dials for the fan-out agents (Find, Verify, Sweep). Scope and
-// Synthesize deliberately carry neither, so they inherit the caller's
-// session model and effort.
-//   FANOUT_MODEL   the model every fan-out agent runs on.
-//   FANOUT_EFFORT  reasoning effort for those agents. null inherits the
-//                  session effort; set "low" | "medium" | "high" |
-//                  "xhigh" | "max" to pin it regardless of caller.
+// Fan-out model pin (Find, Verify, Sweep). Scope and Synthesize deliberately
+// carry neither model nor effort, so they inherit the caller's session model
+// and effort. Fan-out effort is per-level (see LEVEL_PARAMS), not a dial.
 const FANOUT_MODEL = "sonnet"
-const FANOUT_EFFORT = null
-const FANOUT =
-  FANOUT_EFFORT == null
-    ? { model: FANOUT_MODEL }
-    : { model: FANOUT_MODEL, effort: FANOUT_EFFORT }
 
 const RAW_ARGS = (typeof args === "string" ? args : "").trim()
-const FIRST = RAW_ARGS.split(/\s+/)[0] || ""
+const TOKENS = RAW_ARGS.split(/\s+/).filter(Boolean)
 // Own-property check so Object.prototype keys ("constructor", "toString") never parse as a level.
+const FIRST = TOKENS[0] || ""
 const FIRST_IS_LEVEL = Object.prototype.hasOwnProperty.call(LEVEL_PARAMS, FIRST)
 const LEVEL = FIRST_IS_LEVEL ? FIRST : "high"
-const TARGET = FIRST_IS_LEVEL ? RAW_ARGS.slice(FIRST.length).trim() : RAW_ARGS
+let rest = FIRST_IS_LEVEL ? TOKENS.slice(1) : TOKENS
+// angles=N may appear before the target; it never applies to low (single-pass).
+let ANGLES_OVERRIDE
+if (rest[0] != null && /^angles=[1-5]$/.test(rest[0])) {
+  ANGLES_OVERRIDE = Number(rest[0].slice(7))
+  rest = rest.slice(1)
+}
+const TARGET = rest.join(" ")
 const P = LEVEL_PARAMS[LEVEL]
+const CORRECTNESS_COUNT = P.singlePass ? 0 : (ANGLES_OVERRIDE ?? P.correctnessAngles)
+const FANOUT = { model: FANOUT_MODEL, effort: P.effort }
 
 // Prompt fragments shared with the inline /code-review cells (one source of truth).
 const CORRECTNESS_ANGLES = [{"label":"angle-A","text":"### Angle A — line-by-line diff scan\n\nRead every hunk in the diff, line by line. Then Read the enclosing function for\neach hunk — bugs in unchanged lines of a touched function are in scope (the PR\nre-exposes or fails to fix them). For every line ask: what input, state, timing,\nor platform makes this line wrong? Look for inverted/wrong conditions,\noff-by-one, null/undefined deref, missing `await`, falsy-zero checks,\nwrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.\n"},{"label":"angle-B","text":"### Angle B — removed-behavior auditor\n\nFor every line the diff DELETES or replaces, name the invariant or behavior it\nenforced, then search the new code for where that invariant is re-established.\nIf you can't find it, that's a candidate: a removed guard, a dropped error\npath, a narrowed validation, a deleted test that was covering a real case.\n"},{"label":"angle-C","text":"### Angle C — cross-file tracer\n\nFor each function the diff changes, find its callers (Grep for the symbol) and\ncheck whether the change breaks any call site: a new precondition, a changed\nreturn shape, a new exception, a timing/ordering dependency. Also check callees:\ndoes a parallel change in the same PR make a call unsafe?\n"},{"label":"angle-D","text":"### Angle D — language-pitfall specialist\n\nScan for the classic pitfalls of the diff's language/framework — for example:\nJS falsy-zero, `==` coercion, closure-captured loop var; Python mutable default\nargs, late-binding closures; Go nil-map write, range-var capture; SQL injection;\ntimezone/DST drift; float equality. Flag any instance the diff introduces.\n"},{"label":"angle-E","text":"### Angle E — wrapper/proxy correctness\n\nWhen the PR adds or modifies a type that wraps another (cache, proxy, decorator,\nadapter): check that every method routes to the wrapped instance and not back\nthrough a registry/session/global — e.g. a caching provider holding a\n`delegate` field that resolves IDs via `session.get(...)` instead of\n`delegate.get(...)` will re-enter the cache or recurse. Also check that the\nwrapper forwards all the methods the callers actually use.\n"}]
@@ -125,7 +145,7 @@ if (!scope) {
 if (!scope.files || scope.files.length === 0) {
   return { level: LEVEL, target: TARGET || undefined, summary: "No changes found to review.", findings: [], stats: { finders: 0, candidates: 0, verifierAgents: 0, verified: 0 } }
 }
-log(LEVEL + " review: " + scope.files.length + " changed files")
+log(LEVEL + " review (fan-out effort " + P.effort + "): " + scope.files.length + " changed files")
 
 const claudeMdFiles = scope.claudeMdFiles || []
 const SCOPE_BLOCK =
@@ -168,6 +188,19 @@ const FINDER_PROMPT = f => {
     "If nothing qualifies, return an empty list.\n\nStructured output only."
 }
 
+// Low is the official single-pass cell: ONE finder walks the whole diff with
+// every lens at once, nothing is verified, and the synthesizer caps the report
+// at 4. The "pass half-believed candidates through" instruction is dropped
+// because no verifier follows — low is precision by construction.
+const LOW_PASS_PROMPT =
+  "## Code-review — single pass\n\n" + SCOPE_BLOCK + "\n" +
+  "Run the diff command above and review the whole diff in one pass, using all of the following lenses:\n\n" +
+  CORRECTNESS_ANGLES.map(a => a.text).join("\n") + "\n" + CLEANUP_TEXT + "\n" +
+  CLEANUP_PRECEDENCE + "\n" +
+  "No verifier follows this pass, so surface only findings you would stake the review on: " +
+  "each with file, line, a one-line summary, and a concrete failure_scenario. " +
+  "Surface up to 8 candidates; if nothing qualifies, return an empty list.\n\nStructured output only."
+
 // Finders may return absolute, repo-relative, or backslash-separated paths
 // for the same file. Normalize once at ingest by suffix-matching against
 // scope.files (which the Scope agent returns repo-relative) so every
@@ -198,7 +231,9 @@ const GROUP_VERIFIER_PROMPT = group =>
   "Run the diff command above, read the relevant file(s), and return one verdict per candidate. " +
   "Judge EACH candidate independently on its own claim — candidates at the same location may describe distinct issues, the same issue, or a mix. " +
   "Reference each by its [i] index.\n\n" +
-  VERDICT_LADDER + "\n\n" + VERDICT_LADDER_RECALL + "\n\n" +
+  // Verify-framing parity with the official cells: medium judges on the plain
+  // ladder (precision); high and above append the recall bias.
+  VERDICT_LADDER + (P.recall ? "\n\n" + VERDICT_LADDER_RECALL : "") + "\n\n" +
   "Structured output only. Evidence must quote or cite the relevant line(s)."
 
 // ─── Same-location verifier merge — group ingested candidates by loc(c),
@@ -235,17 +270,21 @@ async function verifyGroups(candidates) {
 // 1-angle:1-agent mapping. With four fewer finders at every level the
 // barrier wait shortens enough that wall-clock is net-faster than the
 // pre-#45024 per-finder pipeline.
-const FINDERS = CORRECTNESS_ANGLES.slice(0, P.correctnessAngles)
-  .map(a => ({ ...a, kind: "correctness", cap: P.perAngle }))
-  .concat([{
-    label: "cleanup",
-    kind: "cleanup",
-    cap: 5 * P.perAngle,
-    text: CLEANUP_TEXT,
-  }])
+// Low replaces the fan-out with the official single-pass cell: one finder,
+// every lens, no verify.
+const FINDERS = P.singlePass
+  ? [{ label: "single-pass", kind: "correctness", cap: 8, text: null }]
+  : CORRECTNESS_ANGLES.slice(0, CORRECTNESS_COUNT)
+      .map(a => ({ ...a, kind: "correctness", cap: P.perAngle }))
+      .concat([{
+        label: "cleanup",
+        kind: "cleanup",
+        cap: 5 * P.perAngle,
+        text: CLEANUP_TEXT,
+      }])
 
 const finderOuts = await parallel(FINDERS.map(f => () =>
-  agent(FINDER_PROMPT(f), { label: f.label, phase: "Find", schema: CANDIDATES_SCHEMA, ...FANOUT }).then(r => {
+  agent(P.singlePass ? LOW_PASS_PROMPT : FINDER_PROMPT(f), { label: f.label, phase: "Find", schema: CANDIDATES_SCHEMA, ...FANOUT }).then(r => {
     if (!r) return []
     log(f.label + ": " + r.candidates.length + " candidates")
     return ingest(r.candidates, f.cap, f.kind)
@@ -254,7 +293,11 @@ const finderOuts = await parallel(FINDERS.map(f => () =>
 const allCandidates = finderOuts.filter(Boolean).flat()
 let candidatesSeen = allCandidates.length
 
-let verified = await verifyGroups(allCandidates)
+// Low: no verify pass — candidates flow to synthesis unverdicted, exactly as
+// the official "1 diff pass → no verify" cell reports them.
+let verified = P.singlePass
+  ? allCandidates.map(c => ({ ...c, verdict: undefined, evidence: "" }))
+  : await verifyGroups(allCandidates)
 
 // ─── Sweep (xhigh/max): one fresh finder hunting only for gaps ───
 if (P.sweep) {
@@ -281,21 +324,25 @@ if (P.sweep) {
 
 const surviving = verified.filter(c => c.verdict !== "REFUTED")
 const refuted = verified.filter(c => c.verdict === "REFUTED")
-log("Verify done: " + verified.length + " verified → " + surviving.length + " kept, " + refuted.length + " refuted")
+log(P.singlePass
+  ? "Single pass done: " + surviving.length + " findings (no verify at low)"
+  : "Verify done: " + verified.length + " verified → " + surviving.length + " kept, " + refuted.length + " refuted")
 
 const stats = {
   level: LEVEL,
+  effort: P.effort,
   finders: FINDERS.length,
+  correctnessAngles: CORRECTNESS_COUNT,
   candidates: candidatesSeen,
   verifierAgents,
-  verified: verified.length,
+  verified: P.singlePass ? 0 : verified.length,
   refuted: refuted.length,
 }
 
 if (surviving.length === 0) {
   return {
     level: LEVEL, target: TARGET || undefined,
-    summary: "No findings survived verification.",
+    summary: P.singlePass ? "No findings from the single-pass review." : "No findings survived verification.",
     findings: [],
     stats,
   }
@@ -308,13 +355,14 @@ phase("Synthesize")
 const rank = c => (c.kind === "cleanup" ? 2 : 0) + (c.verdict === "PLAUSIBLE" ? 1 : 0)
 const ranked = surviving.slice().sort((a, b) => rank(a) - rank(b))
 const block = ranked.map((c, i) =>
-  "### [" + i + "] " + loc(c) + " (" + c.verdict + (c.kind === "cleanup" ? ", cleanup" : "") + ")\n" +
-  c.summary + "\nFailure scenario: " + c.failure_scenario + "\nVerifier evidence: " + c.evidence + "\n"
+  "### [" + i + "] " + loc(c) + " (" + (c.verdict || "UNVERIFIED") + (c.kind === "cleanup" ? ", cleanup" : "") + ")\n" +
+  c.summary + "\nFailure scenario: " + c.failure_scenario +
+  (c.evidence ? "\nVerifier evidence: " + c.evidence : "") + "\n"
 ).join("\n")
 
 const report = await agent(
   "## Synthesis: final code-review report\n\n" +
-  ranked.length + " findings survived independent verification (" + LEVEL + "-effort review). They are numbered [0]-[" + (ranked.length - 1) + "] below.\n\n" + block + "\n" +
+  ranked.length + " findings " + (P.singlePass ? "from a single-pass low-effort review" : "survived independent verification (" + LEVEL + "-effort review)") + ". They are numbered [0]-[" + (ranked.length - 1) + "] below.\n\n" + block + "\n" +
   "## Instructions\n" +
   "Return decisions about findings BY INDEX — never re-emit finding text.\n" +
   "1. For each distinct defect, emit one decision with its index. When several findings describe the same defect (same root cause), keep one entry and list the others in its merge array.\n" +
