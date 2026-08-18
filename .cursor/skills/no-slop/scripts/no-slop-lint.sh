@@ -137,6 +137,18 @@ fs.readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
     else if (PRED.test(s))
       findings.push(["WARN", n, `count + contentless predicate: "${s.trim().slice(0, 70)}"`])
   }
+  // Shape 5: TRAILING count-apposition — a comma-appended counter closing the
+  // sentence ("..., two separate things." / "..., three points:"). Same
+  // announcement, different position; restricted to the generic counter nouns
+  // (with optional filler adjective) so "..., two days later" and real content
+  // stay exempt. (Gap found 2026-08-19: a Slack draft opened "Here is what we
+  // found on our side, two separate things." and passed all leading shapes.)
+  for (const s of body.split(/(?<=[.:!?])\s+/)) {
+    const t = s.trim()
+    const m5 = t.match(new RegExp(",\\s*(" + NUM + ")\\s+(?:separate\\s+|different\\s+|distinct\\s+|main\\s+|key\\s+|quick\\s+)?([a-z]+)\\s*[.:!]?$", "i"))
+    if (m5 && COUNTNOUN.test(m5[2]) && !TIME.test(m5[2]))
+      findings.push(["HARD", n, `trailing count-apposition: "${t.slice(-60)}"`])
+  }
 })
 
 let hard = 0
