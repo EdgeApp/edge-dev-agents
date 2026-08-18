@@ -33,14 +33,40 @@ case "$SLUG" in
   *) echo "ERROR: no github origin on $REPO_DIR" >&2; exit 1 ;;
 esac
 
-# Committed docs only. Most-recently-committed wins when a repo carries several.
+# Committed docs THIS BRANCH CARRIES. `src/docs/` is shared across tasks, so
+# "any committed doc in the tree" resolves every branch in the repo to whichever
+# doc landed most recently — stamping an unrelated task's design onto a PR that
+# touches no docs at all. Ownership is the branch diff: a doc this branch added
+# or modified since it left its base. Most-recently-committed still wins when one
+# branch carries several.
+BASE_REF=""
+for cand in \
+  "$(git -C "$REPO_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)" \
+  origin/develop origin/main origin/master
+do
+  [ -n "$cand" ] || continue
+  if git -C "$REPO_DIR" rev-parse --verify --quiet "$cand" >/dev/null 2>&1; then BASE_REF="$cand"; break; fi
+done
+
+MERGE_BASE=""
+if [ -n "$BASE_REF" ]; then
+  MERGE_BASE=$(git -C "$REPO_DIR" merge-base "$BASE_REF" HEAD 2>/dev/null || true)
+fi
+
 DOC=""
 LATEST=0
-while IFS= read -r f; do
-  [ -n "$f" ] || continue
-  ts=$(git -C "$REPO_DIR" log -1 --format=%ct -- "$f" 2>/dev/null || echo 0)
-  if [ "${ts:-0}" -ge "$LATEST" ]; then LATEST="$ts"; DOC="$f"; fi
-done < <(git -C "$REPO_DIR" ls-files 'src/docs/*.md' 2>/dev/null)
+if [ -z "$MERGE_BASE" ]; then
+  # Without a base there is no ownership test, and guessing re-stamps unrelated
+  # docs. Report none and say why on stderr rather than cite the wrong design.
+  echo "WARN: tdd-doc-links: no base branch resolved in $REPO_DIR; reporting no branch-carried TDD doc" >&2
+else
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    case "$f" in *.md) ;; *) continue ;; esac
+    ts=$(git -C "$REPO_DIR" log -1 --format=%ct -- "$f" 2>/dev/null || echo 0)
+    if [ "${ts:-0}" -ge "$LATEST" ]; then LATEST="$ts"; DOC="$f"; fi
+  done < <(git -C "$REPO_DIR" diff --name-only --diff-filter=AM "$MERGE_BASE"..HEAD -- 'src/docs' 2>/dev/null)
+fi
 if [ -z "$DOC" ]; then
   # No committed doc: fall back to a gist pointer for this task, if one exists.
   PTR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/tdd-doc/${AGENT_TASK_GID:-}.env"

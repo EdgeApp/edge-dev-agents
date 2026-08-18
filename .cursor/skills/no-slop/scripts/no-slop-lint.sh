@@ -92,6 +92,11 @@ fs.readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
     if (lower.includes(" " + w + " ") || lower.includes(" " + w + ",") || lower.includes(" " + w + "."))
       findings.push(["HARD", n, `banned vocabulary: "${w}"`])
   }
+  // Claude session links (operator ruling 2026-08-18): never in outward-facing
+  // prose (PR bodies, repo docs, reports). Bare session IDs in report
+  // frontmatter/stamp lines are fine — this matches URLs only.
+  if (/claude\.ai\/(code|share|chat)\//i.test(line))
+    findings.push(["HARD", n, "claude session link: outward-facing prose never carries chat/session URLs"])
   // Loudness precision (operator ruling 2026-08-18): "warn/log/print loudly"
   // is decorative (the output IS the loudness) — HARD. Any other loud/loudly
   // is a vague mechanism claim — WARN: the litmus is "say what happens and who
