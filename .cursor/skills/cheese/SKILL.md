@@ -16,6 +16,7 @@ metadata:
 <rule id="use-companion-script">Run the full workflow via `~/.cursor/skills/cheese/scripts/cheese-build.sh`. Do not inline git / pack / package-manager operations in chat.</rule>
 <rule id="orch-pins-required">ORCHESTRATED runs (an agent session with `$AGENT_TASK_GID`, invoked via one-shot `cheese-build-on-green`): the pin set is NOT optional or user-suggested — it is DEFINED by the task: pin EVERY unpublished dep repo whose changes the gui deliverable requires (the task's own dep-repo PRs, per one-shot `dep-pr-draft-vs-bump`), each `--pin` pointing at that dep's task worktree checked out at ITS PR head. A pointer-only cheese while required dep PRs are unpublished produces a build that cannot demonstrate the change (Jenkins resolves published deps from npm — the Houdini stealth-swap feta miss, 2026-07-14). Record each pinned repo+sha in the run report. YOLO CARVE-OUTS to this skill's interactive confirmations (no human is watching an orch run): pinning 3+ deps → proceed without confirming (the task defines the set); a pin target sitting on its default branch → SKIP that pin (published version suffices) and note it in the report instead of asking; ambiguous pin resolution → the task subtask/PR set IS the resolution, never a question. Human-invoked runs keep the confirmations.</rule>
 <rule id="force-with-lease">The script pushes with `--force-with-lease` via `~/.cursor/skills/git-branch-ops.sh`. Never use plain `--force`.</rule>
+<rule id="takeover-non-blocking">A cheese request is NON-BLOCKING: `test-*` branches are shared scratch pointers, and taking over one another task currently occupies needs no permission, no coordination, and no waiting. The only obligation to the previous occupant is a note: capture the branch's pre-reset tip (step 3) and, when it wasn't already your own push, say in the report/response what it pointed at before.</rule>
 </rules>
 
 <dep-aliases description="Short names for common Edge dep repos. Resolve to $HOME/git/<repo-name>. Aliases are case-insensitive. Explicit absolute paths are also accepted by --pin.">
@@ -35,7 +36,7 @@ metadata:
 <step id="1" name="Parse inputs">
 From the user message, determine:
 
-1. **Cheese branch** — default `test-feta`. Use the user's explicit name if given (e.g. `test-gouda`).
+1. **Cheese branch** — default `test-feta`. Use the user's explicit name if given (e.g. `test-gouda`). The real cheeses are `feta`, `gouda`, `halloumi`, `cheddar` — a dotted variant like `gouda.1` is not a real cheese; resolve it to the base name (`test-gouda`).
 2. **Source ref** — default: current HEAD of `edge-react-gui`. Use an explicit ref if the user names one.
 3. **Deps to pin** — from any aliases or paths the user mentions. None is valid (GUI-only cheese build).
 
@@ -60,7 +61,13 @@ Otherwise go straight to step 3.
 </step>
 
 <step id="3" name="Run script">
-Invoke with resolved absolute paths:
+First capture the branch's current tip for the takeover note (per `takeover-non-blocking`):
+
+```bash
+git fetch origin <cheese-branch> --quiet 2>/dev/null; git rev-parse --short origin/<cheese-branch> 2>/dev/null || echo "(branch did not exist)"
+```
+
+Then invoke with resolved absolute paths:
 
 ```bash
 ~/.cursor/skills/cheese/scripts/cheese-build.sh \
@@ -73,7 +80,7 @@ The script handles: clean-tree check, checkout + hard reset, per-dep `install + 
 </step>
 
 <step id="4" name="Report">
-Print the remote branch URL and final SHA from the script output. Jenkins picks up the push automatically — no further action needed.
+Print the remote branch URL and final SHA from the script output. When the pre-reset tip from step 3 was not your own earlier push, include one line noting what the branch pointed at before. Jenkins picks up the push automatically — no further action needed.
 </step>
 
 <edge-cases>

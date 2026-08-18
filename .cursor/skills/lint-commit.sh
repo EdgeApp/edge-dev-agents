@@ -214,6 +214,18 @@ if node -e "process.exit(require('./package.json').scripts?.localize ? 0 : 1)" 2
   fi
 fi
 
+# Scrub claude session links from the commit message (operator ruling
+# 2026-08-18: outward-facing surfaces never carry chat/session URLs). Strips
+# Claude-Session trailer lines and any claude.ai session URL, then collapses
+# the trailing blank lines the strip can leave. Stripping over blocking: the
+# rest of the message is fine, and this path must never bounce a commit.
+if [[ -n "$MESSAGE" ]]; then
+  MESSAGE=$(printf '%s\n' "$MESSAGE" \
+    | sed -E -e '/^[[:space:]]*Claude-Session:/d' \
+             -e 's#https?://claude\.ai/(code|share|chat)/[^[:space:]]*##g' \
+    | sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}')
+fi
+
 # Step 4: Stage files and report effective commit scope
 if [[ "$PRIMARY_SCOPE_DECLARED" == "true" ]]; then
   echo ">> git add (scoped) && git commit"

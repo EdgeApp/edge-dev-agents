@@ -551,9 +551,9 @@
       ]
     },
     "file:tdd-doc-links.sh": {
-      "hash": "4ec1fd3ab576",
+      "hash": "f5dda2908e75",
       "dims": [
-        "A33"
+        "A31"
       ]
     },
     "pr-address:diagram-escalation": {
@@ -1329,6 +1329,10 @@
     "one-shot:mid-run-state-file": {
       "reason": "2026-08-06: same concurrent effort as description-current-state; state-file quality is transcript-visible only — candidate A-dimension owed by that effort",
       "hash": "025f56ac5ac5"
+    },
+    "cheese:takeover-non-blocking": {
+      "reason": "2026-08-18: operator-workflow etiquette note (branch takeover needs only a provenance note); no eval-checkable output beyond the report line already covered by cheese-build reporting",
+      "hash": "bfe2c2dbba29"
     }
   },
   "excluded_skills": {
