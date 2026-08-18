@@ -152,6 +152,10 @@ Docs, code comments, and descriptions state what IS, not what changed: "Uses a h
 - Hedge stacks: "could potentially possibly" → one hedge, chosen deliberately (a load-bearing hedge is information; a stack is noise).
 - Generic upbeat conclusions: "exciting times ahead", "a major step in the right direction" — cut, end on the last concrete fact (rule 14's closer discipline).
 
+## 17. Name the mechanism, not the volume
+
+When a claim is about failure visibility or error handling, state what happens and who sees it: an exit code, a blocking gate, a report section, an operator ping. "Fails loudly", "surfaces loudly", "loud warning" are vague; "warn loudly"/"log loudly" are pure filler (the output already is the loudness). Litmus: delete the loudness word; if the sentence means the same, it was filler; if it stops distinguishing crash-and-report from continue-silently, replace it with the actual mechanism. Keep loud/loudly only when the same sentence names the silent alternative it contrasts with.
+
 ## Examples
 
 For concrete before/after examples showing these rules applied, see [examples/bad-examples.md](examples/bad-examples.md) and [examples/good-examples.md](examples/good-examples.md).

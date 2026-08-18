@@ -432,7 +432,7 @@ function verifyCode() {
     // Sanctioned arm64 carve-out: flow-bin ships x86_64-only and EBADARCHs on
     // arm64 hosts. A prepare failure with exactly that signature is an
     // environmental defect (flow-bin removal tracked upstream), not a code
-    // failure — warn loudly and continue; tsc/lint/test still gate the code.
+    // failure — print the warning to stderr and continue; tsc/lint/test still gate the code.
     if (cmd === "prepare" && process.arch === "arm64") {
       let tail = "";
       try { tail = readFileSync(result.logPath, "utf8").slice(-4000); } catch {}

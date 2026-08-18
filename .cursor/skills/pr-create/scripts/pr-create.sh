@@ -322,6 +322,25 @@ try {
 // Create PR via gh CLI — write body to a temp file to avoid arg length issues
 const tmpBody = path.join(os.tmpdir(), `pr-body-${process.pid}.md`);
 fs.writeFileSync(tmpBody, body, "utf8");
+
+// Prose lint at the body boundary — the SAME shared lint the run-report attach
+// gate and tdd-lint call (DRY: one implementation per rule class, every
+// artifact boundary calls it; operator ruling 2026-08-18). HARD findings
+// (em dashes, banned vocabulary, decorative loudness) refuse the create so the
+// caller fixes the body; warnings pass through on stderr.
+const lint = spawnSync(
+  path.join(os.homedir(), ".cursor/skills/no-slop/scripts/no-slop-lint.sh"),
+  [tmpBody],
+  { encoding: "utf8" }
+);
+if (lint.status === 1) {
+  console.error("BLOCKED: PR body fails the shared prose lint (writing-style/no-slop). Fix these and re-run:");
+  console.error((lint.stdout || "").trim());
+  try { fs.unlinkSync(tmpBody); } catch {}
+  process.exit(2);
+} else if (lint.status === 0 && /^WARN /m.test(lint.stdout || "")) {
+  console.error((lint.stdout || "").split("\n").filter((l) => l.startsWith("WARN ")).join("\n"));
+}
 const ghArgs = ["pr", "create", "--title", title, "--body-file", tmpBody];
 if (draft) ghArgs.push("--draft");
 
