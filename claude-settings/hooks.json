@@ -198,6 +198,16 @@
         }
       ],
       "matcher": "mcp__.*__(get_task|get_tasks|get_task_stories|search_tasks|search_tasks_preview|search_objects|get_my_tasks)"
+    },
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/slack-prose-gate.sh",
+          "timeout": 15,
+          "type": "command"
+        }
+      ],
+      "matcher": "mcp__.*__slack_(send_message|send_message_draft|schedule_message|create_canvas|update_canvas)"
     }
   ],
   "SessionStart": [
