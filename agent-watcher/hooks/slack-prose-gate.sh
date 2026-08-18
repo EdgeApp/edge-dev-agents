@@ -46,6 +46,11 @@ if [ "$RC" -eq 1 ]; then
   exit 0
 fi
 
+# NO markdown conversion here (verified 2026-08-19 by live render test): the
+# claude.ai Slack connector converts standard markdown server-side (bold,
+# links, tables, language-tagged code blocks with highlighting). A pre-pass to
+# mrkdwn DOUBLE-converts: *bold* reads as standard-markdown italic and fence
+# tags lose highlighting. Sessions write plain GitHub-flavored markdown.
 BRIEF_CHARS=900
 if [ "${#TEXT}" -gt "$BRIEF_CHARS" ]; then
   jq -nc '{
