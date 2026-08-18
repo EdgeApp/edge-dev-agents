@@ -139,7 +139,7 @@ WIP_MODE=""  # cached review-mode verdict; fetched at most once per invocation
 
 # Backstop for the travis-draft-tag flow: a READY PR whose HEAD still carries
 # [skip travis] can never go Travis-green — the strip was skipped at the flip.
-# Warn loudly (do not fail; the watch itself still gates everything else).
+# Print the warning to stderr (do not fail; the watch itself still gates everything else).
 TAGCHK=$(gh pr view "$PR" ${REPO:+--repo "$REPO"} --json isDraft,commits \
   -q '{d: .isDraft, m: .commits[-1].messageHeadline}' 2>/dev/null || true)
 if [ -n "$TAGCHK" ] && [ "$(jq -r '.d' <<<"$TAGCHK")" = "false" ] \

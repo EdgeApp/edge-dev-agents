@@ -140,7 +140,7 @@ clone_node_modules() {
   # wide "Horizon.Server undefined" toast shipped exactly this way. Detection
   # only (an unconditional npm ci here would re-introduce the process storms
   # the clone exists to avoid): write a marker build-and-test checks before
-  # building/baking a dep bundle, and log loudly.
+  # building/baking a dep bundle, and log the skipped path to stderr.
   if [[ -f "$MAIN_REPO/package-lock.json" && -f "$WT/package-lock.json" ]] \
      && ! cmp -s "$MAIN_REPO/package-lock.json" "$WT/package-lock.json"; then
     {

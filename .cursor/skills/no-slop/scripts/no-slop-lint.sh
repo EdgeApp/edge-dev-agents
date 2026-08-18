@@ -92,6 +92,15 @@ fs.readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
     if (lower.includes(" " + w + " ") || lower.includes(" " + w + ",") || lower.includes(" " + w + "."))
       findings.push(["HARD", n, `banned vocabulary: "${w}"`])
   }
+  // Loudness precision (operator ruling 2026-08-18): "warn/log/print loudly"
+  // is decorative (the output IS the loudness) — HARD. Any other loud/loudly
+  // is a vague mechanism claim — WARN: the litmus is "say what happens and who
+  // sees it" (exit code, gate, report section, operator ping).
+  const DECOR = /\b(?:warn(?:s|ing)?|log(?:s|ging)?|print(?:s|ing)?|announc\w+)\s+loudly\b|\bloudly\s+(?:warn|log|print|announce)/i
+  if (DECOR.test(line))
+    findings.push(["HARD", n, `decorative "loudly" (the output is already the loud part): delete it or name the mechanism`])
+  else if (/\bloud(?:ly)?\b/i.test(line))
+    findings.push(["WARN", n, `vague loudness claim: name the mechanism and audience (exit code / gate / report section / ping)`])
   // Count-announcement shapes, per SENTENCE; greeting clause stripped first.
   const body = line.replace(/^(?:hi|hello|hey)\b[^,]*,\s*/i, "")
   for (const s of body.split(/(?<=[.:!?])\s+/)) {
