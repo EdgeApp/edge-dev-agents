@@ -20,15 +20,14 @@ CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 # raw command if the helper is unavailable.
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
-# Only gate pr-create.sh EXECUTIONS: the script token must sit in command
-# position (start of command, or after ;, &, |, ( or $( or an explicit
-# bash/sh/source). A read-only command that merely NAMES the script path in
-# argument position (grep/sed/cat against it) must not fire — that shape
-# blocked 3 read-only greps on the 2026-08-19 eCash run (5-run FP class,
+# Only gate pr-create.sh EXECUTIONS (command-position match via the shared
+# cmd-executes.sh helper). A read-only command that merely NAMES the script
+# path in argument position (grep/sed/cat against it) must not fire — that
+# shape blocked 3 read-only greps on the 2026-08-19 eCash run (5-run FP class,
 # 3rd cohort in a row). Match the SCRIPT, not the directory: a bare
 # *pr-create* also matched sibling helpers under skills/pr-create/scripts/
 # (pr-attach-screenshots.sh) with no compliant way through.
-printf '%s' "$CMD_M" | grep -qE '(^|[;&|(]|\$\(|\b(bash|sh|source)[[:space:]]+)[[:space:]]*[^[:space:]]*pr-create\.sh([[:space:]]|$)' || exit 0
+printf '%s' "$CMD_M" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" pr-create.sh || exit 0
 # The compliant multi-repo paths are explicitly allowed.
 printf '%s' "$CMD_M" | grep -q -- '--no-asana-attach' && exit 0
 printf '%s' "$CMD_M" | grep -q -- '--create-subtask' && exit 0

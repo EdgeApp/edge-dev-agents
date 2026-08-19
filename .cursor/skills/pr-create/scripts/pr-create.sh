@@ -355,10 +355,12 @@ fs.writeFileSync(tmpBody, body, "utf8");
 // gate and tdd-lint call (DRY: one implementation per rule class, every
 // artifact boundary calls it; operator ruling 2026-08-18). HARD findings
 // (em dashes, banned vocabulary, decorative loudness) refuse the create so the
-// caller fixes the body; warnings pass through on stderr.
+// caller fixes the body; warnings pass through on stderr. --semantic adds the
+// haiku judge tier (courtesy enders, forward references; calibrated + enabled
+// 2026-08-19) — a posting boundary, so seconds of judge latency are fine.
 const lint = spawnSync(
   path.join(os.homedir(), ".cursor/skills/no-slop/scripts/no-slop-lint.sh"),
-  [tmpBody],
+  [tmpBody, "--semantic"],
   { encoding: "utf8" }
 );
 if (lint.status === 1) {

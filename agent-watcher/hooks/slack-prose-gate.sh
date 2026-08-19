@@ -31,7 +31,10 @@ TEXT=$(printf '%s' "$INPUT" | jq -r '[.tool_input // {} | .. | strings] | join("
 
 TMP=$(mktemp /tmp/slack-prose.XXXXXX.md) || exit 0
 printf '%s\n' "$TEXT" > "$TMP"
-LINT=$("$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh" "$TMP" 2>/dev/null); RC=$?
+# --semantic: the haiku judge tier for courtesy enders / forward references
+# (calibrated + enabled 2026-08-19). Slack sends are infrequent enough that
+# the judge's seconds of latency are acceptable at this boundary.
+LINT=$("$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh" "$TMP" --semantic 2>/dev/null); RC=$?
 rm -f "$TMP"
 
 if [ "$RC" -eq 1 ]; then

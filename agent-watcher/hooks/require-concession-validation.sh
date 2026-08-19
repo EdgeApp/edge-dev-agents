@@ -31,9 +31,25 @@ NOTE="/tmp/agent-test-blocker-$GID.md"
 VERDICT="/tmp/agent-concession-verdict-$GID.json"
 
 # Determine whether this command is a gated concession, and its reason.
+# EXECUTION-POSITION gating (2026-08-19): the gated scripts must be EXECUTED,
+# not merely named in argument position — a read-only `sed -n ... pr-create.sh`
+# false-fired the downgrade branch (same FP class fixed in require-subtasks the
+# same day; shared helper cmd-executes.sh owns the match).
+EXEC_HELPER="$HOME/.config/agent-watcher/hooks/cmd-executes.sh"
+RUNS_UPDATE_STATUS=false; RUNS_PR_CREATE=false
+if printf '%s' "$CMD_M" | "$EXEC_HELPER" update-status.sh 2>/dev/null; then RUNS_UPDATE_STATUS=true; fi
+if printf '%s' "$CMD_M" | "$EXEC_HELPER" pr-create.sh 2>/dev/null; then RUNS_PR_CREATE=true; fi
 KIND="" REASON=""
-case "$CMD_M" in
-  *update-status.sh*--blocked*yes*)
+TRIGGER="none"
+if $RUNS_UPDATE_STATUS; then
+  case "$CMD_M" in
+    *--blocked*yes*) TRIGGER="block" ;;
+    *Complete*) TRIGGER="finalize" ;;
+  esac
+fi
+if [ "$TRIGGER" = "none" ] && $RUNS_PR_CREATE; then TRIGGER="finalize"; fi
+case "$TRIGGER" in
+  block)
     KIND="block"
     REASON=$(printf '%s' "$CMD" | node -e 'const s=require("fs").readFileSync(0,"utf8");const m=s.match(/--reason\s+("([^"]*)"|\x27([^\x27]*)\x27|(\S+))/);process.stdout.write(m?(m[2]!==undefined?m[2]:m[3]!==undefined?m[3]:m[4]||""):"")' 2>/dev/null || true)
     # HASH-BUG FIX (2026-07-09 eval, O9 finding): PreToolUse sees the command string
@@ -56,7 +72,7 @@ case "$CMD_M" in
       exit 2
     fi
     ;;
-  *pr-create.sh*|*update-status.sh*Complete*)
+  finalize)
     # Finalize action: is the run conceding (didn't reach prescribed in-app success)?
     LAST_RESULT=""
     [ -s "$ALOG" ] && LAST_RESULT=$(jq -rs 'map(.result // "") | last // ""' "$ALOG" 2>/dev/null || echo "")
@@ -67,7 +83,11 @@ case "$CMD_M" in
     # bypass — TON) declares `verified: not-run|partial` even though LAST_RESULT is
     # success. That is still a downgrade; let /concession-validator adjudicate it
     # (it applies the repo-aware carve-outs, e.g. backend-repo legitimacy).
-    REPORT=$(ls -t /tmp/agent-run-report-"$GID"-*.md 2>/dev/null | head -1)
+    # `|| true`: with no report yet (the normal state at pr-create time) the ls
+    # fails and pipefail+set -e killed the whole hook at exit 1 — a SILENT
+    # error-allow, so the downgrade gate never actually ran at the PR boundary
+    # (latent since the branch shipped; surfaced by trigger tests 2026-08-19).
+    REPORT=$(ls -t /tmp/agent-run-report-"$GID"-*.md 2>/dev/null | head -1 || true)
     VERIFIED=""
     [ -n "$REPORT" ] && VERIFIED=$(awk -F': *' 'tolower($1)=="verified"{print tolower($2); exit}' "$REPORT" 2>/dev/null | tr -d ' \r')
     if printf '%s' "$LAST_RESULT" | grep -qiE '^(blocked|failed|loss):'; then

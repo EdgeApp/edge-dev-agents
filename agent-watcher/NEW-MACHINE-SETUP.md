@@ -193,3 +193,11 @@ through pr-address/bugbot companion scripts, which reply in-thread first.
 
 require-maestro-device: maestro test/record without --device is blocked in slot
 sessions (multiple booted sims make the default driver attachment ambiguous).
+    { "type": "command", "command": "~/.config/agent-watcher/hooks/lint-md-on-write.sh", "timeout": 30 },
+
+lint-md-on-write: registered under BOTH matcher `Bash` and matcher `Write|Edit`.
+Runs the shared no-slop lint when markdown is written outside the internal-path
+allowlist (mechanical tier; full on Write, fragment on Edit/heredoc). NOT
+gid-gated — interactive sessions post PRs and Slack messages too. This is the
+file-creation choke point: posted prose travels as --body-file/$(cat file), so
+posting-time hooks cannot see it.

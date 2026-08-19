@@ -123,6 +123,11 @@
           "command": "~/.config/agent-watcher/hooks/require-agents-md-skill.sh",
           "timeout": 10,
           "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/lint-md-on-write.sh",
+          "timeout": 30,
+          "type": "command"
         }
       ],
       "matcher": "Bash"
@@ -142,6 +147,11 @@
         {
           "command": "~/.config/agent-watcher/hooks/require-agents-md-skill.sh",
           "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/lint-md-on-write.sh",
+          "timeout": 30,
           "type": "command"
         }
       ],
