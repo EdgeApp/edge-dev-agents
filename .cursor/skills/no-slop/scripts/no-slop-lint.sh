@@ -24,28 +24,45 @@
 # time/measure nouns ("Two days later"), counts bound to a real verb
 # ("Two engines start concurrently").
 #
-# V2 (designed 2026-07-28, not built): a small-model judge (claude -p, haiku)
-# for the semantic tail these regexes cannot reach — regex flags a WIDE
-# candidate net, the judge supplies precision, verdicts cached by sentence
-# hash, fail-open, default-clean. Same judge-at-a-gate pattern as
-# concession-validator / blocker-validator. Build it as a separate callable
-# stage (--semantic) when cleanliness matters more than latency; calibrate
-# haiku-vs-sonnet agreement on the corpus before any blocking use.
+# V2 SEMANTIC TIER (designed 2026-07-28, built 2026-08-19): --semantic runs
+# scripts/no-slop-judge.sh after the mechanical pass — a wide regex net
+# nominates candidate sentences, one batched `claude -p` haiku call judges the
+# rules regexes cannot decide (courtesy enders, forward references, validation
+# preambles; SKILL rules 14/15), verdicts cached by sentence hash, fail-open.
+# Opt-in per boundary: seconds of latency, so posting/attach boundaries use it,
+# high-frequency write paths do not.
 #
-# Usage: no-slop-lint.sh <file.md> [--warn-only]
+# --fragment: the input is a text FRAGMENT (an Edit new_string, a Bash command
+# carrying a heredoc), not a whole document. Runs only the checks that are
+# position-independent (em dashes, banned vocabulary, session links, loudness)
+# and skips the sentence-shape checks, which false-positive without the
+# surrounding document.
+#
+# Usage: no-slop-lint.sh <file.md> [--warn-only] [--fragment] [--semantic]
 # Output: "HARD <line>: <finding>" / "WARN <line>: <finding>" per finding.
 # Exit: 0 = clean or warnings only (always 0 with --warn-only), 1 = HARD
 #       findings, 2 = usage.
 
 set -uo pipefail
 
-FILE="${1:-}"; MODE="${2:-}"
-[ -f "$FILE" ] || { echo "usage: no-slop-lint.sh <file.md> [--warn-only]" >&2; exit 2; }
+FILE="${1:-}"
+[ -f "$FILE" ] || { echo "usage: no-slop-lint.sh <file.md> [--warn-only] [--fragment] [--semantic]" >&2; exit 2; }
+shift
+WARN_ONLY=0 FRAGMENT=0 SEMANTIC=0
+for a in "$@"; do
+  case "$a" in
+    --warn-only) WARN_ONLY=1 ;;
+    --fragment)  FRAGMENT=1 ;;
+    --semantic)  SEMANTIC=1 ;;
+    *) echo "no-slop-lint: unknown flag $a" >&2; exit 2 ;;
+  esac
+done
 VOCAB="$(cd "$(dirname "$0")/.." && pwd)/banned-vocabulary.md"
 
-node -e '
+MECH_OUT=$(node -e '
 const fs = require("fs")
-const [file, vocabFile, warnOnly] = process.argv.slice(1)
+const [file, vocabFile, fragment] = process.argv.slice(1)
+const FRAGMENT = fragment === "1"
 
 // Banned vocabulary: first cell of every table row in the vocab doc; entries
 // like "delve / delve into" split on "/", "(metaphorical)" qualifiers dropped.
@@ -106,6 +123,7 @@ fs.readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
     findings.push(["HARD", n, `decorative "loudly" (the output is already the loud part): delete it or name the mechanism`])
   else if (/\bloud(?:ly)?\b/i.test(line))
     findings.push(["WARN", n, `vague loudness claim: name the mechanism and audience (exit code / gate / report section / ping)`])
+  if (FRAGMENT) return  // sentence-shape checks need the whole document
   // Count-announcement shapes, per SENTENCE; greeting clause stripped first.
   const body = line.replace(/^(?:hi|hello|hey)\b[^,]*,\s*/i, "")
   for (const s of body.split(/(?<=[.:!?])\s+/)) {
@@ -156,6 +174,23 @@ for (const [tier, n, msg] of findings) {
   if (tier === "HARD") hard++
   console.log(`${tier} ${n}: ${msg}`)
 }
-if (findings.length === 0) console.log("NO_SLOP_OK")
-process.exit(hard > 0 && warnOnly !== "--warn-only" ? 1 : 0)
-' "$FILE" "$VOCAB" "$MODE"
+process.exit(hard > 0 ? 1 : 0)
+' "$FILE" "$VOCAB" "$FRAGMENT")
+MECH_RC=$?
+
+JUDGE_OUT="" JUDGE_RC=0
+if [ "$SEMANTIC" = 1 ]; then
+  JUDGE_OUT=$("$(dirname "$0")/no-slop-judge.sh" "$FILE") || JUDGE_RC=$?
+  [ "$JUDGE_RC" = 1 ] || JUDGE_RC=0   # judge exit 2/errors fail open
+fi
+
+OUT=$(printf '%s\n%s\n' "$MECH_OUT" "$JUDGE_OUT" | grep -v '^$' || true)
+if [ -z "$OUT" ]; then
+  echo "NO_SLOP_OK"
+  exit 0
+fi
+printf '%s\n' "$OUT"
+HARD_PRESENT=0
+{ [ "$MECH_RC" = 1 ] || [ "$JUDGE_RC" = 1 ]; } && HARD_PRESENT=1
+if [ "$HARD_PRESENT" = 1 ] && [ "$WARN_ONLY" = 0 ]; then exit 1; fi
+exit 0

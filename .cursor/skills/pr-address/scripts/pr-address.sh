@@ -236,6 +236,22 @@ case "$CMD" in
         humanReviewers: Array.from(humanCommenters),
         threads, reviewBodies, topLevel
       }, null, 2))
+
+      // OBLIGATION TRAILER (stderr, so stdout | jq pipes stay parseable).
+      // The contract travels with the data: a consumer that filters the JSON
+      // down to .threads still sees these lines in the tool output. Added
+      // 2026-08-19 after a followup segment drove this script without the
+      // SKILL in context, filtered to .threads, and dropped two top-level
+      // CHANGES_REQUESTED review bodies (A14 review-response BAD).
+      const ob = []
+      const unresolved = threads.filter(t => !t.isResolved).length
+      if (unresolved) ob.push(unresolved + ' unresolved thread(s) in .threads: each needs reply-then-resolve (owner) or reply-only (non-owner).')
+      if (reviewBodies.length) ob.push(reviewBodies.length + ' top-level REVIEW BODY(ies) in .reviewBodies (states: ' + reviewBodies.map(r => r.state).join(', ') + '): review feedback exactly like a thread. Each needs a reply, then mark-addressed (pr-address.sh mark-addressed --review-id <id>). Filtering to .threads drops these.')
+      if (topLevel.length) ob.push(topLevel.length + ' top-level PR comment(s) in .topLevel: same reply-then-mark-addressed contract (--comment-id <id>).')
+      if (ob.length) {
+        process.stderr.write('\n>> OBLIGATIONS (pr-address contract; not discharged until each is replied AND marked):\n')
+        for (const o of ob) process.stderr.write('>>   - ' + o + '\n')
+      }
     "
     ;;
 

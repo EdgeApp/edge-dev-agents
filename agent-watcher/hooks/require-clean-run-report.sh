@@ -259,7 +259,9 @@ fi
 #     no-slop lint. Em dashes were already auto-fixed above, so remaining HARD
 #     findings here are the non-mechanical-rewrite kind: block with the lines.
 #     Corpus-calibrated to ~zero false positives before being made blocking.
-SLOP="$("$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh" "$REPORT" 2>/dev/null | grep '^HARD' | grep -v 'em dash' | head -6 || true)"
+#     --semantic (2026-08-19): the haiku judge tier for courtesy enders /
+#     forward references; attach is a terminal boundary, latency is fine.
+SLOP="$("$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh" "$REPORT" --semantic 2>/dev/null | grep '^HARD' | grep -v 'em dash' | head -6 || true)"
 if [ -n "$SLOP" ]; then
   FAIL+="- No-slop violations (banned vocabulary / count-announcement openers; rewrite the flagged lines):
 $(echo "$SLOP" | sed 's/^/    /')
