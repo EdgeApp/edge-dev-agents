@@ -28,9 +28,15 @@ set -euo pipefail
 
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
+# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
+# backticked spans blanked): a command that merely QUOTES a trigger string --
+# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
+# argument extraction, where quoted values are load-bearing. Fail-open to the
+# raw command if the helper is unavailable.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
 # Only gate: update-status.sh ... Complete for THIS session's task.
-case "$CMD" in
+case "$CMD_M" in
   *update-status.sh*"$AGENT_TASK_GID"*Complete*) ;;
   *) exit 0 ;;
 esac
@@ -56,6 +62,17 @@ if [ -n "$TOKEN" ]; then
     echo "BLOCKED: stale followup-scope check for task $GID — comment(s) landed after your last check (marker knows $MARKER_NEWEST, live newest is $LIVE_NEWEST). Re-run: $CHECK — address any new operator asks per followup-scope-is-the-deliverable, then retry Complete." >&2
     exit 2
   fi
+fi
+
+# Watermark ordering: AGENT-authored (🥋-marked) comments newer than the report
+# attach mean the watermark is not last — invisible to the next run's scope
+# check and report arithmetic (one-shot report-as-attachment: post the comment,
+# then RE-ATTACH so the watermark lands last). 3 A9 BADs + 2 MINORs in the
+# 2026-08-19 report-eval cohort; enforcement approved 2026-07-29, built here.
+AGENT_AFTER="$(jq -r '.agent_comments_after_watermark // 0' "$MARKER" 2>/dev/null || echo 0)"
+if [ "$AGENT_AFTER" -gt 0 ] 2>/dev/null; then
+  echo "BLOCKED: $AGENT_AFTER agent-authored comment(s) postdate the run-report attachment, so the report is no longer the watermark — the next run's scope check cannot see anything below it. Re-attach the report (same file via asana-task-update.sh --attach-file; its iteration ordinal stays stable on re-attach), re-run: $CHECK — then retry Complete." >&2
+  exit 2
 fi
 
 # GitHub-side scope: the marker's own record blocks. No live re-fetch here — the

@@ -14,6 +14,12 @@ set -euo pipefail
 INPUT=$(cat)
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
 CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
+# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
+# backticked spans blanked): a command that merely QUOTES a trigger string --
+# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
+# argument extraction, where quoted values are load-bearing. Fail-open to the
+# raw command if the helper is unavailable.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
 # Booted guard (all maestro surfaces, CLI and MCP): the MCP daemon is bound to
 # $AGENT_SIM_UDID at startup, but when that sim goes DOWN (mid-debug reboot),
@@ -38,16 +44,16 @@ esac
 
 # Only gate maestro test/record/studio runs (global flags may sit between
 # `maestro` and the subcommand); `maestro --help`, mcp, etc. pass through.
-echo "$CMD" | grep -qE '\bmaestro\b[^|;&]*[[:space:]](test|record|studio)([[:space:]]|$)' || exit 0
+echo "$CMD_M" | grep -qE '\bmaestro\b[^|;&]*[[:space:]](test|record|studio)([[:space:]]|$)' || exit 0
 booted_guard
 
 MISSING=""
-echo "$CMD" | grep -q -- '--device' || MISSING="--device"
+echo "$CMD_M" | grep -q -- '--device' || MISSING="--device"
 # Per-slot driver port (maestro >= 2.6.0 hidden --driver-host-port): without it,
 # parallel slots' iOS drivers contend. Required only when the session has a slot
 # Metro port to derive it from.
 if [ -n "${AGENT_METRO_PORT:-}" ]; then
-  echo "$CMD" | grep -q -- '--driver-host-port' || MISSING="$MISSING --driver-host-port"
+  echo "$CMD_M" | grep -q -- '--driver-host-port' || MISSING="$MISSING --driver-host-port"
 fi
 [ -z "$MISSING" ] && exit 0
 

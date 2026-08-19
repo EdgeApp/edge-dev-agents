@@ -29,10 +29,16 @@ case "$TOOL" in
   mcp__maestro__*) IS_DRIVE=1 ;;
   Bash)
     CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
+# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
+# backticked spans blanked): a command that merely QUOTES a trigger string --
+# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
+# argument extraction, where quoted values are load-bearing. Fail-open to the
+# raw command if the helper is unavailable.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
     # CLI drives: `maestro ... test/studio ...`. Reads/inspections of maestro
     # dirs, capture-buy-quote.sh (which wraps the CLI), and the mcp wrapper all
     # count as drives too — every path to the sim goes through the playbook.
-    if printf '%s' "$CMD" | grep -qE '(^|[;&|[:space:]])(maestro|capture-buy-quote\.sh|maestro-mcp-wrapper\.sh)[[:space:]]'; then
+    if printf '%s' "$CMD_M" | grep -qE '(^|[;&|[:space:]])(maestro|capture-buy-quote\.sh|maestro-mcp-wrapper\.sh)[[:space:]]'; then
       IS_DRIVE=1
     fi
     ;;

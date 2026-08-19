@@ -130,6 +130,33 @@ if [[ ${#PINS[@]} -gt 0 ]]; then
       exit 1
     fi
 
+    # Verify the tarball carries every prebuilt native artifact the dep's
+    # podspec links against. These binaries are commonly gitignored (CI builds
+    # them and packs them at publish), so a pack from a fresh worktree omits
+    # them silently: the wrapper sources still compile and the build server
+    # dies at link with undefined symbols, an hour into the build.
+    DEP_PODSPEC="$(ls "$DEP_ROOT"/*.podspec 2>/dev/null | head -1 || true)"
+    if [[ -n "$DEP_PODSPEC" ]]; then
+      TAR_LIST="$(tar -tzf "$SRC_TGZ")"
+      MISSING_ARTIFACTS=()
+      while IFS= read -r ARTIFACT; do
+        [[ -n "$ARTIFACT" ]] || continue
+        if ! grep -q "^package/${ARTIFACT%/}" <<<"$TAR_LIST"; then
+          MISSING_ARTIFACTS+=("$ARTIFACT")
+        fi
+      done < <(grep -oE '(vendored_frameworks|vendored_libraries)[^=]*=[^"]*"[^"]+"' "$DEP_PODSPEC" \
+                 | grep -oE '"[^"]+"' | tr -d '"')
+      if [[ ${#MISSING_ARTIFACTS[@]} -gt 0 ]]; then
+        echo "tarball missing native artifact(s) the podspec links against:" >&2
+        printf '  %s\n' "${MISSING_ARTIFACTS[@]}" >&2
+        echo "These are usually gitignored prebuilt binaries absent from a fresh" >&2
+        echo "worktree. Build them in $DEP_ROOT, or copy them in from the published" >&2
+        echo "package when the pinned change is JS-only, then retry." >&2
+        rm -f "$SRC_TGZ"
+        exit 1
+      fi
+    fi
+
     DST_NAME="${DEP_NAME}-${DEP_VERSION}-${STAMP}.tgz"
     cp "$SRC_TGZ" "$GUI_ROOT/$DST_NAME"
     rm -f "$SRC_TGZ"

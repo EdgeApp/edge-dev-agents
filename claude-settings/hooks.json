@@ -83,6 +83,11 @@
           "type": "command"
         },
         {
+          "command": "~/.config/agent-watcher/hooks/no-push-after-complete.sh",
+          "timeout": 15,
+          "type": "command"
+        },
+        {
           "command": "~/.config/agent-watcher/hooks/require-clean-run-report.sh",
           "timeout": 15,
           "type": "command"

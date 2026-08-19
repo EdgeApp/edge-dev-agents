@@ -37,7 +37,13 @@ exec 3>&2   # keep a handle for notes; all paths exit 0
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
-printf '%s' "$CMD" | grep -qE 'update-status\.sh[^|;&]*[[:space:]]Complete([[:space:]]|$)' || exit 0
+# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
+# backticked spans blanked): a command that merely QUOTES a trigger string --
+# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
+# argument extraction, where quoted values are load-bearing. Fail-open to the
+# raw command if the helper is unavailable.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+printf '%s' "$CMD_M" | grep -qE 'update-status\.sh[^|;&]*[[:space:]]Complete([[:space:]]|$)' || exit 0
 
 FIELD=$("$HOME/.cursor/skills/asana-field-value.sh" "$AGENT_TASK_GID" "TDD?" 2>/dev/null || echo "none")
 [ "$FIELD" = "tdd" ] || exit 0

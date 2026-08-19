@@ -25,7 +25,9 @@ case "$TOOL" in
     ;;
   Bash)
     CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
-    case "$CMD" in *skills/agents-md*) touch "$MARKER" ;; esac
+    # Stripped view: quoting the path in a heredoc/echo is not reading it.
+    CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+    case "$CMD_M" in *skills/agents-md*) touch "$MARKER" ;; esac
     ;;
 esac
 exit 0

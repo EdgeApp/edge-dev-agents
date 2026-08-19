@@ -12,11 +12,17 @@ set -euo pipefail
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
+# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
+# backticked spans blanked): a command that merely QUOTES a trigger string --
+# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
+# argument extraction, where quoted values are load-bearing. Fail-open to the
+# raw command if the helper is unavailable.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
 # Match a real invocation (start of command or after ; & | && ||), not the string
 # appearing inside a grep/cat/echo of some file or message.
-if printf '%s' "$CMD" | grep -qE '(^|[;&|][[:space:]]*|&&[[:space:]]*|\|\|[[:space:]]*)(xcrun[[:space:]]+)?simctl[[:space:]]+(uninstall|erase)([[:space:]]|$)' \
-   && ! printf '%s' "$CMD" | grep -qE '^(grep|rg|cat|sed|awk|echo|printf)[[:space:]]'; then
+if printf '%s' "$CMD_M" | grep -qE '(^|[;&|][[:space:]]*|&&[[:space:]]*|\|\|[[:space:]]*)(xcrun[[:space:]]+)?simctl[[:space:]]+(uninstall|erase)([[:space:]]|$)' \
+   && ! printf '%s' "$CMD_M" | grep -qE '^(grep|rg|cat|sed|awk|echo|printf)[[:space:]]'; then
   cat >&2 <<'MSG'
 BLOCKED: `simctl uninstall` deletes the app's data container (the logged-in test
 account — not re-provisionable without a manual login), and `simctl erase` wipes

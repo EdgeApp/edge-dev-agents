@@ -1,8 +1,17 @@
 #!/usr/bin/env node
 // pr-create.sh — Creates a PR for the current branch using gh CLI.
 // Usage: ./pr-create.sh [--title "PR title"] [--body-file <path>] [--draft]
+//                       [--base <ref>]
 // Reads from git context: repo owner/name, current branch, default branch.
 // Outputs JSON with PR URL and number on success.
+//
+// --base names the branch the PR merges INTO. Without it the PR targets the
+// repo's default branch, which is wrong whenever the work sits on top of a
+// long-lived non-default branch (a white-label branch, a release branch): the
+// PR then shows every commit that separates the two branches instead of the
+// change under review. The base also drives the "commits since base" reads
+// below (changelog detection, generated title, generated description), so it is
+// resolved once and used everywhere.
 
 const { execSync, spawnSync } = require("child_process");
 const fs = require("fs");
@@ -15,6 +24,7 @@ let title = null;
 let bodyFile = null;
 let draft = false;
 let asanaTask = null;
+let baseArg = null;
 
 let asanaAttach = false;
 
@@ -22,6 +32,7 @@ for (let i = 0; i < args.length; i++) {
   if (args[i] === "--title" && args[i + 1]) title = args[++i];
   else if (args[i] === "--body-file" && args[i + 1]) bodyFile = args[++i];
   else if (args[i] === "--asana-task" && args[i + 1]) asanaTask = args[++i];
+  else if (args[i] === "--base" && args[i + 1]) baseArg = args[++i];
   else if (args[i] === "--asana-attach") asanaAttach = true;
   else if (args[i] === "--no-asana-attach") asanaAttach = false;
   else if (args[i] === "--draft") draft = true;
@@ -88,7 +99,7 @@ function insertAfterHeading(bodyText, heading, insertText) {
 
 function buildDescriptionFromCommits() {
   try {
-    const log = git(`log origin/${defaultBranch}..HEAD --format=%B---`);
+    const log = git(`log origin/${baseBranch}..HEAD --format=%B---`);
     const messages = log
       .split("---")
       .map(message => message.trim())
@@ -200,9 +211,26 @@ try {
   }
 }
 
+// The PR's base: --base when given, else the repo default.
+const baseBranch = baseArg ?? defaultBranch;
+if (baseBranch === branch) {
+  console.error(
+    `ERROR: --base ${baseBranch} is the current branch. A PR cannot merge a branch into itself.`
+  );
+  process.exit(1);
+}
+try {
+  git(`rev-parse --verify --quiet origin/${baseBranch}`);
+} catch {
+  console.error(
+    `ERROR: origin/${baseBranch} does not exist. Fetch it or correct --base.`
+  );
+  process.exit(1);
+}
+
 let hasChangelog = false;
 try {
-  const diff = git(`diff origin/${defaultBranch}..HEAD -- CHANGELOG.md`);
+  const diff = git(`diff origin/${baseBranch}..HEAD -- CHANGELOG.md`);
   hasChangelog =
     diff.includes("## Unreleased") ||
     /^\+- (added|changed|fixed):/m.test(diff);
@@ -213,7 +241,7 @@ const templateInfo = loadRepoTemplate();
 // Build title from commits/branch if not provided
 if (!title) {
   try {
-    const commits = git(`log origin/${defaultBranch}..HEAD --oneline`)
+    const commits = git(`log origin/${baseBranch}..HEAD --oneline`)
       .split("\n")
       .filter(Boolean);
     if (commits.length === 1) {
@@ -341,7 +369,8 @@ if (lint.status === 1) {
 } else if (lint.status === 0 && /^WARN /m.test(lint.stdout || "")) {
   console.error((lint.stdout || "").split("\n").filter((l) => l.startsWith("WARN ")).join("\n"));
 }
-const ghArgs = ["pr", "create", "--title", title, "--body-file", tmpBody];
+const ghArgs = ["pr", "create", "--title", title, "--body-file", tmpBody,
+  "--base", baseBranch];
 if (draft) ghArgs.push("--draft");
 
 const result = spawnSync("gh", ghArgs, { encoding: "utf8" });
@@ -392,7 +421,7 @@ console.log(
       asana_attached: asanaAttach ? asanaAttached : null,
       number: parseInt(prMatch[1], 10),
       title,
-      base: defaultBranch,
+      base: baseBranch,
       head: branch,
       draft,
       owner,

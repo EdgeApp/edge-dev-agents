@@ -279,7 +279,7 @@
       ]
     },
     "file:require-concession-validation.sh": {
-      "hash": "eea6cfe0aed8",
+      "hash": "2f79570bd436",
       "dims": [
         "O9"
       ]
@@ -423,7 +423,7 @@
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "be04910feac9",
+      "hash": "3db1fb151071",
       "dims": [
         "A9"
       ]
@@ -566,6 +566,12 @@
       "hash": "d6c850d01e1a",
       "dims": [
         "A33"
+      ]
+    },
+    "file:require-followup-scope-on-complete.sh": {
+      "hash": "cd1857ca61e3",
+      "dims": [
+        "A9"
       ]
     }
   },
@@ -1333,6 +1339,10 @@
     "cheese:takeover-non-blocking": {
       "reason": "2026-08-18: operator-workflow etiquette note (branch takeover needs only a provenance note); no eval-checkable output beyond the report line already covered by cheese-build reporting",
       "hash": "bfe2c2dbba29"
+    },
+    "pr-create:base-must-match-branch-point": {
+      "reason": "2026-08-19: Pending operator-curated dimension: the two mechanical failure modes (nonexistent base ref, base equal to head) are now refused by the companion script itself, and a mis-based PR is self-evident in the PR diff. Proposed dimension recorded in the 1216998636347236 run report Skill Gaps section.",
+      "hash": "2c3f32241f59"
     }
   },
   "excluded_skills": {

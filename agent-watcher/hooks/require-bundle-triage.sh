@@ -17,15 +17,21 @@ set -euo pipefail
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
+# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
+# backticked spans blanked): a command that merely QUOTES a trigger string --
+# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
+# argument extraction, where quoted values are load-bearing. Fail-open to the
+# raw command if the helper is unavailable.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
 # Gate 1: RCT_jsLocation WRITES (never reads/deletes; delete restores default).
-if printf '%s' "$CMD" | grep -qE 'defaults[[:space:]]+write[^|;&]*RCT_jsLocation'; then
+if printf '%s' "$CMD_M" | grep -qE 'defaults[[:space:]]+write[^|;&]*RCT_jsLocation'; then
   echo "BLOCKED: never hand-write RCT_jsLocation. Packager pinning is owned by ios-rn-build.sh (cached-launch pins + terminates + relaunches so it takes effect). If the app is loading the wrong bundle, run ~/.config/agent-watcher/bundle-ownership.sh --udid <udid> --worktree <your-repo-worktree> — its verdict names the squatter or the missing Metro and the fix is to own the port the app already reads, not to redirect the app." >&2
   exit 2
 fi
 
 # Gate 2: cache escalations need a fresh triage marker.
-if printf '%s' "$CMD" | grep -qE -- '--reset-cache|rm[[:space:]]+-r?[rf]+[^|;&]*(metro-cache|metro-[*]|/metro-)'; then
+if printf '%s' "$CMD_M" | grep -qE -- '--reset-cache|rm[[:space:]]+-r?[rf]+[^|;&]*(metro-cache|metro-[*]|/metro-)'; then
   MARKER="/tmp/agent-bundle-triage-$AGENT_TASK_GID.json"
   FRESH=0
   if [ -f "$MARKER" ]; then

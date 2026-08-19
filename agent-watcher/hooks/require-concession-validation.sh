@@ -18,6 +18,12 @@ set -euo pipefail
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
+# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
+# backticked spans blanked): a command that merely QUOTES a trigger string --
+# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
+# argument extraction, where quoted values are load-bearing. Fail-open to the
+# raw command if the helper is unavailable.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
 GID="$AGENT_TASK_GID"
 ALOG="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/attempts/$GID.jsonl"
@@ -26,7 +32,7 @@ VERDICT="/tmp/agent-concession-verdict-$GID.json"
 
 # Determine whether this command is a gated concession, and its reason.
 KIND="" REASON=""
-case "$CMD" in
+case "$CMD_M" in
   *update-status.sh*--blocked*yes*)
     KIND="block"
     REASON=$(printf '%s' "$CMD" | node -e 'const s=require("fs").readFileSync(0,"utf8");const m=s.match(/--reason\s+("([^"]*)"|\x27([^\x27]*)\x27|(\S+))/);process.stdout.write(m?(m[2]!==undefined?m[2]:m[3]!==undefined?m[3]:m[4]||""):"")' 2>/dev/null || true)

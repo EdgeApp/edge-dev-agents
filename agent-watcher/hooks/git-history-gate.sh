@@ -38,6 +38,12 @@ set -euo pipefail
 
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
+# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
+# backticked spans blanked): a command that merely QUOTES a trigger string --
+# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
+# argument extraction, where quoted values are load-bearing. Fail-open to the
+# raw command if the helper is unavailable.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
 case "$CMD" in
   *lint-commit.sh*) exit 0 ;;
@@ -45,12 +51,12 @@ case "$CMD" in
 esac
 
 # ---- commit discipline ------------------------------------------------------
-if echo "$CMD" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+(-[^[:space:]]+[[:space:]]+)*commit([[:space:]]|$)'; then
-  if echo "$CMD" | grep -q -- '--no-verify'; then
+if echo "$CMD_M" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+(-[^[:space:]]+[[:space:]]+)*commit([[:space:]]|$)'; then
+  if echo "$CMD_M" | grep -q -- '--no-verify'; then
     echo "BLOCKED: 'git commit --no-verify' is forbidden in agent sessions. A failing hook is a halt-on-error signal — fix the underlying failure (tsc/eslint/jest diagnostics are auto-fixable, max 2 attempts) or stop and report. Commit via ~/.cursor/skills/lint-commit.sh." >&2
     exit 2
   fi
-  if echo "$CMD" | grep -q -- '--amend'; then
+  if echo "$CMD_M" | grep -q -- '--amend'; then
     exit 0
   fi
   echo "BLOCKED: raw 'git commit' is forbidden in agent sessions. Use ~/.cursor/skills/lint-commit.sh -m \"...\" [files...] (or --fixup <hash>) per ~/.cursor/skills/im/SKILL.md. The only raw-git exception is 'git commit --amend' inside the step-6 watch loop." >&2
@@ -59,9 +65,9 @@ fi
 
 # ---- squash + push discipline -----------------------------------------------
 NEEDS_MODE=""
-if echo "$CMD" | grep -qE -- '--autosquash|git-branch-ops\.sh[[:space:]]+autosquash'; then
+if echo "$CMD_M" | grep -qE -- '--autosquash|git-branch-ops\.sh[[:space:]]+autosquash'; then
   NEEDS_MODE="squash"
-elif echo "$CMD" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+push([[:space:]]|$)'; then
+elif echo "$CMD_M" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+push([[:space:]]|$)'; then
   NEEDS_MODE="push"
 fi
 if [ -n "$NEEDS_MODE" ]; then

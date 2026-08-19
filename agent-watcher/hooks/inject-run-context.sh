@@ -96,6 +96,15 @@ Contracts do NOT survive compaction: re-read the run-report template, the task's
 EOF
 }
 
+emit_chat() {
+  # Discussion sessions (claude-asana-chat-*): the boundary that keeps a chat
+  # from silently becoming an unmanaged run. A chat that "helps out" edits the
+  # task's worktree with no one-shot contract, no state file, no attempt log,
+  # and its WIP dies with the idle reaper; the next real run then inherits
+  # mystery diffs.
+  echo "[chat-context] This is a DISCUSSION session (no orch contract). Do not do task deliverable work here: no edits in task worktrees, no commits, no PR/Asana mutations. Work is re-engaged by arming the task (agent_status=Pending); insights that should drive a run go into an Asana comment first. Discussing, inspecting, and drafting text for the operator are all fine."
+}
+
 emit_anchor() {
   local name="$1"
   echo "[anchor-context refresh] You are the '$name' anchor: tmux claude-asana-$name, RC $name."
@@ -113,7 +122,9 @@ if [[ -n "${AGENT_TASK_GID:-}" ]]; then
 elif [[ -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]]; then
   NAME=$(tmux display-message -p -t "$TMUX_PANE" '#{session_name}' 2>/dev/null || true)
   SHORT="${NAME#claude-asana-}"
-  if [[ "$NAME" == claude-asana-* ]] && jq -e --arg n "$SHORT" '.watcher.persistent_anchors | index($n) != null' "$DIR/asana-config.json" >/dev/null 2>&1; then
+  if [[ "$NAME" == claude-asana-chat-* ]]; then
+    emit_chat 2>/dev/null
+  elif [[ "$NAME" == claude-asana-* ]] && jq -e --arg n "$SHORT" '.watcher.persistent_anchors | index($n) != null' "$DIR/asana-config.json" >/dev/null 2>&1; then
     emit_anchor "$SHORT" 2>/dev/null
   fi
 fi

@@ -19,6 +19,16 @@
 #      proof frame (build-and-test hack-verify-visual-changes) but the report
 #      never marks it. A forced frame reads as organic evidence unless it is
 #      labelled, so the label is mechanical, not a matter of recollection.
+#   5. Second report DOC in the same session: one run segment produces ONE
+#      report doc, updated and re-attached in place (stable slug/ordinal). A
+#      second doc with a different slug splinters the record (2 runs in the
+#      2026-08-19 cohort attached parallel report docs). Cross-segment followup
+#      reports (new session id) pass untouched. Marker: /tmp/agent-report-doc-<gid>.
+#   6. Dead GitHub citations: every cited github.com PR/issue/comment/commit URL
+#      is resolved via gh api; a definitive HTTP 404 blocks (a 2026-08-19 report
+#      cited a PR comment that does not exist anywhere on the PR). Network and
+#      rate-limit errors fail OPEN — only proven-nonexistent artifacts block.
+#      Asana and other external URLs are skipped (presigned churn, anti-bot).
 #
 # ALSO auto-fills traceability fields before linting, since every one is fully
 # determined by state the hook can read and none by agent recollection:
@@ -61,12 +71,18 @@ set -euo pipefail
 INPUT=$(cat)
 CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
+# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
+# backticked spans blanked): a command that merely QUOTES a trigger string --
+# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
+# argument extraction, where quoted values are load-bearing. Fail-open to the
+# raw command if the helper is unavailable.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
 # Gate BOTH attach paths: asana-task-update.sh --attach-file, and direct curl
 # to the Asana attachments API (runs fall back to curl when the script or MCP
 # misbehaves — two 2026-08 reports reached Asana unlinted through that side
 # door, em dashes intact).
-case "$CMD" in
+case "$CMD_M" in
   *asana-task-update.sh*--attach-file*) ;;
   *api.asana.com*attachments*) ;;
   *) exit 0 ;;
@@ -81,6 +97,24 @@ REPORT="$(printf '%s' "$CMD" | sed -nE 's/.*--attach-file[= ]+"?([^" ]+)"?.*/\1/
 [ -n "$REPORT" ] || REPORT="$(printf '%s' "$CMD" | sed -nE 's/.*file=@"?([^";]+)"?.*/\1/p' | head -1)"
 REPORT="${REPORT/#\~/$HOME}"
 [ -s "$REPORT" ] || { echo "BLOCKED: --attach-file path '$REPORT' not readable — attach the actual report file." >&2; exit 2; }
+
+# Doc identity: slug from --attach-name, else the file basename. Computed early
+# because both the second-doc check (5) and the ordinal/H1 logic below need it.
+SLUG=$(printf '%s' "$CMD" | sed -E 's/.*--attach-name[= ]+"?agent-run-report-?([^" ]*)\.md"?.*/\1/; s/^[0-9]+-//')
+[ -n "$SLUG" ] && [ "$SLUG" != "$CMD" ] || SLUG=$(basename "$REPORT" .md | sed -E "s/^agent-run-report-?//; s/^$AGENT_TASK_GID-?//; s/^[0-9]+-//")
+SESS=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)
+
+# 5. One report doc per run segment. A second attach in the SAME session with a
+#    DIFFERENT slug is a parallel report doc — blocked; update the existing doc
+#    and re-attach it instead. A new session (followup segment) resets the marker.
+DOCMARK="/tmp/agent-report-doc-$AGENT_TASK_GID"
+if [ -s "$DOCMARK" ] && [ -n "$SESS" ]; then
+  read -r PREV_SESS PREV_SLUG < "$DOCMARK" || true
+  if [ "${PREV_SESS:-}" = "$SESS" ] && [ -n "${PREV_SLUG:-}" ] && [ "$PREV_SLUG" != "$SLUG" ]; then
+    echo "BLOCKED: this session already attached report doc '$PREV_SLUG'; attaching a second doc ('$SLUG') splinters the run record. One segment produces ONE report: fold this content into the existing doc and re-attach it under the SAME name (its iteration ordinal stays stable on re-attach, per the watermark rule)." >&2
+    exit 2
+  fi
+fi
 
 TEMPLATE="$HOME/.cursor/skills/one-shot/templates/agent-run-report.md"
 FAIL=""
@@ -159,9 +193,8 @@ if [ -z "$ITER" ] && [ -n "$ATOKEN" ]; then
 fi
 if [ -n "$ITER" ]; then
   set_frontmatter iteration "$ITER"
-  # H1 title when the report has none: "# Run report NN: <slug>".
-  SLUG=$(printf '%s' "$CMD" | sed -E 's/.*--attach-name[= ]+"?agent-run-report-?([^" ]*)\.md"?.*/\1/; s/^[0-9]+-//')
-  [ -n "$SLUG" ] && [ "$SLUG" != "$CMD" ] || SLUG=$(basename "$REPORT" .md | sed -E "s/^agent-run-report-?//; s/^$AGENT_TASK_GID-?//; s/^[0-9]+-//")
+  # H1 title when the report has none: "# Run report NN: <slug>" (SLUG computed
+  # once above, shared with the second-doc check).
   if ! grep -qE '^# Run report ' "$REPORT"; then
     awk -v t="# Run report $ITER: ${SLUG:-report}" '
       { print }
@@ -253,7 +286,46 @@ $(echo "$HACKED_SHOTS" | head -5 | sed 's/^/    /')
 "
 fi
 
+# 6. Dead GitHub citations (see header; check 5 ran before the auto-fill).
+#    Shapes resolved: issuecomment / discussion_r anchors, pull, issues, commit.
+#    ONLY "HTTP 404" from gh api blocks; every other failure (network, rate
+#    limit, auth) fails open. Capped at 15 unique URLs so a link-heavy report
+#    cannot stall the attach.
+if command -v gh >/dev/null 2>&1; then
+  DEAD=""
+  while IFS= read -r u; do
+    [ -n "$u" ] || continue
+    OR=$(printf '%s' "$u" | sed -E 's#https://github\.com/([^/]+/[^/]+)(/.*)?$#\1#')
+    [ "$OR" != "$u" ] || continue
+    UPATH="${u%%\#*}"
+    API=""
+    case "$u" in
+      *#issuecomment-[0-9]*)  API="repos/$OR/issues/comments/${u##*#issuecomment-}" ;;
+      *#discussion_r[0-9]*)   API="repos/$OR/pulls/comments/${u##*#discussion_r}" ;;
+      *) case "$UPATH" in
+           */pull/[0-9]*)   API="repos/$OR/pulls/$(printf '%s' "$UPATH" | sed -E 's#.*/pull/([0-9]+).*#\1#')" ;;
+           */issues/[0-9]*) API="repos/$OR/issues/$(printf '%s' "$UPATH" | sed -E 's#.*/issues/([0-9]+).*#\1#')" ;;
+           */commit/*)      API="repos/$OR/commits/$(printf '%s' "$UPATH" | sed -E 's#.*/commit/([0-9a-fA-F]+).*#\1#')" ;;
+         esac ;;
+    esac
+    [ -n "$API" ] || continue
+    GHERR=$(gh api "$API" --silent 2>&1 >/dev/null) || {
+      if printf '%s' "$GHERR" | grep -q "HTTP 404"; then DEAD+="    $u
+"; fi
+    }
+  done < <(grep -oE 'https://github\.com/[^][ )>"`]+' "$REPORT" | sed 's/[.,;:]*$//' | sort -u | head -15)
+  if [ -n "$DEAD" ]; then
+    FAIL+="- Dead GitHub citations (the cited artifact returns HTTP 404 — it does not exist; fix the link or remove the claim it supports):
+$DEAD"
+  fi
+fi
+
 if [ -z "$FAIL" ]; then
+  # Record this segment's report doc identity for the second-doc check (5):
+  # session id + slug. Re-attaches (same slug) rewrite it harmlessly. NOT a
+  # bare `[ -n ] &&` — a false test as the last command would trip set -e
+  # (same failure shape as the TDD_SUFFIX incident above).
+  if [ -n "$SESS" ]; then printf '%s %s\n' "$SESS" "$SLUG" > "$DOCMARK"; fi
   # Allow path: normalize the attach NAME to agent-run-report-NN-<slug>.md via
   # updatedInput, so the attachment list orders itself. Idempotent: a name
   # already carrying the computed ordinal passes untouched.
