@@ -13,14 +13,20 @@ set -euo pipefail
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
+# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
+# backticked spans blanked): a command that merely QUOTES a trigger string --
+# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
+# argument extraction, where quoted values are load-bearing. Fail-open to the
+# raw command if the helper is unavailable.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
 # Match: an agent-watcher *.sh helper invocation followed (after any redirections) by a
 # pipe into head/tail. `[^|]*` consumes args up to the FIRST pipe so
 # `update-status.sh X 2>&1 | tail -2` is caught. Second grep is an exception: when a
 # READER (cat/less/sed/awk/grep/rg/bat/view, or a `<` redirect) precedes the watcher
 # path, the script is being READ, not executed — leave it alone.
-if printf '%s' "$CMD" | grep -qE '\.config/agent-watcher/(hooks/)?[A-Za-z0-9_.-]+\.sh[^|]*\|[[:space:]]*(tail|head)([[:space:]]|$|-)' \
-   && ! printf '%s' "$CMD" | grep -qE '(cat|less|head|tail|bat|view|grep|rg|sed|awk)[[:space:]]+[^|]*\.config/agent-watcher/|<[[:space:]]*[^|]*\.config/agent-watcher/'; then
+if printf '%s' "$CMD_M" | grep -qE '\.config/agent-watcher/(hooks/)?[A-Za-z0-9_.-]+\.sh[^|]*\|[[:space:]]*(tail|head)([[:space:]]|$|-)' \
+   && ! printf '%s' "$CMD_M" | grep -qE '(cat|less|head|tail|bat|view|grep|rg|sed|awk)[[:space:]]+[^|]*\.config/agent-watcher/|<[[:space:]]*[^|]*\.config/agent-watcher/'; then
   # REWRITE, don't block: the block costs a full bounce and this was the single most
   # recurrent finding of the 2026-07-09 combined eval (11 fires in one run). Strip the
   # `| tail/head …` segment (watcher script stdout is small; the truncation was

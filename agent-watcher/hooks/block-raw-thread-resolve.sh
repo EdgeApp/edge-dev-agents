@@ -14,7 +14,18 @@ set -euo pipefail
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
 
+# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
+# backticked spans blanked): a command that merely QUOTES a trigger string --
+# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
+# argument extraction, where quoted values are load-bearing. Fail-open to the
+# raw command if the helper is unavailable.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+# The mutation string itself legitimately sits INSIDE quotes (a graphql -f
+# query argument), so the trigger is: the string anywhere in the raw command
+# AND an actual graphql invocation in the stripped view. A heredoc or echo
+# that merely quotes the mutation has no graphql invocation.
 echo "$CMD" | grep -q "resolveReviewThread" || exit 0
+printf '%s' "$CMD_M" | grep -qE '(^|[;&|[:space:]])gh[[:space:]]+api[[:space:]]+graphql([[:space:]]|$)' || exit 0
 
 case "$CMD" in
   *pr-address.sh*|*bugbot*/scripts/*|*github-pr-comments.sh*) exit 0 ;;

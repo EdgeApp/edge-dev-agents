@@ -14,6 +14,7 @@ metadata:
 <rule id="gh-auth-required">If script exits code 2 with `PROMPT_GH_AUTH`, prompt user to run `gh auth login` and STOP.</rule>
 <rule id="no-dirty-pr">Do NOT create a PR when there are uncommitted changes.</rule>
 <rule id="no-base-push">Do NOT push to `master`/`develop` directly.</rule>
+<rule id="base-must-match-branch-point">Pass `--base <ref>` whenever the branch was cut from anything other than the repo's default branch (a white-label branch such as edge-react-gui's `coinhub`, a release branch, a stacked PR's parent). Without it the PR targets the default branch and its diff carries every commit separating the two, which no reviewer can read. Resolve the ref with `git merge-base --is-ancestor origin/<ref> HEAD` or from the branch's upstream before creating the PR.</rule>
 <rule id="verification-required">Run verification before creating the PR.</rule>
 <rule id="no-reviewer-assignment">Do NOT auto-assign Asana reviewers, set review-needed status, or estimate review hours from this skill. Reviewer choice is a human step; callers that want those behaviors must invoke `asana-task-update` themselves.</rule>
 <rule id="flag-contract">`--asana-attach` only runs when a task GID is available from chat context or explicit `--asana-task <gid>`. If no task GID is available, fail fast and skip the attach.</rule>
@@ -39,7 +40,9 @@ Run:
 ~/.cursor/skills/verify-repo.sh . --base <upstream-ref>
 ```
 
-Use `origin/develop` for `edge-react-gui` and `origin/master` for other repos.
+Use `origin/develop` for `edge-react-gui` and `origin/master` for other repos. On
+a branch cut from a non-default base (per `base-must-match-branch-point`), use
+that base instead so verification and the PR diff cover the same commits.
 </step>
 
 <step id="3" name="Build PR description">
@@ -62,8 +65,14 @@ Write body to `/tmp/pr-body-<task-gid>.md` (gid-scoped — a shared `/tmp/pr-bod
 ~/.cursor/skills/pr-create/scripts/pr-create.sh \
   --title "<title>" \
   --body-file /tmp/pr-body-<task-gid>.md \
+  [--base <ref>] \
   [--asana-task <task_gid>]
 ```
+
+`--base` defaults to the repo's default branch; pass it explicitly per
+`base-must-match-branch-point`. The script refuses a base that does not exist on
+`origin` or that equals the current branch, and it scopes its changelog, title,
+and description reads to the same base.
 
 The companion script validates body files against the repo template and rejects generic fallback sections on templated repos. Capture PR URL and number from JSON output.
 </step>

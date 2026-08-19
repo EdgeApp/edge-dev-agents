@@ -74,6 +74,18 @@ NEWER="$(echo "$STORIES" | jq --arg w "$WATERMARK" \
 NEWER_COUNT="$(echo "$NEWER" | jq 'length')"
 NEWEST_COMMENT_AT="$(echo "$STORIES" | jq -r '[.data[] | select(.resource_subtype == "comment_added") | .created_at] | sort | last // empty')"
 
+# Watermark ordering: AGENT-authored comments (🥋-marked, mark-agent-authored-asana.sh)
+# NEWER than the report attach mean the watermark is not last — the next run's
+# scope check and report arithmetic cannot see them. The sanctioned fix is
+# re-attaching the report so the watermark lands last (one-shot
+# report-as-attachment); the Complete gate blocks on this count. Operator
+# comments stay followup scope, never a violation. Zero when no report exists
+# yet: comments BEFORE the first attach are the prescribed order.
+AGENT_AFTER_WM=0
+if [[ -n "$WATERMARK" ]]; then
+  AGENT_AFTER_WM="$(echo "$NEWER" | jq '[.[] | select((.text // "") | test("^\\s*🥋"))] | length')"
+fi
+
 # Field deltas: live fields vs the previous segment's snapshot in versions/<gid>.jsonl.
 # Inside the task's own session the NEWEST fields-bearing stamp was just written by
 # THIS segment's spawn/resume — skip it so the baseline is the segment before.
@@ -169,6 +181,7 @@ jq -n \
   --arg watermark "$WATERMARK" \
   --arg newest_comment_at "$NEWEST_COMMENT_AT" \
   --argjson newer_count "$NEWER_COUNT" \
+  --argjson agent_after_wm "$AGENT_AFTER_WM" \
   --argjson comments "$(echo "$NEWER" | jq '[.[] | {created_at, by: (.created_by.name // "?"), text: (.text // "" | .[0:400])}]')" \
   --arg delta_status "$DELTA_STATUS" \
   --arg baseline_ts "$BASELINE_TS" \
@@ -177,7 +190,7 @@ jq -n \
   --argjson gh_scope "$GH_SCOPE" \
   --argjson gh_blocking "$GH_BLOCKING" \
   --argjson gh_bots_incomplete "${GH_BOTS_INCOMPLETE:-0}" \
-  '{task_gid: $gid, checked_at: $checked_at, watermark: $watermark, newest_comment_at: $newest_comment_at, newer_count: $newer_count, comments: $comments,
+  '{task_gid: $gid, checked_at: $checked_at, watermark: $watermark, newest_comment_at: $newest_comment_at, newer_count: $newer_count, agent_comments_after_watermark: $agent_after_wm, comments: $comments,
     field_delta_status: $delta_status, field_baseline_ts: $baseline_ts, field_deltas: $field_deltas,
     github_status: $gh_status, github_prs: $gh_scope, github_blocking_threads: $gh_blocking, github_bots_incomplete: $gh_bots_incomplete}' \
   > "$MARKER"
@@ -193,6 +206,9 @@ if [[ "$NEWER_COUNT" -eq 0 ]]; then
 else
   echo ">>   $NEWER_COUNT comment(s) NEWER than the watermark — this is THIS run's scope (followup-scope-is-the-deliverable):"
   echo "$NEWER" | jq -r '.[] | "     [\(.created_at)] \(.created_by.name // "?"): \(.text // "" | gsub("\\s+"; " ") | .[0:200])"'
+fi
+if [[ "$AGENT_AFTER_WM" -gt 0 ]]; then
+  echo ">>   $AGENT_AFTER_WM AGENT-authored comment(s) postdate the report attachment — the watermark is not last, so these are invisible to the next run's scope check. Re-attach the report (same file: its iteration ordinal stays stable) so the watermark lands last; Complete is gate-blocked until a re-check records zero."
 fi
 if [[ "$DELTA_STATUS" == "ok" ]]; then
   DELTA_COUNT=$(echo "$FIELD_DELTAS" | jq 'length')
