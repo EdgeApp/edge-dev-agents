@@ -21,7 +21,7 @@ deletion loses nothing) or when tells cluster.
   sense, which is the whole reason it exists.
 - Formal or polished prose without specific tells. Dry is not slop.
 - One short sentence for emphasis. Flag staccato only in runs.
-- A load-bearing hedge ("unverified: X"). Hedges are information when they
+- A deliberate hedge ("unverified: X"). Hedges are information when they
   change what the reader should do.
 - Quoted or discussed text: never flag a banned phrase inside a quotation, a
   title, or an example where the phrase is the subject.

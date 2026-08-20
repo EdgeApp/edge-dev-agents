@@ -149,7 +149,7 @@ Docs, code comments, and descriptions state what IS, not what changed: "Uses a h
 - Fragmented headers: a heading followed by a one-liner that restates the heading ("## Performance / Speed matters.") — cut the warm-up line.
 - Tailing-negation fragments: "…, no guessing" / "…, no wasted motion" tacked on — write the real clause or drop it.
 - Filler phrases: "in order to" → "to", "at this point in time" → "now", "due to the fact that" → "because", "has the ability to" → "can", "it is important to note that" → (delete).
-- Hedge stacks: "could potentially possibly" → one hedge, chosen deliberately (a load-bearing hedge is information; a stack is noise).
+- Hedge stacks: "could potentially possibly" → one hedge, chosen deliberately (a hedge the reader acts on is information; a stack is noise).
 - Generic upbeat conclusions: "exciting times ahead", "a major step in the right direction" — cut, end on the last concrete fact (rule 14's closer discipline).
 
 ## 17. Name the mechanism, not the volume

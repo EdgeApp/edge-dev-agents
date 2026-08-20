@@ -5,9 +5,18 @@ skills, companion scripts, coding standards, an autonomous Asana-to-PR
 orchestration system with deterministic enforcement hooks, a post-hoc eval
 suite, and meta-tooling for maintaining the workflow itself.
 
-The distributable Cursor content lives under `.cursor/`. This repo is the
-versioned home for those skills, rules, scripts, and docs, plus the portable
+The distributable content lives under `.cursor/`. This repo is the versioned
+home for those skills, rules, scripts, and docs, plus the portable
 orchestration trees a second machine bootstraps from.
+
+The `.cursor/` path is historical, not a commitment: the system is built to
+sync across agent harnesses, not just Cursor. Claude Code is the primary
+consumer today (`~/.claude/skills` symlinks to the canonical tree,
+`~/.claude/CLAUDE.md` is generated from the always-apply rules, and the
+enforcement hooks are Claude Code hooks); OpenCode gets generated mirrors via
+`tool-sync.sh`. Other harnesses are untested, but the content is plain
+markdown and shell, so most of it should carry in theory; the hook layer is
+the Claude-specific part.
 
 The canonical local doc lives at `~/.cursor/README.md`. During
 `/convention-sync`, that file is mirrored to `edge-dev-agents/README.md`, and
