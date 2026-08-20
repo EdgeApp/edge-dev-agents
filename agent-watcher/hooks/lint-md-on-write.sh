@@ -91,7 +91,9 @@ case "$TOOL" in
 esac
 [ -n "$TEXT" ] || exit 0
 
-TMP=$(mktemp /tmp/lint-md-write.XXXXXX.md) || exit 0
+# Trailing Xs required: macOS mktemp treats an embedded-X template
+# (name.XXXXXX.md) as a LITERAL filename — concurrent sessions collide.
+TMP=$(mktemp /tmp/lint-md-write.XXXXXX) || exit 0
 printf '%s\n' "$TEXT" > "$TMP"
 if [ -n "$MODE" ]; then
   OUT=$("$LINT" "$TMP" "$MODE" 2>/dev/null); RC=$?

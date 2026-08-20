@@ -99,8 +99,33 @@ case "$CMD" in
     fi
 
     # Read review JSON from stdin: { event, body, comments: [{path, line, body, start_line?, side?}] }
-    # Inject commit_id from --sha and POST to reviews endpoint
-    jq --arg sha "$SHA" '. + {commit_id: $sha}' | \
+    # Inject commit_id from --sha and POST to reviews endpoint.
+    REVIEW_JSON=$(cat)
+
+    # Prose lint on the outbound review (top-level body + every inline comment
+    # body), the shared no-slop lint WITH the --semantic haiku judge — a PR
+    # review is where the 2026-08-19 courtesy-ender incident shipped, and this
+    # is the one point where the final text is fully assembled. HARD findings
+    # refuse the submit; lint infra failure fails OPEN.
+    LINT="$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh"
+    if [[ -x "$LINT" ]]; then
+      # Trailing Xs required (macOS mktemp treats embedded-X templates as
+      # literal names); `|| RC=$?` so set -e cannot die at the assignment.
+      TMP=$(mktemp /tmp/pr-review-lint.XXXXXX) || TMP=""
+      if [[ -n "$TMP" ]]; then
+        printf '%s' "$REVIEW_JSON" | jq -r '[(.body // ""), ((.comments // [])[] | .body // "")] | join("\n\n")' > "$TMP" 2>/dev/null || true
+        RC=0
+        OUT=$("$LINT" "$TMP" --semantic 2>/dev/null) || RC=$?
+        rm -f "$TMP"
+        if [[ "$RC" -eq 1 ]]; then
+          echo "BLOCKED: review text fails the shared prose lint (writing-style/no-slop, judge tier included). Fix these and retry:" >&2
+          printf '%s\n' "$OUT" | grep '^HARD' | head -8 >&2
+          exit 1
+        fi
+      fi
+    fi
+
+    printf '%s' "$REVIEW_JSON" | jq --arg sha "$SHA" '. + {commit_id: $sha}' | \
       gh api "repos/$OWNER/$REPO/pulls/$PR/reviews" -X POST --input - | \
       jq '{id: .id, state: .state, url: .html_url}'
     ;;

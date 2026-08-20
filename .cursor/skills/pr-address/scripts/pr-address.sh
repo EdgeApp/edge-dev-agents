@@ -57,6 +57,32 @@ require_gh() {
   fi
 }
 
+# Prose lint on OUTBOUND bodies (reply / mark-addressed / comment), the SAME
+# shared lint every artifact boundary calls, WITH the --semantic haiku judge:
+# PR conversations are exactly where the 2026-08-19 courtesy-ender incident
+# shipped, and the file-write hook only runs the mechanical tier. This is the
+# one point where the final body is fully assembled (file-over-args makes the
+# command string opaque to hooks). HARD findings refuse the post; lint infra
+# failure fails OPEN (a lint outage must never block review responses).
+lint_outbound_body() { # $1 = body text
+  local tmp out rc=0 lint="$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh"
+  [[ -x "$lint" ]] || return 0
+  # Trailing Xs required: macOS mktemp treats an embedded-X template
+  # (name.XXXXXX.md) as a LITERAL filename — concurrent sessions collide.
+  tmp=$(mktemp /tmp/pr-outbound-lint.XXXXXX) || return 0
+  printf '%s\n' "$1" > "$tmp"
+  # `|| rc=$?`: under set -e a bare `out=$(cmd); rc=$?` dies at the failing
+  # assignment and the block message below never prints.
+  out=$("$lint" "$tmp" --semantic 2>/dev/null) || rc=$?
+  rm -f "$tmp"
+  if [[ "$rc" -eq 1 ]]; then
+    echo "BLOCKED: outbound PR text fails the shared prose lint (writing-style/no-slop, judge tier included). Fix these and retry:" >&2
+    printf '%s\n' "$out" | grep '^HARD' | head -6 >&2
+    exit 1
+  fi
+  return 0
+}
+
 # Install node deps in <dir> when node_modules is absent. Agent worktrees are
 # created without an install, so lint-commit.sh's `./node_modules/.bin/eslint`
 # would be missing. Detects the package manager from the lockfile (npm vs yarn).
@@ -315,6 +341,7 @@ case "$CMD" in
     if [[ -z "$OWNER" || -z "$REPO" || -z "$PR" || -z "$COMMENT_ID" || -z "$BODY" ]]; then
       echo "Error: --owner, --repo, --pr, --comment-id, --body required" >&2; exit 1
     fi
+    lint_outbound_body "$BODY"
     RESULT=$(echo '{}' | jq --arg body "$BODY" '{body: $body}' | \
       gh api "repos/$OWNER/$REPO/pulls/$PR/comments/$COMMENT_ID/replies" \
         -X POST --input -)
@@ -347,6 +374,7 @@ case "$CMD" in
     if [[ -z "$OWNER" || -z "$REPO" || -z "$PR" || -z "$TARGET_TYPE" || -z "$TARGET_ID" || -z "$BODY" ]]; then
       echo "Error: --owner, --repo, --pr, --type, --target-id, --body required" >&2; exit 1
     fi
+    lint_outbound_body "$BODY"
     MARKER="<!-- addressed:${TARGET_TYPE}:${TARGET_ID} -->"
     FULL_BODY="${BODY} ${MARKER}"
     RESULT=$(echo '{}' | jq --arg body "$FULL_BODY" '{body: $body}' | \
@@ -368,6 +396,7 @@ case "$CMD" in
     if [[ -z "$OWNER" || -z "$REPO" || -z "$PR" || -z "$BODY" ]]; then
       echo "Error: --owner, --repo, --pr, and --body or --body-file required" >&2; exit 1
     fi
+    lint_outbound_body "$BODY"
     RESULT=$(echo '{}' | jq --arg body "$BODY" '{body: $body}' | \
       gh api "repos/$OWNER/$REPO/issues/$PR/comments" -X POST --input -)
     URL=$(echo "$RESULT" | jq -r '.html_url // empty')
