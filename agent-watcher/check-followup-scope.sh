@@ -22,8 +22,18 @@
 #      a failed fetch degrades to "unavailable", never fails the comment check. The
 #      snapshot is a delta baseline only — decisions keep reading fields live.
 #   4. Fetch GITHUB-side scope for every PR attached to the task (view_url on
-#      external attachments): unresolved review threads from ANY author, and the
-#      reviewDecision. A re-arm is often triggered by a human PR review with ZERO
+#      external attachments): unresolved review threads from ANY author, the
+#      reviewDecision, AND (owned PRs) unanswered top-level review bodies and
+#      PR comments per pr-address's addressed-marker convention (2026-08-20:
+#      the zano/xmr run Completed past 19 findings in Paul's review BODIES —
+#      twice in two days an agent enumerated threads only, and the fetch
+#      script's stderr obligation trailer was piped away via `2>&1 | grep`;
+#      only a live gate at the boundary survives output filtering). Review
+#      bodies are counted via pr-address.sh fetch itself so the marker logic
+#      has ONE implementation. reviewDecision stays non-blocking by design:
+#      CHANGES_REQUESTED is sticky until the reviewer re-reviews, so gating on
+#      it would deadlock every human-reviewed PR; Complete means "ready for
+#      re-review", and the gate keys on OUR reply markers instead. A re-arm is often triggered by a human PR review with ZERO
 #      Asana activity — the Maya miss (2026-07-29): peachbits requested changes on
 #      PR #459, the re-fired run saw "0 new comments", filtered threads to
 #      __typename==Bot per the old gate wording, and re-set Complete past an OPEN
@@ -137,6 +147,19 @@ if command -v gh >/dev/null 2>&1; then
       "$API/tasks/$TASK_GID/attachments?opt_fields=view_url" 2>/dev/null || true)"
     PR_URLS=$(echo "$ATT2" | jq -r '[.data[]? | .view_url // "" | select(test("github\\.com/.+/pull/[0-9]+$"))] | unique | .[]' 2>/dev/null || true)
   fi
+  # SUBTASK attachments too: multi-repo runs attach PRs to a subtask per repo
+  # (one-shot multi-repo-subtasks), so a parent-only sweep saw ZERO GitHub
+  # scope on exactly those tasks (found 2026-08-20 testing on the zano/xmr
+  # task: threads, bots, and review bodies were all silently unguarded for
+  # every multi-repo task). Best-effort: a failed fetch just adds nothing.
+  SUBT="$(curl -sS --max-time 20 -H "Authorization: Bearer $TOKEN" \
+    "$API/tasks/$TASK_GID/subtasks?opt_fields=gid" 2>/dev/null || true)"
+  for SGID in $(echo "$SUBT" | jq -r '.data[]?.gid // empty' 2>/dev/null); do
+    SATT="$(curl -sS --max-time 20 -H "Authorization: Bearer $TOKEN" \
+      "$API/tasks/$SGID/attachments?opt_fields=view_url" 2>/dev/null || true)"
+    SURLS=$(echo "$SATT" | jq -r '[.data[]? | .view_url // "" | select(test("github\\.com/.+/pull/[0-9]+$"))] | unique | .[]' 2>/dev/null || true)
+    [[ -n "$SURLS" ]] && PR_URLS=$(printf '%s\n%s\n' "$PR_URLS" "$SURLS" | grep -v '^$' | sort -u)
+  done
   if [[ "$GH_STATUS" == "ok" ]]; then
     while IFS= read -r url; do
       [[ -n "$url" ]] || continue
@@ -150,6 +173,21 @@ if command -v gh >/dev/null 2>&1; then
              unresolved: [.reviewThreads.nodes[] | select(.isResolved | not) | .comments.nodes[0]
                           | {by: (.author.login // "?"), at: .createdAt, text: (.body // "" | .[0:200])}]}' 2>/dev/null || true)
       if [[ -n "$PRJ" ]]; then
+        # Unanswered top-level review bodies + PR comments on OWNED PRs, via
+        # pr-address.sh fetch (the ONE implementation of the addressed-marker
+        # arithmetic; its stderr obligation trailer is dropped here). Fail-open:
+        # a fetch failure counts 0 rather than wedging the enumeration.
+        UNANSWERED=0; UN_LIST="[]"
+        if [[ "$(jq -r '.owned' <<<"$PRJ")" == "true" ]]; then
+          PAJ=$("$HOME/.cursor/skills/pr-address/scripts/pr-address.sh" fetch \
+            --owner "$OWNER" --repo "$RNAME" --pr "$NUM" 2>/dev/null || true)
+          if [[ -n "$PAJ" ]] && jq -e . >/dev/null 2>&1 <<<"$PAJ"; then
+            UNANSWERED=$(jq '((.reviewBodies // [] | length) + (.topLevel // [] | length))' <<<"$PAJ" 2>/dev/null || echo 0)
+            UN_LIST=$(jq -c '[(.reviewBodies[]? | {kind:"review", id:.reviewId, user, state, at:.submittedAt, text:(.body // "" | .[0:160])}),
+                              (.topLevel[]?     | {kind:"comment", id, user, at:.createdAt, text:(.body // "" | .[0:160])})]' <<<"$PAJ" 2>/dev/null || echo "[]")
+          fi
+        fi
+        PRJ=$(jq -c --argjson ub "${UNANSWERED:-0}" --argjson ul "${UN_LIST:-[]}" '. + {unanswered_bodies: $ub, unanswered: $ul}' <<<"$PRJ")
         # Reviewer-bot check-run state on the ready HEAD: Complete without the
         # bots having run-and-concluded there is the cohort's repeat A3 FAIL
         # class (2026-08-06). Count each required bot that is missing or not
@@ -171,8 +209,10 @@ if command -v gh >/dev/null 2>&1; then
     done <<<"$PR_URLS"
     GH_BLOCKING=$(jq '[.[] | select(.owned) | .unresolved | length] | add // 0' <<<"$GH_SCOPE")
     GH_BOTS_INCOMPLETE=$(jq '[.[] | select(.owned) | .bots_incomplete // 0] | add // 0' <<<"$GH_SCOPE")
+    GH_UNANSWERED=$(jq '[.[] | select(.owned) | .unanswered_bodies // 0] | add // 0' <<<"$GH_SCOPE")
   fi
 fi
+GH_UNANSWERED="${GH_UNANSWERED:-0}"
 
 MARKER="/tmp/agent-followup-scope-$TASK_GID.json"
 jq -n \
@@ -190,9 +230,10 @@ jq -n \
   --argjson gh_scope "$GH_SCOPE" \
   --argjson gh_blocking "$GH_BLOCKING" \
   --argjson gh_bots_incomplete "${GH_BOTS_INCOMPLETE:-0}" \
+  --argjson gh_unanswered "${GH_UNANSWERED:-0}" \
   '{task_gid: $gid, checked_at: $checked_at, watermark: $watermark, newest_comment_at: $newest_comment_at, newer_count: $newer_count, agent_comments_after_watermark: $agent_after_wm, comments: $comments,
     field_delta_status: $delta_status, field_baseline_ts: $baseline_ts, field_deltas: $field_deltas,
-    github_status: $gh_status, github_prs: $gh_scope, github_blocking_threads: $gh_blocking, github_bots_incomplete: $gh_bots_incomplete}' \
+    github_status: $gh_status, github_prs: $gh_scope, github_blocking_threads: $gh_blocking, github_bots_incomplete: $gh_bots_incomplete, github_unanswered_bodies: $gh_unanswered}' \
   > "$MARKER"
 
 echo ">> check-followup-scope: task $TASK_GID"
@@ -234,6 +275,10 @@ if [[ "$GH_STATUS" == "ok" ]]; then
     fi
     if [[ "$GH_BLOCKING" -gt 0 ]]; then
       echo ">>   $GH_BLOCKING unresolved thread(s) on OWNED PR(s) — THIS RUN'S SCOPE regardless of Asana silence (a human review IS the re-arm reason; scope lives where the reviewer wrote it). Address per pr-address reply-then-resolve; Complete is gate-blocked until a re-check records zero."
+    fi
+    if [[ "$GH_UNANSWERED" -gt 0 ]]; then
+      echo ">>   $GH_UNANSWERED unanswered top-level review BODY(ies)/PR comment(s) on OWNED PR(s) — review feedback exactly like a thread, and it is NOT in .threads (the surface runs keep missing). Address each per /pr-address: reply, then mark-addressed. Complete is gate-blocked until a re-check records zero:"
+      jq -r '.[] | select(.owned) | .unanswered[]? | "     [\(.kind) \(.id)] \(.user) @ \(.at): \(.text | gsub("\\s+"; " ") | .[0:140])"' <<<"$GH_SCOPE" 2>/dev/null || true
     fi
   fi
 else
