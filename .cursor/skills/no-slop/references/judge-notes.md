@@ -1,8 +1,10 @@
 # V2 semantic-judge calibration notes
 
 Material for the small-model judge stage of no-slop-lint.sh (designed
-2026-07-28, not built; see the lint header for the architecture: wide-net regex
-for recall, judge for precision, verdict cache, fail-open, default-clean).
+2026-07-28, built 2026-08-19; see the lint header for the architecture:
+wide-net regex for recall, judge for precision, verdict cache, fail-open,
+default-clean). Rules judged: courtesy-ender, forward-reference,
+validation-preamble, aphorism-formula (SKILL rule 17).
 Distilled from blader/humanizer's detection guidance (MIT), adapted to this
 machine's technical writing.
 

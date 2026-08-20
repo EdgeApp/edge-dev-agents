@@ -9,6 +9,7 @@
 #   courtesy-ender       content-free courtesy/offer closers
 #   forward-reference    sentences that only preview/announce/grade the prose
 #   validation-preamble  stance-validation openers ("good question", "you're right")
+#   aphorism-formula     an ordinary claim dressed as a maxim (SKILL rule 17)
 #
 # Why a judge: "Happy to re-review once the token bridge lands" and "happy path
 # returns the cached token" share every token a regex can see; only reading
@@ -20,6 +21,13 @@
 # produce zero findings and exit 0. Only a parsed, affirmative violation
 # verdict emits. Verdicts cache under ~/.cache/no-slop-judge/ ("1 <rule>" or
 # "0" per sentence hash); failures are never cached.
+#
+# FAIL-OPEN BUT NEVER SILENT: a call that was attempted and produced no
+# verdicts prints "WARN 0: semantic judge unavailable (<reason>)" on stdout and
+# a "no-slop-judge: UNAVAILABLE ..." line on stderr. Exit stays 0, so no
+# boundary blocks on a judge outage, but a dead tier no longer reads as a clean
+# pass. Every run also writes a stderr census (candidates / cached / judged) so
+# "nothing nominated" and "nothing judged" are distinguishable.
 #
 # Usage: no-slop-judge.sh <file>
 # Output: "HARD <line>: judge(<rule>): \"<sentence>\"" per finding.
@@ -41,9 +49,10 @@ const [file, cacheDir] = process.argv.slice(1)
 
 // Wide candidate net. Precision comes from the judge, so these lean inclusive.
 const NETS = [
-  [/\b(happy to|glad to|feel free|let me know|hope (this|that|it) helps|reach out|don\x27t hesitate|say the word|if (that|this) helps|any questions)\b/i, "courtesy-ender"],
+  [/\b(happy to|glad to|feel free|let me know|hope (this|that|it) helps|reach out|don\x27t hesitate|say the word|if (that|this) helps|any questions|no concerns|nothing further|nothing else|that\x27s all|all set|we\x27re good|shout if|ping me|holler|up to you|either way|whatever works|no rush|at your convenience|if (helpful|useful|needed)|here to help|on hand|available if|as needed|for anything else)\b/i, "courtesy-ender"],
   [/\b(here\x27s (what|the|why|how)|the key (thing|point|takeaway|insight)|what matters( most)?|worth (noting|flagging|mentioning|calling out)|let\x27s break|let me break|to summarize|to be clear|simply put|importantly|notably)\b/i, "forward-reference"],
   [/^(good|great|excellent|fair|solid|nice) (question|point|catch|call)\b|\byou\x27re (absolutely |quite )?right\b|\bvalid (point|concern)\b/i, "validation-preamble"],
+  [/\b(boils down to|comes down to|the difference between|the whole point|becomes a trap|think of it as|where the rubber|is the [a-z]+ of (?:the|a|all)\b)/i, "aphorism-formula"],
 ]
 
 const hash = s => crypto.createHash("sha256").update(s.replace(/\s+/g, " ").trim().toLowerCase()).digest("hex").slice(0, 16)
@@ -63,11 +72,14 @@ fs.readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
     }
   }
 })
-if (!candidates.length) process.exit(0)
+const diag = m => { try { fs.writeSync(2, "no-slop-judge: " + m + "\n") } catch {} }
+if (!candidates.length) { diag("0 candidates nominated"); process.exit(0) }
 
 // Cache pass.
 const findings = []
 const toJudge = []
+let unavailable = null
+let judgedCount = 0
 for (const c of candidates) {
   const h = hash(c.sentence)
   let cached = null
@@ -85,22 +97,27 @@ if (toJudge.length) {
     "Rule courtesy-ender: a content-free courtesy or OPEN-ENDED offer, typically closing a message: \"Happy to re-review once X lands\", \"Let me know if you have questions\", \"Hope this helps\", \"Feel free to reach out\". NOT a violation when the phrase does technical work (\"the happy path returns the cached token\", \"clients are free to retry\") or requests a SPECIFIC needed decision or input (\"Let me know which of the two schemas you pick, since the migration differs\" asks for a concrete choice the work depends on; \"let me know if you have questions\" asks for nothing).",
     "Rule forward-reference: a sentence whose only job is to preview, announce, or grade the prose itself: \"Here is what matters:\", \"Worth flagging explicitly:\", \"The key thing is this:\", \"To summarize:\", \"Let me break this down\". NOT a violation when the sentence carries the actual claim alongside: \"Worth noting the cache is already warm, so the retry is free\" still announces, but \"The cache is already warm, so the retry is free\" does not; judge whether removing the announcing clause loses information.",
     "Rule validation-preamble: an opener that grades the reader\x27s stance instead of stating facts: \"Good question\", \"You\x27re right to push on this\", \"Fair point\". NOT a violation when agreement itself is the factual content and is followed by the specifics in the same sentence.",
+    "Rule aphorism-formula: an ordinary claim dressed as a maxim instead of stated plainly: \"That is the difference between shipping a claim flow and shipping a warning\", \"It all boils down to trust\", \"Latency becomes a trap\". NOT a violation when the construction carries a real comparison or measurement the reader needs (\"the difference between the two timeouts is 90 seconds\", \"the cost comes down to one extra round trip\"); judge whether a concrete fact would be lost by rewriting it flat.",
     "",
     "Sentences:",
     ...cap.map((c, i) => (i + 1) + ". " + c.sentence.replace(/\n/g, " ")),
     "",
-    "Output: a JSON array, one entry per sentence number, shape {\"n\": <number>, \"violation\": true|false, \"rule\": \"courtesy-ender\"|\"forward-reference\"|\"validation-preamble\"|\"none\"}."
+    "Output: a JSON array, one entry per sentence number, shape {\"n\": <number>, \"violation\": true|false, \"rule\": \"courtesy-ender\"|\"forward-reference\"|\"validation-preamble\"|\"aphorism-formula\"|\"none\"}."
   ].join("\n")
 
-  let verdicts = null
+  let verdicts = null, failure = null
   try {
-    const out = execSync("claude -p --model haiku", { input: prompt, timeout: 90000, encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] })
+    const out = execSync("claude -p --model haiku", { input: prompt, timeout: 90000, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] })
     const m = out.match(/\[[\s\S]*\]/)
     if (m) {
       const arr = JSON.parse(m[0])
       if (Array.isArray(arr)) verdicts = arr
     }
-  } catch {}
+    if (!verdicts) failure = "unparseable response"
+  } catch (e) {
+    const raw = [e && e.stdout, e && e.stderr, e && e.message].filter(Boolean).join(" ")
+    failure = String(raw).replace(/\s+/g, " ").trim().slice(0, 120) || "claude -p failed"
+  }
 
   if (verdicts) {
     for (const v of verdicts) {
@@ -108,13 +125,24 @@ if (toJudge.length) {
       if (!c) continue
       const bad = v.violation === true && v.rule && v.rule !== "none"
       try { fs.writeFileSync(cacheDir + "/" + hash(c.sentence), bad ? "1 " + v.rule : "0") } catch {}
+      judgedCount++
       if (bad) findings.push({ ...c, rule: v.rule })
     }
+  } else {
+    // Fail open on findings, but never silently: an unauthenticated or broken
+    // `claude -p` used to be indistinguishable from a clean pass, which hid a
+    // dead judge tier for weeks. Cache nothing so a fix takes effect at once.
+    unavailable = { reason: failure || "no verdicts", n: cap.length }
   }
-  // No verdicts (call failed / unparseable): fail open, cache nothing.
 }
 
 findings.sort((a, b) => a.line - b.line)
 for (const f of findings) console.log(`HARD ${f.line}: judge(${f.rule}): "${f.sentence.slice(0, 90)}"`)
+if (unavailable) {
+  console.log(`WARN 0: semantic judge unavailable (${unavailable.reason}); ${unavailable.n} candidate sentence(s) unjudged`)
+  diag(`UNAVAILABLE (${unavailable.reason}); ${unavailable.n} candidates unjudged`)
+} else {
+  diag(`${candidates.length} candidates, ${candidates.length - toJudge.length} cached, ${judgedCount} judged`)
+}
 process.exit(findings.length ? 1 : 0)
 ' "$FILE" "$CACHE"
