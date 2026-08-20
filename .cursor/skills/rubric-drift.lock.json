@@ -574,6 +574,18 @@
         "A14",
         "A9"
       ]
+    },
+    "file:lint-commit.sh": {
+      "hash": "9dc80abe6ae8",
+      "dims": [
+        "A12"
+      ]
+    },
+    "im:commit-subject-50": {
+      "hash": "e947a5e624bb",
+      "dims": [
+        "A12"
+      ]
     }
   },
   "acked_uncovered": {
@@ -1344,6 +1356,14 @@
     "pr-create:base-must-match-branch-point": {
       "reason": "2026-08-19: Pending operator-curated dimension: the two mechanical failure modes (nonexistent base ref, base equal to head) are now refused by the companion script itself, and a mis-based PR is self-evident in the PR diff. Proposed dimension recorded in the 1216998636347236 run report Skill Gaps section.",
       "hash": "2c3f32241f59"
+    },
+    "review-standards:commit-subject-50": {
+      "reason": "2026-08-20: review-side checklist item for /pr-review on others' PRs; the authoring side is graded by A12 (era note 2026-08-20) and gated by lint-commit.sh",
+      "hash": "69bbec3fd1e4"
+    },
+    "review-standards:no-attribution-trailers": {
+      "reason": "2026-08-20: review-side checklist item; authoring side is scrub-enforced in lint-commit.sh and graded under A12",
+      "hash": "371607070274"
     }
   },
   "excluded_skills": {

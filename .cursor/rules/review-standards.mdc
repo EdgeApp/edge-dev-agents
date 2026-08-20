@@ -186,6 +186,14 @@ alwaysApply: false
 
 </section>
 
+<section name="Git Hygiene">
+
+<rule id="commit-subject-50">Commit subjects are at most 50 characters, boundary inclusive (Edge convention; Paul enforces it in review on every repo). When reviewing a PR, check `git log` subjects of the branch commits and flag any over 50 with the measured length and a suggested shorter subject. Exempt: `fixup!`/`squash!` (squashed away), `Revert "..."`, merge commits.</rule>
+
+<rule id="no-attribution-trailers">Commit messages never carry `Co-authored-by` or session-attribution trailers; flag any that appear.</rule>
+
+</section>
+
 <section name="Server Conventions" description="Only applies to repositories with name ending in -server or containing pm2.json at root.">
 
 <rule id="server-devdependencies">Place all dependencies in `devDependencies` except cleaner packages (which may be exported as types to NPM consumers).</rule>

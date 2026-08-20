@@ -214,16 +214,39 @@ if node -e "process.exit(require('./package.json').scripts?.localize ? 0 : 1)" 2
   fi
 fi
 
-# Scrub claude session links from the commit message (operator ruling
-# 2026-08-18: outward-facing surfaces never carry chat/session URLs). Strips
-# Claude-Session trailer lines and any claude.ai session URL, then collapses
-# the trailing blank lines the strip can leave. Stripping over blocking: the
-# rest of the message is fine, and this path must never bounce a commit.
+# Scrub the commit message: Claude-Session trailer lines and claude.ai
+# session URLs (operator ruling 2026-08-18: outward surfaces never carry
+# them), and Co-authored-by trailers (operator ruling 2026-08-20: attribution
+# is deliberately blanked and must never reappear via a trailer). Then
+# collapse the trailing blank lines the strip can leave. Stripping over
+# blocking: the rest of the message is fine, and this path must never bounce
+# a commit for content it can mechanically remove.
 if [[ -n "$MESSAGE" ]]; then
   MESSAGE=$(printf '%s\n' "$MESSAGE" \
     | sed -E -e '/^[[:space:]]*Claude-Session:/d' \
+             -e '/^[[:space:]]*Co-authored-by:/Id' \
              -e 's#https?://claude\.ai/(code|share|chat)/[^[:space:]]*##g' \
     | sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}')
+fi
+
+# Commit-subject length gate (Edge convention, stated three times by Paul in
+# the week of 2026-08-17: "commit subjects must be at most 50 characters",
+# boundary inclusive — "exactly 50 ... is fine"). BLOCKS, unlike the scrub:
+# shortening changes meaning, so the caller rewrites. Exempt shapes:
+# fixup!/squash! inherit their target's subject and get squashed away;
+# Revert "..."/Merge are git-authored.
+if [[ -n "$MESSAGE" ]]; then
+  SUBJECT=$(printf '%s\n' "$MESSAGE" | head -1)
+  case "$SUBJECT" in
+    "fixup! "*|"squash! "*|"Revert \""*|"Merge "*) ;;
+    *)
+      if [[ ${#SUBJECT} -gt 50 ]]; then
+        echo "BLOCKED: commit subject is ${#SUBJECT} characters; the Edge convention is at most 50 (reviewer-enforced on every repo). Shorten the first line and retry:" >&2
+        echo "  $SUBJECT" >&2
+        exit 1
+      fi
+      ;;
+  esac
 fi
 
 # Step 4: Stage files and report effective commit scope
