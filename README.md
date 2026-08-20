@@ -123,10 +123,14 @@ flowchart TD
   (task-url)`. A task with a prior transcript is RESUMED instead, on a fresh
   slot, via `resume-task`. Re-engaging a finished task is therefore one
   signal: set it back to `Pending`.
-- **Resume compaction, and why finalize is gated.** The resume auto-answers
-  the resume menu with "Resume from summary", which COMPACTS the conversation
-  from a summary built before the re-arm, so a resumed agent's memory never
-  contains the followup comment that triggered it. The counter is mechanical:
+- **Resume memory, and why finalize is gated.** A resumed session's memory is
+  never trusted for scope decisions: long runs auto-compact mid-flight, and
+  the summary a compaction runs on predates whatever re-armed the task, so
+  "the newest comment is my own Complete note" recalled from context is
+  exactly the stale claim that has re-Completed past real followups. (Resumes
+  themselves answer the resume menu with a FULL resume; the lossier
+  summary-resume tier is retired, and a transcript past the degradation
+  threshold fresh-spawns from artifacts instead.) The counter is mechanical:
   `check-followup-scope.sh` live-fetches comments and attachments, lists every
   operator comment newer than the latest `agent-run-report*.md` watermark,
   diffs the task's fields against the previous segment's snapshot, fetches
@@ -191,7 +195,51 @@ the task's own unpublished dep PRs when the deliverable requires them.
 It does NOT re-engage finished tasks: that is the watcher's job (Pending
 resumes), so watchdog and watcher stay decoupled.
 
-#### 5. Run reports and the watermark
+#### 5. Sessions: tmux, remote control, and lifecycle
+
+Every agent is an INTERACTIVE `claude --rc` process in a detached tmux
+session, never a headless `claude -p`. The pane is part of the machinery, not
+just a viewport.
+
+- **Naming is state.** `claude-asana-<gid>` is a live run; the watchdog's
+  completion sweep renames it to `done-asana-<gid>` at retirement (resources
+  freed, claude kept alive); `chat-<slug>` sessions are discussion forks of
+  past transcripts (`resume-agent.sh --chat`: talk to a finished run from
+  anywhere, no slot, original conversation untouched); long-lived operator
+  anchors keep their own names. Hooks and the watchdog read the name to decide
+  context: the 🥋 authorship boundary is "pane name is exactly
+  `claude-asana-<gid>`", so a retired session's text counts as operator
+  instruction.
+- **Spawn.** `spawn-test-session.sh` writes a wrapper script (slot env baked
+  in: worktree cwd, `AGENT_SIM_UDID`, `AGENT_METRO_PORT`, task gid, model and
+  effort flags) and launches it with `tmux new-session -d`. When claude exits
+  the wrapper prints the exit time and drops to a shell, so the pane and its
+  scrollback survive for diagnosis.
+- **Resume poking.** `claude --resume` on a prior transcript shows an
+  interactive menu that would wedge a hands-off session, so the spawner polls
+  the pane and answers it with send-keys (Down+Enter: FULL resume; the
+  summary tier is retired). This is the general pattern: the session is
+  driven through its terminal exactly as an operator would drive it, which
+  means every interactive surface the CLI grows is automatable without new
+  APIs.
+- **Remote-control keepalive.** Each session arms a remote-control bridge at
+  startup, so the operator can steer any run from the desktop or phone app.
+  Bridge liveness is read from the pane footer (the `/rc` token, or the
+  "Remote Control active" line on older builds). The watchdog revives ONLY a
+  verified-dead bridge on a verified-alive claude: kill the pane's process,
+  confirm death, relaunch in place with `--remote-control <name> --resume
+  <live-id>` and the preserved flags, under a per-session cooldown. A
+  half-open bridge is left for the operator to reconnect, and the revive
+  never adds a second process (the count goes 1 to 0 to 1).
+- **No self-respawn.** A session never kills or relaunches its own pane;
+  `resume-task.sh` and `resume-agent.sh` are watcher/operator tools and
+  refuse to run from inside their target. The `no-self-respawn.sh` hook
+  enforces the agent side.
+- **The host must not idle-sleep.** All of this dies with the machine, so the
+  box runs a keep-awake LaunchAgent (machine-local, not synced; an idle-sleep
+  default once killed every bridge in the fleet after hours of quiet).
+
+#### 6. Run reports and the watermark
 
 Every run ends by attaching ONE structured run report to the Asana task
 (`agent-run-report-NN-<slug>.md`). The report is more than documentation: its
@@ -203,7 +251,7 @@ re-attach so the watermark is last again. The attach boundary is gated (see
 frontmatter, one report doc per segment, and resolvable GitHub citations are
 all checked mechanically.
 
-#### 6. Eval
+#### 7. Eval
 
 Post-hoc, per run or per cohort. See [Evals](#evals).
 
@@ -681,3 +729,12 @@ scripts live at `skills/` top level. The ones most worth knowing:
 8. **Evals close the loop.** Runs are graded against anchored rubrics, findings
    become gates, and rubric era notes keep old runs graded by the rules in
    force when they ran.
+9. **Interactive sessions over headless.** Every agent runs as an interactive
+   `claude` in tmux, never `claude -p`. The pane is an interface: the operator
+   can attach or remote-control any run mid-flight and steer it by typing;
+   the watchdog reads it (bridge footer, parked prompts, menus) and drives it
+   with send-keys; a run survives watcher restarts and stays alive after
+   Complete for followups with full context. It also future-proofs billing:
+   provider terms have singled out headless/programmatic usage for separate
+   metering (announced, so far unenforced), and interactive sessions stay on
+   the plan surface either way.
