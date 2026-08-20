@@ -134,8 +134,9 @@ flowchart TD
   `check-followup-scope.sh` live-fetches comments and attachments, lists every
   operator comment newer than the latest `agent-run-report*.md` watermark,
   diffs the task's fields against the previous segment's snapshot, fetches
-  GitHub-side scope (unresolved review threads, reviewer-bot completeness on
-  owned ready HEADs), and writes a marker; the
+  GitHub-side scope across parent AND subtask-attached PRs (unresolved review
+  threads, reviewer-bot completeness on owned ready HEADs, unanswered
+  top-level review bodies and PR comments), and writes a marker; the
   `require-followup-scope-on-complete.sh` hook blocks `Complete` unless that
   marker exists, still matches the live newest comment, records zero blocking
   threads and bot gaps, and shows the report attachment as the newest
