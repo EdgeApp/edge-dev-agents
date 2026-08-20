@@ -30,7 +30,9 @@
 # rules regexes cannot decide (courtesy enders, forward references, validation
 # preambles; SKILL rules 14/15), verdicts cached by sentence hash, fail-open.
 # Opt-in per boundary: seconds of latency, so posting/attach boundaries use it,
-# high-frequency write paths do not.
+# high-frequency write paths do not. When the judge cannot run it emits a
+# non-blocking "WARN 0: semantic judge unavailable (<reason>)" line, so a dead
+# tier is visible in the output instead of passing as NO_SLOP_OK.
 #
 # --fragment: the input is a text FRAGMENT (an Edit new_string, a Bash command
 # carrying a heredoc), not a whole document. Runs only the checks that are
@@ -87,7 +89,7 @@ try {
 const NUM = "(?:one|two|three|four|five|six|seven|eight|nine|ten|\\d+|a few|several|a couple of|some)"
 // Generic counter nouns: high-precision list for the mid-line padding-header
 // shape. Only nouns whose count+colon use is near-always structural padding.
-const COUNTNOUN = /^(?:changes?|defects?|issues?|things?|points?|reasons?|ways?|parts?|items?|fixes?|problems?|options?|notes?|steps?|cases?|goals?|aspects?|factors?|takeaways?|observations?|considerations?)\b/i
+const COUNTNOUN = /^(?:changes?|defects?|issues?|things?|points?|reasons?|ways?|parts?|items?|fixes?|problems?|options?|notes?|steps?|cases?|goals?|aspects?|factors?|takeaways?|observations?|considerations?|blockers?|concerns?|gaps?|risks?|findings?|caveats?|constraints?|tradeoffs?|surprises?|corrections?|clarifications?|asks?|questions?|exceptions?|differences?|misses?|wins?)\b/i
 const TIME = /^(?:day|days|week|weeks|month|months|hour|hours|minute|minutes|second|seconds|percent|ms|px)\b/i
 const VERBS = new Set(("is are was were has have had do does did start starts started take takes took run runs ran need needs use uses show shows fail fails work works go goes come comes mean means make makes get gets give gives keep keeps hold holds add adds drop drops call calls return returns throw throws pass passes block blocks land lands ship ships wait waits cover covers remain remains require requires").split(" "))
 const PRED = /\b(?:are|is)\s+(?:easy to miss|worth noting|worth calling out|worth mentioning|notable|important to note)\b|\bstands? out\b|\bdeserves? (?:mention|attention)\b/i
@@ -134,11 +136,21 @@ fs.readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
       continue
     }
     const rest = m[2]
+    // A ZERO count is a conditional label, never a structure announcement:
+    // "0 findings after curation: no review is submitted" states a case and its
+    // consequence. Nobody announces that zero things follow.
+    if (/^0+$/.test(m[1])) continue
     if (/^-/.test(rest)) continue                          // "Two-phase ..."
     if (/^of\b/i.test(rest.trim())) continue               // "Two of the five ..."
     if (TIME.test(rest.trim())) continue                   // "Two days later ..."
     const toks = rest.trim().replace(/[.:]$/, "").split(/\s+/).filter(Boolean)
     const hasVerb = toks.some(t => VERBS.has(t.toLowerCase().replace(/[,;]$/, "")))
+    // Shape 4 only: the "bound to a real verb" exemption means the COUNTED NOUN
+    // governs a verb ("Two options remain: ..."), not that a verb homograph sits
+    // anywhere in a trailing qualifier. In "One blocker before we scope the
+    // wallet work:", the noun "work" granted a blanket exemption. Check only the
+    // head position, the token right after the counted noun.
+    const headVerb = toks.length > 1 && VERBS.has(toks[1].toLowerCase().replace(/[,;]$/, ""))
     // Shape 1 requires the LINE to end with the colon: "One visible seam: the
     // race is..." is the legitimate label-colon idiom, not an announcement.
     if (/:$/.test(s.trim()) && /:\s*$/.test(line) && toks.length <= 6 && !hasVerb)
@@ -146,7 +158,7 @@ fs.readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
     // Shape 4: counted padding header whose colon does NOT end the line
     // ("Two defects compound: the engine ..."). Restricted to generic
     // counter nouns so the legitimate label-colon idiom stays exempt.
-    else if (/:$/.test(s.trim()) && !/:\s*$/.test(line) && COUNTNOUN.test(rest.trim()) && toks.length <= 4 && !hasVerb)
+    else if (/:$/.test(s.trim()) && !/:\s*$/.test(line) && COUNTNOUN.test(rest.trim()) && toks.length <= 8 && !headVerb)
       findings.push(["HARD", n, `counted padding header (mid-line): "${s.trim().slice(0, 60)}"`])
     // Shape 2 applies to PROSE sentences only: a bare-NP BULLET ("- One
     // EdgeCurrencyWallet implementation.") is normal list style.
