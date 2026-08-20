@@ -83,6 +83,18 @@ if [ "$GH_BLOCKING" -gt 0 ] 2>/dev/null; then
   exit 2
 fi
 
+# Unanswered top-level review bodies / PR comments on OWNED PRs (2026-08-20:
+# the zano/xmr run Completed past 19 findings in Paul's review BODIES; agents
+# keep enumerating .threads only, and the fetch script's stderr obligation
+# trailer was piped away — only this live gate survives output filtering).
+# Keys on pr-address's addressed-marker replies, NOT reviewDecision, which is
+# sticky until the reviewer re-reviews and must never gate Complete.
+GH_UNANSWERED="$(jq -r '.github_unanswered_bodies // 0' "$MARKER" 2>/dev/null || echo 0)"
+if [ "$GH_UNANSWERED" -gt 0 ] 2>/dev/null; then
+  echo "BLOCKED: your followup-scope check recorded $GH_UNANSWERED unanswered top-level review BODY(ies)/PR comment(s) on an OWNED PR — review feedback exactly like a thread, but it lives in .reviewBodies/.topLevel, NOT .threads. Address each per /pr-address (reply, then mark-addressed with the <!-- addressed:... --> marker), re-run: $CHECK — then retry Complete once it records zero." >&2
+  exit 2
+fi
+
 # Reviewer-bot completeness: Complete may not rest on a ready HEAD the bots
 # never ran on (the 2026-08-06 cohort's two A3 gate FAILs). watch-pr writes the
 # outage waiver when a reviewer is genuinely unavailable; its presence exempts.
