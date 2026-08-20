@@ -47,6 +47,12 @@ allowlisted() { # $1 = absolute-ish path; exit 0 = skip linting
   local p="$1" b
   case "$p" in
     "$HOME/.cursor/"*|"$HOME/.claude/"*|"$HOME/.config/"*|"$HOME/.local/"*|"$HOME/agent-evals/"*) return 0 ;;
+    # Orch run machinery under /tmp: agent-state-<gid>.md (mid-run state file),
+    # agent-run-report-*.md (its own boundary is the attach gate, which
+    # AUTO-REWRITES em dashes instead of blocking — write-time blocking here
+    # cost a live run two full heredoc regenerations on 2026-08-19), blocker
+    # notes, plan docs. These are internal or later-gated; never block them.
+    /tmp/agent-*|/private/tmp/agent-*|/tmp/plan-*|/private/tmp/plan-*) return 0 ;;
   esac
   b=$(basename "$p")
   case "$b" in raw-*|data-*|*fixture*) return 0 ;; esac
