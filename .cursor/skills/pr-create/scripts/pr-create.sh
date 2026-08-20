@@ -238,6 +238,29 @@ try {
 
 const templateInfo = loadRepoTemplate();
 
+// Commit-subject length backstop (Edge convention: subjects <= 50 chars,
+// reviewer-enforced). lint-commit.sh blocks at authoring time; this catches
+// commits that arrived by other paths (rebased-in history, pre-gate work).
+// WARN, not block: rewording deep history mid-flow is expensive, and the
+// authoring gate keeps new work clean — the warn is the agent's cue to
+// reword cheap cases (HEAD via amend) before the PR is human-visible.
+try {
+  const longSubjects = git(`log origin/${baseBranch}..HEAD --format=%h%x09%s`)
+    .split("\n")
+    .filter(Boolean)
+    .filter((l) => {
+      const s = l.split("\t")[1] ?? "";
+      if (/^(fixup! |squash! |Revert "|Merge )/.test(s)) return false;
+      return s.length > 50;
+    });
+  if (longSubjects.length > 0) {
+    console.error(
+      `WARN: ${longSubjects.length} branch commit(s) exceed the 50-char subject convention (reviewers flag these):`
+    );
+    for (const l of longSubjects) console.error(`  ${l}`);
+  }
+} catch {}
+
 // Build title from commits/branch if not provided
 if (!title) {
   try {
