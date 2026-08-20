@@ -29,7 +29,9 @@ esac
 TEXT=$(printf '%s' "$INPUT" | jq -r '[.tool_input // {} | .. | strings] | join("\n")' 2>/dev/null || true)
 [ -n "$TEXT" ] || exit 0
 
-TMP=$(mktemp /tmp/slack-prose.XXXXXX.md) || exit 0
+# Trailing Xs required: macOS mktemp treats an embedded-X template
+# (name.XXXXXX.md) as a LITERAL filename — concurrent sessions collide.
+TMP=$(mktemp /tmp/slack-prose.XXXXXX) || exit 0
 printf '%s\n' "$TEXT" > "$TMP"
 # --semantic: the haiku judge tier for courtesy enders / forward references
 # (calibrated + enabled 2026-08-19). Slack sends are infrequent enough that
