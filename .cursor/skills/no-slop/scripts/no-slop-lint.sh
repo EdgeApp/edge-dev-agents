@@ -96,7 +96,34 @@ const PRED = /\b(?:are|is)\s+(?:easy to miss|worth noting|worth calling out|wort
 
 const findings = []
 let fence = false
-fs.readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
+// Hard-wrapped prose (commit bodies wrap at 72, and PR bodies often inherit the
+// habit) puts one sentence across several physical lines. The line-scoped checks
+// below are unaffected, but every sentence-shape check needs the whole sentence:
+// splitting "...a value of 9.789\nBTC." at the wrap made "BTC." read as a
+// verbless bare-count sentence, and a colon landing on a wrap point read as a
+// line-final colon. PARA[i] holds the joined paragraph for the line that STARTS
+// it and null for continuation lines, so those checks run once per paragraph and
+// report at its first line.
+const LINES = fs.readFileSync(file, "utf8").split("\n")
+const PARA = new Array(LINES.length).fill(null)
+{
+  let f = false, start = -1, buf = []
+  const flush = () => {
+    if (start >= 0 && buf.length) PARA[start] = buf.join(" ")
+    start = -1; buf = []
+  }
+  LINES.forEach((raw, i) => {
+    if (/^\s*```/.test(raw)) { f = !f; flush(); return }
+    // A blank line, or any construct the per-line loop already skips, ends the
+    // paragraph. A new list marker starts one, so sibling items never merge.
+    if (f || !raw.trim() || /^\s*#|^\s*\||^\s*>/.test(raw)) { flush(); return }
+    if (/^\s*(?:[-*]\s+|\d+[.)]\s+)/.test(raw)) flush()
+    if (start < 0) start = i
+    buf.push(raw.trim())
+  })
+  flush()
+}
+LINES.forEach((raw, i) => {
   const n = i + 1
   if (/^\s*```/.test(raw)) { fence = !fence; return }
   if (fence) return
@@ -126,6 +153,10 @@ fs.readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
   else if (/\bloud(?:ly)?\b/i.test(line))
     findings.push(["WARN", n, `vague loudness claim: name the mechanism and audience (exit code / gate / report section / ping)`])
   if (FRAGMENT) return  // sentence-shape checks need the whole document
+  // Continuation lines carry no paragraph of their own; their text was folded
+  // into the line that starts it.
+  if (PARA[i] == null) return
+  line = PARA[i].replace(/^\s*(?:[-*]\s+|\d+[.)]\s+)?/, "")
   // Count-announcement shapes, per SENTENCE; greeting clause stripped first.
   const body = line.replace(/^(?:hi|hello|hey)\b[^,]*,\s*/i, "")
   for (const s of body.split(/(?<=[.:!?])\s+/)) {
