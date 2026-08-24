@@ -25,6 +25,19 @@
 # NOT gated (deliberate):
 #   - local commits (lint-commit.sh, git commit). Committing changes nothing a
 #     reviewer or CI can see; the push is the event that invalidates the gate.
+#   - `gh pr edit` of the title, body, labels or reviewers. None of it moves the
+#     PR head, so no check or reviewer bot re-runs and the gate stays valid on
+#     the head it ruled on. `gh pr edit --base` IS gated: retargeting the merge
+#     base re-runs CI against different code.
+#   - EVERY comment operation, for the same reason: `gh pr comment`, `gh pr
+#     review`, POST/PATCH/DELETE against issues/comments or pulls/comments, the
+#     pr-address reply and resolve-thread scripts, pr-attach-screenshots.sh.
+#     Talking on a finished PR is how a run answers a late reviewer, and none of
+#     it changes what the gate ruled on. This exemption is intentional, not
+#     incidental: it holds because those verbs are absent from TARGETS below, so
+#     any future broadening must keep tests/no-push-after-complete.test.py green.
+#     Do NOT implement it as an early exit — a blanket comment-op exemption would
+#     pass `gh pr comment ... && git push` straight through.
 #   - a blocked completion's aftermath. `Complete --blocked yes` is still
 #     Complete, and a blocked run has nothing to push; if it does, it is the same
 #     defect and gets the same block.
@@ -54,7 +67,8 @@ WRAPPERS = r"(?:(?:sudo|nohup|command|timeout\s+\S+|env(?:\s+\w+=\S+)*|\w+=\S+)\
 PATH_PREFIX = r"(?:[\w./~-]*/)?"
 TARGETS = (r"(?:" + PATH_PREFIX + r"git\s+push|" + PATH_PREFIX +
            r"git-branch-ops\.sh\s+push|" + PATH_PREFIX +
-           r"gh\s+pr\s+(?:create|edit|ready|reopen))")
+           r"gh\s+pr\s+(?:create|ready|reopen)|" + PATH_PREFIX +
+           r"gh\s+pr\s+edit\s[^;&|]*--base)")
 pat = re.compile(r"(?:^|[;&|(]|\|\||&&|\bthen\b|\bdo\b)\s*" + WRAPPERS + TARGETS)
 print("yes" if pat.search(cmd) else "no")
 ' 2>/dev/null || echo no)

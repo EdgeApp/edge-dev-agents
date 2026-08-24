@@ -356,7 +356,7 @@ interactive sessions post PRs and Slack messages too.
 
 | Group | Hook | Enforces |
 |---|---|---|
-| Status gates | `require-plan-before-developing.sh` | No Developing until the plan doc exists |
+| Status gates | `require-plan-before-developing.sh` | No Developing until ingestion evidence (`asana-get-context.sh` ran, attachments downloaded) AND the plan doc exist |
 | | `require-concession-validation.sh` | A block or a downgrade-finalize needs a fresh concession-validator verdict bound to the exact reason |
 | | `require-followup-scope-on-complete.sh` | Complete needs a fresh live scope check: no newer operator comments unaddressed, zero blocking threads, reviewer bots concluded, watermark last |
 | | `require-continuation-or-block.sh` (Stop) | A turn may not end except at Complete or a validated block |
@@ -366,6 +366,7 @@ interactive sessions post PRs and Slack messages too.
 | | `require-subtasks-for-multi-repo-pr.sh` | Multi-repo PR sets attach subtask-per-PR, never flat onto the main task |
 | | `require-clean-run-report.sh` | Report attach: template form, prose lint (with judge), traceability frontmatter auto-fill, stable ordinals, one doc per segment, no dead GitHub citations |
 | | `block-raw-thread-resolve.sh` | Review threads resolve through the reply-first scripts, never raw GraphQL |
+| | `block-raw-gh-writes.sh` | Raw `gh pr create` (non-draft), `gh pr comment`/`review`, and `gh api` comment/review writes go through the linted companion scripts |
 | | `block-upfront-conflict-probe.sh` | PR mergeability is a landing-time concern; no upfront probes |
 | | `ensure-tdd-pr-link.sh` | PR bodies carry the TDD link when one is owed |
 | | `no-push-after-complete.sh` | No branch/PR mutation once the task is Complete (post-Complete rework must re-arm) |
@@ -384,6 +385,7 @@ interactive sessions post PRs and Slack messages too.
 | | `require-agents-md-skill.sh` + `mark-agents-md-skill-read.sh` | AGENTS.md edits load the authoring skill first |
 | | `mark-playbook-read.sh` | Records the playbook read the drive gate requires |
 | | `nudge-asana-mcp.sh` | Steers bulk Asana reads to the cheaper script path |
+| | `block-raw-asana-api.sh` | Raw Asana API calls go through the sanctioned scripts (ingestion with attachment download, field reads, writes, scope checks) |
 | | `inject-run-context.sh`, `inject-no-slop-reminder.sh`, `inject-no-slop-line.sh` | Session-start run context; no-slop refresh at session start and every prompt |
 | Shared helpers | `strip-cmd-mentions.sh` | Blanks quoted/heredoc spans so hooks trigger on commands, not on text that merely mentions them |
 | | `cmd-executes.sh` | Command-position matching, so naming a script in a grep never fires the gate that guards executing it |

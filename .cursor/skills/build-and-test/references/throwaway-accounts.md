@@ -32,3 +32,4 @@ On a different pool sim, create a fresh one rather than trying to import.
 An account whose test dirtied synced state (an activated promo code, an
 affiliate attribution) should say so in Notes, or be left off the reusable list.
 | `agent-tw-731735443` | `Agent3Throwaway1` | `1234` | agent-sim-pool-1 | 2026-08-18 | app defaults (BTC, ETH, LTC, BCH, DASH) | Empty. Lives in the **Coinhub** white-label app (`app.coinhubatm.wallet`), NOT `co.edgesecure.app` — the two bundles have separate data containers, so this row is unusable from the Edge app. Region set to California/USA. |
+| `agent-tw-139899574` | `Agent3Throwaway1` | `1234` | agent-sim-pool-0 | 2026-08-20 | app defaults (BTC, ETH, LTC, BCH, DASH) | Empty. Lives in the **Coinhub** white-label app (`app.coinhubatm.wallet`), NOT `co.edgesecure.app` — separate data containers, so this row is unusable from the Edge app. Region set to California/USA. |
