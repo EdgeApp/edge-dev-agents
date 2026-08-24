@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 # PreToolUse hook (matcher: Bash). Blocks the Planning→Developing status
-# transition in agent sessions until the plan document exists. Deterministic
-# counterpart to asana-plan's `create-plan-required` (the prose-guarded plan
-# contract was met 1/3 in the last cohort; the hook-guarded contracts went 3/3).
+# transition in agent sessions until BOTH planning artifacts exist:
+#
+#   1. INGESTION marker /tmp/asana-task-<gid>/.context-fetched — proof
+#      asana-get-context.sh ran (task-review step 1; it downloads every task
+#      attachment). Added 2026-08-24: task 1217796671374968 hand-rolled a raw
+#      curl with notes-only opt_fields, never learned the prescribed script
+#      existed, and planned past two repro screenshots. A read-gate on script
+#      invocation cannot catch a script that is never invoked; only this
+#      boundary-evidence check can.
+#   2. PLAN document — deterministic counterpart to asana-plan's
+#      `create-plan-required` (the prose-guarded plan contract was met 1/3 in
+#      the last cohort; the hook-guarded contracts went 3/3).
 #
 # Scope: no-ops unless AGENT_TASK_GID is set. Exit 0 allow, exit 2 block.
 set -euo pipefail
@@ -23,6 +32,14 @@ case "$CMD_M" in
   *) exit 0 ;;
 esac
 echo "$CMD_M" | grep -q "Developing" || exit 0
+
+# Check 1: ingestion evidence. Checked before the plan check — a plan written
+# without ingestion is exactly the failure this catches, so prescribing "write
+# the plan" first would order the fix backwards.
+if [ ! -f "/tmp/asana-task-$AGENT_TASK_GID/.context-fetched" ]; then
+  echo "BLOCKED: no task-ingestion evidence for $AGENT_TASK_GID. Run ~/.cursor/skills/asana-get-context.sh $AGENT_TASK_GID (task-review step 1) BEFORE planning: it fetches the task, comments, subtasks, AND downloads every attachment to /tmp/asana-task-$AGENT_TASK_GID/ — screenshots, specs, and logs attached to the task are requirements, and a hand-rolled curl with notes-only opt_fields silently misses them all. Read any downloaded attachments, fold them into the plan (revise the plan file if it already exists), then retry this status update." >&2
+  exit 2
+fi
 
 if ls /tmp/plan-"$AGENT_TASK_GID"-*.md >/dev/null 2>&1 || \
    ls "$HOME"/git/.agent-worktrees/"$AGENT_TASK_GID"/*/plan-"$AGENT_TASK_GID"-*.md >/dev/null 2>&1; then

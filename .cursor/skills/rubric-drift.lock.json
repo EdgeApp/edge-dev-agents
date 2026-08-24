@@ -586,13 +586,15 @@
       "dims": [
         "A12"
       ]
+    },
+    "asana-plan:task-review-for-asana": {
+      "hash": "b43a8fa8e06e",
+      "dims": [
+        "A11"
+      ]
     }
   },
   "acked_uncovered": {
-    "asana-plan:task-review-for-asana": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "b43a8fa8e06e"
-    },
     "asana-task-update:use-companion-script": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "20243b1d60b1"

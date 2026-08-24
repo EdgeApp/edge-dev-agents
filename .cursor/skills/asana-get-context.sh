@@ -173,6 +173,15 @@ else:
 # Fetch attachments — download all supported types, then post-process
 DOWNLOAD_DIR="/tmp/asana-task-$TASK_GID"
 
+# Ingestion marker, written UNCONDITIONALLY (attachments or not): proof this
+# script ran for the gid. require-plan-before-developing.sh gates the
+# Developing transition on it — a run that hand-rolls its own task fetch
+# (raw curl with notes-only opt_fields) never sees attachments and never
+# writes this marker (2026-08-24, task 1217796671374968: planned from a
+# one-line notes field while two repro screenshots sat on the task).
+mkdir -p "$DOWNLOAD_DIR"
+date -u +%Y-%m-%dT%H:%M:%SZ > "$DOWNLOAD_DIR/.context-fetched"
+
 # Phase 1: Download all supported attachments
 curl -s "$API/tasks/$TASK_GID/attachments?opt_fields=name,resource_subtype,download_url" \
   -H "$AUTH" | python3 -c "
