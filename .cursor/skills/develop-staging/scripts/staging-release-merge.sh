@@ -23,6 +23,8 @@ set -euo pipefail
 #   --staging <branch>   default: staging
 #   --remote <name>      default: origin
 #   --keep-workspace     leave the temp worktree in place for inspection
+#   --no-publish         skip publishing the dry-run inspection tags
+#   --tag-prefix <ns>    namespace for those tags (default: dryrun)
 #
 # Exit: 0 done, 1 error, 2 needs operator input.
 # The last line is always `RESULT: <verdict>`:
@@ -41,6 +43,8 @@ DEVELOP="develop"
 STAGING="staging"
 REMOTE="origin"
 KEEP_WS=""
+PUBLISH=1
+TAG_PREFIX="dryrun"
 ALLOW=()
 RESOLVE_THEIRS=()
 SAFE=""
@@ -59,19 +63,45 @@ while [ $# -gt 0 ]; do
     --staging) STAGING="$2"; shift 2 ;;
     --remote) REMOTE="$2"; shift 2 ;;
     --keep-workspace) KEEP_WS=1; shift ;;
+    --no-publish) PUBLISH=""; shift ;;
+    --tag-prefix) TAG_PREFIX="$2"; shift 2 ;;
     -h|--help) sed -n '4,31p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; echo "RESULT: error"; exit 1 ;;
   esac
 done
 
 say()  { printf '>> %s\n' "$*"; }
-warn() { printf '!! %s\n' "$*"; }
+WARN_COUNT=0
+warn() { WARN_COUNT=$((WARN_COUNT + 1)); printf '!! %s\n' "$*"; }
 hdr()  { printf '\n=== %s ===\n' "$*"; }
+
+# Step ledger. Every phase records its outcome here, and finish() renders it on
+# EVERY exit path, so a run that stopped at a gate still reports what the phases
+# before it did. Kept as a newline-delimited string rather than an associative
+# array, which bash 3.2 (the macOS system bash) does not have.
+PHASES="Preflight Preconditions Workspace Bump Merge Parity Push"
+STEP_LOG=""
+step() { STEP_LOG="$STEP_LOG$1|$2|$3
+"; }
+render_steps() {
+  printf '\n=== Step report ===\n'
+  for ph in $PHASES; do
+    line="$(printf '%s' "$STEP_LOG" | grep "^$ph|" || true)"
+    if [ -z "$line" ]; then
+      printf '  %-14s %-9s %s\n' "$ph" "not-reached" "-"
+      continue
+    fi
+    st="$(printf '%s' "$line" | cut -d'|' -f2)"
+    detail="$(printf '%s' "$line" | cut -d'|' -f3-)"
+    printf '  %-14s %-9s %s\n' "$ph" "$st" "$detail"
+  done
+}
 RESULT_PRINTED=""
 finish() {
   # The kept-workspace note prints HERE, not from the EXIT trap, so that
   # `RESULT:` is always the last line a caller reads.
   [ -n "${KEEP_WS:-}" ] && [ -n "${WT:-}" ] && [ -d "$WT" ] && say "workspace kept at $WT"
+  render_steps
   RESULT_PRINTED=1
   printf '\nRESULT: %s\n' "$1"
   exit "$2"
@@ -113,6 +143,7 @@ case "$VERSION" in
   *) die "--version must be X.Y.Z, got: $VERSION" ;;
 esac
 say "version $CUR_VERSION -> $VERSION"
+step Preflight ok "$CUR_VERSION -> $VERSION; $DEV_REF $(git -C "$REPO" rev-parse --short "$DEV_REF"), $STG_REF $(git -C "$REPO" rev-parse --short "$STG_REF")"
 
 # ------------------------------------------------- manual-checklist warnings --
 # Crowdin syncs and the checkpoint / chain-registry publishes are release
@@ -142,6 +173,12 @@ for pkg in react-native-zcash react-native-piratechain edge-currency-accountbase
     say "$pkg: $have (current)"
   fi
 done
+
+if [ "$WARN_COUNT" -eq 0 ]; then
+  step Preconditions ok "no outstanding Crowdin PR or dependency publish"
+else
+  step Preconditions warn "$WARN_COUNT warning(s), see above; none block the release"
+fi
 
 # --------------------------------------------------------------- workspace ---
 STAMP="$(git -C "$REPO" rev-parse --short "$DEV_REF")"
@@ -196,6 +233,8 @@ for p in env.json src/controllers/edgeProvider/client/rolledUp.js src/controller
   say "copied $p"
 done
 
+step Workspace ok "$WT on $TMP_DEV"
+
 # ------------------------------------------------------------------- bump ----
 hdr "Version bump on $DEVELOP"
 node - "$WT" "$VERSION" "$PREV_DATE" <<'NODE' || exit 1
@@ -248,6 +287,7 @@ if [ $rc -ne 0 ]; then
   tail -30 "$BUMP_LOG" >&2
   die "bump commit failed (full log: $BUMP_LOG)"
 fi
+step Bump ok "$(git -C "$WT" rev-parse --short HEAD) sets $VERSION in package.json, package-lock.json, CHANGELOG.md"
 say "bump commit $(git -C "$WT" rev-parse --short HEAD)"
 git -C "$WT" --no-pager show --stat --oneline HEAD | sed 's/^/   /'
 
@@ -257,7 +297,9 @@ git -C "$WT" switch --quiet -c "$TMP_STG" "$STG_REF" || die "could not branch $T
 rc=0
 git -C "$WT" merge --no-ff -m "Merge branch '$DEVELOP' into $STAGING" "$TMP_DEV" >"$MERGE_LOG" 2>&1 || rc=$?
 
+HAD_CONFLICTS=""
 if [ $rc -ne 0 ]; then
+  HAD_CONFLICTS=1
   CONFLICTS="$(git -C "$WT" diff --name-only --diff-filter=U)"
   say "conflicts:"; printf '%s\n' "$CONFLICTS" | sed 's/^/   /'
 
@@ -384,6 +426,7 @@ NODE
       echo "$DEVELOP before cutting the release; do not clear it with --resolve-theirs."
       echo
     fi
+    step Merge stopped "$(printf '%s' "$REMAINING" | grep -c . ) conflict(s) outside CHANGELOG.md need an operator decision"
     finish conflicts 2
   fi
 
@@ -398,6 +441,11 @@ NODE
     tail -30 "$MERGE_LOG" >&2
     die "merge --continue failed (full log: $MERGE_LOG)"
   fi
+fi
+if [ -n "$HAD_CONFLICTS" ]; then
+  step Merge ok "$(git -C "$WT" rev-parse --short HEAD); CHANGELOG union-resolved, ${#RESOLVE_THEIRS[@]} file(s) cleared to develop"
+else
+  step Merge ok "$(git -C "$WT" rev-parse --short HEAD); no conflicts"
 fi
 say "merge commit $(git -C "$WT" rev-parse --short HEAD)"
 
@@ -436,8 +484,10 @@ if [ -n "$BLOCKING" ]; then
   echo "The repo's precommit chain regenerates eslint.config.mjs and"
   echo "src/locales/strings on every commit, so either can appear here purely as"
   echo "an artifact of the merge commit rather than as real drift."
+  step Parity stopped "$(printf '%s' "$BLOCKING" | grep -c . ) non-CHANGELOG path(s) differ between $STAGING and $DEVELOP"
   finish parity-mismatch 2
 fi
+step Parity ok "clean; CHANGELOG.md is the only difference${ALLOW[0]+, allowed: ${ALLOW[*]}}"
 say "parity clean (CHANGELOG.md is the only expected difference)"
 
 # ------------------------------------------------------------------- push ----
@@ -445,8 +495,48 @@ hdr "Push"
 echo "  $TMP_DEV -> $REMOTE/$DEVELOP   ($(git -C "$WT" rev-parse --short "$TMP_DEV"))"
 echo "  $TMP_STG -> $REMOTE/$STAGING   ($(git -C "$WT" rev-parse --short "$TMP_STG"))"
 if [ -n "$DRY_RUN" ]; then
-  hdr "DRY RUN, nothing was pushed"
+  hdr "DRY RUN, neither $DEVELOP nor $STAGING was pushed"
+  if [ -n "$PUBLISH" ]; then
+    # Publish the two commits as TAGS so other machines can fetch and inspect
+    # the merge result. Tags, not branches, and never in the `v*` namespace:
+    # `vX.Y.Z` means a shipped release here, and this script reads those tags
+    # to date CHANGELOG headings. A dry-run commit landing there would corrupt
+    # the release record.
+    case "$TAG_PREFIX" in
+      v[0-9]*|"") die "refusing tag prefix '$TAG_PREFIX': it collides with the vX.Y.Z release namespace" ;;
+    esac
+    DEV_TAG="$TAG_PREFIX/$VERSION-develop"
+    STG_TAG="$TAG_PREFIX/$VERSION-staging"
+    CLEARED="${RESOLVE_THEIRS[*]+${RESOLVE_THEIRS[*]}}"
+    ALLOWED="${ALLOW[*]+${ALLOW[*]}}"
+    NOTE="dry run of $DEVELOP -> $STAGING for $VERSION
+source: $DEV_REF $(git -C "$REPO" rev-parse --short "$DEV_REF"), $STG_REF $(git -C "$REPO" rev-parse --short "$STG_REF")
+conflicts cleared to develop: ${CLEARED:-none}
+parity paths allowed: ${ALLOWED:-none}
+parity diff after merge: $(printf '%s' "${DIFF_PATHS:-none}" | tr '\n' ' ')
+generated by staging-release-merge.sh on $(hostname -s) at $(date -u +%Y-%m-%dT%H:%M:%SZ)
+NOT A RELEASE. Nothing was pushed to $DEVELOP or $STAGING."
+    git -C "$WT" tag -f -a "$DEV_TAG" -m "$NOTE" "$TMP_DEV" >/dev/null
+    git -C "$WT" tag -f -a "$STG_TAG" -m "$NOTE" "$TMP_STG" >/dev/null
+    # Force is scoped to this prefix, which only this script writes, so a re-run
+    # moves the tag to the new attempt instead of accumulating stale ones.
+    if git -C "$WT" push -f "$REMOTE" "refs/tags/$DEV_TAG" "refs/tags/$STG_TAG" >/dev/null 2>&1; then
+      say "published inspection tags:"
+      echo "    $DEV_TAG   $(git -C "$WT" rev-parse --short "$TMP_DEV")   (bump on $DEVELOP)"
+      echo "    $STG_TAG   $(git -C "$WT" rev-parse --short "$TMP_STG")   (merge result)"
+      echo
+      echo "  Inspect from any machine:"
+      echo "    git fetch $REMOTE --tags --force"
+      echo "    git diff $DEV_TAG $STG_TAG          # the parity check"
+      echo "    git show $STG_TAG                    # the merge commit"
+      echo "    git log --oneline $DEV_TAG -1        # the bump"
+    else
+      warn "could not push the inspection tags to $REMOTE (no write access, or the remote rejected them)"
+      say "they exist locally as $DEV_TAG and $STG_TAG"
+    fi
+  fi
   say "release $VERSION is ready; re-run without --dry-run to push"
+  step Push dry-run "nothing pushed to $DEVELOP or $STAGING${DEV_TAG:+; inspection tags $DEV_TAG, $STG_TAG}"
   finish ok 0
 fi
 if [ -z "$ASSUME_YES" ]; then
@@ -454,11 +544,12 @@ if [ -z "$ASSUME_YES" ]; then
   read -r reply
   case "$reply" in
     [yY]*) ;;
-    *) say "declined by operator, nothing pushed"; finish aborted 2 ;;
+    *) say "declined by operator, nothing pushed"; step Push declined "operator answered no at the confirmation"; finish aborted 2 ;;
   esac
 fi
 git -C "$WT" push "$REMOTE" "$TMP_DEV:$DEVELOP" || die "push to $DEVELOP failed"
 git -C "$WT" push "$REMOTE" "$TMP_STG:$STAGING" || die "push to $STAGING failed"
 say "pushed $DEVELOP and $STAGING"
 say "release $VERSION is on $STAGING"
+step Push ok "$DEVELOP <- $(git -C "$WT" rev-parse --short "$TMP_DEV"), $STAGING <- $(git -C "$WT" rev-parse --short "$TMP_STG")"
 finish ok 0

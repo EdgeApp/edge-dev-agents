@@ -94,6 +94,25 @@ emit_run() {
   cat <<'EOF'
 Contracts do NOT survive compaction: re-read the run-report template, the task's TDD, and the relevant SKILL.md sections at their point of use, never write from remembered shape. Anything above contradicting your recollection means your recollection is stale.
 EOF
+
+  # Planning-skill injection (2026-08-26): while planning is incomplete (no
+  # plan file yet), inject the asana-plan + task-review bodies verbatim so the
+  # ingestion contract is in context BEFORE the first tool call — runs holding
+  # only the one-shot body improvised raw-curl task fetches and planned past
+  # attachments (three runs, 08-24 and 08-26). ~13KB, skipped once a plan
+  # exists so post-planning boundaries (compact/resume) don't pay it.
+  # Injected bodies count as "read" for the skill-read gate: pre-write markers.
+  if ! ls /tmp/plan-"$gid"-*.md >/dev/null 2>&1; then
+    local sk
+    for sk in asana-plan task-review; do
+      if [[ -f "$HOME/.cursor/skills/$sk/SKILL.md" ]]; then
+        echo "--- INJECTED SKILL (governs the phase you are in now; follow it, do not re-fetch): ~/.cursor/skills/$sk/SKILL.md ---"
+        cat "$HOME/.cursor/skills/$sk/SKILL.md"
+        echo
+        touch "/tmp/agent-skill-read-$gid-$sk" 2>/dev/null || true
+      fi
+    done
+  fi
 }
 
 emit_chat() {

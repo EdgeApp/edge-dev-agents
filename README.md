@@ -383,10 +383,11 @@ interactive sessions post PRs and Slack messages too.
 | | `block-piped-watcher-scripts.sh` | Watcher status scripts run bare (pipes silently masked their exit codes); gated-claim commands hard-block instead of rewriting |
 | | `mark-agent-authored-asana.sh` | In-flight-run Asana prose carries the 🥋/👊 authorship markers; operator-context text stays unmarked |
 | | `require-agents-md-skill.sh` + `mark-agents-md-skill-read.sh` | AGENTS.md edits load the authoring skill first |
+| | `require-skill-read-for-scripts.sh` + `mark-skill-read.sh` | A skill's companion script runs only after its SKILL.md entered context (Read, Skill tool, or session-start injection) |
 | | `mark-playbook-read.sh` | Records the playbook read the drive gate requires |
 | | `nudge-asana-mcp.sh` | Steers bulk Asana reads to the cheaper script path |
 | | `block-raw-asana-api.sh` | Raw Asana API calls go through the sanctioned scripts (ingestion with attachment download, field reads, writes, scope checks) |
-| | `inject-run-context.sh`, `inject-no-slop-reminder.sh`, `inject-no-slop-line.sh` | Session-start run context; no-slop refresh at session start and every prompt |
+| | `inject-run-context.sh`, `inject-no-slop-reminder.sh`, `inject-no-slop-line.sh` | Session-start run context, plus the asana-plan + task-review bodies while planning is incomplete; no-slop refresh at session start and every prompt |
 | Shared helpers | `strip-cmd-mentions.sh` | Blanks quoted/heredoc spans so hooks trigger on commands, not on text that merely mentions them |
 | | `cmd-executes.sh` | Command-position matching, so naming a script in a grep never fires the gate that guards executing it |
 
