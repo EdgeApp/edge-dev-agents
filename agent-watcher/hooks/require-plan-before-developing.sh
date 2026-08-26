@@ -37,7 +37,7 @@ echo "$CMD_M" | grep -q "Developing" || exit 0
 # without ingestion is exactly the failure this catches, so prescribing "write
 # the plan" first would order the fix backwards.
 if [ ! -f "/tmp/asana-task-$AGENT_TASK_GID/.context-fetched" ]; then
-  echo "BLOCKED: no task-ingestion evidence for $AGENT_TASK_GID. Run ~/.cursor/skills/asana-get-context.sh $AGENT_TASK_GID (task-review step 1) BEFORE planning: it fetches the task, comments, subtasks, AND downloads every attachment to /tmp/asana-task-$AGENT_TASK_GID/ — screenshots, specs, and logs attached to the task are requirements, and a hand-rolled curl with notes-only opt_fields silently misses them all. Read any downloaded attachments, fold them into the plan (revise the plan file if it already exists), then retry this status update." >&2
+  echo "BLOCKED: no task-ingestion evidence for $AGENT_TASK_GID. Read ~/.cursor/skills/task-review/SKILL.md and run its steps 1-3 BEFORE planning — step 1's asana-get-context.sh fetches the task, comments, subtasks, AND downloads every attachment to /tmp/asana-task-$AGENT_TASK_GID/ (screenshots, specs, and logs attached to the task are requirements; a hand-rolled curl with notes-only opt_fields silently misses them all), and the skill's later steps tell you how to READ each downloaded artifact and fold it into the plan. Running the script bare skips those steps — read the skill first. Revise the plan file if it already exists, then retry this status update." >&2
   exit 2
 fi
 
