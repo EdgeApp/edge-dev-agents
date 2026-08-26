@@ -13,7 +13,7 @@ set -euo pipefail
 # keep their position. A hunk whose two sides disagree on their SECTION
 # HEADINGS is refused, because a blind union would scramble sections.
 #
-# RELEASE-MERGE mode (--release-merge), added 2026-08-26 for /develop-staging.
+# RELEASE-MERGE mode (--release-merge), used by /develop-staging.
 # The develop→staging release merge produces a hunk shape the default mode
 # always refuses: develop carries whole release sections (`## 4.51.0 (staging)`,
 # plus any hotfix sections) that staging has never seen, so the two sides'

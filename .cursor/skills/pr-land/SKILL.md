@@ -65,7 +65,7 @@ Arguments are classified automatically:
 | `staging-cherry-pick.sh` | Cherry-pick merged PR commits onto staging (see `/staging-cherry-pick` skill) |
 | `asana-task-update.sh` | Update linked Asana tasks after merge |
 | `pr-merge-watch.sh` | Babysit armed PRs: poll until all merge, a check fails, one needs a rebase (DIRTY, or BEHIND with green checks — auto-merge never updates a BEHIND branch), or one is green but blocked solely on a missing approving review |
-| `changelog-union-merge.sh` | Mechanically resolve a CHANGELOG rebase/cherry-pick conflict (union, dedupe, type-order) |
+| `changelog-union-merge.sh` | Mechanically resolve a CHANGELOG rebase/cherry-pick conflict (union, dedupe, type-order). Shared with /develop-staging, which adds whole-section merging behind `--release-merge`; pr-land never passes that flag |
 | `npm-publish-web.sh` | Login-if-needed + publish via npm web/link auth under a PTY; emits `AUTH_URL` lines to relay |
 
 | Script | Exit 0 | Exit 1 | Exit 2 | Exit 3 | Exit 4 |
