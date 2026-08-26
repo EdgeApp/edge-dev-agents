@@ -1386,6 +1386,7 @@
     "resolve-run": "2026-07-19: the eval layer itself; grades orch runs, is not one",
     "coinhub": "2026-07-24: Standalone operator-invocable coinhub maintenance skill; domain-procedure rules (snapshot regen, safe force-push, theme drift), not orchestration-gating behavior. Not wired into one-shot delegation, so not an orch dependent the agent-eval/orch-eval rubrics grade. Re-evaluate if one-shot ever delegates to /coinhub.",
     "agents-md": "2026-07-31: Non-orch: repo-authoring tooling invoked by the AGENTS.md write gate, not part of the one-shot delegation chain; its correctness is enforced by require-agents-md-skill.sh plus the skill's own checklist, not by a run-eval dimension.",
-    "kanban-categorize": "2026-08-10: 2026-08-10: operator tooling for Asana board grooming; invoked by a human, not reachable from one-shot or the watcher"
+    "kanban-categorize": "2026-08-10: 2026-08-10: operator tooling for Asana board grooming; invoked by a human, not reachable from one-shot or the watcher",
+    "develop-staging": "2026-08-26: operator release tooling: a human cuts the staging release with it. one-shot never delegates to it, so no orchestrated run is graded against its rules."
   }
 }

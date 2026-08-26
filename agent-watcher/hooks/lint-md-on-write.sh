@@ -79,8 +79,11 @@ case "$TOOL" in
     CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
     [ -n "$CMD" ] || exit 0
     # A redirect into a .md target ('> x.md', '>> x.md', 'tee x.md'); heredoc
-    # bodies ride inside $CMD so linting the command text covers them.
-    TARGET=$(printf '%s' "$CMD" | grep -oE '(>>?|tee([[:space:]]+-a)?)[[:space:]]*"?[^"[:space:];|&]+\.md' | sed -E 's/^(>>?|tee([[:space:]]+-a)?)[[:space:]]*"?//' | head -1 || true)
+    # bodies ride inside $CMD so linting the command text covers them. The
+    # operator must be preceded by whitespace/start-of-line: prose like
+    # '<repo>/README.md' inside a heredoc otherwise reads as '> /README.md'
+    # (the 2026-08-26 FP that blocked a SKILL.md rewrite).
+    TARGET=$(printf '%s' "$CMD" | grep -oE '(^|[[:space:]])(>>?|tee([[:space:]]+-a)?)[[:space:]]*"?[^"[:space:];|&]+\.md' | sed -E 's/^[[:space:]]*(>>?|tee([[:space:]]+-a)?)[[:space:]]*"?//' | head -1 || true)
     [ -n "$TARGET" ] || exit 0
     TARGET="${TARGET/#\~/$HOME}"
     case "$TARGET" in /*) ;; *) TARGET="$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)/$TARGET" ;; esac

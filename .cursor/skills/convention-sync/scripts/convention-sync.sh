@@ -224,25 +224,22 @@ if [[ "$DO_STAGE" == "true" && "$ORIGIN_AHEAD" -gt 0 ]]; then
   exit 1
 fi
 
-# Branch safety (#1, user-to-repo + stage). The top hazard is a fresh clone sitting
-# on the default branch, where `git push origin HEAD` would bypass the sync PR and
-# push straight to main. Refuse the default branch; if an open sync PR exists,
-# require its head branch. Override with --force-branch.
+# Branch safety (#1, user-to-repo + stage). Since 2026-08-26 the sync targets
+# the DEFAULT branch directly (the perpetual sync PR is retired; PR #1 merged
+# intentionally). The hazard is now the inverse of the old one: the shared
+# checkout parked on some OTHER session's feature branch, where committing
+# rides the sync onto that branch and a later HEAD:main push can fast-forward
+# an open PR's head into main, closing it unreviewed (the PR #3
+# develop-staging incident, 2026-08-26). Refuse any non-default branch.
+# Override with --force-branch.
 if [[ "$DO_STAGE" == "true" && "$DIRECTION" == "user-to-repo" && "$FORCE_BRANCH" != "true" ]]; then
   cur_branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
   def_branch="$(git -C "$REPO_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')"
   [[ -z "$def_branch" ]] && def_branch="main"
-  sync_branch="$(cd "$REPO_DIR" && gh pr list --state open --json headRefName --jq '.[0].headRefName' 2>/dev/null || true)"
-  if [[ "$cur_branch" == "$def_branch" ]]; then
-    echo "ERROR: refusing to sync onto the default branch '$cur_branch'." >&2
-    echo "convention-sync targets a PR branch, not '$def_branch'." >&2
-    [[ -n "$sync_branch" ]] && echo "  cd $REPO_DIR && git checkout $sync_branch" >&2
-    echo "(override with --force-branch only if you truly mean to commit to '$def_branch')." >&2
-    exit 1
-  fi
-  if [[ -n "$sync_branch" && "$cur_branch" != "$sync_branch" ]]; then
-    echo "ERROR: on branch '$cur_branch' but the open sync PR targets '$sync_branch'." >&2
-    echo "  cd $REPO_DIR && git checkout $sync_branch   (or pass --force-branch)" >&2
+  if [[ "$cur_branch" != "$def_branch" ]]; then
+    echo "ERROR: on branch '$cur_branch' but the sync commits directly to '$def_branch'." >&2
+    echo "  cd $REPO_DIR && git checkout $def_branch   (or pass --force-branch)" >&2
+    echo "If '$cur_branch' is another session's PR branch, committing here would ride the sync onto its PR." >&2
     exit 1
   fi
 fi
