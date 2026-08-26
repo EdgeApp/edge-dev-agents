@@ -53,6 +53,16 @@
           "type": "command"
         },
         {
+          "command": "~/.config/agent-watcher/hooks/block-raw-asana-api.sh",
+          "timeout": 15,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/block-raw-gh-writes.sh",
+          "timeout": 15,
+          "type": "command"
+        },
+        {
           "command": "~/.config/agent-watcher/hooks/require-maestro-device.sh",
           "timeout": 10,
           "type": "command"
