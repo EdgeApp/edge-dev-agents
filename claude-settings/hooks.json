@@ -18,6 +18,16 @@
         }
       ],
       "matcher": "Skill|Read|Bash"
+    },
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/mark-skill-read.sh",
+          "timeout": 10,
+          "type": "command"
+        }
+      ],
+      "matcher": "Read|Bash|Skill"
     }
   ],
   "PreToolUse": [
@@ -59,6 +69,11 @@
         },
         {
           "command": "~/.config/agent-watcher/hooks/block-raw-gh-writes.sh",
+          "timeout": 15,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/require-skill-read-for-scripts.sh",
           "timeout": 15,
           "type": "command"
         },
