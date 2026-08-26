@@ -549,6 +549,46 @@ staging when the remote is ahead, the branch is wrong, or the sync would delete
 or revert canonical files authored elsewhere (the fix is a repo-to-user pass
 first). `bootstrap.sh` does the reverse (repo to home) on a new machine.
 
+### Why sync scripts instead of a plain git checkout of home
+
+The repo's remote side is plain git (normal pull/push on the checkout). The
+sync machinery exists for the other hop, home to checkout, and the honest
+rationale splits into structural reasons and historical ones:
+
+- **The canonical "tree" is not one tree, and not all files** (structural).
+  It spans `~/.cursor`, `~/.config/agent-watcher`, `~/.claude/memory-shared`,
+  and the `.hooks` KEY inside `~/.claude/settings.json`, whose sibling keys
+  (model, theme) are machine-local. Git versions whole files; the settings
+  projection needs a key-level merge step under any design, and no checkout
+  layout absorbs it.
+- **Both machines operate unattended** (structural). The home tree has
+  concurrent uncoordinated writers: anchor sessions editing skills, agent runs
+  appending to skill references (the throwaway-account registry rows are
+  written by runs mid-task), eval tooling rewriting `rubric-drift.lock.json`.
+  A checkout of home would be perpetually dirty, and a pull that conflicts
+  needs a human at the keyboard that these boxes do not have. The sync's
+  content-hash staleness blocks and mtime `skippedNewer` protection are
+  cruder than git merge but never require interactive resolution; the
+  prescribed recovery (repo-to-user pass, then re-push) is a command, not a
+  conflict editor.
+- **Secrets are NOT a real justification.** `credentials.json` and state files
+  are kept out by hardcoded rsync excludes, but a `.gitignore` would do the
+  same job in a checkout model. The excludes are a gitignore in different
+  clothing.
+- **The deletion guards compensate for rsync, not for git.** Mirror-style sync
+  from a stale machine would delete files it never had; git pull/push ordering
+  prevents that class natively. Those guards are a cost of this design, not a
+  benefit over the alternative.
+- **Path dependence** (historical). `~/.cursor` grew as a live config dir
+  first; the repo came later as a distribution copy, and nothing has forced
+  the relocation cost since: a checkout-plus-symlinks redesign means touching
+  every launchd plist, hook registration, and absolute path in scripts, and
+  it still keeps a merge step for the settings projection.
+
+Net: the settings-key projection and unattended conflict handling are why the
+scripts stay; the file-copying part is the replaceable bit if the relocation
+cost is ever paid.
+
 ## Architecture
 
 ```text
