@@ -51,6 +51,23 @@ if [ "$RC" -eq 1 ]; then
   exit 0
 fi
 
+# NO TABLES IN DRAFTS (operator ruling 2026-08-26): the draft path stores raw
+# text — a markdown table shows as pipe soup in the client, renders only if the
+# AGENT later tool-sends the draft, and dies on operator manual send or
+# copy-out. Detection: a markdown table separator row. Deny drafts only; direct
+# sends may carry tables (the send converter renders them).
+if [ "${TOOL##*__}" = "slack_send_message_draft" ] \
+   && printf '%s\n' "$TEXT" | grep -qE '^[[:space:]]*\|?[[:space:]]*:?-+:?[[:space:]]*(\|[[:space:]]*:?-+:?[[:space:]]*)+\|?[[:space:]]*$'; then
+  jq -nc '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: "Markdown tables do not survive the Slack draft path (raw pipes in the client; lost on manual send or copy). Restructure as labeled lists, or attach tabular data as a code block. See ~/.cursor/skills/slack/SKILL.md no-tables-in-drafts."
+    }
+  }'
+  exit 0
+fi
+
 # NO markdown conversion here (verified 2026-08-19 by live render test): the
 # claude.ai Slack connector converts standard markdown server-side (bold,
 # links, tables, language-tagged code blocks with highlighting). A pre-pass to

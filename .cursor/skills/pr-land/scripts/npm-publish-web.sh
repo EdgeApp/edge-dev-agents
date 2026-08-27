@@ -100,7 +100,9 @@ run_phase() {
   while kill -0 "$CHILD_PID" 2>/dev/null; do
     if [ -z "$url_seen" ]; then
       local url
-      url=$(grep -oE 'https://www\.npmjs\.com/(login\?next=[^ "[:cntrl:]]+|auth/cli/[a-f0-9-]+)' "$out" 2>/dev/null | head -1 || true)
+      # -a: the `script` PTY capture carries control bytes, so without it grep
+      # declares the file binary and emits "Binary file ... matches" as the URL.
+      url=$(grep -aoE 'https://www\.npmjs\.com/(login\?next=[^ "[:cntrl:]]+|auth/cli/[a-f0-9-]+)' "$out" 2>/dev/null | head -1 || true)
       if [ -n "$url" ]; then
         echo "AUTH_URL $phase $url"
         url_seen=1
@@ -162,6 +164,29 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
   if published; then
     echo "PUBLISHED $pkg_name@$pkg_version"
     exit 0
+  fi
+  # TERMINAL registry rejections are not auth expiry: retrying re-mints links
+  # that authenticate fine and then hit the same wall, which reads to the
+  # operator as their taps being ignored (the 2026-08-27 piratechain 403 burned
+  # 20 links twice). Detect and stop. -a: the PTY capture is binary to grep.
+  if grep -qa "cannot publish over the previously published versions" "$WORK_DIR/publish.out" 2>/dev/null; then
+    # This 403 means the version IS on npm (an earlier auth completed server-side
+    # while read replicas still denied it). Confirm with a settle delay.
+    sleep 20
+    if published; then
+      echo "PUBLISHED $pkg_name@$pkg_version (landed earlier; replicas were lagging)"
+      exit 0
+    fi
+    echo "FAILED publish version-conflict: registry claims $pkg_version exists but view cannot see it yet; re-run after replication settles"
+    exit 3
+  fi
+  if grep -qaE "You do not have permission to publish|403 Forbidden|E403" "$WORK_DIR/publish.out" 2>/dev/null; then
+    echo "FAILED publish permission-denied: $(grep -aoE '403 Forbidden[^"]*' "$WORK_DIR/publish.out" | head -1)"
+    exit 3
+  fi
+  if grep -qaE "E402|payment required" "$WORK_DIR/publish.out" 2>/dev/null; then
+    echo "FAILED publish payment-required"
+    exit 3
   fi
 done
 
