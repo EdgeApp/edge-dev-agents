@@ -144,7 +144,9 @@ function checkNpmPublished(packageName, version) {
   }
 }
 
-async function publishRepo(repo, branch) {
+// bump: optional per-repo override ("patch" | "minor"); absent = derive from
+// the changelog entry tags as always. Additive — existing callers unchanged.
+async function publishRepo(repo, branch, bump) {
   const repoDir = getRepoDir(repo);
   const results = {
     repo,
@@ -188,7 +190,8 @@ async function publishRepo(repo, branch) {
     for (const entry of changelog.entries) {
       console.error(`  ${entry}`);
     }
-    console.error(`\nVersion bump: ${changelog.patchOnly ? "PATCH" : "MINOR"}`);
+    const effPatchOnly = bump === "patch" ? true : bump === "minor" ? false : changelog.patchOnly;
+    console.error(`\nVersion bump: ${effPatchOnly ? "PATCH" : "MINOR"}${bump ? ` (override: ${bump})` : ""}`);
     
     // Run verification
     console.error("\nRunning verification...");
@@ -220,7 +223,7 @@ async function publishRepo(repo, branch) {
     console.error("✓ Verification passed");
     
     // Bump version
-    const { newVersion } = bumpVersion(repoDir, changelog.patchOnly);
+    const { newVersion } = bumpVersion(repoDir, effPatchOnly);
     console.error(`\nVersion: ${currentVersion} → ${newVersion}`);
     
     // Update changelog
@@ -318,8 +321,8 @@ async function main() {
   
   let exitCode = 0;
   
-  for (const { repo, branch } of repos) {
-    const result = await publishRepo(repo, branch || "master");
+  for (const { repo, branch, bump } of repos) {
+    const result = await publishRepo(repo, branch || "master", bump);
     
     if (result.success) {
       results.published.push(result);
