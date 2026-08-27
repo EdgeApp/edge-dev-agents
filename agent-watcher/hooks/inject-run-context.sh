@@ -24,7 +24,10 @@ DIR="$HOME/.config/agent-watcher"
 ST="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"
 CRED="$DIR/credentials.json"
 
-cat >/dev/null 2>&1 || true   # drain hook JSON (unused; env + files carry what we need)
+# SessionStart source drives segment semantics: startup/resume = a NEW run
+# segment (fresh obligations); clear/compact = a context boundary INSIDE the
+# same segment (artifacts from earlier in the segment stay valid).
+SRC=$(jq -r '.source // empty' 2>/dev/null || true)
 
 emit_run() {
   local gid="$1" tok
@@ -95,14 +98,27 @@ emit_run() {
 Contracts do NOT survive compaction: re-read the run-report template, the task's TDD, and the relevant SKILL.md sections at their point of use, never write from remembered shape. Anything above contradicting your recollection means your recollection is stale.
 EOF
 
-  # Planning-skill injection (2026-08-26): while planning is incomplete (no
-  # plan file yet), inject the asana-plan + task-review bodies verbatim so the
-  # ingestion contract is in context BEFORE the first tool call — runs holding
-  # only the one-shot body improvised raw-curl task fetches and planned past
-  # attachments (three runs, 08-24 and 08-26). ~13KB, skipped once a plan
-  # exists so post-planning boundaries (compact/resume) don't pay it.
+  # Segment-fresh obligations (2026-08-27): on a NEW segment (startup/resume),
+  # stale per-segment evidence from a PRIOR segment must not satisfy this
+  # segment's gates — a followup resumed with the old segment's ingestion
+  # marker would pass the Developing gate without ever fetching the new
+  # comments/attachments that ARE the followup's scope. Plan files stay (real
+  # artifacts); markers are evidence, and evidence expires with the segment.
+  if [[ "$SRC" == "startup" || "$SRC" == "resume" ]]; then
+    rm -f /tmp/agent-skill-read-"$gid"-* "/tmp/asana-task-$gid/.context-fetched" 2>/dev/null || true
+  fi
+
+  # Planning-skill injection (2026-08-26): inject the asana-plan + task-review
+  # bodies verbatim so the ingestion contract is in context BEFORE the first
+  # tool call — runs holding only the one-shot body improvised raw-curl task
+  # fetches and planned past attachments (three runs, 08-24 and 08-26). ~13KB.
+  # On startup/resume: ALWAYS (a fresh segment re-plans; a followup's stale
+  # plan file from the prior segment must not mask this — the 08-27 followup
+  # resume got no injection under the old no-plan-file condition). On
+  # clear/compact: only while THIS segment still has no plan, so post-planning
+  # boundaries don't re-pay the context.
   # Injected bodies count as "read" for the skill-read gate: pre-write markers.
-  if ! ls /tmp/plan-"$gid"-*.md >/dev/null 2>&1; then
+  if [[ "$SRC" == "startup" || "$SRC" == "resume" ]] || ! ls /tmp/plan-"$gid"-*.md >/dev/null 2>&1; then
     local sk
     for sk in asana-plan task-review; do
       if [[ -f "$HOME/.cursor/skills/$sk/SKILL.md" ]]; then
