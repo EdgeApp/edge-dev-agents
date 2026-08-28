@@ -12,7 +12,7 @@ description: Compose, draft, send, or schedule Slack messages, comms, replies, a
 <rule id="draft-first-for-unreviewed">Text the operator has not reviewed goes out as a draft (slack_send_message_draft), not a send, unless the operator explicitly said to send directly.</rule>
 <rule id="tool-send-reviewed-drafts">A reviewed draft is posted by the AGENT via slack_send_message with draft_id (this re-runs the markdown converter and deletes the draft). Never tell the operator to hit Send on a draft in the Slack client for formatted content; the client posts stored raw text.</rule>
 <rule id="relay-message-link">After every send, reply to the operator with the returned message_link as a clickable link (drafts: the channel_link). Applies to sends, thread replies, scheduled messages, drafts, and canvas writes.</rule>
-<rule id="drafts-are-frozen">There is no draft update or delete tool; one attached draft per channel, revisable only by the operator in the Slack client. On draft_already_exists: tell the operator plainly that the stale draft in that channel needs their manual delete, and push-notify if they are away. Never silently skip, send fresh instead, or abandon the correction.</rule>
+<rule id="drafts-are-frozen">There is no draft update or delete tool; one attached draft per channel, revisable only by the operator in the Slack client. Two result shapes mean the channel's draft slot is taken: the draft_already_exists error, and a success-shaped create result with NO draft_id in the payload (the connector's silent form of the same conflict; a real create always returns a draft_id). On either: tell the operator plainly that the stale draft in that channel needs their manual delete, and push-notify if they are away. Never relay a draft_id-less create as created, silently skip, send fresh instead, or abandon the correction.</rule>
 </rules>
 
 <step id="1" name="Compose">
@@ -34,7 +34,7 @@ Report the message_link per `relay-message-link`, plus anything undelivered and 
 </step>
 
 <edge-cases>
-<case name="draft_already_exists">Handle per `drafts-are-frozen`.</case>
+<case name="draft_already_exists / create result missing draft_id">Handle per `drafts-are-frozen`; both are the same conflict.</case>
 <case name="Table genuinely needed">Only a direct tool-send renders it, and it will not survive copy-out. If the content must be copyable or starts as a draft, use a list or attach the table as a code block.</case>
 <case name="Gate denies the send">slack-prose-gate returns the lint findings; fix the text and re-send. Do not rephrase to dodge the lint while keeping the violation.</case>
 </edge-cases>
