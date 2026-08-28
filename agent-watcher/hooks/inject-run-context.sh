@@ -29,6 +29,33 @@ CRED="$DIR/credentials.json"
 # same segment (artifacts from earlier in the segment stay valid).
 SRC=$(jq -r '.source // empty' 2>/dev/null || true)
 
+# Headless-child guard (2026-08-28): scripts running INSIDE a run shell out to
+# `claude -p` (the no-slop semantic judge via pr-address.sh, ad-hoc helpers).
+# Those children inherit AGENT_TASK_GID and fire SessionStart source=startup,
+# but they are NOT new run segments: injecting pays ~13KB + live fetches per
+# judge call, and the segment-fresh rm below wiped the PARENT run's mid-segment
+# markers (Cacao 08-28: /im gate re-blocked mid-run after each judge call).
+# Detect print-mode by walking up to the owning claude process and checking
+# its argv; interactive runs never pass a bare -p/--print.
+# Only the EXECUTABLE token decides whether an ancestor is the claude CLI —
+# wrapper shells (zsh -c snapshot) quote arbitrary text in argv, so a
+# whole-argv substring match false-positives on any command mentioning
+# ".claude" paths or "-p" flags.
+PP=$PPID
+for _ in 1 2 3; do
+  PCMD=$(ps -o command= -p "$PP" 2>/dev/null) || break
+  EXE="${PCMD%% *}"
+  case "$EXE" in
+    claude|*/claude)
+      case " $PCMD " in
+        *" -p "*|*" --print "*|*" --print") exit 0 ;;
+      esac
+      break ;;
+  esac
+  PP=$(ps -o ppid= -p "$PP" 2>/dev/null | tr -d ' ')
+  [[ -n "$PP" && "$PP" != 0 ]] || break
+done
+
 emit_run() {
   local gid="$1" tok
   tok=$(jq -r '.asana_token // empty' "$CRED" 2>/dev/null)
