@@ -283,9 +283,15 @@ if [ ! -e "$WT/node_modules" ] && [ -d "$REPO/node_modules" ]; then
     || cp -R "$REPO/node_modules" "$WT/node_modules" \
     || die "could not stage node_modules"
 fi
-if [ ! -e "$WT/.husky/_" ] && [ -e "$REPO/.husky/_" ]; then
-  ln -s "$REPO/.husky/_" "$WT/.husky/_"
-  say "linked .husky/_"
+# COPIED, never symlinked: a symlink named `_` is a file, so husky's own
+# `_/.gitignore` (which lives INSIDE the real dir) cannot ignore it, and a
+# scoped commit can sweep the link into the repo as a dangling absolute path
+# that breaks husky on every other machine (shipped to develop+staging in the
+# 4.51.0 cut's zcash pin-bump, 2026-08-27; removed in 99297e718).
+if [ ! -e "$WT/.husky/_" ] && [ -d "$REPO/.husky/_" ]; then
+  mkdir -p "$WT/.husky"
+  cp -R "$REPO/.husky/_" "$WT/.husky/_"
+  say "copied .husky/_"
 fi
 # Copied, not symlinked: the prepare step regenerates this dir (typechain
 # mkdir), which fails with EEXIST when the path is a symlink into the caller's

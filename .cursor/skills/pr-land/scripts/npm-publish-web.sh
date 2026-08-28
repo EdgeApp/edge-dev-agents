@@ -147,6 +147,36 @@ echo "logged in as $(cat "$WORK_DIR/whoami" 2>/dev/null | tail -1)" >&2
 pkg_name=$(cd "$REPO_DIR" && node -e "process.stdout.write(require(process.cwd()+\"/package.json\").name)")
 pkg_version=$(cd "$REPO_DIR" && node -e "process.stdout.write(require(process.cwd()+\"/package.json\").version)")
 
+# --- Phase 2a: prepack + tarball sanity -------------------------------------
+# This machine hardens npm with ignore-scripts=true (postinstall-RCE guard), so
+# a publish SKIPS prepack — which, for repos that vendor their native SDK at
+# pack time (react-native-zcash / react-native-piratechain: update-sources
+# clones the Swift sources and builds the xcframework), silently published
+# tarballs missing the whole iOS payload (0.13.3 / 0.6.2, 2026-08-27: 36MB to
+# 108KB, every downstream iOS build failed on missing SDK types). Running the
+# repo's OWN prepack by name is a deliberate first-party invocation — the run
+# subcommand is unaffected by ignore-scripts — so the hardening stays intact.
+has_prepack=$(cd "$REPO_DIR" && node -e "process.stdout.write(require(process.cwd()+\"/package.json\").scripts?.prepack ? \"1\" : \"\")")
+if [ -n "$has_prepack" ]; then
+  echo "running prepack explicitly (ignore-scripts=true skips it at pack time)..." >&2
+  (cd "$REPO_DIR" && $NPM run prepack) > "$WORK_DIR/prepack.out" 2>&1 || {
+    tail -15 "$WORK_DIR/prepack.out" >&2
+    echo "FAILED prepack (see stderr tail)"
+    exit 1
+  }
+fi
+
+# Tarball sanity: whatever the cause, a pack that SHRANK dramatically vs the
+# registry's previous release is a gutted package, and publishing it breaks
+# every consumer. Failures are stops.
+prev_size=$(cd "$REPO_DIR" && $NPM view "$pkg_name" dist.unpackedSize 2>/dev/null | tail -1 | tr -dc 0-9)
+new_size=$(cd "$REPO_DIR" && $NPM pack --dry-run --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);process.stdout.write(String(j[0].unpackedSize||0))}catch(e){process.stdout.write("0")}})')
+if [ -n "$prev_size" ] && [ "${new_size:-0}" -gt 0 ] && [ "$new_size" -lt $((prev_size / 2)) ]; then
+  echo "FAILED publish tarball-shrunk: new pack ${new_size}B is under half the previous release ${prev_size}B — refusing to publish a gutted package"
+  exit 4
+fi
+echo "tarball sanity: new ${new_size:-?}B vs previous ${prev_size:-?}B" >&2
+
 published() {
   local v
   v=$(cd "$REPO_DIR" && $NPM view "$pkg_name@$pkg_version" version 2>/dev/null | tail -1)
