@@ -6,7 +6,9 @@
 //
 // For each PR:
 //   1. Determine merge commit SHA (from input or by querying GitHub)
-//   2. Extract non-merge commits: git log <merge>^1..<merge>^2
+//   2. Extract commits by parent count: a merge commit unpacks as
+//      git log <merge>^1..<merge>^2; a single-parent commit (dep bump
+//      from upgrade-dep.sh) cherry-picks as itself
 //   3. Pull latest staging branch
 //   4. Cherry-pick each commit individually (oldest first)
 //   5. Report results
@@ -38,15 +40,48 @@ function getMergeCommit(repo, prNumber) {
 }
 
 function getCommitsToCherry(repoDir, mergeSha) {
-  // Extract non-merge commits from the PR: merge^1..merge^2
-  // This gives us the branch commits in chronological order
+  // Parent count decides the extraction shape. A PR merge has two parents and
+  // unpacks as the branch commits merge^1..merge^2. A dep bump from
+  // upgrade-dep.sh has ONE parent: ^2 does not exist there, and running the
+  // range unconditionally dies with "fatal: ambiguous argument" that
+  // allowFailure swallowed, so every staging-routed dep bump skipped silently
+  // at exit 0 (2026-08-28 LiFi land).
+  const parents = runGit(
+    ["rev-list", "--parents", "-n", "1", mergeSha],
+    repoDir,
+    { allowFailure: true }
+  );
+  if (!parents.success || !parents.stdout) {
+    console.error(
+      `✗ Cannot resolve ${mergeSha}: ${(parents.stderr || "unknown revision").trim()}`
+    );
+    return [];
+  }
+  const parentCount = parents.stdout.trim().split(/\s+/).length - 1;
+
+  if (parentCount < 2) {
+    const one = runGit(["log", "-1", "--format=%H %s", mergeSha], repoDir, {
+      allowFailure: true,
+    });
+    if (!one.success || !one.stdout) {
+      console.error(`✗ Cannot read commit ${mergeSha}: ${one.stderr}`);
+      return [];
+    }
+    const line = one.stdout.trim();
+    const spaceIdx = line.indexOf(" ");
+    return [{ sha: line.slice(0, spaceIdx), message: line.slice(spaceIdx + 1) }];
+  }
+
   const result = runGit(
     ["log", "--reverse", "--format=%H %s", `${mergeSha}^1..${mergeSha}^2`],
     repoDir,
     { allowFailure: true }
   );
-
-  if (!result.success || !result.stdout) {
+  if (!result.success) {
+    console.error(`✗ Commit extraction failed: ${result.stderr}`);
+    return [];
+  }
+  if (!result.stdout) {
     return [];
   }
 
