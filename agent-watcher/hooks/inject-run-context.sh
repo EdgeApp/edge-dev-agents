@@ -133,6 +133,15 @@ EOF
   # artifacts); markers are evidence, and evidence expires with the segment.
   if [[ "$SRC" == "startup" || "$SRC" == "resume" ]]; then
     rm -f /tmp/agent-skill-read-"$gid"-* "/tmp/asana-task-$gid/.context-fetched" 2>/dev/null || true
+  elif [[ "$SRC" == "compact" || "$SRC" == "clear" ]]; then
+    # Skill-READ markers also expire at intra-segment context boundaries
+    # (2026-08-28): their evidence is "the body text is in context", which is
+    # precisely what compaction destroys — the summary keeps a paraphrase and
+    # drops the rules. Cheap to re-arm now that the read-gate denies with the
+    # full body: the first post-compact call of a still-needed skill gets the
+    # contract re-delivered lazily. Ingestion evidence (.context-fetched) is
+    # disk-backed and survives, as do plan files.
+    rm -f /tmp/agent-skill-read-"$gid"-* 2>/dev/null || true
   fi
 
   # Planning-skill injection (2026-08-26): inject the asana-plan + task-review

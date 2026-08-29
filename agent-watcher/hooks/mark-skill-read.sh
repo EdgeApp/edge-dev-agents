@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # mark-skill-read.sh — PostToolUse hook (matcher: Read|Bash|Skill). Records
-# which SKILL.mds entered this run's context, as markers the companion
+# which SKILL.mds FULLY entered this run's context, as markers the companion
 # read-gate (require-skill-read-for-scripts.sh) checks before letting a
-# skill's script execute. Three sources count as a read:
-#   Read tool  — file_path is a skills/<name>/SKILL.md
-#   Bash       — the command references a skills/<name>/SKILL.md (cat/sed/grep;
-#                generous on purpose: partial reads still beat none, and the
-#                gate is a nudge toward reading, not a comprehension check)
+# skill's script execute. STRICT since 2026-08-28: only provably-complete
+# deliveries count, because a partial read that earns the marker also
+# suppresses the gate's deny-with-body delivery, recreating the under-read
+# hole (the Cacao run credited pr-address from a 150-235 line slice).
+#   Read tool  — file_path is a skills/<name>/SKILL.md AND no offset/limit
+#   Bash       — `cat` of the SKILL.md in a command with no truncation tool
+#                (sed/head/tail/awk) anywhere in it
 #   Skill tool — the invocation injects the body wholesale
+# Partial reads earn nothing; the gate then denies the first script call and
+# delivers the full body itself (writing the marker as it does).
 # inject-run-context.sh pre-writes markers for the bodies it injects at
 # session start (asana-plan, task-review).
 #
@@ -26,15 +30,23 @@ mark() { touch "/tmp/agent-skill-read-$AGENT_TASK_GID-$1" 2>/dev/null || true; }
 case "$TOOL" in
   Read)
     FP=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
-    if printf '%s' "$FP" | grep -qE 'skills/[a-z0-9-]+/SKILL\.md$'; then
+    RANGED=$(printf '%s' "$INPUT" | jq -r 'if (.tool_input.offset // null) != null or (.tool_input.limit // null) != null then "yes" else "no" end' 2>/dev/null || echo yes)
+    if [ "$RANGED" = "no" ] && printf '%s' "$FP" | grep -qE 'skills/[a-z0-9-]+/SKILL\.md$'; then
       mark "$(printf '%s' "$FP" | sed -E 's|.*skills/([a-z0-9-]+)/SKILL\.md$|\1|')"
     fi
     ;;
   Bash)
     CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
-    for sk in $(printf '%s' "$CMD" | grep -oE 'skills/[a-z0-9-]+/SKILL\.md' | sed -E 's|skills/([a-z0-9-]+)/SKILL\.md|\1|' | sort -u); do
-      mark "$sk"
-    done
+    # Full-read heuristic: a cat of the file counts unless the command also
+    # wields a truncation/slicing tool. Coarse on purpose — under-marking is
+    # cheap now (the gate backfills with the full body), over-marking is the
+    # failure mode this strictness exists to prevent.
+    if printf '%s' "$CMD" | grep -qE '(^|[;&|(]|\$\()[[:space:]]*cat[[:space:]][^|;&]*skills/[a-z0-9-]+/SKILL\.md' \
+       && ! printf '%s' "$CMD" | grep -qE '\b(sed|head|tail|awk)\b'; then
+      for sk in $(printf '%s' "$CMD" | grep -oE 'skills/[a-z0-9-]+/SKILL\.md' | sed -E 's|skills/([a-z0-9-]+)/SKILL\.md|\1|' | sort -u); do
+        mark "$sk"
+      done
+    fi
     ;;
   Skill)
     SK=$(printf '%s' "$INPUT" | jq -r '.tool_input.skill // empty' 2>/dev/null || true)
