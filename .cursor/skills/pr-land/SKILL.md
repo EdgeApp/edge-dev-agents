@@ -371,7 +371,7 @@ For qualifying PRs/commits, invoke the `/staging-cherry-pick` skill:
 echo '[{"repo":"edge-react-gui","prNumber":123,"mergeSha":"abc123"}]' | ~/.cursor/skills/staging-cherry-pick/scripts/staging-cherry-pick.sh
 ```
 
-Pass the `mergeSha` from the merge step's JSON output. For dep upgrade commits, pass the commit SHA from step 7. The script cherry-picks individual (non-merge) commits onto the staging branch.
+Pass the `mergeSha` from the merge step's JSON output. For dep upgrade commits, pass the commit SHA from step 7 (the script handles single-parent commits by cherry-picking the sha itself). Staging takes cherry-picks ONLY — never run `upgrade-dep.sh` on staging or commit natively there (staging-cherry-pick `cherry-picks-only`).
 
 **On exit 3 (CHANGELOG conflict):** Run `changelog-union-merge.sh <repoDir> --continue` (it detects the in-progress cherry-pick). Resolve by hand (existing staging entries first, then the new entry) only if it exits non-zero. Re-run for remaining PRs.
 
