@@ -43,6 +43,7 @@ echo "BLOCKED: raw Asana API calls are forbidden in agent sessions — the sanct
   task ingestion (task+comments+subtasks+ATTACHMENTS): ~/.cursor/skills/asana-get-context.sh <gid>
   single field read: ~/.cursor/skills/asana-field-value.sh <gid> \"<field>\"
   writes (comments, attachments, subtasks): ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh
+  task DESCRIPTION (agent-maintained tail only): asana-task-update.sh --task <gid> --set-current-state <file>
   followup-scope / watermark: ~/.config/agent-watcher/check-followup-scope.sh --task-gid <gid>
   status transitions: ~/.config/agent-watcher/update-status.sh
 Read the owning SKILL.md (task-review, asana-task-update) before using its script." >&2

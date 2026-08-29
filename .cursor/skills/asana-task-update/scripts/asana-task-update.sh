@@ -34,6 +34,8 @@ AUTO_EST_REVIEW=false
 CREATE_SUBTASK=false
 SUBTASK_NAME=""
 
+SET_CURRENT_STATE_FILE=""
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --task) TASK_GID="$2"; shift 2 ;;
@@ -44,6 +46,7 @@ while [[ $# -gt 0 ]]; do
     --pr-title) PR_TITLE="$2"; shift 2 ;;
     --pr-number) PR_NUMBER="$2"; shift 2 ;;
     --attach-file) DO_ATTACH_FILE=true; ATTACH_FILE_PATH="$2"; shift 2 ;;
+    --set-current-state) SET_CURRENT_STATE_FILE="$2"; shift 2 ;;
     --attach-name) ATTACH_FILE_NAME="$2"; shift 2 ;;
     --assign)
       DO_ASSIGN=true
@@ -72,7 +75,7 @@ if [[ -z "$TASK_GID" ]]; then
   exit 1
 fi
 
-if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_STATUS" ]] && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_REVIEWER_GID" ]] && [[ -z "$SET_IMPLEMENTOR_GID" ]] && [[ -z "$SET_PRIORITY_GID" ]] && [[ -z "$SET_PLANNED_GID" ]] && ! $AUTO_EST_REVIEW; then
+if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_STATUS" ]] && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_REVIEWER_GID" ]] && [[ -z "$SET_IMPLEMENTOR_GID" ]] && [[ -z "$SET_PRIORITY_GID" ]] && [[ -z "$SET_PLANNED_GID" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && ! $AUTO_EST_REVIEW; then
   echo "Error: No operations specified" >&2
   exit 1
 fi
@@ -106,6 +109,12 @@ fi
 
 ASANA_API="https://app.asana.com/api/1.0"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# The one line separating operator prose from the agent-maintained tail of a
+# task description. Owned here so every writer agrees on the byte-exact literal;
+# `--set-current-state` replaces everything from this line down and never touches
+# what sits above it.
+CURRENT_STATE_DELIM="===== CURRENT STATE (agent-maintained; supersedes any stale prose above) ====="
 
 # --create-subtask: create a subtask under --task, print its gid, and re-point
 # TASK_GID to it so any --attach-pr/--set-status in the SAME invocation lands on
@@ -372,5 +381,46 @@ if $AUTO_EST_REVIEW; then
         -d "$REVIEW_PATCH" > /dev/null
       echo ">> Est. Review Hrs: set to $EST_VAL (10% of Spent Dev Hrs)"
     fi
+  fi
+fi
+
+# --set-current-state <file>: rewrite ONLY the agent-maintained tail of the task
+# description. Reads the current notes, drops everything from
+# CURRENT_STATE_DELIM down, and re-appends the delimiter plus the file's body
+# marked by agent-authored-text.sh. Replacing rather than appending is what makes
+# a re-run idempotent: the section never stacks, and operator prose above the
+# delimiter is preserved byte-for-byte.
+if [[ -n "$SET_CURRENT_STATE_FILE" ]]; then
+  [[ -f "$SET_CURRENT_STATE_FILE" ]] || {
+    echo "Error: --set-current-state file not found: $SET_CURRENT_STATE_FILE" >&2; exit 1; }
+  CS_BODY="$(cat "$SET_CURRENT_STATE_FILE")"
+  [[ -n "${CS_BODY//[[:space:]]/}" ]] || {
+    echo "Error: --set-current-state file is empty: $SET_CURRENT_STATE_FILE" >&2; exit 1; }
+
+  CS_NOTES="$(curl -sf "$ASANA_API/tasks/$TASK_GID?opt_fields=notes" \
+      -H "Authorization: Bearer $ASANA_TOKEN" 2>/dev/null | jq -r '.data.notes // ""')" || {
+    echo ">> CURRENT STATE: FAILED (could not read notes for task $TASK_GID)" >&2; exit 1; }
+
+  # Everything above the delimiter, with trailing whitespace trimmed so the
+  # rebuilt notes get exactly one blank line before the delimiter.
+  CS_PROSE="$(printf '%s\n' "$CS_NOTES" \
+    | awk -v d="$CURRENT_STATE_DELIM" 'index($0, d) == 1 { exit } { print }')"
+  CS_PROSE="${CS_PROSE%"${CS_PROSE##*[![:space:]]}"}"
+
+  CS_MARKER="$HOME/.config/agent-watcher/agent-authored-text.sh"
+  if [[ -x "$CS_MARKER" ]]; then
+    CS_BODY="$(printf '%s' "$CS_BODY" | "$CS_MARKER")"
+  fi
+
+  CS_NEW="$(printf '%s\n\n%s\n%s\n' "$CS_PROSE" "$CURRENT_STATE_DELIM" "$CS_BODY")"
+  CS_PATCH="$(jq -n --arg n "$CS_NEW" '{data:{notes:$n}}')"
+  if curl -sf -X PUT "$ASANA_API/tasks/$TASK_GID" \
+      -H "Authorization: Bearer $ASANA_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "$CS_PATCH" > /dev/null 2>&1; then
+    echo ">> CURRENT STATE: updated on task $TASK_GID (operator prose above the delimiter preserved)"
+  else
+    echo ">> CURRENT STATE: FAILED (PUT rejected for task $TASK_GID)" >&2
+    exit 1
   fi
 fi

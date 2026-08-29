@@ -1344,8 +1344,8 @@
       "hash": "f12ed2e6a7ae"
     },
     "one-shot:description-current-state": {
-      "reason": "2026-08-07: format-only change (blank line before delimiter, TDD branch link first in section); write path still deterministic via agent-authored-text.sh pipe, eval-relevance unchanged from prior ack",
-      "hash": "a7d192d941af"
+      "reason": "2026-08-28: 2026-08-28: write-path change only (raw curl+PUT mechanics replaced by asana-task-update.sh --set-current-state, which now owns the delimiter, the strip-and-replace and the authorship marking); the graded expectation — refresh the section when delivered scope diverges, never touch operator prose — is unchanged from the prior ack",
+      "hash": "1a417915bdab"
     },
     "one-shot:mid-run-state-file": {
       "reason": "2026-08-06: same concurrent effort as description-current-state; state-file quality is transcript-visible only — candidate A-dimension owed by that effort",
@@ -1366,6 +1366,10 @@
     "review-standards:no-attribution-trailers": {
       "reason": "2026-08-20: review-side checklist item; authoring side is scrub-enforced in lint-commit.sh and graded under A12",
       "hash": "371607070274"
+    },
+    "asana-task-update:current-state-owns-the-tail": {
+      "reason": "2026-08-28: 2026-08-28: mechanics-only rule (which flag writes the description tail); the graded OUTCOME — section refreshed when delivered scope diverges, operator prose above the delimiter untouched — is already covered by one-shot:description-current-state, so a second dimension would double-count the same evidence",
+      "hash": "f41123c345d5"
     }
   },
   "excluded_skills": {
