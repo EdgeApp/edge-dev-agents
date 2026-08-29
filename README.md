@@ -354,6 +354,66 @@ Most gates no-op unless `AGENT_TASK_GID` is set (orchestrated sessions only).
 The prose gates and the Asana authorship marker run everywhere, because
 interactive sessions post PRs and Slack messages too.
 
+### Skill-contract delivery (deny-with-body)
+
+The dominant compliance failure across audited runs is cross-file-read
+skipping: rules INSIDE the prompt a session holds are followed almost
+universally, while obligations that require reading ANOTHER skill file
+mid-flow get skipped or satisfied with a partial slice. The enforcement
+stack therefore never trusts "go read X". A contract reaches a run's context
+in exactly one of three ways, all of which stamp the same per-segment marker,
+and the marker is what the read-gate checks before letting any companion
+script execute:
+
+1. **Injected at the boundary** — every fresh segment gets the planning
+   contracts (asana-plan + task-review) pushed in whole by
+   `inject-run-context.sh`.
+2. **Read whole by the agent** — strict marking: a full `Read` (no
+   offset/limit), a bare `cat`, or a Skill-tool invocation. A `sed` slice or
+   `cat | head` earns nothing, because partial credit would suppress
+   delivery.
+3. **Delivered by the gate itself** — a script call with no marker is DENIED,
+   and the deny message IS the full SKILL.md body (marker written at
+   delivery). The uneducated call never executes; the retry arrives with the
+   complete contract. This is one round-trip cheaper than the old
+   block→read→retry loop.
+
+Markers are evidence about what is IN CONTEXT, so they expire when the
+context does: startup/resume (a new segment) kills all of them plus the
+ingestion marker; compact/clear kills the read markers, because compaction
+keeps a paraphrase and drops the rules; headless `claude -p` children
+(the no-slop judge) inherit the gid but are ignored entirely. Re-arming is
+cheap by design — the gate re-delivers lazily, only for skills the run
+actually touches again.
+
+```mermaid
+flowchart TB
+    SPAWN["segment boundary:<br/>planning contracts injected whole"]
+    READ["agent reads it whole:<br/>full Read / bare cat / Skill tool<br/>(sed slices earn nothing)"]
+    GATE["gate denies, message = full SKILL.md<br/>(deny-with-body)"]
+    M[("per-segment marker<br/>/tmp/agent-skill-read-&lt;gid&gt;-&lt;skill&gt;")]
+    CALL{"companion-script call:<br/>owning skill's marker present?"}
+    RUN["script executes"]
+    PTR["deny with read-in-full pointer,<br/>no marker until the full read"]
+    EXP["expiry: startup/resume → all markers;<br/>compact/clear → read markers;<br/>claude -p children ignored"]
+    SPAWN --> M
+    READ --> M
+    GATE --> M
+    M -.attests.-> CALL
+    CALL -->|yes| RUN
+    CALL -->|"no, body ≤ 50KB"| GATE
+    GATE -->|retry| CALL
+    CALL -->|"no, body > 50KB (one-shot, pr-land)"| PTR
+    EXP -.expires.-> M
+```
+
+The gate closes one half of the substitution failure class (a sanctioned
+script run contract-blind); the raw-API blocks (`block-raw-asana-api.sh`,
+`block-raw-gh-writes.sh`, `block-raw-thread-resolve.sh`) close the other
+half (an improvised replacement for the script), and the status gates
+check outcome evidence at phase boundaries regardless of how the work was
+done.
+
 | Group | Hook | Enforces |
 |---|---|---|
 | Status gates | `require-plan-before-developing.sh` | No Developing until ingestion evidence (`asana-get-context.sh` ran, attachments downloaded) AND the plan doc exist |
