@@ -36,7 +36,7 @@ metadata:
 <step id="1" name="Parse inputs">
 From the user message, determine:
 
-1. **Cheese branch** — default `test-feta`. Use the user's explicit name if given (e.g. `test-gouda`). The real cheeses are `feta`, `gouda`, `halloumi`, `cheddar` — a dotted variant like `gouda.1` is not a real cheese; resolve it to the base name (`test-gouda`).
+1. **Cheese branch** — default `test-feta`. Use the user's explicit name if given (e.g. `test-gouda`). The real cheeses are `feta`, `gouda`, `halloumi`, `cheddar`, `paneer`, `kraft`, `colby`, `string`, `parm`, `swiss` — a dotted variant like `gouda.1` is not a real cheese; resolve it to the base name (`test-gouda`).
 2. **Source ref** — default: current HEAD of `edge-react-gui`. Use an explicit ref if the user names one.
 3. **Deps to pin** — from any aliases or paths the user mentions. None is valid (GUI-only cheese build).
 
