@@ -36,7 +36,7 @@ Before any other work, ensure the PR's branch is checked out and up to date:
 The script:
 - If the PR branch is already checked out in **another git worktree** → pulls latest there and reports `WORKTREE_PATH=<dir>`, leaving the main checkout untouched (git forbids the same branch in two worktrees)
 - If already on the PR branch → pulls latest
-- If on a different branch → stashes uncommitted changes (if any), checks out the PR branch, pulls latest
+- If on a different branch → stashes uncommitted changes (if any), fetches and checks out the PR branch (creating a tracking branch when it exists only on the remote), pulls latest. Exits 1 if the branch cannot be checked out, rather than proceeding on the wrong branch
 - In every case, if the target directory has no `node_modules`, installs deps (`npm ci` or `yarn install` per the lockfile) so `lint-commit.sh`'s eslint resolves. **This can take several minutes on a cold worktree — invoke `ensure-branch` with `block_until_ms: 600000`.**
 
 Output includes `BRANCH_READY`, `STASHED`, and (if switched) `PREVIOUS_BRANCH`. If `STASHED=true`, inform the user that changes were stashed on the previous branch.

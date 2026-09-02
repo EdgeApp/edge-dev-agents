@@ -16,7 +16,7 @@
 #   resolve-id     --owner <o> --repo <r> --pr <n> --node-id <id>
 #   headline       --owner <o> --repo <r> --sha <sha>
 #   fetch-pr-body  --owner <o> --repo <r> --pr <n>         Fetch current PR body → /tmp/pr-body.md
-#   ensure-branch  --owner <o> --repo <r> --pr <n>         Checkout PR branch, stash if needed, pull.
+#   ensure-branch  --owner <o> --repo <r> --pr <n>         Fetch + checkout PR branch, stash if needed, pull.
 #                                                          If the branch is already bound to another worktree,
 #                                                          reports WORKTREE_PATH=<dir> and leaves main checkout untouched.
 #                                                          Installs node deps (npm ci / yarn install) when the
@@ -477,7 +477,23 @@ case "$CMD" in
         STASHED=true
       fi
       echo ">> Switching from $CURRENT_BRANCH to $PR_BRANCH"
-      git checkout "$PR_BRANCH" 2>&1
+      # A PR branch authored elsewhere (another worktree, another machine, a
+      # teammate) has no local ref, so `git checkout` fails with "pathspec did
+      # not match". Fetch first, then fall back to a tracking branch off the
+      # remote ref. A failed checkout is fatal: continuing would stash, commit,
+      # and force-push onto whatever branch happened to be checked out.
+      git fetch origin "$PR_BRANCH" 2>&1 || git fetch --prune origin 2>&1 || true
+      git checkout "$PR_BRANCH" 2>&1 ||
+        git checkout -b "$PR_BRANCH" --track "origin/$PR_BRANCH" 2>&1 || {
+          echo "Error: cannot check out $PR_BRANCH (not local, and no origin/$PR_BRANCH)" >&2
+          [[ "$STASHED" == "true" ]] && echo "Note: uncommitted changes are stashed on $CURRENT_BRANCH (git stash pop)" >&2
+          exit 1
+        }
+      ACTUAL_BRANCH=$(git branch --show-current)
+      if [[ "$ACTUAL_BRANCH" != "$PR_BRANCH" ]]; then
+        echo "Error: expected to be on $PR_BRANCH, but HEAD is on ${ACTUAL_BRANCH:-a detached commit}" >&2
+        exit 1
+      fi
       git pull --ff-only 2>&1 || git pull --rebase 2>&1
       ensure_deps "$(git rev-parse --show-toplevel)"
       echo ">> BRANCH_READY=$PR_BRANCH STASHED=$STASHED PREVIOUS_BRANCH=$CURRENT_BRANCH"
