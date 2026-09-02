@@ -39,7 +39,7 @@
         },
         {
           "command": "~/.config/agent-watcher/hooks/git-history-gate.sh",
-          "timeout": 10,
+          "timeout": 30,
           "type": "command"
         },
         {
@@ -286,6 +286,11 @@
       "hooks": [
         {
           "command": "~/.config/agent-watcher/hooks/inject-no-slop-line.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/mark-operator-present.sh",
           "timeout": 10,
           "type": "command"
         }

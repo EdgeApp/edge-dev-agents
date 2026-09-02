@@ -309,7 +309,7 @@
       ]
     },
     "one-shot:pr-watch-loop-amend-pattern": {
-      "hash": "b3d38094952e",
+      "hash": "ec114eef94ed",
       "dims": [
         "A12"
       ]
@@ -527,7 +527,7 @@
       ]
     },
     "file:no-slop-lint.sh": {
-      "hash": "920b82af5602",
+      "hash": "3d87d2aec498",
       "dims": [
         "A9"
       ]

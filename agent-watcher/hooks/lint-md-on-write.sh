@@ -22,11 +22,19 @@
 # files legitimately hold quoted data; the judge tier runs at the posting/attach
 # boundaries (pr-create, slack gate, report attach), which see final artifacts.
 #
+# SKILL-READ GATE (orch runs only): a full Write of outward prose is the moment
+# the writer needs the no-slop contract in context, and prose has no companion
+# script for require-skill-read-for-scripts.sh to key on. So the first such
+# Write in a segment without the no-slop marker is denied with the full skill
+# body (lib/skill-read-gate.sh); the retry passes this check and is then
+# linted. Interactive sessions (no AGENT_TASK_GID) skip the read check.
+#
 # Allowlist (never linted):
 #   - internal tooling and state: ~/.cursor, ~/.claude, ~/.config, ~/.local,
 #     ~/agent-evals (eval artifacts quote the slop under analysis; writing-style
-#     exempts internal tooling, and the no-slop skill's own corpus is made of
-#     violations)
+#     exempts internal tooling). EXCEPTION: ~/.cursor/skills/no-slop itself IS
+#     linted, so the literature agents read for the rules cannot carry the
+#     patterns it bans; its deliberate-slop corpus is exempt by fixture NAME.
 #   - data/fixture files by NAME: basename starting raw- or data-, or containing
 #     "fixture" — the sanctioned way to save fetched text or deliberate-slop
 #     test corpora as .md (or just use .txt/.json, which are never linted)
@@ -45,7 +53,10 @@ LINT="$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh"
 
 allowlisted() { # $1 = absolute-ish path; exit 0 = skip linting
   local p="$1" b
+  b=$(basename "$p")
+  case "$b" in raw-*|data-*|*fixture*) return 0 ;; esac
   case "$p" in
+    "$HOME/.cursor/skills/no-slop/"*) return 1 ;;
     "$HOME/.cursor/"*|"$HOME/.claude/"*|"$HOME/.config/"*|"$HOME/.local/"*|"$HOME/agent-evals/"*) return 0 ;;
     # Orch run machinery under /tmp: agent-state-<gid>.md (mid-run state file),
     # agent-run-report-*.md (its own boundary is the attach gate, which
@@ -54,8 +65,6 @@ allowlisted() { # $1 = absolute-ish path; exit 0 = skip linting
     # notes, plan docs. These are internal or later-gated; never block them.
     /tmp/agent-*|/private/tmp/agent-*|/tmp/plan-*|/private/tmp/plan-*) return 0 ;;
   esac
-  b=$(basename "$p")
-  case "$b" in raw-*|data-*|*fixture*) return 0 ;; esac
   return 1
 }
 
@@ -67,6 +76,18 @@ case "$TOOL" in
     allowlisted "$TARGET" && exit 0
     TEXT=$(printf '%s' "$INPUT" | jq -r '.tool_input.content // empty' 2>/dev/null || true)
     MODE=""
+    # Skill-read gate (see header). Only full Writes: an Edit or heredoc
+    # fragment presupposes a document already written under the gate.
+    if [ -n "${AGENT_TASK_GID:-}" ] && [ -f "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh" ]; then
+      . "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh"
+      if [ -n "$(skill_read_missing no-slop)" ]; then
+        {
+          echo "BLOCKED: $TARGET is outward prose and the no-slop contract has not entered this session's context yet. The full skill is below; it now counts as read. Rewrite the file against it, then retry the Write (the retry is linted)."
+          skill_read_deliver no-slop
+        } >&2
+        exit 2
+      fi
+    fi
     ;;
   Edit)
     TARGET=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)

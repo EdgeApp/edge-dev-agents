@@ -10,6 +10,9 @@
 #   forward-reference    sentences that only preview/announce/grade the prose
 #   validation-preamble  stance-validation openers ("good question", "you're right")
 #   aphorism-formula     an ordinary claim dressed as a maxim (SKILL rule 17)
+#   uniform-connector-cadence  a run of adjacent "X, so Y"/"X, and Y" compound
+#                        sentences sharing one shape (SKILL rule 20); nominated
+#                        per WINDOW of consecutive sentences, not per sentence
 #
 # Why a judge: "Happy to re-review once the token bridge lands" and "happy path
 # returns the cached token" share every token a regex can see; only reading
@@ -54,7 +57,7 @@ const NETS = [
   // Numeric preview of the structure that follows ("Three things need...",
   // "four items below"). The prose form of "Three things:" reads as content, so
   // the mechanical tier misses it; the judge decides whether it announces.
-  [/\b(two|three|four|five|six|seven|eight|nine|ten|\d+) (things|items|points|questions|reasons|takeaways|asks)\b/i, "structure-announcement"],
+  [/\b(two|three|four|five|six|seven|eight|nine|ten|\d+) (?:[a-z]+ ){0,2}(things|items|points|questions|reasons|takeaways|asks|notes|observations)\b/i, "structure-announcement"],
   [/^(good|great|excellent|fair|solid|nice) (question|point|catch|call)\b|\byou\x27re (absolutely |quite )?right\b|\bvalid (point|concern)\b/i, "validation-preamble"],
   [/\b(boils down to|comes down to|the difference between|the whole point|becomes a trap|think of it as|where the rubber|is the [a-z]+ of (?:the|a|all)\b)/i, "aphorism-formula"],
 ]
@@ -63,6 +66,7 @@ const hash = s => crypto.createHash("sha256").update(s.replace(/\s+/g, " ").trim
 
 // Collect candidates: per non-fence, non-heading, non-table line, per sentence.
 const candidates = []  // {line, sentence, hint}
+const prose = []       // ordered sentence stream for window-level rules
 let fence = false
 fs.readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
   if (/^\s*```/.test(raw)) { fence = !fence; return }
@@ -71,11 +75,31 @@ fs.readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
   for (const s of line.split(/(?<=[.:!?])\s+/)) {
     const t = s.trim()
     if (t.length < 8) continue
+    prose.push({ line: i + 1, sentence: t })
     for (const [re, hint] of NETS) {
       if (re.test(t)) { candidates.push({ line: i + 1, sentence: t, hint }); break }
     }
   }
 })
+
+// Window-level net (SKILL rule 20): 3+ CONSECUTIVE sentences each carrying a
+// mid-sentence ", so/and/but " join nominate as ONE candidate — the whole run,
+// joined with " | ". The net is wide (list commas match too); the judge owns
+// precision, same as the per-sentence nets.
+const COMPOUND = /,\s+(so|and|but)\s+\S/i
+for (let i = 0; i < prose.length; ) {
+  let j = i
+  while (j < prose.length && COMPOUND.test(prose[j].sentence)) j++
+  if (j - i >= 3) {
+    const run = prose.slice(i, j)
+    candidates.push({
+      line: run[0].line,
+      sentence: run.map(p => p.sentence.replace(/\n/g, " ")).join(" | "),
+      hint: "uniform-connector-cadence"
+    })
+  }
+  i = Math.max(j, i + 1)
+}
 const diag = m => { try { fs.writeSync(2, "no-slop-judge: " + m + "\n") } catch {} }
 if (!candidates.length) { diag("0 candidates nominated"); process.exit(0) }
 
@@ -96,17 +120,18 @@ for (const c of candidates) {
 if (toJudge.length) {
   const cap = toJudge.slice(0, 40)  // bound the batch; the rest judges next run
   const prompt = [
-    "You judge sentences from technical prose against three rules. Answer with JSON ONLY, no prose.",
+    "You judge sentences from technical prose against the rules below. Answer with JSON ONLY, no prose.",
     "",
     "Rule courtesy-ender: a content-free courtesy or OPEN-ENDED offer, typically closing a message: \"Happy to re-review once X lands\", \"Let me know if you have questions\", \"Hope this helps\", \"Feel free to reach out\". DIRECTION IS THE TEST: the violation is something the WRITER offers or an open invitation to be contacted, carrying no information. A REQUEST TO THE RECIPIENT is never this rule, however politely softened: \"Still waiting on that square PNG logo, whenever someone has a moment\" and \"the signed copy when you get a chance, no rush\" both name an outstanding deliverable, so they carry information and are clean. NOT a violation either when the phrase does technical work (\"the happy path returns the cached token\", \"clients are free to retry\") or requests a SPECIFIC needed decision or input (\"Let me know which of the two schemas you pick, since the migration differs\" asks for a concrete choice the work depends on; \"let me know if you have questions\" asks for nothing).",
     "Rule forward-reference: a sentence whose only job is to preview, announce, or grade the prose itself: \"Here is what matters:\", \"Worth flagging explicitly:\", \"The key thing is this:\", \"To summarize:\", \"Let me break this down\". NOT a violation when the sentence carries the actual claim alongside: \"Worth noting the cache is already warm, so the retry is free\" still announces, but \"The cache is already warm, so the retry is free\" does not; judge whether removing the announcing clause loses information.",
     "Rule validation-preamble: an opener that grades the reader\x27s stance instead of stating facts: \"Good question\", \"You\x27re right to push on this\", \"Fair point\". NOT a violation when agreement itself is the factual content and is followed by the specifics in the same sentence.",
     "Rule aphorism-formula: an ordinary claim dressed as a maxim instead of stated plainly: \"That is the difference between shipping a claim flow and shipping a warning\", \"It all boils down to trust\", \"Latency becomes a trap\". NOT a violation when the construction carries a real comparison or measurement the reader needs (\"the difference between the two timeouts is 90 seconds\", \"the cost comes down to one extra round trip\"); judge whether a concrete fact would be lost by rewriting it flat.",
+    "Rule uniform-connector-cadence: applies ONLY to entries containing \" | \", which mark a RUN of consecutive sentences from the document. Violation when the run shares one repeated two-clause shape — independent clause, comma, connector (so/and/but), clause — so the passage reads as a drumbeat: \"The cache was cold, so the first load was slow. | The index was stale, so the query scanned. | The pool was small, and the workers queued.\" NOT a violation when a matched comma joins list items rather than clauses (\"a, b, and c\"), when the sentences otherwise vary clearly in shape and length, or when splitting any of the connectors would lose a causal or coordinate link the reader needs. Judge the run as a whole, not each sentence.",
     "",
     "Sentences:",
     ...cap.map((c, i) => (i + 1) + ". " + c.sentence.replace(/\n/g, " ")),
     "",
-    "Output: a JSON array, one entry per sentence number, shape {\"n\": <number>, \"violation\": true|false, \"rule\": \"courtesy-ender\"|\"forward-reference\"|\"validation-preamble\"|\"aphorism-formula\"|\"none\"}."
+    "Output: a JSON array, one entry per sentence number, shape {\"n\": <number>, \"violation\": true|false, \"rule\": \"courtesy-ender\"|\"forward-reference\"|\"validation-preamble\"|\"aphorism-formula\"|\"uniform-connector-cadence\"|\"none\"}."
   ].join("\n")
 
   let verdicts = null, failure = null

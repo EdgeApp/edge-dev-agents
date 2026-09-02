@@ -74,14 +74,24 @@ const FRAGMENT = fragment === "1"
 // regex cannot tell apart — corpus dry-run flagged 10 legit uses of "key"
 // alone. These stay prose-judgment / v2-judge territory.
 const AMBIGUOUS = new Set(["key", "harness", "underscore", "robust", "ecosystem", "landscape", "word"])
+// Each entry becomes one word-boundary regex whose inner joins accept a space,
+// a hyphen, or nothing, so "long-tail", "long tail" and "longtail" are one
+// entry; a possessive or a bracket after the word is a boundary too. Entries
+// that fold to the same regex are kept once so a hit reports once.
 const vocab = []
+const seen = new Set()
 try {
   for (const line of fs.readFileSync(vocabFile, "utf8").split("\n")) {
     const m = line.match(/^\|\s*([^|]+?)\s*\|/)
     if (!m || /^-+$|^Banned$/.test(m[1].trim())) continue
     for (let w of m[1].split("/")) {
       w = w.replace(/\(.*?\)/g, "").trim().toLowerCase()
-      if (w.length > 2 && !AMBIGUOUS.has(w)) vocab.push(w)
+      if (w.length <= 2 || AMBIGUOUS.has(w)) continue
+      const parts = w.split(/[\s-]+/).filter(Boolean)
+      const src = "\\b" + parts.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[ -]?") + "\\b"
+      if (seen.has(src)) continue
+      seen.add(src)
+      vocab.push({ label: w, re: new RegExp(src) })
     }
   }
 } catch {}
@@ -133,10 +143,14 @@ LINES.forEach((raw, i) => {
   if (/^\s*#|^\s*\||^\s*>/.test(line)) return
   const isListItem = /^\s*(?:[-*]\s+|\d+[.)]\s+)/.test(line)
   line = line.replace(/^\s*(?:[-*]\s+|\d+[.)]\s+)?/, "") // markers stripped, content participates
-  const lower = " " + line.toLowerCase() + " "
-  for (const w of vocab) {
-    if (lower.includes(" " + w + " ") || lower.includes(" " + w + ",") || lower.includes(" " + w + "."))
-      findings.push(["HARD", n, `banned vocabulary: "${w}"`])
+  // Backticked spans are quoted identifiers or verbatim text, not words the
+  // writer chose (SKILL rule 1, input does not license output); blockquotes
+  // were skipped above for the same reason. Em dashes stay checked in every
+  // position: the skill names the character by codepoint, never by glyph.
+  const noCode = line.replace(/`[^`]*`/g, " ")
+  const lower = noCode.toLowerCase()
+  for (const { label, re } of vocab) {
+    if (re.test(lower)) findings.push(["HARD", n, `banned vocabulary: "${label}"`])
   }
   // Claude session links (operator ruling 2026-08-18): never in outward-facing
   // prose (PR bodies, repo docs, reports). Bare session IDs in report
@@ -148,9 +162,9 @@ LINES.forEach((raw, i) => {
   // is a vague mechanism claim — WARN: the litmus is "say what happens and who
   // sees it" (exit code, gate, report section, operator ping).
   const DECOR = /\b(?:warn(?:s|ing)?|log(?:s|ging)?|print(?:s|ing)?|announc\w+)\s+loudly\b|\bloudly\s+(?:warn|log|print|announce)/i
-  if (DECOR.test(line))
+  if (DECOR.test(noCode))
     findings.push(["HARD", n, `decorative "loudly" (the output is already the loud part): delete it or name the mechanism`])
-  else if (/\bloud(?:ly)?\b/i.test(line))
+  else if (/\bloud(?:ly)?\b/i.test(noCode))
     findings.push(["WARN", n, `vague loudness claim: name the mechanism and audience (exit code / gate / report section / ping)`])
   if (FRAGMENT) return  // sentence-shape checks need the whole document
   // Continuation lines carry no paragraph of their own; their text was folded
@@ -176,6 +190,9 @@ LINES.forEach((raw, i) => {
     if (TIME.test(rest.trim())) continue                   // "Two days later ..."
     const toks = rest.trim().replace(/[.:]$/, "").split(/\s+/).filter(Boolean)
     const hasVerb = toks.some(t => VERBS.has(t.toLowerCase().replace(/[,;]$/, "")))
+    // The counted noun may sit behind up to two filler adjectives ("Two small
+    // asks ...", "Three quick separate points ..."); shape 4 keys on the noun.
+    const countedNounAt = toks.slice(0, 3).findIndex(t => COUNTNOUN.test(t))
     // Shape 4 only: the "bound to a real verb" exemption means the COUNTED NOUN
     // governs a verb ("Two options remain: ..."), not that a verb homograph sits
     // anywhere in a trailing qualifier. In "One blocker before we scope the
@@ -189,7 +206,7 @@ LINES.forEach((raw, i) => {
     // Shape 4: counted padding header whose colon does NOT end the line
     // ("Two defects compound: the engine ..."). Restricted to generic
     // counter nouns so the legitimate label-colon idiom stays exempt.
-    else if (/:$/.test(s.trim()) && !/:\s*$/.test(line) && COUNTNOUN.test(rest.trim()) && toks.length <= 8 && !headVerb)
+    else if (/:$/.test(s.trim()) && !/:\s*$/.test(line) && countedNounAt >= 0 && toks.length <= 8 && !headVerb)
       findings.push(["HARD", n, `counted padding header (mid-line): "${s.trim().slice(0, 60)}"`])
     // Shape 2 applies to PROSE sentences only: a bare-NP BULLET ("- One
     // EdgeCurrencyWallet implementation.") is normal list style.

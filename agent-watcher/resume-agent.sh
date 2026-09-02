@@ -577,6 +577,16 @@ if $CHAT; then
       tmux kill-session -t "$TMUX_NAME" 2>/dev/null || true
       exit 1
     fi
+    # Claude Code >= 2.1.25x refuses to --resume a transcript that its daemon
+    # already holds as a background session (desktop app / `claude attach`
+    # model). The refusal lands on the shell prompt, so without this check the
+    # spawn "succeeds" with an empty pane (main anchor, 2026-09-01).
+    if printf '%s' "$pane" | grep -q "is running as a background session"; then
+      SHORT=$(printf '%s' "$LATEST_UUID" | cut -c1-8)
+      echo ">> resume-agent: $LATEST_UUID is held by the claude daemon as a background session; run 'claude stop $SHORT' first (or 'claude attach $SHORT' to use it there), then retry" >&2
+      tmux kill-session -t "$TMUX_NAME" 2>/dev/null || true
+      exit 1
+    fi
     if printf '%s' "$pane" | grep -q "Resume from summary"; then
       # Menu order: 1. Resume from summary (highlighted)  2. Resume full session as-is.
       # Chat defaults to FULL (a summary resume compresses away the drafts/details a

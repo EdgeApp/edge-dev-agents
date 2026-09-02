@@ -204,6 +204,14 @@ if [[ "$MODE" == "autosquash" && "$IS_OWNER" == "true" ]]; then
     emit_json "{action: '$(prefix_action autosquash)', mode: '$MODE', reason: 'no active reviewer'}"
     exit 0
   fi
+  # Same check git-history-gate.sh applies to a raw push: a non-fixup commit
+  # that rewrites lines already on the remote branch must be folded before the
+  # push (git-branch-ops.sh self-rewrite owns the rule and the remediation).
+  # Runs BEFORE the autosquash so fixup! commits, the compliant shape, are still
+  # distinguishable from standalone rewrites.
+  if ! "$GIT_BRANCH_OPS_SH" self-rewrite --gate >/dev/null; then
+    exit 1
+  fi
   run_autosquash_and_push
   exit 0
 fi

@@ -134,7 +134,7 @@ if [[ -n "$SESSION_ID" ]]; then
     # grep -c prints "0" AND exits 1 on no match, so `|| echo 0` double-printed
     # "0\n0" and blew up the [[ -ge ]] below. `|| true` keeps set -e safe; the
     # :-0 default covers an unreadable file (grep prints nothing).
-    TR_COMPACTS=$(grep -c '"subtype":"compact_boundary"' "$TR" 2>/dev/null || true)
+    TR_COMPACTS=$(jq -R 'fromjson? | select(.type == "system" and .subtype == "compact_boundary") | .uuid' "$TR" 2>/dev/null | sort -u | wc -l | tr -d ' ' || true)
     TR_COMPACTS=${TR_COMPACTS:-0}
     if [[ "$TR_BYTES" -ge "$FRESH_MIN_BYTES" || "$TR_COMPACTS" -ge "$FRESH_MIN_COMPACTIONS" ]]; then
       FRESH_SPAWN=true

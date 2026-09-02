@@ -3,13 +3,17 @@ name: no-slop
 description: Avoid AI writing patterns when producing prose. Use when writing articles, blog posts, documentation, emails, proposals, reports, README content, PR descriptions, release notes, or any long-form text. Activates for drafting, composing, or writing tasks.
 ---
 
-# no-slop — Anti-AI-Detection Rules
+# no-slop: anti-AI-detection rules
 
 When writing any prose (articles, docs, emails, reports, descriptions, proposals), follow every rule below. These patterns are documented tells of AI-generated text. Violating even a few destroys credibility.
 
 ## 1. Banned vocabulary
 
 Do NOT use any word or phrase listed in [banned-vocabulary.md](banned-vocabulary.md). If you catch yourself reaching for one, use a plain, specific alternative or restructure the sentence.
+
+- **Code is in scope.** The list applies to committed code as well as prose: comments, doc strings, identifiers, and string literals. A constant named for a banned word carries it into every file that imports it. (Rule 15's courtesy-ender scope stays prose-only.)
+- **Input does not license output.** Words come from this list, not from the text you are answering. A banned term in any input (a message, a review, a document, a spec, a codebase, a prior report) does not permit it in your output. Quote verbatim when you need the original words, in a blockquote, then restate the point in plain terms in your own sentence. The lint exempts blockquotes and backticked spans; inline quotation marks are linted as your own prose.
+- **When the list grows.** A new row applies to work in flight: clean existing uses on open branches in the next address round, as a fixup. Merged code is cleaned when the file is next touched, not in a dedicated sweep.
 
 ## 2. Use simple copulas
 
@@ -18,15 +22,15 @@ Use "is," "are," "was," "has," "had." Do not substitute with:
 - "boasts," "features," "offers"
 - "ventured into" instead of "tried" or "ran for"
 
-Bad: "The library serves as a foundational component in the ecosystem."
-Good: "The library is the base of the stack."
+> Bad: "The library serves as a foundational component in the ecosystem."
+> Good: "The library is the base of the stack."
 
 ## 3. No promotional tone
 
 Write like a journalist or engineer, not a marketer. Never hype. State facts and let them speak.
 
-Bad: "This groundbreaking framework revolutionizes how developers build APIs."
-Good: "This framework generates API clients from OpenAPI specs."
+> Bad: "This groundbreaking framework revolutionizes how developers build APIs."
+> Good: "This framework generates API clients from OpenAPI specs."
 
 ## 4. No vague attributions
 
@@ -40,10 +44,10 @@ Never write "experts say," "industry reports suggest," "observers note," "some c
 
 ## 6. No present-participle chains
 
-Do not string together "-ing" words as filler commentary: "highlighting," "emphasizing," "contributing to," "reflecting," "showcasing," "cultivating." These add no information. Replace with concrete verbs or cut entirely.
+Do not string together "-ing" words as filler commentary: `highlighting`, `emphasizing`, `contributing to`, `reflecting`, `showcasing`, `cultivating`. These add no information. Replace with concrete verbs or cut entirely.
 
-Bad: "The update introduces new caching, improving performance while highlighting the team's commitment to speed."
-Good: "The update adds caching. Page loads dropped from 3s to 800ms."
+> Bad: "The update introduces new caching, improving performance while highlighting the team's commitment to speed."
+> Good: "The update adds caching. Page loads dropped from 3s to 800ms."
 
 ## 7. No elegant variation
 
@@ -51,15 +55,15 @@ Do not swap synonyms for the same thing across sentences to avoid repetition. If
 
 ## 8. No overstating significance
 
-Do not call things pivotal, transformative, revolutionary, or groundbreaking. Do not say something "marks a turning point" or "leaves an indelible mark." If it's important, show why with evidence — don't announce it.
+Do not call things `pivotal`, `transformative`, `revolutionary`, or `groundbreaking`. Do not say something `marks a turning point` or `leaves an indelible mark`. If it's important, show why with evidence; don't announce it.
 
 ## 9. No em dashes
 
-Do not use em dashes (`—`, U+2014). Use a comma, colon, semicolon, parentheses, or two sentences instead. Zero is the rule for every destination this skill governs (external prose and chat responses). Hyphens (`-`) and en-dashes (`–`) are fine. AI text is riddled with em dashes.
+Do not use em dashes (U+2014). Use a comma, colon, semicolon, parentheses, or two sentences instead. Zero is the rule for every destination this skill governs (external prose and chat responses). Hyphens (`-`) and en-dashes (`–`) are fine. AI text is riddled with em dashes.
 
 ## 10. No collaborative language
 
-Never write "let's explore," "let us delve into," "we will examine," "as we can see." Write directly. The reader is reading, not exploring with you.
+Never write `let's explore`, `let us delve into`, `we will examine`, `as we can see`. Write directly. The reader is reading, not exploring with you.
 
 ## 11. No knowledge-cutoff disclaimers
 
@@ -68,7 +72,7 @@ Never apologize for gaps, say "as of my last update," or speculate about missing
 ## 12. Formatting restraint
 
 Restraint applies to DECORATION, not organization. Bullets, tables, and blank
-lines are encouraged wherever they carry structure a paragraph would bury — a
+lines are encouraged wherever they carry structure a paragraph would bury: a
 run-on prose wall is its own failure, not a virtue. Bold lead-in list items
 ("- **Cache path:** …") are legitimate organization, PROVIDED the content after
 the colon says something the lead-in doesn't (a lead-in whose sentence merely
@@ -93,8 +97,8 @@ literally.
 - Be specific over general. Numbers over adjectives. Evidence over claims.
 - It's OK to be blunt, dry, or even terse. Humans are.
 - American English spellings (behavior, honored, initialize, randomization).
-  British forms creep in when quoting partners who use them; a verbatim quote
-  keeps its original spelling, but your own prose around it does not inherit it.
+  A verbatim quote keeps its original spelling; your own prose around it does
+  not inherit it (rule 1, input does not license output).
 
 ## 14. State findings, don't grade or announce them
 
@@ -110,14 +114,14 @@ A sentence must carry a claim, not an evaluation or preview of the claim you're 
 
 Certainty belongs inside the claim, marked tersely: "Unverified: X." / "By the published terms, X." A hedge that changes what the reader should do is information; a sentence that grades your own prose is not.
 
-Leading with a real answer is still required (see writing-style). The verdict sentence must carry the verdict's substance — "Your fleet is unaffected: it runs interactive sessions, which the change excludes" — not just its polarity ("it's good news").
+Leading with a real answer is still required (see writing-style). The verdict sentence must carry the verdict's substance ("Your fleet is unaffected: it runs interactive sessions, which the change excludes"), not just its polarity ("it's good news").
 
-Bad: "The support article is clear, and it's the opposite of a penalty. On June 15, usage moves to a separate credit."
-Good: "On June 15, Agent SDK and -p usage moves to a separate monthly credit and stops counting against plan limits."
+> Bad: "The support article is clear, and it's the opposite of a penalty. On June 15, usage moves to a separate credit."
+> Good: "On June 15, Agent SDK and -p usage moves to a separate monthly credit and stops counting against plan limits."
 
 ## 15. No courtesy enders in external communications
 
-Scope: the external destinations defined in `~/.cursor/rules/writing-style.mdc` (its em-dash-free list — PR titles/descriptions/comments, commit messages, changelogs, release notes, Asana tasks/comments, agent run reports, review/issue comments, docs, emails, proposals). Do not close with an offer or pleasantry that carries no information:
+Scope: the external destinations defined in `~/.cursor/rules/writing-style.mdc` (its em-dash-free list: PR titles/descriptions/comments, commit messages, changelogs, release notes, Asana tasks/comments, agent run reports, review/issue comments, docs, emails, proposals). Do not close with an offer or pleasantry that carries no information:
 
 - "We can file these as issues with repro steps if that helps tracking."
 - "Happy to split this out / adjust / help however we can."
@@ -128,16 +132,16 @@ The recipient knows they can reply. End on the last substantive sentence. If a f
 
 ## 16. Copy-paste drafts go in a plaintext block
 
-When the user asks for a draft they will copy somewhere (a PR comment, an email, an issue reply, an Asana comment), deliver the draft inside a fenced plaintext block containing exactly the text to paste — nothing else in the block, no chat commentary mixed in. The block's content is formatted for its destination, not for chat: if the destination renders markdown poorly or at all unknown, keep the draft bare (numbered lists and blank lines only). Commentary about the draft goes outside the block.
+When the user asks for a draft they will copy somewhere (a PR comment, an email, an issue reply, an Asana comment), deliver the draft inside a fenced plaintext block containing exactly the text to paste, with nothing else in the block. The block's content is formatted for its destination, not for chat: if the destination renders markdown poorly or at all unknown, keep the draft bare (numbered lists and blank lines only). Commentary about the draft goes outside the block.
 
 ## 17. No fake profundity
 
-Four moves that dress an ordinary point as a deep one — say the point plainly instead:
+Four moves dress an ordinary point as a deep one; say the point plainly instead:
 
-- Authority tropes: "the real question is", "at its core", "what really matters", "the heart of the matter". The sentence after them restates a normal claim with ceremony.
-- Aphorism formulas: "X is the Y of Z", "X becomes a trap", "the currency/architecture/language of". Replace with the concrete claim the formula gestures at.
-- Manufactured staccato: stacking clipped fragments for drama ("No aesthetic prior. No nostalgia. The old rules were gone."). One short sentence for emphasis is fine; a run of them is engineered.
-- Fake-candid openers: "Honestly?", "Here's the thing", "Let's be honest" as a theatrical pause before a routine answer. A person being honest just says the thing.
+- Authority tropes: `the real question is`, `at its core`, `what really matters`, `the heart of the matter`. The sentence after them restates a normal claim with ceremony.
+- Aphorism formulas: `X is the Y of Z`, `X becomes a trap`, `the currency/architecture/language of`. Replace with the concrete claim the formula gestures at.
+- Manufactured staccato: stacking clipped fragments for drama (`No aesthetic prior. No nostalgia. The old rules were gone.`). One short sentence for emphasis is fine; a run of them is engineered.
+- Fake-candid openers: `Honestly?`, `Here's the thing`, `Let's be honest` as a theatrical pause before a routine answer. A person being honest just says the thing.
 
 ## 18. Describe the thing, not the change
 
@@ -145,17 +149,26 @@ Docs, code comments, and descriptions state what IS, not what changed: "Uses a h
 
 ## 19. Small patterns
 
-- False ranges: "from X to Y" where X and Y aren't on a real scale — list the items instead.
-- Fragmented headers: a heading followed by a one-liner that restates the heading ("## Performance / Speed matters.") — cut the warm-up line.
-- Tailing-negation fragments: "…, no guessing" / "…, no wasted motion" tacked on — write the real clause or drop it.
-- Filler phrases: "in order to" → "to", "at this point in time" → "now", "due to the fact that" → "because", "has the ability to" → "can", "it is important to note that" → (delete).
-- Hedge stacks: "could potentially possibly" → one hedge, chosen deliberately (a hedge the reader acts on is information; a stack is noise).
-- Generic upbeat conclusions: "exciting times ahead", "a major step in the right direction" — cut, end on the last concrete fact (rule 14's closer discipline).
+- False ranges: "from X to Y" where X and Y aren't on a real scale; list the items instead.
+- Fragmented headers: a heading followed by a one-liner that restates the heading ("## Performance / Speed matters."); cut the warm-up line.
+- Tailing-negation fragments: "…, no guessing" / "…, no wasted motion" tacked on; write the real clause or drop it.
+- Filler phrases: `in order to` → `to`, `at this point in time` → `now`, `due to the fact that` → `because`, `has the ability to` → `can`, `it is important to note that` → (delete).
+- Hedge stacks: `could potentially possibly` → one hedge, chosen deliberately (a hedge the reader acts on is information; a stack is noise).
+- Generic upbeat conclusions: `exciting times ahead`, `a major step in the right direction`; cut them and end on the last concrete fact (rule 14's closer discipline).
 
-## 17. Name the mechanism, not the volume
+## 20. Vary sentence shape: no uniform connector cadence
 
-When a claim is about failure visibility or error handling, state what happens and who sees it: an exit code, a blocking gate, a report section, an operator ping. "Fails loudly", "surfaces loudly", "loud warning" are vague; "warn loudly"/"log loudly" are pure filler (the output already is the loudness). Litmus: delete the loudness word; if the sentence means the same, it was filler; if it stops distinguishing crash-and-report from continue-silently, replace it with the actual mechanism. Keep loud/loudly only when the same sentence names the silent alternative it contrasts with.
+"X, so Y" and "X, and Y" are fine sentences; a RUN of them is a tell. AI prose collapses toward one safe explanatory frame (claim, connector, justification), so adjacent sentences come out the same length with the connector in the same place. Each instance passes every other rule; the violation is set-level uniformity. Tests:
+
+- **Connector deletion**: replace ", so" with a period. If both halves stand and the causality is still obvious, the connector was glue: split the sentence. Keep "so" only when the reader would miss the link.
+- **Payload position**: "X, so Y" buries the consequence at the end. When the consequence is the point (warnings, error copy, verdicts), lead with it or give it its own sentence.
+- **Coordinate test for "and"**: clean when the clauses are true parallels ("the wallet pays the provider, and the provider pays the recipient"); slop when "and" welds unrelated claims together to dodge a second sentence.
+- **Set-level variance**: one two-clause compound per paragraph is English; three in adjacent sentences is cadence, even when each survives the other tests. Break the run with a bare statement, a reason-first sentence, or a two-sentence pair.
+
+## 21. Name the mechanism, not the volume
+
+When a claim is about failure visibility or error handling, state what happens and who sees it: an exit code, a blocking gate, a report section, an operator ping. `Fails loudly`, `surfaces loudly`, `loud warning` are vague; `warn loudly` and `log loudly` are pure filler (the output already is the loudness). Litmus: delete the loudness word; if the sentence means the same, it was filler; if it stops distinguishing crash-and-report from continue-silently, replace it with the actual mechanism. Keep loud/loudly only when the same sentence names the silent alternative it contrasts with.
 
 ## Examples
 
-For concrete before/after examples showing these rules applied, see [examples/bad-examples.md](examples/bad-examples.md) and [examples/good-examples.md](examples/good-examples.md).
+For concrete before/after examples showing these rules applied, see [examples/bad-examples-fixture.md](examples/bad-examples-fixture.md) (a deliberate-slop corpus, exempt from the write-time lint by its fixture name) and [examples/good-examples.md](examples/good-examples.md).

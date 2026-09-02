@@ -8,7 +8,7 @@ These words and phrases are statistically overrepresented in AI-generated text. 
 |---|---|
 | additionally | also, and, (or just start the next sentence) |
 | delve / delve into | look at, examine, dig into |
-| tapestry | (drop it — almost never needed) |
+| tapestry | (drop it; almost never needed) |
 | pivotal | important, key (sparingly) |
 | vibrant | (be specific: busy, loud, colorful, active) |
 | meticulous / meticulously | careful, thorough |
@@ -27,7 +27,7 @@ These words and phrases are statistically overrepresented in AI-generated text. 
 | enduring | lasting, long-running |
 | crucial | important, critical, necessary |
 | enhance / enhancing | improve, boost |
-| highlighting | (cut it — rewrite without) |
+| highlighting | (cut it; rewrite without) |
 | renowned | well-known, famous |
 | groundbreaking | new, novel, first |
 | profound | deep, major, significant |
@@ -47,51 +47,52 @@ These words and phrases are statistically overrepresented in AI-generated text. 
 | synergy | (drop it) |
 | paradigm | model, approach, pattern |
 | ecosystem (metaphorical) | system, community, market |
+| long-tail / long tail / longer tail | name the boundary ("every asset outside the stable and major tiers", "tokens outside the top 50 by volume"), or the plain adjective: low-volume, rarely traded, obscure |
 
 ## Banned Phrases
 
-- "marks a pivotal moment"
-- "represents a significant shift"
-- "indelible mark"
-- "deeply rooted"
-- "rich history"
-- "natural beauty"
-- "nestled in"
-- "boasts a"
-- "serves as a"
-- "stands as a"
-- "not just X, but Y" / "not only X, but also Y"
-- "it's not... it's..."
-- "despite its [positive], [subject] faces challenges"
-- "let's explore"
-- "let us delve into"
-- "in today's [landscape/world/era]"
-- "at the heart of"
-- "it is worth noting"
-- "a testament to"
-- "paving the way"
-- "plays a crucial role"
-- "in an era where"
-- "the intersection of"
-- "a beacon of"
-- "sends a strong message"
-- "it remains to be seen"
-- "Summary, in three parts" (and any "in N parts" structure announcement)
-- "let me break this down"
-- "here's what matters" / "here's the key" / "the key thing is"
-- "here's the [adjective] [noun]:" as a forward reference ("here's the precise failure:")
-- "good question" / "fair point" / "your concern is fair" as openers
-- "you're right to push"
-- "is clear, and" (evidence-grading preamble)
-- "cheapest/easiest/most important item on the list" (per-item self-grading; state order in the list header instead)
-- "happy to help / happy to adjust / happy to split this out" as a closer
-- "let me know if you have any questions"
-- "hope this helps"
-- "feel free to"
-- "if that helps tracking" (and similar no-op closing offers)
-- "say the word" / "just say the word"
-- "let me know if you'd like" / "let me know if you want"
-- "if you want, I can" as a closer (state the open decision and its default instead)
+- `marks a pivotal moment`
+- `represents a significant shift`
+- `indelible mark`
+- `deeply rooted`
+- `rich history`
+- `natural beauty`
+- `nestled in`
+- `boasts a`
+- `serves as a`
+- `stands as a`
+- `not just X, but Y` / `not only X, but also Y`
+- `it's not... it's...`
+- `despite its [positive], [subject] faces challenges`
+- `let's explore`
+- `let us delve into`
+- `in today's [landscape/world/era]`
+- `at the heart of`
+- `it is worth noting`
+- `a testament to`
+- `paving the way`
+- `plays a crucial role`
+- `in an era where`
+- `the intersection of`
+- `a beacon of`
+- `sends a strong message`
+- `it remains to be seen`
+- `Summary, in three parts` (and any `in N parts` structure announcement)
+- `let me break this down`
+- `here's what matters` / `here's the key` / `the key thing is`
+- `here's the [adjective] [noun]:` as a forward reference (`here's the precise failure:`)
+- `good question` / `fair point` / `your concern is fair` as openers
+- `you're right to push`
+- `is clear, and` (evidence-grading preamble)
+- `cheapest/easiest/most important item on the list` (per-item self-grading; state order in the list header instead)
+- `happy to help / happy to adjust / happy to split this out` as a closer
+- `let me know if you have any questions`
+- `hope this helps`
+- `feel free to`
+- `if that helps tracking` (and similar no-op closing offers)
+- `say the word` / `just say the word`
+- `let me know if you'd like` / `let me know if you want`
+- `if you want, I can` as a closer (state the open decision and its default instead)
 
 ## Conditional Bans
 

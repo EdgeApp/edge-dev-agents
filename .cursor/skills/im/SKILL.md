@@ -97,7 +97,7 @@ This ensures the subsequent feature commit introduces zero pre-existing lint fin
    ~/.cursor/skills/lint-commit.sh -m "commit message" [files...]
    ```
    You can optionally pass specific files to scope the commit.
-5. **Fixup commits**: When a change logically amends an earlier commit on the branch (e.g. fixing a typo from commit A, adding a missed import for commit B, adjusting behavior introduced in a prior commit), use a fixup commit instead of a standalone commit:
+5. **Fixup commits**: When a change logically amends an earlier commit on the branch (e.g. fixing a typo from commit A, adding a missed import for commit B, adjusting behavior introduced in a prior commit), use a fixup commit instead of a standalone commit. This holds for FOLLOWUP scope on a branch with an open PR: an operator ask that reshapes a surface an earlier branch commit introduced is a fixup of that commit, however the ask was worded; only a change that adds a new surface without rewriting the branch's own lines is a standalone commit. The test is mechanical (`~/.cursor/skills/git-branch-ops.sh self-rewrite` lists commits whose removed lines came from published branch commits, with their fold targets) and the push gate rejects what it flags:
    ```bash
    ~/.cursor/skills/lint-commit.sh --fixup <hash> [files...]
    ```
@@ -137,9 +137,9 @@ Other repos only have `## Unreleased` — no staging distinction.
 <step id="4" name="History cleanup">
 **Always run this step** — do not skip it and do not ask for permission. Review the branch history against the `clean-history` rule and automatically fix any issues found.
 
-1. **Check for an open PR**: Run `gh pr view --json url,reviews 2>/dev/null || echo '{}'` to determine if a PR exists and whether it has human review comments. Treat `{}` as the normal "no PR exists" case, not a failure.
-2. **If a PR exists with human review comments**, skip cleanup — rewriting history would lose review context. Note the pending cleanup in the retrospective.
-3. **Otherwise (no PR, or PR with no human reviews)**, always perform ALL applicable cleanup automatically:
+1. **Ask the review-mode oracle, never the review list**: Run `gh pr view --json number,headRepositoryOwner,headRepository 2>/dev/null || echo '{}'`; `{}` is the normal "no PR exists" case. With a PR, run `~/.cursor/skills/pr-address/scripts/pr-address.sh review-mode --owner <o> --repo <r> --pr <n>` and read `.mode`. The oracle is the only definition of "a human has reviewed": reviewer bots and your own replies posted under the operator's login are NOT human review, and a review list read by eye counts them as one.
+2. **If `.mode` is `preserve`**, skip cleanup — rewriting history would lose review context. Note the pending cleanup in the retrospective.
+3. **Otherwise (no PR, or `.mode` is `autosquash`)**, always perform ALL applicable cleanup automatically:
    - **Fixup commits exist**: Autosquash with `~/.cursor/skills/git-branch-ops.sh autosquash --base <base-branch>`. Do this immediately — never leave fixup commits unsquashed.
    - **Reorder commits**: Use the companion script to reorder commits to the desired order. Hashes are oldest-to-newest:
      ```bash

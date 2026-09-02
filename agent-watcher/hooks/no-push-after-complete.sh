@@ -42,6 +42,15 @@
 #     Complete, and a blocked run has nothing to push; if it does, it is the same
 #     defect and gets the same block.
 #   - everything outside an orchestrated session (no AGENT_TASK_GID).
+#   - IN-SESSION OPERATOR FOLLOWUPS (2026-08-31): a human prompt within the
+#     last 30 min (stamped by mark-operator-present.sh on UserPromptSubmit;
+#     machine prompts — the /one-shot spawn, watchdog pings — do not stamp)
+#     means someone IS watching, which is the exact condition the block
+#     protects. The push is allowed with a stdout note reminding that the
+#     finalize snapshot is stale (re-watch + refresh the report for task work)
+#     and that the carve-out does NOT extend to app/sim testing: the slot sim
+#     is retired at Complete, so device verification still requires a re-arm
+#     to Pending. A stale or absent stamp blocks as before.
 #
 # Fail-open on API/network errors: Asana being down must not wedge a push.
 # Exit 2 = block (stderr -> model).
@@ -86,6 +95,23 @@ STATUS="$(curl -sS --max-time 10 -H "Authorization: Bearer $TOKEN" \
 
 [ "$STATUS" = "Complete" ] || exit 0
 
+# Operator-present carve-out (see header). Fresh human prompt => allow + note.
+STAMP="/tmp/agent-operator-present-$GID"
+if [ -f "$STAMP" ]; then
+  STAMP_TS=$(stat -f %m "$STAMP" 2>/dev/null || stat -c %Y "$STAMP" 2>/dev/null || echo 0)
+  AGE=$(( $(date +%s) - STAMP_TS ))
+  if [ "$AGE" -ge 0 ] && [ "$AGE" -le 1800 ]; then
+    cat <<EOF
+operator-present carve-out: push allowed past Complete (human prompt ${AGE}s ago).
+The finalize snapshot is now stale: if this push is task work, re-watch the PR
+head (watch-pr.sh) and refresh the run report's Finalize Gate. NOT covered:
+app/sim testing — the slot sim is retired at Complete, so device verification
+requires a re-arm to Pending.
+EOF
+    exit 0
+  fi
+fi
+
 cat >&2 <<EOF
 BLOCKED: task $GID is at agent_status = Complete, so the finalize gate has
 already been evaluated and closed. Pushing now changes the PR head the gate ruled
@@ -104,5 +130,9 @@ If this push is real work, REOPEN the phase rather than working past Complete:
 
 If this push is NOT task work (a test-* cheese branch, an unrelated repo), say so
 in the run report and re-run it after step 1.
+
+(In-session operator followups are exempt: a human prompt in the last 30 min
+stamps /tmp/agent-operator-present-<gid>. This block firing means no fresh
+human prompt exists — do not create the stamp yourself.)
 EOF
 exit 2
