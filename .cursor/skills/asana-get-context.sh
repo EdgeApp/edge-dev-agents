@@ -15,15 +15,19 @@
 #
 # Output (compact, agent-friendly):
 #   TASK_NAME: <name>
-#   TASK_DESCRIPTION: <notes, truncated to 500 chars>
+#   TASK_DESCRIPTION: <notes, full text; over TEXT_CEILING chars it is cut with a
+#                     marker naming the total size and the full-text file>
 #   PRIORITY: <value>
 #   STATUS: <value>
 #   IMPLEMENTOR: <name>
 #   REVIEWER: <name>
-#   COMMENTS: (most recent 5, one per block)
+#   COMMENTS: <count> (ALL comments, oldest first, full text; newest kept inline
+#             when the thread exceeds TEXT_CEILING, older ones elided with a marker
+#             pointing at the full-thread file)
 #   PARENT: <gid> <name>                           [if task has a parent]
 #   SUBTASKS: <count>                              [if any; then per subtask a "<gid> [open|done] <name>" line + an indented "DESC: <notes>" line (eager body, truncated)]
 #   DEPENDENCIES: / DEPENDENTS:                    [if any; same per-line format]
+#   DESCRIPTION_FILE: / COMMENTS_FILE: <path>   [always; full text on disk for grep/Read]
 #   ATTACHMENTS: <count> files
 #   DOWNLOADED: <count> files to <dir>
 #   UNPACKED: <zip> -> <dir> (<count> files)     [if ZIPs present]
@@ -81,6 +85,13 @@ fi
 
 API="https://app.asana.com/api/1.0"
 AUTH="Authorization: Bearer $ASANA_TOKEN"
+DOWNLOAD_DIR="/tmp/asana-task-$TASK_GID"
+mkdir -p "$DOWNLOAD_DIR"
+# Inline text ceiling. Task text is ingested in FULL (a capped description or
+# comment is the top cause of runs planning from a partial spec and hand-rolling
+# raw API fetches to recover the rest). The ceiling only guards against a pasted
+# log dump; the full text is always on disk regardless.
+TEXT_CEILING="${ASANA_TEXT_CEILING:-60000}"
 
 # Fetch task + custom fields + relationship pointers. Parent/dependencies/
 # dependents ride the same call. Pointers are gid + state + name ONLY — this
@@ -95,9 +106,14 @@ data = json.load(sys.stdin)['data']
 print(f\"TASK_NAME: {data['name']}\")
 
 notes = (data.get('notes') or '').strip()
-if len(notes) > 500:
-    notes = notes[:500] + '...'
+ceiling = int('$TEXT_CEILING')
+desc_path = '$DOWNLOAD_DIR/description.txt'
+with open(desc_path, 'w') as fh:
+    fh.write(notes)
+if len(notes) > ceiling:
+    notes = notes[:ceiling] + f\"\\n[TRUNCATED at {ceiling} of {len(notes)} chars; full text: {desc_path}]\"
 print(f\"TASK_DESCRIPTION: {notes or '(empty)'}\")
+print(f\"DESCRIPTION_FILE: {desc_path}\")
 
 FIELDS = {
     '795866930204488': 'PRIORITY',
@@ -151,27 +167,47 @@ if rows:
 "
 fi
 
-# Fetch recent comments (last 5)
+# Comments: ALL of them, oldest first, full text. Newlines inside a comment are
+# kept (continuation lines indented) so bullet lists written by the operator
+# survive. The full thread is always written to COMMENTS_FILE; when the inline
+# thread would exceed TEXT_CEILING the OLDEST comments are elided first, since
+# followup scope lives in the newest ones.
 curl -s "$API/tasks/$TASK_GID/stories?opt_fields=resource_subtype,text,created_by.name,created_at&limit=100" \
   -H "$AUTH" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)['data']
-comments = [s for s in data if s.get('resource_subtype') == 'comment_added'][-5:]
+comments = [s for s in data if s.get('resource_subtype') == 'comment_added']
+ceiling = int('$TEXT_CEILING')
+path = '$DOWNLOAD_DIR/comments.txt'
+def fmt(c):
+    author = (c.get('created_by') or {}).get('name', 'unknown')
+    text = (c.get('text') or '').strip().replace('\\n', '\\n    ')
+    date = c.get('created_at', '')[:10]
+    return f'  [{date}] {author}: {text}'
+blocks = [fmt(c) for c in comments]
+with open(path, 'w') as fh:
+    fh.write('\\n'.join(blocks))
 if not comments:
     print('COMMENTS: (none)')
 else:
-    print('COMMENTS:')
-    for c in comments:
-        author = c.get('created_by', {}).get('name', 'unknown')
-        text = (c.get('text') or '').strip().replace('\n', ' ')
-        if len(text) > 200:
-            text = text[:200] + '...'
-        date = c.get('created_at', '')[:10]
-        print(f'  [{date}] {author}: {text}')
+    total = sum(len(b) for b in blocks)
+    keep = blocks
+    omitted = 0
+    if total > ceiling:
+        keep, used = [], 0
+        for b in reversed(blocks):
+            if used + len(b) > ceiling: break
+            keep.insert(0, b); used += len(b)
+        omitted = len(blocks) - len(keep)
+    print(f'COMMENTS: {len(comments)}')
+    if omitted:
+        print(f'  [{omitted} older comment(s), {total - sum(len(b) for b in keep)} chars, elided; full thread: {path}]')
+    for b in keep:
+        print(b)
+print(f'COMMENTS_FILE: {path}')
 "
 
 # Fetch attachments — download all supported types, then post-process
-DOWNLOAD_DIR="/tmp/asana-task-$TASK_GID"
 
 # Ingestion marker, written UNCONDITIONALLY (attachments or not): proof this
 # script ran for the gid. require-plan-before-developing.sh gates the
@@ -179,7 +215,6 @@ DOWNLOAD_DIR="/tmp/asana-task-$TASK_GID"
 # (raw curl with notes-only opt_fields) never sees attachments and never
 # writes this marker (2026-08-24, task 1217796671374968: planned from a
 # one-line notes field while two repro screenshots sat on the task).
-mkdir -p "$DOWNLOAD_DIR"
 date -u +%Y-%m-%dT%H:%M:%SZ > "$DOWNLOAD_DIR/.context-fetched"
 
 # Phase 1: Download all supported attachments

@@ -86,7 +86,16 @@ emit_run() {
     fi
     stories=$(curl -s --max-time 6 -H "Authorization: Bearer $tok" \
       "https://app.asana.com/api/1.0/tasks/$gid/stories?opt_fields=type,created_at,text&limit=100" 2>/dev/null \
-      | jq -r --arg wm "$wm" '[.data[]? | select(.type == "comment" and .created_at > $wm)] | .[-5:][] | "  [\(.created_at)] \(.text | gsub("\n"; " ") | .[0:280])"' 2>/dev/null)
+      | jq -r --arg wm "$wm" --arg gid "$gid" --argjson ceil "${ASANA_TEXT_CEILING:-20000}" '
+          [.data[]? | select(.type == "comment" and .created_at > $wm) | "  [\(.created_at)] \(.text | gsub("\n"; "\n    "))"]
+          | . as $all | (map(length) | add // 0) as $total
+          | if $total <= $ceil then $all[]
+            else ( reduce ($all|reverse)[] as $c ({keep: [], used: 0};
+                     if .used + ($c|length) > $ceil then . else {keep: ([$c] + .keep), used: (.used + ($c|length))} end)
+                 ) as $r
+                 | "  [\(($all|length) - ($r.keep|length)) older comment(s), \($total - $r.used) chars, elided; full text: ~/.config/agent-watcher/check-followup-scope.sh --task-gid \($gid) then /tmp/agent-followup-scope-\($gid).json]",
+                   $r.keep[]
+            end' 2>/dev/null)
     if [[ -n "$stories" ]]; then
       echo "OPERATOR COMMENTS NEWER THAN THE LAST RUN REPORT (undischarged followup scope):"
       echo "$stories"

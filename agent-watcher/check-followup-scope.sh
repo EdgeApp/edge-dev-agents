@@ -222,7 +222,7 @@ jq -n \
   --arg newest_comment_at "$NEWEST_COMMENT_AT" \
   --argjson newer_count "$NEWER_COUNT" \
   --argjson agent_after_wm "$AGENT_AFTER_WM" \
-  --argjson comments "$(echo "$NEWER" | jq '[.[] | {created_at, by: (.created_by.name // "?"), text: (.text // "" | .[0:400])}]')" \
+  --argjson comments "$(echo "$NEWER" | jq '[.[] | {created_at, by: (.created_by.name // "?"), text: (.text // "")}]')" \
   --arg delta_status "$DELTA_STATUS" \
   --arg baseline_ts "$BASELINE_TS" \
   --argjson field_deltas "$FIELD_DELTAS" \
@@ -246,7 +246,7 @@ if [[ "$NEWER_COUNT" -eq 0 ]]; then
   echo ">>   0 comments newer than the watermark — no new comment scope"
 else
   echo ">>   $NEWER_COUNT comment(s) NEWER than the watermark — this is THIS run's scope (followup-scope-is-the-deliverable):"
-  echo "$NEWER" | jq -r '.[] | "     [\(.created_at)] \(.created_by.name // "?"): \(.text // "" | gsub("\\s+"; " ") | .[0:200])"'
+  echo "$NEWER" | jq -r '.[] | "     [\(.created_at)] \(.created_by.name // "?"): \(.text // "" | gsub("\n"; "\n       "))"'
 fi
 if [[ "$AGENT_AFTER_WM" -gt 0 ]]; then
   echo ">>   $AGENT_AFTER_WM AGENT-authored comment(s) postdate the report attachment — the watermark is not last, so these are invisible to the next run's scope check. Re-attach the report (same file: its iteration ordinal stays stable) so the watermark lands last; Complete is gate-blocked until a re-check records zero."

@@ -79,8 +79,14 @@ PASSES = [
 NOT_COMPLETE = [c for _, c in BLOCKS]
 
 
+STAMP = '/tmp/agent-operator-present-1111111111'
+
+
 def main():
     fails = []
+    # The operator-present stamp must not exist for the baseline sections.
+    if os.path.exists(STAMP):
+        os.remove(STAMP)
     with tempfile.TemporaryDirectory() as tmp:
         make_shim(tmp, 'Complete')
         for name, cmd in BLOCKS:
@@ -95,6 +101,29 @@ def main():
             print(f"{'PASS' if ok else 'FAIL'} passes: {name} (rc={got})")
             if not ok:
                 fails.append(('passes', name, got))
+
+    # Operator-present carve-out: a fresh human-prompt stamp allows the push
+    # past Complete; a stale one (> 30 min) blocks as before.
+    import time
+    with tempfile.TemporaryDirectory() as tmp:
+        make_shim(tmp, 'Complete')
+        try:
+            open(STAMP, 'w').close()
+            got = run('git push origin br', tmp)
+            ok = got == 0
+            print(f"{'PASS' if ok else 'FAIL'} fresh operator stamp allows push (rc={got})")
+            if not ok:
+                fails.append(('stamp-fresh', 'git push', got))
+            old = time.time() - 3600
+            os.utime(STAMP, (old, old))
+            got = run('git push origin br', tmp)
+            ok = got == 2
+            print(f"{'PASS' if ok else 'FAIL'} stale operator stamp blocks push (rc={got})")
+            if not ok:
+                fails.append(('stamp-stale', 'git push', got))
+        finally:
+            if os.path.exists(STAMP):
+                os.remove(STAMP)
 
     with tempfile.TemporaryDirectory() as tmp:
         make_shim(tmp, 'Reviewing')

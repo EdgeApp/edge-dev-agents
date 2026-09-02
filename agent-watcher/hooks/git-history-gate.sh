@@ -16,6 +16,17 @@
 #   pre-review pushes (the amend+watch loop on a draft) resolve to
 #   autosquash/none and stay raw and free.
 #
+#   PUSHES that ADD REWRITES of published branch work are blocked when the
+#   oracle says AUTOSQUASH (no human reviewer yet): a standalone commit whose
+#   removed lines came from commits already on the remote branch is an
+#   amendment of that earlier commit wearing a feature subject (im's
+#   clean-history), the shape followup segments produce when they read new
+#   operator scope as "new work". `git-branch-ops.sh self-rewrite --gate` owns
+#   the detection, the thresholds, the remediation text and the concession
+#   note; pr-finalize-fixups.sh runs the same check before its autosquash so
+#   both push paths agree. Preserve mode skips it (fixups are the model there
+#   and the raw push is blocked anyway).
+#
 #   SQUASHES go through pr-finalize-fixups.sh, whose review-mode oracle
 #   (pr-address.sh review-mode) owns squash-vs-preserve. A raw
 #   `git rebase --autosquash` (or a direct git-branch-ops.sh autosquash, the
@@ -112,6 +123,13 @@ that buys a bot review of a HEAD you already know is incomplete.
 MSG
     fi
     exit 2
+  fi
+  if [ "$MODE" = "autosquash" ] && [ "$NEEDS_MODE" = "push" ]; then
+    SR_ERR=$("$HOME/.cursor/skills/git-branch-ops.sh" self-rewrite --gate 2>&1 >/dev/null) && SR_RC=0 || SR_RC=$?
+    if [ "$SR_RC" -eq 2 ]; then
+      printf '%s\n' "$SR_ERR" >&2
+      exit 2
+    fi
   fi
 fi
 

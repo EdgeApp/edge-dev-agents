@@ -29,6 +29,26 @@ esac
 TEXT=$(printf '%s' "$INPUT" | jq -r '[.tool_input // {} | .. | strings] | join("\n")' 2>/dev/null || true)
 [ -n "$TEXT" ] || exit 0
 
+# Skill-read gate (orch runs only): outbound Slack text is outward prose, so
+# the first send/draft in a segment without the no-slop marker is denied with
+# the full skill body (lib/skill-read-gate.sh); the retry passes this check and
+# is then linted. Same mechanism as lint-md-on-write.sh's Write path.
+if [ -n "${AGENT_TASK_GID:-}" ] && [ -f "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh" ]; then
+  . "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh"
+  if [ -n "$(skill_read_missing no-slop)" ]; then
+    BODY=$(skill_read_deliver no-slop)
+    REASON="Slack text is outward prose and the no-slop contract has not entered this session yet. The full skill is below; it now counts as read. Rewrite the message against it, then retry (the retry is linted)."
+    jq -nc --arg reason "$REASON" --arg body "$BODY" '{
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: ($reason + "\n" + $body)
+      }
+    }'
+    exit 0
+  fi
+fi
+
 # Trailing Xs required: macOS mktemp treats an embedded-X template
 # (name.XXXXXX.md) as a LITERAL filename — concurrent sessions collide.
 TMP=$(mktemp /tmp/slack-prose.XXXXXX) || exit 0

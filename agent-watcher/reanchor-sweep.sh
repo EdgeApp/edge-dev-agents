@@ -93,12 +93,19 @@ for name in $ANCHORS; do
   [[ -n "$uuid" ]] && jsonl=$(ls "$HOME/.claude/projects/"*/"$uuid.jsonl" 2>/dev/null | head -1)
   if [[ -z "$jsonl" ]]; then
     pstart=$(ps -o lstart= -p "$cpid" | xargs -I{} date -j -f '%a %b %d %T %Y' '{}' +%s 2>/dev/null)
-    jsonl=$(find "$HOME/.claude/projects" -name '*.jsonl' -newermt "@${pstart:-0}" 2>/dev/null | xargs ls -t 2>/dev/null | head -1)
+    # Fresh spawn (no --resume): the conversation's transcript was BORN at/after
+    # process start. Filter by birthtime (60s grace), newest mtime wins — a
+    # bare newest-mtime fallback grabs whatever session is writing right now.
+    piso=$(date -r "${pstart:-0}" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || echo '1970-01-01T00:00:00')
+    jsonl=$(find "$HOME/.claude/projects" -name '*.jsonl' -newermt "$piso" 2>/dev/null | while read -r f; do
+        b=$(stat -f %B "$f" 2>/dev/null || echo 0)
+        [[ "$b" -ge $((${pstart:-0} - 60)) ]] && echo "$f"
+      done | xargs ls -t 2>/dev/null | head -1)
   fi
   [[ -n "$jsonl" && -f "$jsonl" ]] || { echo "$name: no transcript resolved"; continue; }
 
   bytes=$(stat -f %z "$jsonl")
-  compacts=$(grep -c '"subtype":"compact_boundary"' "$jsonl" 2>/dev/null || echo 0)
+  compacts=$(jq -R 'fromjson? | select(.type == "system" and .subtype == "compact_boundary") | .uuid' "$jsonl" 2>/dev/null | sort -u | wc -l | tr -d ' '); compacts=${compacts:-0}
   armed=false
   [[ "$compacts" -ge "$MAX_COMPACT" || "$bytes" -ge "$MAX_BYTES" ]] && armed=true
 
@@ -129,15 +136,23 @@ for name in $ANCHORS; do
 
   # 1. Distill: the anchor snapshots its open threads BEFORE anything is killed.
   ledger="$MEMDIR/anchor-$name-open-threads.md"
+  distill_start=$(date +%s)
   tmux send-keys -t "$sess" C-u
-  tmux send-keys -t "$sess" "Reanchor sweep (automated): this session resets shortly. Update your open-threads ledger NOW: write every open thread, pending decision, and in-flight item (with enough context to resume cold) to $ledger, add/refresh its MEMORY.md index line, then reply with exactly REANCHOR-DISTILL-DONE." Enter
+  tmux send-keys -t "$sess" -l "Reanchor sweep (automated): this session resets shortly. Update your open-threads ledger NOW: write every open thread, pending decision, and in-flight item (with enough context to resume cold) to $ledger, add/refresh its MEMORY.md index line, then reply with exactly REANCHOR-DISTILL-[DONE] but without the brackets."
+  sleep 1
+  tmux send-keys -t "$sess" Enter
   ok=false
   for _ in $(seq 1 $((DISTILL_WAIT_S / 10))); do
     sleep 10
     tmux capture-pane -p -t "$sess" 2>/dev/null | grep -q 'REANCHOR-DISTILL-DONE' && { ok=true; break; }
   done
-  if ! $ok || [[ ! -f "$ledger" ]]; then
-    echo "$name: ABORT — distill not confirmed (done=$ok, ledger=$([[ -f "$ledger" ]] && echo yes || echo no)); retry next sweep"
+  ledger_fresh=false
+  if [[ -f "$ledger" ]]; then
+    lmt=$(stat -f %m "$ledger" 2>/dev/null || echo 0)
+    [[ "$lmt" -ge "$distill_start" ]] && ledger_fresh=true
+  fi
+  if ! $ok || ! $ledger_fresh; then
+    echo "$name: ABORT — distill not confirmed (done=$ok, fresh-ledger=$ledger_fresh); retry next sweep"
     continue
   fi
 
@@ -156,7 +171,9 @@ for name in $ANCHORS; do
     sleep 2
     tmux capture-pane -p -t "$sess" 2>/dev/null | grep -qE '(^|\s)/rc(\s|$)|bypass permissions on|Remote Control' && break
   done
-  tmux send-keys -t "$sess" "Fresh reanchor of $name (previous conversation reset for context hygiene; its transcript remains searchable via session-index). Read $ledger and your MEMORY.md before doing anything else, then summarize the open threads back to the operator." Enter
+  tmux send-keys -t "$sess" -l "Fresh reanchor of $name (previous conversation reset for context hygiene; its transcript remains searchable via session-index). Read $ledger and your MEMORY.md before doing anything else, then summarize the open threads back to the operator."
+  sleep 1
+  tmux send-keys -t "$sess" Enter
 
   jq --arg n "$name" --argjson t "$NOW" '.[$n] = ((.[$n] // {}) + {last_reset: $t, hash: "", ts: $t})' "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
   echo "$name: reanchored (fresh conversation; ledger $ledger)"
