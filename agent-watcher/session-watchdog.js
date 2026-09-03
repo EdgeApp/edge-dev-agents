@@ -611,29 +611,44 @@ function reapStaleWatchmanRoots(liveSessions) {
   }
 }
 
-// fseventsd leak guard. fseventsd (root-owned) leaks RSS under heavy fs churn
-// (worktree/sim-clone/node_modules cycles): 43.6GB after 56 days, observed
-// 2026-07-22. Only root can restart it, so this guard is INERT until the operator
-// adds a narrow sudoers rule via `sudo visudo`:
+// fseventsd guard. fseventsd (root-owned) degrades two ways under heavy fs churn
+// (worktree/sim-clone/node_modules cycles): it leaks RSS (43.6GB after 56 days,
+// observed 2026-07-22) and it pins a core or more indefinitely (123% CPU at 7GB
+// RSS after 37 days, 2026-09-03, which alone kept the asana-watcher's load
+// guardrail tripped and blocked every pickup). Only root can restart it, so this
+// guard is INERT until the operator adds a narrow sudoers rule via `sudo visudo`:
 //   eddy ALL=(root) NOPASSWD: /usr/bin/pkill -x fseventsd
-// With the rule: past the RSS limit, `sudo -n` restarts it (launchd respawns it
-// clean; watchman/Spotlight recrawl once, first Metro rebuild after is slower).
-// Without it: sudo -n fails silently and we log the manual instruction, throttled
-// to once per 24h via watchdog state.
+// Triggers (either): RSS over the limit, or CPU at/over FSEVENTSD_CPU_HOT_PCT on
+// FSEVENTSD_CPU_HOT_TICKS consecutive watchdog ticks (2-minute ticks, so a
+// build's transient spike never fires it). With the rule: `sudo -n` restarts it
+// (launchd respawns it clean; watchman/Spotlight recrawl once, first Metro
+// rebuild after is slower). Without it: sudo -n fails silently and we log the
+// manual instruction. Either way one attempt per 24h via watchdog state.
 const FSEVENTSD_RSS_LIMIT_KB = 16 * 1024 * 1024 // 16GB
+const FSEVENTSD_CPU_HOT_PCT = 100
+const FSEVENTSD_CPU_HOT_TICKS = 3
 function guardFseventsd(state, now) {
   const pid = parseInt(sh('pgrep -x fseventsd').split('\n')[0], 10)
   if (!Number.isFinite(pid)) return
   const rssKb = parseInt(sh(`ps -p ${pid} -o rss=`), 10)
-  if (!Number.isFinite(rssKb) || rssKb < FSEVENTSD_RSS_LIMIT_KB) return
+  const cpu = parseFloat(sh(`ps -p ${pid} -o %cpu=`))
+  const hot = Number.isFinite(cpu) && cpu >= FSEVENTSD_CPU_HOT_PCT
+  state.fseventsdHotTicks = hot ? (state.fseventsdHotTicks || 0) + 1 : 0
+  const rssOver = Number.isFinite(rssKb) && rssKb >= FSEVENTSD_RSS_LIMIT_KB
+  const cpuOver = state.fseventsdHotTicks >= FSEVENTSD_CPU_HOT_TICKS
+  if (!rssOver && !cpuOver) return
   if (state.fseventsdLastAttempt && now - state.fseventsdLastAttempt < 24 * 3600 * 1000) return
   state.fseventsdLastAttempt = now
+  const why = rssOver
+    ? `RSS ${Math.round(rssKb / 1024 / 1024)}GB over ${Math.round(FSEVENTSD_RSS_LIMIT_KB / 1024 / 1024)}GB limit`
+    : `CPU ${Math.round(cpu)}% for ${state.fseventsdHotTicks} consecutive ticks (>= ${FSEVENTSD_CPU_HOT_PCT}% x ${FSEVENTSD_CPU_HOT_TICKS})`
   sh('sudo -n /usr/bin/pkill -x fseventsd 2>/dev/null')
   sh('sleep 3')
   if (!sh(`ps -p ${pid} -o pid=`)) {
-    log(`[fseventsd] RSS ${Math.round(rssKb / 1024 / 1024)}GB over limit → restarted via sudo -n (launchd respawns it)`)
+    state.fseventsdHotTicks = 0
+    log(`[fseventsd] ${why} → restarted via sudo -n (launchd respawns it)`)
   } else {
-    log(`[fseventsd] RSS ${Math.round(rssKb / 1024 / 1024)}GB over ${Math.round(FSEVENTSD_RSS_LIMIT_KB / 1024 / 1024)}GB limit — cannot restart without sudo. One-time setup (sudo visudo): eddy ALL=(root) NOPASSWD: /usr/bin/pkill -x fseventsd`)
+    log(`[fseventsd] ${why} — cannot restart without sudo. One-time setup (sudo visudo): eddy ALL=(root) NOPASSWD: /usr/bin/pkill -x fseventsd`)
   }
 }
 
@@ -1017,9 +1032,22 @@ function main() {
     const anchorName = isChat ? null : session.replace(/^claude-(asana-)?/, '')
     const exempt = anchorName != null && PERSISTENT_ANCHORS.includes(anchorName)
     if (!exempt && !changed && now - (prior?.lastChange ?? now) > IDLE_REAP_MS()) {
-      const kind = isChat ? 'chat session' : `unlisted anchor '${anchorName}'`
+      // A numeric gid here is a RUN session whose task never reached Complete
+      // (the completion sweep above would have retired it): it still holds a
+      // slot, a pool sim, and a Metro port. Killing the pane alone leaked slot 1
+      // for four days (gid 1217727042724252, reaped as an "unlisted anchor" on
+      // 2026-08-24, released by hand 2026-08-28). Release everything the retire
+      // path releases; the worktree stays for inspection.
+      const isRun = !isChat && /^\d+$/.test(taskGid)
+      const kind = isChat ? 'chat session' : isRun ? 'run session (task not Complete)' : `unlisted anchor '${anchorName}'`
       log(`[${session}] ${kind} idle ${Math.round((now - prior.lastChange) / 3600000)}h > ${Math.round(IDLE_REAP_MS() / 3600000)}h → reaped (transcript survives; resurrect: resume-agent --uuid <id> --chat${isChat ? '' : ' --name <name>'}; keep one permanently via watcher.persistent_anchors)`)
       sh(`tmux kill-session -t "${session}"`)
+      if (isRun) {
+        let slot = null
+        try { slot = slots.get(taskGid) } catch { /* slots.json unreadable */ }
+        releaseSimAndSlot(taskGid)
+        freeMetroPort(slot?.metro_port ?? null)
+      }
       delete state.sessions[session]
       continue
     }
