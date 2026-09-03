@@ -6,6 +6,7 @@
 #   git-branch-ops.sh autosquash [--base <ref> | --merge-base-with <ref>]
 #   git-branch-ops.sh push [--remote <name>] [--branch <name>] [--force-with-lease]
 #   git-branch-ops.sh self-rewrite [--upstream <ref>] [--min-lines N] [--min-ratio N] [--gate]
+#   git-branch-ops.sh self-rewrite --whole-branch [--min-lines N] [--min-ratio N]
 #
 # self-rewrite: find unpublished commits that REWRITE lines this branch already
 # published. A commit whose removed lines were introduced by commits already on
@@ -20,6 +21,10 @@
 #   a candidate is FLAGGED when its removed lines number >= --min-lines (5) and
 #   the share of them that `git blame` attributes to published commits is
 #   >= --min-ratio percent (80)
+# --whole-branch is the AUDIT form for a branch already on the remote: every
+# commit since the merge-base is a candidate and its reference set is the
+# earlier commits of the same branch, so it lists the squiggly path a PR
+# already carries (what a rebase should fold) instead of what a push would add.
 # The fold is a fixup (`lint-commit.sh --fixup <sha>`), so fixup! commits are
 # the compliant shape and are never candidates. A commit that only ADDS lines
 # (a new surface) removes nothing and is never flagged. No remote branch yet
@@ -53,6 +58,7 @@ UPSTREAM=""
 MIN_LINES=5
 MIN_RATIO=80
 GATE="false"
+WHOLE_BRANCH="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -90,6 +96,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --gate)
       GATE="true"
+      shift
+      ;;
+    --whole-branch)
+      WHOLE_BRANCH="true"
       shift
       ;;
     *)
@@ -157,31 +167,45 @@ run_push() {
 run_self_rewrite() {
   local branch up flagged_json="" ncand=0 status="checked"
   branch="${BRANCH:-$(git branch --show-current 2>/dev/null || true)}"
-  if [[ -z "$branch" ]]; then
+  if [[ -z "$branch" && "$WHOLE_BRANCH" != "true" ]]; then
     printf '{"status":"not-a-branch","upstream":"","candidates":0,"flagged":[]}\n'
     return 0
   fi
-  up="${UPSTREAM:-$REMOTE/$branch}"
-  if ! git rev-parse --verify -q "$up" >/dev/null 2>&1; then
-    printf '{"status":"no-upstream","upstream":"%s","candidates":0,"flagged":[]}\n' "$up"
-    return 0
-  fi
-
-  # '-' = patch already on the remote branch (published), '+' = unpublished.
-  local cherry published="" candidates=""
-  cherry="$(git cherry "$up" HEAD 2>/dev/null || true)"
-  published="$(printf '%s\n' "$cherry" | awk '$1=="-"{print $2}')"
-  candidates="$(printf '%s\n' "$cherry" | awk '$1=="+"{print $2}')"
-  # Commits reachable from the remote branch are published too (blame can land
-  # on them when the local branch was never rewritten).
-  local merge_base
-  merge_base="$(git merge-base "$(resolve_default_upstream)" "$up" 2>/dev/null || true)"
-  if [[ -n "$merge_base" ]]; then
-    published="$(printf '%s\n%s\n' "$published" "$(git rev-list "$merge_base..$up" 2>/dev/null || true)")"
+  local cherry published="" candidates="" merge_base
+  if [[ "$WHOLE_BRANCH" == "true" ]]; then
+    # Audit form: every branch commit is a candidate; the reference set is
+    # filled per candidate below (the branch commits before it).
+    up="${UPSTREAM:-$(resolve_default_upstream)}"
+    merge_base="$(git merge-base "$up" HEAD 2>/dev/null || true)"
+    if [[ -z "$merge_base" ]]; then
+      printf '{"status":"no-merge-base","upstream":"%s","candidates":0,"flagged":[]}\n' "$up"
+      return 0
+    fi
+    candidates="$(git rev-list --reverse "$merge_base..HEAD" 2>/dev/null || true)"
+  else
+    up="${UPSTREAM:-$REMOTE/$branch}"
+    if ! git rev-parse --verify -q "$up" >/dev/null 2>&1; then
+      printf '{"status":"no-upstream","upstream":"%s","candidates":0,"flagged":[]}\n' "$up"
+      return 0
+    fi
+    # '-' = patch already on the remote branch (published), '+' = unpublished.
+    cherry="$(git cherry "$up" HEAD 2>/dev/null || true)"
+    published="$(printf '%s\n' "$cherry" | awk '$1=="-"{print $2}')"
+    candidates="$(printf '%s\n' "$cherry" | awk '$1=="+"{print $2}')"
+    # Commits reachable from the remote branch are published too (blame can land
+    # on them when the local branch was never rewritten).
+    merge_base="$(git merge-base "$(resolve_default_upstream)" "$up" 2>/dev/null || true)"
+    if [[ -n "$merge_base" ]]; then
+      published="$(printf '%s\n%s\n' "$published" "$(git rev-list "$merge_base..$up" 2>/dev/null || true)")"
+    fi
   fi
 
   local sha subject total own parents f hunks range blamed target_list
   for sha in $candidates; do
+    if [[ "$WHOLE_BRANCH" == "true" ]]; then
+      published="$(git rev-list "$merge_base..$sha^" 2>/dev/null || true)"
+      [[ -n "$published" ]] || { ncand=$((ncand+1)); continue; }
+    fi
     subject="$(git log -1 --format=%s "$sha")"
     case "$subject" in fixup!*|squash!*|amend!*) continue ;; esac
     parents="$(git rev-list --parents -n 1 "$sha" | wc -w | tr -d ' ')"
