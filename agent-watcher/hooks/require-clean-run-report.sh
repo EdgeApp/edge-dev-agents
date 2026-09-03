@@ -29,6 +29,10 @@
 #      cited a PR comment that does not exist anywhere on the PR). Network and
 #      rate-limit errors fail OPEN — only proven-nonexistent artifacts block.
 #      Asana and other external URLs are skipped (presigned churn, anti-bot).
+#   7. Reviewer-bot outage narration outside the Finalize Gate section (operator
+#      ruling 2026-09-02): a bot that did not run is ONE unchecked Finalize Gate
+#      box with its reason, nowhere else. Pattern lives in
+#      lib/reviewer-outage-noise.sh, shared with the Asana comment hook.
 #
 # ALSO auto-fills traceability fields before linting, since every one is fully
 # determined by state the hook can read and none by agent recollection:
@@ -261,6 +265,17 @@ fi
 #     Corpus-calibrated to ~zero false positives before being made blocking.
 #     --semantic (2026-08-19): the haiku judge tier for courtesy enders /
 #     forward references; attach is a terminal boundary, latency is fine.
+# 7. Reviewer-outage narration outside "## Finalize Gate".
+. "$HOME/.config/agent-watcher/hooks/lib/reviewer-outage-noise.sh"
+OUTSIDE_FG="$(mktemp)"
+awk '/^## /{fg=($0 ~ /^## Finalize Gate/)} !fg' "$REPORT" > "$OUTSIDE_FG"
+NOISE="$(reviewer_noise_hits "$OUTSIDE_FG" | head -6 || true)"
+rm -f "$OUTSIDE_FG"
+if [ -n "$NOISE" ]; then
+  FAIL+="- Reviewer-bot outage narrated outside the Finalize Gate (operator ruling 2026-09-02: a bot that did not run is ONE unchecked Finalize Gate box with its reason, and nothing else: no Follow-ups item, no Testing gap, no re-gate note). Delete these lines:
+$(printf '%s\n' "$NOISE" | sed 's/^/    /')
+"
+fi
 SLOP="$("$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh" "$REPORT" --semantic 2>/dev/null | grep '^HARD' | grep -v 'em dash' | head -6 || true)"
 if [ -n "$SLOP" ]; then
   FAIL+="- No-slop violations (banned vocabulary / count-announcement openers; rewrite the flagged lines):

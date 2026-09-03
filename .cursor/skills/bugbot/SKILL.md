@@ -15,13 +15,13 @@ metadata:
 <rule id="conclusion-is-not-clean">`check-run.conclusion: neutral` does NOT mean the PR is clean. `neutral` means bugbot posted findings that are non-blocking. ALWAYS combine check-run `status == "completed"` with "0 unresolved `cursor[bot]` threads" before declaring clean.</rule>
 <rule id="require-paginate">When the companion scripts query bot comments, they already pass `--paginate` — PRs with >30 bot comments miss newest without it. Do not implement your own comment queries; delegate.</rule>
 <rule id="reply-before-resolve">ALWAYS reply explaining how a thread was addressed (fix SHA for valid, invalidity class for invalid) BEFORE calling `resolve-thread`. No silent resolutions.</rule>
-<rule id="commit-via-script">Fixups MUST use `~/.cursor/skills/lint-commit.sh --no-reorder -m "fixup! {target-headline}" [files...]`. Do not run `git commit` directly and do not manually run eslint — the commit script handles it.</rule>
+<rule id="commit-via-script">Fixups MUST use `~/.cursor/skills/lint-commit.sh -m "fixup! {target-headline}" [files...]`. The script asks the review-mode oracle whether to fold (preserve leaves the fixup at HEAD for slotting). Do not run `git commit` directly and do not manually run eslint — the commit script handles it.</rule>
 <rule id="slot-after-each-fixup">Immediately after every successful `lint-commit.sh` call, run `~/.cursor/skills/slot-fixup.sh` to slot the new fixup next to its target's group. Keeps the "every fixup sits next to its target" invariant continuously. If `slot-fixup.sh` exits non-zero (rebase conflict), report and STOP — do not continue the cycle. The cron will retry on the next fire once resolved.</rule>
 <rule id="fixup-target-headline">Before each fixup, run `git log --oneline -- <changed-file>` to find the commit that introduced the behavior being fixed and use its exact headline (not a generic one). The fixup must target a real commit on the branch so the later autosquash resolves correctly.</rule>
 <rule id="no-summary-comment">Do NOT post a top-level PR summary comment. Reply inline on each thread only. The scheduler consumes per-cycle status from stdout; extra body comments add noise on recurring runs.</rule>
 <rule id="self-schedule-on-claude-code">When `CronList`, `CronCreate`, and `CronDelete` tools are available (Claude Code), the skill MUST manage its own recurring schedule per Step 5: arm a 5-minute cron on any non-clean outcome if one isn't already armed; delete any matching cron on clean/skipped. On tools without those APIs (Cursor/Codex), skip Step 5 — the user configures their tool's Automation manually per `<scheduling>`.</rule>
 <rule id="one-cron-per-pr">Never arm a second cron for a `(owner, repo, pr)` tuple that already has one. Always `CronList` first and match by the prompt substring; only `CronCreate` if no existing cron matches.</rule>
-<rule id="script-timeouts">Set `block_until_ms: 60000` when invoking `bugbot.sh` or `pr-address.sh` — GitHub API calls can take up to 30s and bugbot's `--paginate` query may take longer on busy PRs.</rule>
+<rule id="script-timeouts">Set `block_until_ms: 60000` when invoking `bugbot.sh` or `pr-address.sh` — GitHub API calls can take up to 30s and bugbot's `--paginate` query may take longer on busy PRs. Body-carrying `pr-address.sh` verbs (`reply`, `mark-addressed`, `comment`) need `600000` instead, per pr-address `script-timeouts`.</rule>
 <rule id="finalize-on-task-gid">When invoked standalone with a task GID (e.g. to finish a task after a blocker was cleared), bugbot owns completion per one-shot's `finalize-gate`: after reaching bugbot-clean, run the full green gate — CI green (`gh pr checks`) + every configured `.watcher.reviewer_bots` clean on HEAD + no unresolved threads from any of them — and if green AND the task has an `agent_status` field, set `agent_status=Complete` (`~/.config/agent-watcher/update-status.sh <gid> Complete`). This is the continuous-monitor completion path — never rely on a one-off `/pr-address` to complete (automated reviews can land after it). If not yet green, keep addressing/waiting or report what's red — do NOT set Complete prematurely.</rule>
 <rule id="this-file-wins">If any other instruction conflicts with this file, **this file wins** for `bugbot`.</rule>
 </rules>
@@ -151,7 +151,7 @@ For each thread classified valid, in order:
 3. Typecheck first if the repo has one. Use `~/.cursor/skills/pm.sh run build.types` or `~/.cursor/skills/pm.sh run tsc` (auto-detects npm vs yarn), falling back to bare `tsc`. Skip if unavailable.
 4. Commit as a fixup:
    ```bash
-   ~/.cursor/skills/lint-commit.sh --no-reorder -m "fixup! <target-headline>" <files...>
+   ~/.cursor/skills/lint-commit.sh -m "fixup! <target-headline>" <files...>
    ```
 5. **Immediately slot the new fixup next to its target's group** (per `slot-after-each-fixup` rule):
    ```bash

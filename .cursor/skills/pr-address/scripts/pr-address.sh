@@ -8,6 +8,10 @@
 #   fetch-thread   --owner <o> --repo <r> --pr <n> --thread-id <id>
 #   reply          --owner <o> --repo <r> --pr <n> --comment-id <id> --body <text>
 #   resolve-thread --thread-id <node_id>                   Mark inline thread as resolved (GraphQL)
+#   delete-comment --owner <o> --repo <r> --comment-id <id>
+#                                                          Retract a comment YOU authored (review-thread
+#                                                          reply or top-level). Refuses any other author.
+#                                                          No body lint: a delete carries no prose.
 #   mark-addressed --owner <o> --repo <r> --pr <n> --type <review|comment> --target-id <id> --body <text>
 #   comment        --owner <o> --repo <r> --pr <n> --body <text>|--body-file <path>
 #                                                          Post a standalone top-level PR comment (no
@@ -353,6 +357,40 @@ case "$CMD" in
     fi
     ;;
 
+  delete-comment)
+    # Retraction path for a comment this agent posted by mistake. Exists because
+    # block-raw-gh-writes.sh (correctly) blocks the raw `gh api --method DELETE`
+    # on comment endpoints, which left an accidental post permanently stuck on a
+    # human's PR. Author-scoped to currentUser: an agent may retract its own
+    # noise, never anyone else's review. No lint_outbound_body call — a delete
+    # carries no prose to lint.
+    require_gh
+    if [[ -z "$OWNER" || -z "$REPO" || -z "$COMMENT_ID" ]]; then
+      echo "Error: --owner, --repo, --comment-id required" >&2; exit 1
+    fi
+    ME=$(gh api user --jq '.login')
+    # A numeric comment id is ambiguous across two endpoints: review comments
+    # (inline, incl. thread replies) and issue comments (top-level). Probe the
+    # review endpoint first, then the issue one.
+    KIND="" AUTHOR="" PREVIEW=""
+    for ep in "pulls/comments" "issues/comments"; do
+      GOT=$(gh api "repos/$OWNER/$REPO/$ep/$COMMENT_ID" 2>/dev/null) || continue
+      KIND="$ep"
+      AUTHOR=$(echo "$GOT" | jq -r '.user.login // empty')
+      PREVIEW=$(echo "$GOT" | jq -r '.body // empty' | head -c 120)
+      break
+    done
+    if [[ -z "$KIND" ]]; then
+      echo "Error: comment $COMMENT_ID not found in $OWNER/$REPO (neither a review comment nor an issue comment)" >&2; exit 1
+    fi
+    if [[ "$AUTHOR" != "$ME" ]]; then
+      echo "Error: comment $COMMENT_ID was authored by '$AUTHOR', not '$ME'. delete-comment only retracts your own comments." >&2; exit 1
+    fi
+    echo ">> deleting $KIND/$COMMENT_ID by $AUTHOR: $PREVIEW"
+    gh api "repos/$OWNER/$REPO/$KIND/$COMMENT_ID" -X DELETE >/dev/null
+    echo "deleted: $COMMENT_ID"
+    ;;
+
   resolve-thread)
     require_gh
     if [[ -z "$THREAD_ID" ]]; then
@@ -619,7 +657,7 @@ case "$CMD" in
     ;;
 
   *)
-    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|resolve-thread|mark-addressed|resolve-id|headline|fetch-pr-body|ensure-branch|review-mode|autosquash} [args]" >&2
+    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|delete-comment|resolve-thread|mark-addressed|comment|resolve-id|headline|fetch-pr-body|ensure-branch|review-mode|autosquash} [args]" >&2
     exit 1
     ;;
 esac

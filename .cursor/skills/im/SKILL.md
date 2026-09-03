@@ -101,7 +101,7 @@ This ensures the subsequent feature commit introduces zero pre-existing lint fin
    ```bash
    ~/.cursor/skills/lint-commit.sh --fixup <hash> [files...]
    ```
-   This marks the commit for automatic squashing into the target commit. Use `git log --oneline` to find the target hash.
+   This marks the commit for squashing into the target commit; `lint-commit.sh` folds it at once unless the review-mode oracle says a human is mid-review (`preserve`), in which case it stays a `fixup!` commit until the next sanctioned squash. Use `git log --oneline` to find the target hash.
 6. Include a `CHANGELOG.md` entry in the **last feature commit** (not a separate commit) using format: `- type: description`
    - Types: `added`, `changed`, `fixed`
    - Example: `- added: New short feature description`

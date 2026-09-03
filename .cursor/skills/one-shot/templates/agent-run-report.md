@@ -47,7 +47,9 @@ _None observed._
      the eval cross-checks every box against GitHub/Asana (a checked box that
      contradicts live state is a report-honesty finding). Per PRIMARY PR:
        - [ ] CI checks green on HEAD (`gh pr checks`)
-       - [ ] every reviewer bot completed-clean on HEAD (SUCCESS/skipped; not NEUTRAL)
+       - [ ] every reviewer bot completed-clean on HEAD (SUCCESS; not NEUTRAL). A bot
+             that did not run (quota, outage) stays UNCHECKED with its one-line
+             reason here and is mentioned NOWHERE else in this report
        - [ ] zero unresolved review threads (bot AND human)
        - [ ] landed or auto-merge armed (per `land-on-approval`) / stopped at PR (say which)
        - [ ] Build field routing done (cheese pushed / staging noted / none)  -->

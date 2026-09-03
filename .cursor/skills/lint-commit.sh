@@ -10,8 +10,15 @@
 # Options:
 #   -m "msg"       Commit message (mutually exclusive with --fixup)
 #   --fixup <hash> Create a fixup commit targeting <hash>
-#   --reorder      After fixup commit, autosquash from merge-base with upstream (default: true)
-#   --no-reorder   Skip the autosquash follow-up
+#   --reorder      After a fixup commit, autosquash from merge-base with upstream.
+#                  DEFAULT, gated by the review-mode oracle (`git-branch-ops.sh
+#                  fold-mode`): when a human is mid-review on the branch's PR
+#                  (preserve) the fixup stays a fixup! commit at HEAD so the
+#                  reviewer sees the delta (slot it with slot-fixup.sh); no PR,
+#                  autosquash mode, or an operator rewrite approval note folds
+#                  it. Outside an agent session (no AGENT_TASK_GID) an explicit
+#                  --reorder forces the fold.
+#   --no-reorder   Never autosquash, whatever the oracle says
 #
 # If files are given, they are the primary scope for linting/committing.
 # The script may also auto-include generated companion files like:
@@ -55,7 +62,7 @@ run_yarn() {
 
 MESSAGE=""
 FIXUP=""
-REORDER="true"  # Default to reordering fixups
+REORDER="auto"  # auto = fold when the review-mode oracle allows; true = forced (interactive only); false = never
 FILES=()
 PRIMARY_SCOPE_DECLARED="false"
 
@@ -378,8 +385,24 @@ elif [[ "$MESSAGE" == fixup!* ]]; then
   IS_FIXUP="true"
 fi
 
-if [[ "$IS_FIXUP" == "true" && "$REORDER" == "true" ]]; then
-  echo ">> Autosquashing fixup commit..."
+FOLD="false"
+if [[ "$IS_FIXUP" == "true" && "$REORDER" != "false" ]]; then
+  FOLD_JSON="$(~/.cursor/skills/git-branch-ops.sh fold-mode 2>/dev/null || echo '{"fold":true,"mode":"unknown","reason":"fold-mode unavailable"}')"
+  FOLD_MODE="$(printf '%s' "$FOLD_JSON" | jq -r '.mode // "unknown"' 2>/dev/null || echo unknown)"
+  FOLD_REASON="$(printf '%s' "$FOLD_JSON" | jq -r '.reason // ""' 2>/dev/null || true)"
+  if [[ "$(printf '%s' "$FOLD_JSON" | jq -r '.fold' 2>/dev/null)" == "true" ]]; then
+    FOLD="true"
+  elif [[ "$REORDER" == "true" && -z "${AGENT_TASK_GID:-}" ]]; then
+    FOLD="true"; FOLD_REASON="explicit --reorder in an interactive session overrides $FOLD_MODE"
+  fi
+  if [[ "$FOLD" != "true" ]]; then
+    echo ">> Fixup left at HEAD (review-mode $FOLD_MODE: $FOLD_REASON)." >&2
+    echo ">> Slot it next to its target with ~/.cursor/skills/slot-fixup.sh; it squashes at the next sanctioned autosquash (pr-finalize-fixups.sh)." >&2
+  fi
+fi
+
+if [[ "$FOLD" == "true" ]]; then
+  echo ">> Autosquashing fixup commit ($FOLD_REASON)..."
 
   DEFAULT_UPSTREAM=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
     || echo "origin/$(git remote show origin 2>/dev/null | sed -n '/HEAD branch/s/.*: //p')" \

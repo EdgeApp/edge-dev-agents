@@ -11,8 +11,11 @@
 #   1. `gh pr create` WITHOUT --draft  -> pr-create.sh (draft dep PRs are
 #      sanctioned raw, per one-shot dep-pr-draft-vs-bump / pre-pr-gate header)
 #   2. `gh pr comment` / `gh pr review` -> pr-address.sh / github-pr-review.sh
-#   3. `gh api` WRITES to comment/review endpoints (POST/PATCH shapes)
-#      -> same scripts. Reads (bare GET listings) stay allowed.
+#   3. `gh api` WRITES to comment/review endpoints (POST/PATCH/DELETE shapes)
+#      -> same scripts. Reads (bare GET listings) stay allowed. DELETE is
+#      matched too: the sanctioned retraction is pr-address.sh delete-comment,
+#      which is author-scoped to currentUser, so an agent can clean up its own
+#      accidental post without gaining the ability to erase a human's review.
 #
 # Known residual: graphql addComment/submitPullRequestReview mutations.
 # block-raw-thread-resolve.sh owns resolveReviewThread; extend here if a
@@ -60,7 +63,7 @@ fi
 if echo "$CMD" | grep -qE '(issues|pulls)/[0-9]+/(comments|reviews)|issues/comments/[0-9]+|pulls/comments/[0-9]+'; then
   if printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])gh[[:space:]]+api([[:space:]]|$)' && \
      printf '%s' "$CMD_M" | grep -qE '(^|[[:space:]])(-f|-F|--field|--raw-field|--input)([[:space:]]|$|=)|--method[[:space:]=]+(POST|PATCH|DELETE)|-X[[:space:]]+(POST|PATCH|DELETE)'; then
-    block "raw \`gh api\` writes to comment/review endpoints are forbidden in agent sessions — posting goes through pr-address.sh (reply, comment, mark-addressed) or github-pr-review.sh (review submit), which lint the body per /no-slop and keep the addressed-marker arithmetic the Complete gate reads. Reads (bare GET listings) are fine. Read the owning SKILL.md and use its script."
+    block "raw \`gh api\` writes to comment/review endpoints are forbidden in agent sessions — posting goes through pr-address.sh (reply, comment, mark-addressed) or github-pr-review.sh (review submit), which lint the body per /no-slop and keep the addressed-marker arithmetic the Complete gate reads. RETRACTING a comment you posted by mistake also has a sanctioned path: \`pr-address.sh delete-comment --owner <o> --repo <r> --comment-id <id>\`, which refuses any author but you. Reads (bare GET listings) are fine. Read the owning SKILL.md and use its script."
   fi
 fi
 

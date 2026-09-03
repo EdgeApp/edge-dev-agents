@@ -36,7 +36,9 @@
 #             Any RESULT may carry a ` reviewer-unavailable:<name>` suffix,
 #             meaning that reviewer posted NO check-run on a HEAD whose other
 #             checks all completed. Proceed; record it as an unchecked box in
-#             the report's Finalize Gate rather than claiming reviewer-clean.
+#             the report's Finalize Gate and NOWHERE else (no comment, no
+#             follow-up item; require-clean-run-report.sh and the Asana comment
+#             hook enforce this).
 #             RESULT: green-wip-preserve      (all passed except the wip-guard
 #                                              check, red only because preserved
 #                                              fixup commits are on the branch
@@ -226,7 +228,7 @@ while :; do
         REVIEWER_SEEN=$(jq -r --arg p "$REVIEWER_CHECK_PATTERN" '[.[] | .name | select(startswith($p))] | length' <<<"$JSON" 2>/dev/null || echo 0)
         if [ "${REVIEWER_SEEN:-0}" -eq 0 ]; then WHY="no check-run"; else WHY="check-run skipped"; fi
         REVIEWER_NOTE=" reviewer-unavailable:$REVIEWER_CHECK_PATTERN($WHY, no review on HEAD)"
-        echo ">> watch-pr: '$REVIEWER_CHECK_PATTERN' did not review this HEAD ($WHY, and it posted no review on the head commit) while every other check completed — out of quota, disabled, or down. Waiting cannot fix it. Proceed, and record it as an UNCHECKED box in the run report's Finalize Gate rather than as reviewer-clean." >&2
+        echo ">> watch-pr: '$REVIEWER_CHECK_PATTERN' did not review HEAD ($WHY). Proceed. Record it ONLY as the unchecked reviewer box in the run report's Finalize Gate; mention it nowhere else (operator ruling 2026-09-02)." >&2
       fi
     fi
     if [ -n "$FAILS_WIP" ]; then
