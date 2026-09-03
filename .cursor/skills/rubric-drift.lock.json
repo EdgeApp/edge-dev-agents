@@ -252,13 +252,13 @@
       ]
     },
     "file:runaway-guard.sh": {
-      "hash": "156eae5f5109",
+      "hash": "927d3a2be08a",
       "dims": [
         "O2"
       ]
     },
     "file:memory-monitor.sh": {
-      "hash": "b78368785d18",
+      "hash": "f076efc0fb0b",
       "dims": [
         "O3"
       ]
@@ -592,6 +592,30 @@
       "dims": [
         "A11"
       ]
+    },
+    "one-shot:comms-drafts-never-sends": {
+      "hash": "c6c65c5397a8",
+      "dims": [
+        "A8"
+      ]
+    },
+    "staging-cherry-pick:cherry-picks-only": {
+      "hash": "29a2f8a0d85a",
+      "dims": [
+        "A8"
+      ]
+    },
+    "staging-cherry-pick:individual-commits": {
+      "hash": "c097e204a3a7",
+      "dims": [
+        "A8"
+      ]
+    },
+    "build-and-test:testids-over-coordinates": {
+      "hash": "ce8652fc4f59",
+      "dims": [
+        "A21"
+      ]
     }
   },
   "acked_uncovered": {
@@ -702,10 +726,6 @@
     "build-and-test:report-failures-actionable": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "625a193ffb67"
-    },
-    "build-and-test:testids-over-coordinates": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "1a79f82f9499"
     },
     "build-and-test:scripts-over-inline": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -986,10 +1006,6 @@
     "pr-land:defer-gui": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "8f90992d5dc4"
-    },
-    "staging-cherry-pick:individual-commits": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "75233fbc8546"
     },
     "staging-cherry-pick:pull-first": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
