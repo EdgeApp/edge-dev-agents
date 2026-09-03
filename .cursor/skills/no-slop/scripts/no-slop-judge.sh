@@ -10,6 +10,8 @@
 #   forward-reference    sentences that only preview/announce/grade the prose
 #   validation-preamble  stance-validation openers ("good question", "you're right")
 #   aphorism-formula     an ordinary claim dressed as a maxim (SKILL rule 17)
+#   second-proof         a second observation restating a proven point (rule 22)
+#   extra-ask            a second request or history aside on a message (rule 22)
 #   uniform-connector-cadence  a run of adjacent "X, so Y"/"X, and Y" compound
 #                        sentences sharing one shape (SKILL rule 20); nominated
 #                        per WINDOW of consecutive sentences, not per sentence
@@ -60,6 +62,10 @@ const NETS = [
   [/\b(two|three|four|five|six|seven|eight|nine|ten|\d+) (?:[a-z]+ ){0,2}(things|items|points|questions|reasons|takeaways|asks|notes|observations)\b/i, "structure-announcement"],
   [/^(good|great|excellent|fair|solid|nice) (question|point|catch|call)\b|\byou\x27re (absolutely |quite )?right\b|\bvalid (point|concern)\b/i, "validation-preamble"],
   [/\b(boils down to|comes down to|the difference between|the whole point|becomes a trap|think of it as|where the rubber|is the [a-z]+ of (?:the|a|all)\b)/i, "aphorism-formula"],
+  // SKILL rule 22: a second observation restating a proven point, and a
+  // second request or a history aside riding on the real ask of the message.
+  [/\b(sees? (?:this|it|the same) too|also (?:sees?|confirms?|shows?|returns?) (?:this|it|the same)|confirms? (?:this|it|the same)|the same (?:thing|result|failure|error) (?:from|in|on)|as well as the|likewise)\b/i, "second-proof"],
+  [/\b(once before|has happened before|in the past|previously|last time|back on [A-Z][a-z]{2}|if (?:the key|it|that|this) (?:changed|was rotated),? please|please (?:also|in addition)|one more (?:thing|ask|request)|separately,? (?:can|could|please))\b/i, "extra-ask"],
 ]
 
 const hash = s => crypto.createHash("sha256").update(s.replace(/\s+/g, " ").trim().toLowerCase()).digest("hex").slice(0, 16)
@@ -126,12 +132,14 @@ if (toJudge.length) {
     "Rule forward-reference: a sentence whose only job is to preview, announce, or grade the prose itself: \"Here is what matters:\", \"Worth flagging explicitly:\", \"The key thing is this:\", \"To summarize:\", \"Let me break this down\". NOT a violation when the sentence carries the actual claim alongside: \"Worth noting the cache is already warm, so the retry is free\" still announces, but \"The cache is already warm, so the retry is free\" does not; judge whether removing the announcing clause loses information.",
     "Rule validation-preamble: an opener that grades the reader\x27s stance instead of stating facts: \"Good question\", \"You\x27re right to push on this\", \"Fair point\". NOT a violation when agreement itself is the factual content and is followed by the specifics in the same sentence.",
     "Rule aphorism-formula: an ordinary claim dressed as a maxim instead of stated plainly: \"That is the difference between shipping a claim flow and shipping a warning\", \"It all boils down to trust\", \"Latency becomes a trap\". NOT a violation when the construction carries a real comparison or measurement the reader needs (\"the difference between the two timeouts is 90 seconds\", \"the cost comes down to one extra round trip\"); judge whether a concrete fact would be lost by rewriting it flat.",
+    "Rule second-proof: a sentence that adds a SECOND observation confirming a point the previous sentence already proved: \"Our production plugin sees this too: quotes fail with 401\" after \"every endpoint returns 401 for any key\". NOT a violation when the second observation adds a different fact the reader acts on (a different endpoint, a different user impact, a number the first lacked).",
+    "Rule extra-ask: a message-level rule. Violation when the sentence is a SECOND request piggybacking on the message\x27s real ask (\"If the key changed, please send us the current one\" after \"Was the key revoked or rotated?\"), or a history aside the recipient does not need to act on (\"It was disabled once before, on Apr 27\"). NOT a violation when the sentence is the only request in the message, or when the prior incident changes what the recipient must do now.",
     "Rule uniform-connector-cadence: applies ONLY to entries containing \" | \", which mark a RUN of consecutive sentences from the document. Violation when the run shares one repeated two-clause shape — independent clause, comma, connector (so/and/but), clause — so the passage reads as a drumbeat: \"The cache was cold, so the first load was slow. | The index was stale, so the query scanned. | The pool was small, and the workers queued.\" NOT a violation when a matched comma joins list items rather than clauses (\"a, b, and c\"), when the sentences otherwise vary clearly in shape and length, or when splitting any of the connectors would lose a causal or coordinate link the reader needs. Judge the run as a whole, not each sentence.",
     "",
     "Sentences:",
     ...cap.map((c, i) => (i + 1) + ". " + c.sentence.replace(/\n/g, " ")),
     "",
-    "Output: a JSON array, one entry per sentence number, shape {\"n\": <number>, \"violation\": true|false, \"rule\": \"courtesy-ender\"|\"forward-reference\"|\"validation-preamble\"|\"aphorism-formula\"|\"uniform-connector-cadence\"|\"none\"}."
+    "Output: a JSON array, one entry per sentence number, shape {\"n\": <number>, \"violation\": true|false, \"rule\": \"courtesy-ender\"|\"forward-reference\"|\"validation-preamble\"|\"aphorism-formula\"|\"uniform-connector-cadence\"|\"second-proof\"|\"extra-ask\"|\"none\"}."
   ].join("\n")
 
   let verdicts = null, failure = null

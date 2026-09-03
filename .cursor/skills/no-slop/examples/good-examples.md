@@ -70,3 +70,19 @@ Each example below is a rewrite of the corresponding bad example from [bad-examp
 - Includes specific numbers and technical details
 - No promotional language about `elevating` or `commitment`
 - Migration plan is stated as a fact, not a `challenge`
+
+---
+
+## Example 6: Partner status message (rule 22)
+
+**Bad:**
+> What we get today: every endpoint returns 401 for any key. Our production plugin sees this too: quotes fail with 401 right now. Was the key rotated on your side? If the key changed, please send us the current one. It was disabled once before, on Apr 27.
+
+**Good:**
+> We see: every endpoint returns 401 for any key. Was the key revoked or rotated around your Sep 1 deploy, or are our requests blocked by IP?
+
+**Why this works:**
+- No label narrating when the observation happened
+- Proof stated once, request stated once
+- No send-time stamp; the thread already carries the date
+- Names the deploy instead of "your side"
