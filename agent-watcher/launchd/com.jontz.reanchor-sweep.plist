@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.jontz.reanchor-sweep</string>
+  <key>ProgramArguments</key>
+  <array><string>__HOME__/.config/agent-watcher/reanchor-sweep.sh</string></array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>StartInterval</key><integer>1800</integer>
+  <key>StandardOutPath</key><string>/tmp/reanchor-sweep.out</string>
+  <key>StandardErrorPath</key><string>/tmp/reanchor-sweep.err</string>
+</dict>
+</plist>

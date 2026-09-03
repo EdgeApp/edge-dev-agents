@@ -23,6 +23,8 @@
 # Log at /tmp/memory-monitor.log
 
 set -uo pipefail
+# launchd starts scripts with a bare PATH; add nvm/homebrew/~/.local/bin (lib header has the details).
+source "$HOME/.config/agent-watcher/lib/launchd-env.sh"
 
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"; mkdir -p "$STATE_DIR"
 STATE_FILE="$STATE_DIR/memory-monitor.state"

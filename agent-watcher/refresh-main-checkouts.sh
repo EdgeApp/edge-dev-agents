@@ -29,6 +29,8 @@
 #   than this, so the 30-min idle job costs nothing between real refreshes.
 # Exit: 0 always (per-repo outcomes in the report; this is maintenance, not a gate).
 set -uo pipefail
+# launchd starts scripts with a bare PATH; add nvm/homebrew/~/.local/bin (lib header has the details).
+source "$HOME/.config/agent-watcher/lib/launchd-env.sh"
 
 STAMP="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/main-checkouts-refresh.stamp"
 DRY=false
