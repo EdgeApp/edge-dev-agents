@@ -45,7 +45,7 @@
       ]
     },
     "one-shot:yolo-true-blockers": {
-      "hash": "9946591eb131",
+      "hash": "55d10f28b633",
       "dims": [
         "A7",
         "O7"
@@ -1402,6 +1402,10 @@
     "pr-address:retract-your-own-noise": {
       "reason": "2026-09-03: fires only after an agent mis-posts; the observable is the ABSENCE of stray comments, which agent-eval already reads off live PR state rather than as its own dimension",
       "hash": "0f0970f03dea"
+    },
+    "task-review:operator-final-say": {
+      "reason": "2026-09-03: graded under A7 as true-blocker condition (e); the gate is mechanical (require-plan-before-developing.sh), no separate dimension",
+      "hash": "c7682b76a643"
     }
   },
   "excluded_skills": {

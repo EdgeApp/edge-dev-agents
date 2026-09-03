@@ -69,8 +69,9 @@ TOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$DIR/credentials.json" 2>
 API="https://app.asana.com/api/1.0"
 ATT="$(curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" \
   "$API/tasks/$TASK_GID/attachments?opt_fields=name,created_at,gid")" || { echo "check-followup-scope: attachments fetch failed" >&2; exit 1; }
+OP_GID="$(curl -sS --max-time 10 -H "Authorization: Bearer $TOKEN" "$API/users/me?opt_fields=gid" 2>/dev/null | jq -r '.data.gid // empty')"
 STORIES="$(curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" \
-  "$API/tasks/$TASK_GID/stories?opt_fields=created_at,resource_subtype,text,created_by.name")" || { echo "check-followup-scope: stories fetch failed" >&2; exit 1; }
+  "$API/tasks/$TASK_GID/stories?opt_fields=created_at,resource_subtype,text,created_by.name,created_by.gid")" || { echo "check-followup-scope: stories fetch failed" >&2; exit 1; }
 echo "$ATT" | jq -e '.data' >/dev/null 2>&1 || { echo "check-followup-scope: attachments response invalid: $(echo "$ATT" | head -c 200)" >&2; exit 1; }
 echo "$STORIES" | jq -e '.data' >/dev/null 2>&1 || { echo "check-followup-scope: stories response invalid: $(echo "$STORIES" | head -c 200)" >&2; exit 1; }
 
@@ -222,7 +223,7 @@ jq -n \
   --arg newest_comment_at "$NEWEST_COMMENT_AT" \
   --argjson newer_count "$NEWER_COUNT" \
   --argjson agent_after_wm "$AGENT_AFTER_WM" \
-  --argjson comments "$(echo "$NEWER" | jq '[.[] | {created_at, by: (.created_by.name // "?"), text: (.text // "")}]')" \
+  --argjson comments "$(echo "$NEWER" | jq --arg op "$OP_GID" '[.[] | {created_at, by: (.created_by.name // "?"), authored: (if ((.text // "") | test("^🥋") and test("👊$")) then "agent" elif (.created_by.gid == $op) then "operator" else "other" end), text: (.text // "")}]')" \
   --arg delta_status "$DELTA_STATUS" \
   --arg baseline_ts "$BASELINE_TS" \
   --argjson field_deltas "$FIELD_DELTAS" \
@@ -246,7 +247,7 @@ if [[ "$NEWER_COUNT" -eq 0 ]]; then
   echo ">>   0 comments newer than the watermark — no new comment scope"
 else
   echo ">>   $NEWER_COUNT comment(s) NEWER than the watermark — this is THIS run's scope (followup-scope-is-the-deliverable):"
-  echo "$NEWER" | jq -r '.[] | "     [\(.created_at)] \(.created_by.name // "?"): \(.text // "" | gsub("\n"; "\n       "))"'
+  echo "$NEWER" | jq -r --arg op "$OP_GID" '.[] | "     [\(.created_at)] [\(if ((.text // "") | test("^🥋") and test("👊$")) then "agent" elif (.created_by.gid == $op) then "operator" else "other" end)] \(.created_by.name // "?"): \(.text // "" | gsub("\n"; "\n       "))"'
 fi
 if [[ "$AGENT_AFTER_WM" -gt 0 ]]; then
   echo ">>   $AGENT_AFTER_WM AGENT-authored comment(s) postdate the report attachment — the watermark is not last, so these are invisible to the next run's scope check. Re-attach the report (same file: its iteration ordinal stays stable) so the watermark lands last; Complete is gate-blocked until a re-check records zero."

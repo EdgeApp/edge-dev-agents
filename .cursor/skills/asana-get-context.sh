@@ -21,7 +21,10 @@
 #   STATUS: <value>
 #   IMPLEMENTOR: <name>
 #   REVIEWER: <name>
-#   COMMENTS: <count> (ALL comments, oldest first, full text; newest kept inline
+#   DESCRIPTION_AUTHORSHIP: creator + every notes edit, tagged [operator|other|agent]
+#   LAST_HUMAN_WORD: operator | other (+ the items awaiting the operator's ruling)
+#   COMMENTS: <count> (ALL comments, oldest first, full text, each tagged
+#             [operator], [other], or [agent]; newest kept inline
 #             when the thread exceeds TEXT_CEILING, older ones elided with a marker
 #             pointing at the full-thread file)
 #   PARENT: <gid> <name>                           [if task has a parent]
@@ -97,8 +100,11 @@ TEXT_CEILING="${ASANA_TEXT_CEILING:-60000}"
 # dependents ride the same call. Pointers are gid + state + name ONLY — this
 # script never fetches related-task content and never recurses; the calling
 # skill decides what (if anything) to walk.
-TASK_JSON=$(curl -s "$API/tasks/$TASK_GID?opt_fields=name,notes,num_subtasks,parent.name,dependencies.name,dependencies.completed,dependents.name,dependents.completed,custom_fields.gid,custom_fields.name,custom_fields.display_value" \
+OPERATOR_GID=$(curl -s --max-time 10 "$API/users/me?opt_fields=gid" -H "$AUTH" | jq -r '.data.gid // empty')
+export OPERATOR_GID
+TASK_JSON=$(curl -s "$API/tasks/$TASK_GID?opt_fields=name,notes,num_subtasks,created_by.name,created_by.gid,created_at,parent.name,dependencies.name,dependencies.completed,dependents.name,dependents.completed,custom_fields.gid,custom_fields.name,custom_fields.display_value" \
   -H "$AUTH")
+export TASK_JSON
 printf '%s' "$TASK_JSON" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)['data']
@@ -167,26 +173,77 @@ if rows:
 "
 fi
 
-# Comments: ALL of them, oldest first, full text. Newlines inside a comment are
-# kept (continuation lines indented) so bullet lists written by the operator
-# survive. The full thread is always written to COMMENTS_FILE; when the inline
-# thread would exceed TEXT_CEILING the OLDEST comments are elided first, since
-# followup scope lives in the newest ones.
-curl -s "$API/tasks/$TASK_GID/stories?opt_fields=resource_subtype,text,created_by.name,created_at&limit=100" \
+# Comments: ALL of them, oldest first, full text, each tagged by author class:
+#   [operator] the token owner (the person who arms tasks and has final say)
+#   [agent]    orch-written (🥋 … 👊 wrapper, agent-authored-text.sh)
+#   [other]    any other human (support, product, other devs)
+# Newlines inside a comment are kept (continuation lines indented). The full
+# thread is always written to COMMENTS_FILE; when the inline thread would exceed
+# TEXT_CEILING the OLDEST comments are elided first.
+#
+# Also computed here, from the same stories: DESCRIPTION_AUTHORSHIP (creator and
+# every notes edit, tagged) and LAST_HUMAN_WORD. The operator has final say
+# before implementation (task-review operator-final-say): when any [other] human
+# comment or notes edit postdates the operator's last comment/notes edit, the
+# marker /tmp/asana-task-<gid>/.awaiting-operator-ruling is written listing
+# those items and require-plan-before-developing.sh blocks Developing on it.
+# An operator comment after them clears it on the next run of this script.
+curl -s "$API/tasks/$TASK_GID/stories?opt_fields=resource_subtype,text,created_by.name,created_by.gid,created_at&limit=100" \
   -H "$AUTH" | python3 -c "
-import sys, json
+import sys, json, os
 data = json.load(sys.stdin)['data']
-comments = [s for s in data if s.get('resource_subtype') == 'comment_added']
+op = os.environ.get('OPERATOR_GID') or ''
+task = json.loads(os.environ.get('TASK_JSON') or '{}').get('data', {})
 ceiling = int('$TEXT_CEILING')
 path = '$DOWNLOAD_DIR/comments.txt'
+marker = '$DOWNLOAD_DIR/.awaiting-operator-ruling'
+def cls(st):
+    raw = (st.get('text') or '').strip()
+    if st.get('resource_subtype') == 'comment_added' and raw.startswith('🥋') and raw.endswith('👊'):
+        return 'agent'
+    return 'operator' if (st.get('created_by') or {}).get('gid') == op else 'other'
+comments = [st for st in data if st.get('resource_subtype') == 'comment_added']
+edits = [st for st in data if st.get('resource_subtype') == 'notes_changed']
 def fmt(c):
     author = (c.get('created_by') or {}).get('name', 'unknown')
     text = (c.get('text') or '').strip().replace('\\n', '\\n    ')
-    date = c.get('created_at', '')[:10]
-    return f'  [{date}] {author}: {text}'
+    return f'  [{c.get(\"created_at\", \"\")[:10]}] [{cls(c)}] {author}: {text}'
 blocks = [fmt(c) for c in comments]
 with open(path, 'w') as fh:
     fh.write('\\n'.join(blocks))
+# description authorship
+cb = task.get('created_by') or {}
+ctag = 'operator' if cb.get('gid') == op else 'other'
+desc = f\"created by {cb.get('name', '?')} [{ctag}] {(task.get('created_at') or '')[:10]}\"
+for e in edits:
+    desc += f\"; edited by {(e.get('created_by') or {}).get('name', '?')} [{cls(e)}] {e.get('created_at', '')[:10]}\"
+notes = (task.get('notes') or '')
+if '===== CURRENT STATE (agent-maintained' in notes:
+    desc += '; agent CURRENT STATE section present'
+print(f'DESCRIPTION_AUTHORSHIP: {desc}')
+# last human word + ruling marker
+words = [st for st in comments + edits if cls(st) != 'agent']
+words.sort(key=lambda st: st.get('created_at', ''))
+last_op = max([st.get('created_at', '') for st in words if cls(st) == 'operator'] or [''])
+pending = [st for st in words if cls(st) == 'other' and st.get('created_at', '') > last_op]
+if not words:
+    print('LAST_HUMAN_WORD: none (no human comments or description edits)')
+elif not pending:
+    lw = words[-1]
+    print(f\"LAST_HUMAN_WORD: operator ({lw.get('created_at', '')[:16]}); no other-human text after it\")
+else:
+    print(f\"LAST_HUMAN_WORD: other; {len(pending)} other-human item(s) postdate the operator's last word ({last_op[:16] or 'never'}) -> OPERATOR RULING REQUIRED before Developing (task-review operator-final-say):\")
+    for st in pending:
+        kind = 'comment' if st.get('resource_subtype') == 'comment_added' else 'description edit'
+        print(f\"  - {st.get('created_at', '')[:16]} {(st.get('created_by') or {}).get('name', '?')} ({kind})\")
+if pending:
+    with open(marker, 'w') as fh:
+        for st in pending:
+            kind = 'comment' if st.get('resource_subtype') == 'comment_added' else 'description edit'
+            fh.write(f\"{st.get('created_at', '')} {(st.get('created_by') or {}).get('name', '?')} {kind}\\n\")
+elif os.path.exists(marker):
+    os.remove(marker)
+# inline thread
 if not comments:
     print('COMMENTS: (none)')
 else:

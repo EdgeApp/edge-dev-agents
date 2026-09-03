@@ -82,12 +82,12 @@ emit_run() {
     # the delivered reality; the CURRENT STATE section, TDD, and comments
     # supersede it.
     if [[ "${nreports:-0}" -gt 0 ]]; then
-      echo "DESCRIPTION STALENESS: this task has $nreports completed run report(s); treat the description's operator prose as potentially stale — its CURRENT STATE section, the TDD, and comments since the watermark supersede it. Reconcile before treating description prose as scope."
+      echo "DESCRIPTION STALENESS: this task has $nreports completed run report(s); the CURRENT STATE section, the TDD, and run reports record what was DELIVERED and may postdate the operator prose. For what is REQUIRED, operator text still outranks all agent-authored text, newest operator statement first (task-review operator-final-say); reconcile delivered-vs-required before treating either as scope."
     fi
     stories=$(curl -s --max-time 6 -H "Authorization: Bearer $tok" \
-      "https://app.asana.com/api/1.0/tasks/$gid/stories?opt_fields=type,created_at,text&limit=100" 2>/dev/null \
-      | jq -r --arg wm "$wm" --arg gid "$gid" --argjson ceil "${ASANA_TEXT_CEILING:-20000}" '
-          [.data[]? | select(.type == "comment" and .created_at > $wm) | "  [\(.created_at)] \(.text | gsub("\n"; "\n    "))"]
+      "https://app.asana.com/api/1.0/tasks/$gid/stories?opt_fields=type,created_at,text,created_by.gid&limit=100" 2>/dev/null \
+      | jq -r --arg wm "$wm" --arg gid "$gid" --arg op "$(curl -s --max-time 6 -H "Authorization: Bearer $tok" "https://app.asana.com/api/1.0/users/me?opt_fields=gid" 2>/dev/null | jq -r '.data.gid // empty')" --argjson ceil "${ASANA_TEXT_CEILING:-20000}" '
+          [.data[]? | select(.type == "comment" and .created_at > $wm) | "  [\(.created_at)] [\(if (.text | test("^🥋") and test("👊$")) then "agent" elif (.created_by.gid == $op) then "operator" else "other" end)] \(.text | gsub("\n"; "\n    "))"]
           | . as $all | (map(length) | add // 0) as $total
           | if $total <= $ceil then $all[]
             else ( reduce ($all|reverse)[] as $c ({keep: [], used: 0};
@@ -97,7 +97,7 @@ emit_run() {
                    $r.keep[]
             end' 2>/dev/null)
     if [[ -n "$stories" ]]; then
-      echo "OPERATOR COMMENTS NEWER THAN THE LAST RUN REPORT (undischarged followup scope):"
+      echo "HUMAN COMMENTS NEWER THAN THE LAST RUN REPORT (undischarged followup scope; [other] items need the operator's ruling before Developing, task-review operator-final-say):"
       echo "$stories"
     else
       echo "No operator comments newer than the last run-report attachment (verified live just now)."

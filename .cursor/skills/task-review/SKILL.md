@@ -10,6 +10,7 @@ metadata:
 
 <rules description="Non-negotiable constraints.">
 <rule id="summary-first">Present the task summary to the user BEFORE exploring any code. Code exploration happens after the user has seen the analysis.</rule>
+<rule id="operator-final-say">The operator (the Asana token owner; `asana-get-context.sh` prints them as `OPERATOR` and tags every comment and description edit `[operator]`, `[other]`, or `[agent]`) has final say before implementation on any task other humans collaborate on. Plan from the operator's statements; treat `[other]` text (support, product, other devs) as proposals and `[agent]` text as a record of what was delivered. Conflicts resolve in this order: 1. operator over other over agent; 2. among operator statements, newer wins; 3. every conflict is NAMED in the summary (who said what, what the plan follows) so the operator can overrule with one line. The gate is `LAST_HUMAN_WORD`: when any `[other]` comment or description edit postdates the operator's last comment or description edit, the script writes `/tmp/asana-task-<gid>/.awaiting-operator-ruling` and `require-plan-before-developing.sh` blocks Developing. Interactive runs: put the open items in the Step 3 summary and end at asana-plan's confirmation. Orchestrated runs: attach the plan, post ONE agent comment listing each open proposal by author with the plan's chosen default, then take the blocked completion per one-shot `yolo-true-blockers` (e). Arming the task, moving it, or changing fields is not a ruling; only an operator comment or description edit is. An operator comment after the open items clears the marker on the next ingestion.</rule>
 <rule id="script-timeout">The `asana-get-context.sh` script can take up to 90s (PDF conversion is slow). Always set `block_until_ms: 120000` when invoking it.</rule>
 </rules>
 
@@ -120,7 +121,7 @@ Present a concise summary to the user covering:
 After the summary, list any:
 - **Ambiguities**: Requirements that are unclear or could be interpreted multiple ways
 - **Missing info**: Information needed that isn't in the task
-- **Contradictions**: Conflicting statements between the description and comments
+- **Contradictions**: Conflicting statements between the description and comments, resolved per `operator-final-say` (operator over other over agent, newer over older) and named so the operator can overrule
 - **Decisions needed**: Choices that the user should weigh in on before implementation begins
 
 If there are no questions, say so explicitly — don't fabricate them.
