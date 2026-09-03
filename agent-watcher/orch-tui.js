@@ -4,11 +4,16 @@
 // Launch: `orch-tui` alias, or run this file.
 //
 // Panels:
-//   VITALS    load vs guardrail max (red = spawns gated), free RAM vs min,
-//             active/max_concurrent, watcher + watchdog last-tick age, launchd
-//             job health (asana-watcher, session-watchdog, config-watch,
-//             memory-monitor, runaway-guard; config-watch exit 1 = CONFIG
-//             DRIFT), Asana agent_status tally for the agent project
+//   HEALTH    answers "why is nothing spawning?" without asking a session:
+//             a SPAWN verdict computed the way asana-watcher.js gates a tick
+//             (hold file, load vs max_load_avg, RAM vs min_free_ram_gb, runs vs
+//             max_concurrent, free sim, a Pending task) with the first blocker
+//             named; 1/5/15-min load with the processes pinning it; RAM plus
+//             memory-monitor level; capacity (runs/slots/sims/pending, with the
+//             pending task names); fseventsd CPU/RSS and its last guard restart;
+//             runaway-guard count; launchd job health (config-watch exit 1 =
+//             CONFIG DRIFT); the watcher's own last tick line verbatim and the
+//             ETA of its next tick; Asana agent_status tally
 //   SESSIONS  the session-tui.js live model (same code, required as a lib)
 //   SLOTS     slots.json ⨯ live sessions (stale slot = gid with no session)
 //   SIM POOL  pool.json entries ⨯ liveness
@@ -16,6 +21,8 @@
 //   ACTIVITY  merged interesting tail of watcher + watchdog logs
 //
 // Refresh: local state every 10s; Asana tally every 60s; `r` forces both.
+// `--once` prints one frame (no alt screen, no TTY needed) for a quick look
+// from any shell or agent; `--dump` prints the model as JSON.
 // Titles come from the shared asana-task-names.tsv cache (resume-agent's) —
 // no per-refresh Asana calls for names.
 'use strict'
@@ -75,13 +82,40 @@ function collectVitals (cfgAll) {
     return ts ? (Date.now() - Date.parse(ts[1])) / 1000 : null
   }
   const lastWatcher = sh("tail -40 /tmp/asana-watcher.out 2>/dev/null").split('\n').filter(Boolean)
-  const gated = lastWatcher.slice().reverse().find(l => /skipped this tick|Spawning|Spawned|nothing to spawn|Active sessions/.test(l)) || ''
+  const gated = lastWatcher.slice().reverse().find(l => /skipped this tick|Spawning|Spawned|spawned|resumed prior session|nothing to spawn|no Pending|Active sessions/.test(l)) || ''
+  const loads = (() => { try { return os.loadavg() } catch { return [load, 0, 0] } })()
+  // Who is pinning the load: top processes by CPU, sim app paths abbreviated.
+  const hogs = []
+  for (const line of sh('ps -axo pcpu=,comm= -r 2>/dev/null').split('\n').slice(0, 8)) {
+    const m = line.trim().match(/^([\d.]+)\s+(.+)$/)
+    if (!m || Number(m[1]) < 20) continue
+    let name = m[2]
+    const sim = name.match(/CoreSimulator\/Devices\/([0-9A-F]{8})[^/]*\/.*\/([^/]+\.app)\//)
+    if (sim) name = `${sim[2]}@${sim[1]}`
+    else if (/CoreSimulator\/Profiles\/Runtimes/.test(name)) name = 'sim runtime'
+    else name = name.split('/').pop()
+    hogs.push(`${name} ${Math.round(Number(m[1]))}%`)
+  }
+  // memory-monitor: last level line (green | warn | critical).
+  const mm = sh('tail -1 /tmp/memory-monitor.log 2>/dev/null').match(/level=(\w+)\s+avail=(\S+)/)
+  const memLevel = mm ? { level: mm[1], avail: mm[2] } : null
+  // runaway-guard: agent cli process count vs cap.
+  const rg = sh(`tail -1 '${ST}/runaway-guard.log' 2>/dev/null`).match(/total=(\d+)\s+\(cap=(\d+)\)/)
+  const runaway = rg ? { total: Number(rg[1]), cap: Number(rg[2]) } : null
+  // fseventsd: the standing tax on this box (37 days at 100%+ blocked every pickup, 2026-09-03).
+  const fsePid = sh('pgrep -x fseventsd').split('\n')[0]
+  const fse = fsePid ? sh(`ps -p ${fsePid} -o pcpu=,rss=,etime=`).trim().split(/\s+/) : null
+  const fseRestart = sh("grep '\\[fseventsd\\]' /tmp/session-watchdog.out 2>/dev/null | tail -1").match(/^\[([0-9T:.Z-]+)\].*→ restarted/)
+  const fseventsd = fse ? { cpu: Number(fse[0]), rssGb: Number(fse[1]) / 1024 / 1024, etime: fse[2], lastRestart: fseRestart ? Date.parse(fseRestart[1]) : null } : null
+  const holds = sh('ls /tmp/reanchor-hold* /tmp/agent-watcher-hold* 2>/dev/null').split('\n').filter(Boolean).map(h => h.replace('/tmp/', ''))
   return {
-    load, maxLoad, freeGb, minFree,
+    load, loads, maxLoad, freeGb, minFree, hogs, memLevel, runaway, fseventsd, holds,
     maxConcurrent: Number(process.env.AGENT_WATCHER_MAX_CONCURRENT || w.max_concurrent || 2),
+    watcherInterval: 120,
     watcherTickAge: tickAge('/tmp/asana-watcher.out', /Watcher tick/),
     watchdogTickAge: tickAge('/tmp/session-watchdog.out', /Watching \d+ session/),
     lastWatcherLine: gated.replace(/^\[[^\]]+\]\s*/, ''),
+    lastWatcherAt: (gated.match(/^\[([0-9T:.Z-]+)\]/) || [])[1] || null,
     jobs
   }
 }
@@ -180,24 +214,61 @@ function collect () {
   }
 }
 
-function vline (v) {
-  const loadBad = v.load > v.maxLoad
-  const ramBad = v.freeGb < v.minFree
-  const seg = []
-  seg.push(`${loadBad ? C.red : C.grn}load ${v.load.toFixed(1)}/${v.maxLoad}${loadBad ? ' SPAWNS GATED' : ''}${C.off}`)
-  seg.push(`${ramBad ? C.red : C.grn}ram ${v.freeGb.toFixed(0)}G free (min ${v.minFree})${C.off}`)
-  seg.push(`cap ${v.maxConcurrent}`)
-  seg.push(`watcher tick ${v.watcherTickAge == null ? `${C.red}?${C.off}` : fmtAgo(Date.now() / 1000 - v.watcherTickAge) + ' ago'}`)
-  seg.push(`watchdog ${v.watchdogTickAge == null ? `${C.red}?${C.off}` : fmtAgo(Date.now() / 1000 - v.watchdogTickAge) + ' ago'}`)
-  return seg.join('   ')
+// The spawn verdict mirrors asana-watcher.js's tick order; the first blocker wins.
+function spawnVerdict (v, runs, freeSims, pending) {
+  if (v.holds.length) return { ok: false, why: `hold file ${v.holds[0]}` }
+  if (v.load > v.maxLoad) return { ok: false, why: `load ${v.load.toFixed(1)} > max_load_avg ${v.maxLoad}` }
+  if (v.freeGb < v.minFree) return { ok: false, why: `free RAM ${v.freeGb.toFixed(0)}G < min ${v.minFree}G` }
+  if (runs >= v.maxConcurrent) return { ok: false, why: `runs ${runs}/${v.maxConcurrent} (cap)` }
+  if (freeSims === 0) return { ok: false, why: 'no free sim in pool' }
+  if (pending === 0) return { ok: true, why: 'idle: no Pending task', idle: true }
+  return { ok: true, why: `${pending} Pending task(s) will spawn on the next tick` }
 }
 
 function jobsLine (jobs) {
   return jobs.map(j => {
     let col = C.grn; let note = ''
-    if (j.name === 'config-watch' && j.rc === 1) { col = C.red; note = ':DRIFT' } else if (j.rc !== 0) { col = C.yel; note = `:rc${j.rc}` }
+    if (j.name === 'config-watch' && j.rc === 1) { col = C.red; note = ' DRIFT' } else if (j.rc !== 0) { col = C.yel; note = ` rc${j.rc}` }
     return `${col}${j.name}${note}${C.off}`
   }).join('  ')
+}
+
+function healthPanel (v, cols) {
+  const runs = M.fleet.live.filter(r => r.kind === 'run' && r.state === 'running').length
+  const freeSlots = Math.max(0, v.maxConcurrent - M.slots.length)
+  const freeSims = M.pool.filter(p => p.state === 'free').length
+  const pendingTasks = (ASANA.pending || []).filter(p => /^pending$/i.test(p.status))
+  const verdict = spawnVerdict(v, runs, freeSims, ASANA.tally ? pendingTasks.length : 0)
+  const row = (label, body) => `  ${C.dim}${pad(label, 10)}${C.off}${body}`
+  const L = []
+  const nextTick = v.watcherTickAge == null ? '?' : `${Math.max(0, Math.round(v.watcherInterval - v.watcherTickAge))}s`
+  const spawn = verdict.ok
+    ? (verdict.idle ? `${C.grn}● OPEN${C.off}  ${C.dim}${verdict.why}${C.off}` : `${C.grn}● OPEN${C.off}  ${verdict.why}`)
+    : `${C.red}✗ GATED${C.off}  ${C.red}${verdict.why}${C.off}`
+  L.push(row('spawn', `${spawn}   ${C.dim}next watcher tick in ${nextTick}${C.off}`))
+  const lc = (x) => (x > v.maxLoad ? C.red : x > v.maxLoad * 0.75 ? C.yel : C.grn) + x.toFixed(1) + C.off
+  const hogs = v.hogs.length ? `${C.dim}pinned by${C.off} ${v.hogs.slice(0, 4).join(', ')}` : ''
+  L.push(row('load', `1m ${lc(v.loads[0])}  5m ${lc(v.loads[1])}  15m ${lc(v.loads[2])}  ${C.dim}max ${v.maxLoad} (${os.cpus().length} cores)${C.off}   ${hogs}`))
+  const ramCol = v.freeGb < v.minFree ? C.red : C.grn
+  const mm = v.memLevel ? `   ${C.dim}memory-monitor${C.off} ${v.memLevel.level === 'green' ? C.grn : v.memLevel.level === 'warn' ? C.yel : C.red}${v.memLevel.level}${C.off} ${C.dim}(avail ${v.memLevel.avail})${C.off}` : ''
+  L.push(row('ram', `${ramCol}${v.freeGb.toFixed(0)}G free${C.off}  ${C.dim}min ${v.minFree}G${C.off}${mm}`))
+  const pendNames = pendingTasks.slice(0, 3).map(p => p.name.replace(/^Asana: /, '').slice(0, 28)).join(', ')
+  const pendSeg = ASANA.tally ? `pending ${pendingTasks.length}${pendNames ? ` ${C.dim}(${pendNames}${pendingTasks.length > 3 ? ', …' : ''})${C.off}` : ''}` : `${C.dim}pending ?${C.off}`
+  L.push(row('capacity', `runs ${runs}/${v.maxConcurrent}   slots ${freeSlots} free   sims ${freeSims}/${M.pool.length} free   ${pendSeg}`))
+  const fse = v.fseventsd
+    ? `fseventsd ${(fse => (fse.cpu >= 100 ? C.red : fse.cpu >= 50 ? C.yel : C.grn) + fse.cpu.toFixed(0) + '%' + C.off)(v.fseventsd)} ${v.fseventsd.rssGb.toFixed(1)}G up ${v.fseventsd.etime}${v.fseventsd.lastRestart ? `${C.dim}, guard restarted ${fmtAgo(v.fseventsd.lastRestart / 1000)} ago${C.off}` : ''}`
+    : `${C.dim}fseventsd ?${C.off}`
+  const rg = v.runaway ? `   runaway ${v.runaway.total >= v.runaway.cap * 0.8 ? C.yel : C.grn}${v.runaway.total}/${v.runaway.cap}${C.off} agent procs` : ''
+  const holds = v.holds.length ? `   ${C.red}holds: ${v.holds.join(' ')}${C.off}` : `   ${C.dim}holds: none${C.off}`
+  L.push(row('guards', `${fse}${rg}${holds}`))
+  L.push(row('jobs', `${jobsLine(v.jobs)}   ${C.dim}watcher tick ${v.watcherTickAge == null ? '?' : fmtAgo(Date.now() / 1000 - v.watcherTickAge) + ' ago'} · watchdog ${v.watchdogTickAge == null ? '?' : fmtAgo(Date.now() / 1000 - v.watchdogTickAge) + ' ago'}${C.off}`))
+  const lw = v.lastWatcherLine ? `${/skipped/.test(v.lastWatcherLine) ? C.yel : C.dim}${v.lastWatcherLine.slice(0, cols - 14)}${C.off}` : `${C.dim}(no watcher line)${C.off}`
+  L.push(row('watcher', lw))
+  let asanaSeg = `${C.dim}loading…${C.off}`
+  if (ASANA.err) asanaSeg = `${C.yel}${ASANA.err}${C.off}`
+  else if (ASANA.tally) asanaSeg = [...ASANA.tally.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}=${n}`).join('  ') + `   ${C.dim}(open tasks, ${fmtAgo(ASANA.at / 1000)} ago)${C.off}`
+  L.push(row('asana', asanaSeg))
+  return L
 }
 
 function render () {
@@ -206,16 +277,8 @@ function render () {
   const rows = process.stdout.rows || 45
   const L = []
   const v = M.vitals
-  L.push(`${C.bold} ORCH ${C.off} ${C.dim}${new Date(M.at).toLocaleTimeString()}${C.off}  ${vline(v)}`)
-  L.push(`   jobs: ${jobsLine(v.jobs)}   ${C.dim}${v.lastWatcherLine.slice(0, cols - 40)}${C.off}`)
-
-  // Asana tally
-  let asanaSeg = `${C.dim}asana loading…${C.off}`
-  if (ASANA.err) asanaSeg = `${C.yel}asana: ${ASANA.err}${C.off}`
-  else if (ASANA.tally) {
-    asanaSeg = [...ASANA.tally.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}=${n}`).join('  ')
-  }
-  L.push(`   agent_status (open tasks): ${asanaSeg}`)
+  L.push(`${C.bold} ORCH HEALTH${C.off} ${C.dim}${new Date(M.at).toLocaleTimeString()}${C.off}`)
+  L.push(...healthPanel(v, cols))
   L.push('')
 
   const titleW = Math.min(52, cols - 60)
@@ -265,7 +328,16 @@ function render () {
 }
 
 // ─── main ────────────────────────────────────────────────────────────────────
-if (process.argv.includes('--dump')) {
+if (process.argv.includes('--once')) {
+  collect()
+  refreshAsana(M.cfgAll).then(() => {
+    const cols = process.stdout.columns || 140
+    const v = M.vitals
+    const L = [`${C.bold} ORCH HEALTH${C.off} ${C.dim}${new Date(M.at).toLocaleTimeString()}${C.off}`, ...healthPanel(v, cols)]
+    console.log(L.join('\n'))
+    process.exit(0)
+  })
+} else if (process.argv.includes('--dump')) {
   collect()
   refreshAsana(M.cfgAll).then(() => {
     console.log(JSON.stringify({ ...M, asana: { ...ASANA, tally: ASANA.tally && [...ASANA.tally] } }, null, 2))
