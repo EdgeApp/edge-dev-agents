@@ -3,7 +3,7 @@
   "team_gid": "1190661726966109",
   "team_name": "test",
   "project_gid": "1215088146871429",
-  "project_name": "Agent MVP — Test Kanban",
+  "project_name": "Agent MVP \u2014 Test Kanban",
   "project_url": "https://app.asana.com/1/9976422036640/project/1215088146871429",
   "user_gid": "1200972350160586",
   "user_email": "jon@edge.app",
@@ -101,15 +101,15 @@
       "max_concurrent": "Max parallel agent sessions. Slot accounting is by LIVE tmux sessions, not Asana state. Env override: AGENT_WATCHER_MAX_CONCURRENT.",
       "metro_base_port": "Slot N gets Metro port (metro_base_port + N). 8181 (NOT 8081) keeps slot Metro ports out of the hardcoded DEBUG_<dep> dev-server range (8080/8082/8083/8084/8101) so a slot's Metro never collides with a DEBUG_<dep> webpack dev-server. Env override: AGENT_METRO_BASE_PORT.",
       "master_sim": "The iOS 18 iPhone 16 Pro Max sim holding the test account; cloned per slot. Resolved by device+runtime unless a UDID is hardcoded. refresh_on_develop (default true): before each spawn tick, refresh-master-build.sh checks if develop_ref advanced and, if its native side (ios/Podfile.lock) changed, rebuilds the master from develop and reclones the pool so runs test against a current build (BLOCKING; a JS-only develop advance skips the rebuild). develop_ref (default origin/develop): the branch the master tracks. Set refresh_on_develop=false or env SKIP_MASTER_REFRESH=1 to disable.",
-      "resource_guardrail": "Pre-spawn safety gate. Skip spawning this tick if 1-min load avg > max_load_avg OR free RAM < min_free_ram_gb. Env overrides: AGENT_WATCHER_MAX_LOAD_AVG, AGENT_WATCHER_MIN_FREE_RAM_GB.",
+      "resource_guardrail": "1-min load avg cap + free-RAM floor for a new spawn. 24 = 1.5x the 16 cores: one sim drive alone sits at 15-20, two at ~40 (2026-09-03); 12 blocked every pickup while two runs tested.",
       "npm_migration_commit": "Commit cherry-picked onto each fresh agent worktree so RN tooling uses npm not yarn.",
       "worktrees_root": "Where per-task worktrees live: <worktrees_root>/<task-gid>/<repo>/.",
       "repos_root": "Where main repo checkouts live: <repos_root>/<repo>.",
       "default_repo": "Repo a spawned agent works in (worktree + sim are provisioned for it).",
-      "sim_pool": "Pre-cloned iOS sims kept ready so per-task spawn is fast (no inline simctl clone). Size defaults to max_concurrent. Lifecycle: free → in_use (on allocate) → dirty (on watchdog reap) → free (next ensure-sim-pool refresh). Refresh deletes the stale sim and clones from master.",
+      "sim_pool": "Pre-cloned iOS sims kept ready so per-task spawn is fast (no inline simctl clone). Size defaults to max_concurrent. Lifecycle: free \u2192 in_use (on allocate) \u2192 dirty (on watchdog reap) \u2192 free (next ensure-sim-pool refresh). Refresh deletes the stale sim and clones from master.",
       "keep_completed_worktrees": "How many completed/retired worktrees to keep on disk for inspection/resume before the watchdog prunes the oldest. On completion the sim + slot are freed immediately; the worktree is retained. Worktrees whose session is still alive (incl. a RETIRED session) are never counted or pruned. Default 5; set 0 to destroy on completion (old behavior).",
-      "keep_completed_sessions": "How many COMPLETED tmux sessions to keep alive for inspection / remote re-engagement before the watchdog kills the oldest. On completion a session is RETIRED — renamed claude-asana-<gid> → done-asana-<gid> so it no longer holds a concurrency slot — but its claude is left running so you can attach to it. Each retired session holds a live claude, so this bounds memory. Default 3; set 0 to hard-kill on completion (old behavior).",
-      "agent_model": "DEFAULT model for spawned agent sessions (`claude --model <value>`), used when a task has no agent_model custom field selected. Per-task the Asana agent_model enum wins: its selected option maps to a CLI string via custom_fields.agent_model.options[label].model. Empty/absent here = the server-side default alias. Set to an exact ID to pin fleet behavior — e.g. claude-opus-4-8[1m] for Opus 4.8 with 1M context. A human can still flip a LIVE session's model per-turn via the desktop/RC picker; this only sets what sessions START on.",
+      "keep_completed_sessions": "How many COMPLETED tmux sessions to keep alive for inspection / remote re-engagement before the watchdog kills the oldest. On completion a session is RETIRED \u2014 renamed claude-asana-<gid> \u2192 done-asana-<gid> so it no longer holds a concurrency slot \u2014 but its claude is left running so you can attach to it. Each retired session holds a live claude, so this bounds memory. Default 3; set 0 to hard-kill on completion (old behavior).",
+      "agent_model": "DEFAULT model for spawned agent sessions (`claude --model <value>`), used when a task has no agent_model custom field selected. Per-task the Asana agent_model enum wins: its selected option maps to a CLI string via custom_fields.agent_model.options[label].model. Empty/absent here = the server-side default alias. Set to an exact ID to pin fleet behavior \u2014 e.g. claude-opus-4-8[1m] for Opus 4.8 with 1M context. A human can still flip a LIVE session's model per-turn via the desktop/RC picker; this only sets what sessions START on.",
       "agent_effort": "DEFAULT reasoning effort for spawned agent sessions (`claude --effort <low|medium|high|xhigh|max>`), used when a task has no agent_effort custom field selected. Per-task the Asana agent_effort enum wins (its option label IS the CLI value). Default high. Applies on both fresh spawns and follow-up resumes."
     },
     "default_repo": "edge-react-gui",
@@ -122,7 +122,7 @@
       "develop_ref": "origin/develop"
     },
     "resource_guardrail": {
-      "max_load_avg": 12.0,
+      "max_load_avg": 24.0,
       "min_free_ram_gb": 8.0
     },
     "npm_migration_commit": "4d169a59e2",
