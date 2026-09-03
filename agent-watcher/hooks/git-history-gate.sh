@@ -16,6 +16,14 @@
 #   pre-review pushes (the amend+watch loop on a draft) resolve to
 #   autosquash/none and stay raw and free.
 #
+#   OPERATOR-APPROVED REWRITE: the operator can authorize a history rewrite on
+#   a PR under active review (a fold of a squiggly path the reviewer will
+#   re-read anyway). The authority is the operator's task comment; the agent
+#   records it as /tmp/agent-history-rewrite-approved-<gid>.md citing that
+#   comment, and the note flips preserve-mode squash + push to allowed here and
+#   in pr-finalize-fixups.sh. Audited by /eval-run: a note with no matching
+#   operator comment is a finding.
+#
 #   PUSHES that ADD REWRITES of published branch work are blocked when the
 #   oracle says AUTOSQUASH (no human reviewer yet): a standalone commit whose
 #   removed lines came from commits already on the remote branch is an
@@ -100,6 +108,11 @@ if [ -n "$NEEDS_MODE" ]; then
         | jq -r '.mode // empty' 2>/dev/null || true)
     fi
   fi
+  REWRITE_OK="/tmp/agent-history-rewrite-approved-$AGENT_TASK_GID.md"
+  if [ "$MODE" = "preserve" ] && [ -s "$REWRITE_OK" ]; then
+    echo ">> git-history-gate: preserve-mode $NEEDS_MODE allowed by operator rewrite approval ($REWRITE_OK)" >&2
+    MODE="autosquash"
+  fi
   if [ "$MODE" = "preserve" ]; then
     if [ "$NEEDS_MODE" = "squash" ]; then
       cat >&2 <<'MSG'
@@ -111,6 +124,9 @@ what changed since their review — squashing now destroys that.
   - Squashing becomes legitimate when the review is APPROVED/DISMISSED; run
     ~/.cursor/skills/pr-finalize-fixups.sh then — it re-checks the mode itself
     and squashes only when allowed.
+  - The OPERATOR can approve a rewrite under review (a task comment saying so):
+    record it as /tmp/agent-history-rewrite-approved-<gid>.md citing that
+    comment, and this gate allows the squash and the force-with-lease push.
 MSG
     else
       cat >&2 <<'MSG'

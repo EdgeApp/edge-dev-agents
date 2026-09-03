@@ -18,7 +18,7 @@ These words and phrases are statistically overrepresented in AI-generated text. 
 | intricate / intricacies | complex, complicated, details |
 | interplay | interaction, relationship |
 | load-bearing / load bearing | name what depends on it ("X breaks without this") |
-| byte-identical / byte identical / byte-for-byte | name the check that proved it ("cmp clean", "same sha256"), or plain "identical" |
+| byte-identical / byte-for-byte / byte-equivalent / byte-equivalence | name the check that proved it ("cmp clean", "same sha256"), or plain "identical" |
 | garner | get, earn, attract |
 | bolster / bolstered | support, strengthen, back |
 | foster / fostering | encourage, support, build |

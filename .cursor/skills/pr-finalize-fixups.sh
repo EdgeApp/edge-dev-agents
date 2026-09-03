@@ -5,6 +5,12 @@
 #
 # POLICY (single source of truth — do not duplicate in skill .md files):
 #
+#   Operator rewrite approval: in an orchestrated session (AGENT_TASK_GID set), a
+#   non-empty /tmp/agent-history-rewrite-approved-<gid>.md (the agent's record of
+#   an operator task comment approving a history rewrite under review) turns a
+#   preserve verdict into autosquash for an OWNED PR. Same note git-history-gate.sh
+#   honors; /eval-run audits it against the operator comment it cites.
+#
 #   Ownership guard (HARD override, checked first): if the authenticated gh user
 #   is NOT the PR author (currentUser != prAuthor), mode is ALWAYS preserve and
 #   squash-stale is a noop. We never autosquash or otherwise rewrite a PR we
@@ -131,6 +137,12 @@ IS_OWNER=$(echo "$MODE_JSON" | node -e "
   const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'))
   process.stdout.write(String(d.isOwner === true))
 ")
+
+REWRITE_OK="/tmp/agent-history-rewrite-approved-${AGENT_TASK_GID:-none}.md"
+if [[ "$MODE" == "preserve" && "$IS_OWNER" == "true" && -n "${AGENT_TASK_GID:-}" && -s "$REWRITE_OK" ]]; then
+  echo ">> pr-finalize-fixups: preserve -> autosquash by operator rewrite approval ($REWRITE_OK)" >&2
+  MODE="autosquash"
+fi
 
 # Find latest existing fixup commit's timestamp on this branch (if any).
 DEFAULT_UPSTREAM="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \

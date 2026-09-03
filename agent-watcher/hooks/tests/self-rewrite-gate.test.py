@@ -192,6 +192,18 @@ try:
     check('raw push of an additive commit passes', rc == 0, f'rc={rc} {err[:200]}')
     rc, err = hook(f'cd {repo} && git status', home, shim)
     check('non-push command is untouched', rc == 0, f'rc={rc} {err[:200]}')
+    with open(mode_file, 'w') as fh:
+        fh.write('preserve')
+    approval = f'/tmp/agent-history-rewrite-approved-{GID}.md'
+    with open(approval, 'w') as fh:
+        fh.write('operator comment gid 1: rewrite approved\n')
+    rc, err = hook(f'cd {repo} && git push --force-with-lease origin feature', home, shim)
+    check('preserve mode + operator rewrite approval allows the push', rc == 0, f'rc={rc} {err[:200]}')
+    rc, err = hook(f'cd {repo} && git rebase -i --autosquash origin/master', home, shim)
+    check('preserve mode + operator rewrite approval allows the autosquash', rc == 0, f'rc={rc} {err[:200]}')
+    os.remove(approval)
+    rc, err = hook(f'cd {repo} && git rebase -i --autosquash origin/master', home, shim)
+    check('without the approval the preserve squash block returns', rc == 2, f'rc={rc}')
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 

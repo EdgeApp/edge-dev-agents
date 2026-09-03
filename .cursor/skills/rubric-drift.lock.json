@@ -477,7 +477,7 @@
       ]
     },
     "one-shot:tdd-when-flagged": {
-      "hash": "6ad6c43a5a7d",
+      "hash": "495da791f9df",
       "dims": [
         "A31"
       ]
@@ -615,6 +615,18 @@
       "hash": "ce8652fc4f59",
       "dims": [
         "A21"
+      ]
+    },
+    "tdd:doc-rides-the-first-commit": {
+      "hash": "eb814bcc4886",
+      "dims": [
+        "A31"
+      ]
+    },
+    "file:tdd-stamp.sh": {
+      "hash": "c4dfcc02a33b",
+      "dims": [
+        "A31"
       ]
     }
   },

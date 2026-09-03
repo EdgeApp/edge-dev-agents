@@ -142,6 +142,14 @@ lines.forEach((line, i) => {
   if (ci >= 0 && line.indexOf(";", ci) >= 0) {
     findings.push(`mermaid: line ${i + 1} has a semicolon in message/note text — mermaid lexes ";" as a statement terminator and the diagram fails to render. Use a comma`)
   }
+  // A labelled dotted link is "-. text .->"; the spaces are part of the token.
+  // Written as "-.text.->" the label is not lexed as a label and the edge is
+  // dropped from the rendered graph, silently and with no parse error. The
+  // unlabelled "-.->" has no label to space and never matches here.
+  const dm = /-\.([^\n]*?)\.->/.exec(line)
+  if (dm != null && !(/^ /.test(dm[1]) && / $/.test(dm[1]))) {
+    findings.push(`mermaid: line ${i + 1} writes a dotted link label as "-.${dm[1]}.->" — mermaid needs a space on each side ("-. ${dm[1].trim()} .->") or the edge renders without its label`)
+  }
 })
 
 // ---------------------------------------------------------------------------
