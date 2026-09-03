@@ -169,6 +169,21 @@ Docs, code comments, and descriptions state what IS, not what changed: "Uses a h
 
 When a claim is about failure visibility or error handling, state what happens and who sees it: an exit code, a blocking gate, a report section, an operator ping. `Fails loudly`, `surfaces loudly`, `loud warning` are vague; `warn loudly` and `log loudly` are pure filler (the output already is the loudness). Litmus: delete the loudness word; if the sentence means the same, it was filler; if it stops distinguishing crash-and-report from continue-silently, replace it with the actual mechanism. Keep loud/loudly only when the same sentence names the silent alternative it contrasts with.
 
+## 22. Partner messages: locate once, never timestamp, prove once, ask once
+
+Scope: the external destinations in rule 15, and above all Slack messages to partners, which are read days later in a thread that already carries a timestamp and a sender.
+
+- **Locators once.** "on our side", "on our end", "on your side", "on your end", "ours:" appear at most once per message, and only where the sentence would otherwise leave the actor ambiguous. Elsewhere name the component: "the plugin", "your `-edge` endpoints", "the list endpoint". A message that keeps re-establishing whose side something is on reads as hedging.
+- **No send-time stamps.** `today`, `tonight`, `this morning`, `this afternoon`, `this evening`, `just now`, `right now`, `at the moment`, `at this time`, `currently` are out. The message carries its own timestamp; these words add nothing on the day and mislead a week later. A date appears only when it is not the send date: "on Aug 28", "since the Jul 14 deploy".
+- **One proof per claim.** After the observation that proves the point, stop. A second confirming observation ("our production plugin sees this too: ...") is cut, not appended; if the second observation is the stronger one, it replaces the first.
+- **One ask, no asides.** A message carries one request. A second request ("if the key changed, please send the current one") and a history aside ("it was disabled once before, on Apr 27") are cut unless the recipient must act on them, in which case they are the message.
+- **No intro labels.** "Measured today:", "What we get today:", "Observed:" become "We see:" or nothing; the list speaks for itself.
+
+> Bad: "What we get today: [list]. Our production plugin sees this too: quotes fail with 401. If the key changed, please send us the current one. It was disabled once before, on Apr 27."
+> Good: "We see: [list]. Was the key revoked or rotated around your Sep 1 deploy, or are our requests blocked by IP?"
+
+The first two bullets and the last are enforced by `scripts/no-slop-lint.sh`; the proof and ask bullets are judged by `scripts/no-slop-judge.sh` at the Slack and report boundaries.
+
 ## Examples
 
 For concrete before/after examples showing these rules applied, see [examples/bad-examples-fixture.md](examples/bad-examples-fixture.md) (a deliberate-slop corpus, exempt from the write-time lint by its fixture name) and [examples/good-examples.md](examples/good-examples.md).

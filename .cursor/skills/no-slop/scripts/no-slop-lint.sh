@@ -18,6 +18,14 @@
 #         (also matched after a greeting clause: "Hi team, two issues on X.")
 #   WARN  count + contentless predicate:   "Two consequences are easy to miss."
 #         (finite predicate list; incomplete by nature, hence warn-only)
+#   HARD  send-time stamps (SKILL rule 22): "today", "this morning", "right
+#         now", "at the moment", "currently" ... the destination already carries
+#         a timestamp; a date is fine, a relative stamp is not.
+#   HARD  intro label over a stamp/observation word: "What we get today:",
+#         "Measured today:", "Observed:" (line is only the label + colon)
+#   HARD  locator repeated (SKILL rule 22): "on our side/end", "on your
+#         side/end", "ours:" more than once per document (whole-document
+#         count; skipped under --fragment)
 #
 # Exclusions keeping false positives out: code fences, headings, table rows,
 # partitives ("Two of the five ..."), hyphenated compounds ("Two-phase auth"),
@@ -105,6 +113,7 @@ const VERBS = new Set(("is are was were has have had do does did start starts st
 const PRED = /\b(?:are|is)\s+(?:easy to miss|worth noting|worth calling out|worth mentioning|notable|important to note)\b|\bstands? out\b|\bdeserves? (?:mention|attention)\b/i
 
 const findings = []
+const locators = []  // [line, text]; SKILL rule 22, at most one per document
 let fence = false
 // Hard-wrapped prose (commit bodies wrap at 72, and PR bodies often inherit the
 // habit) puts one sentence across several physical lines. The line-scoped checks
@@ -166,6 +175,20 @@ LINES.forEach((raw, i) => {
     findings.push(["HARD", n, `decorative "loudly" (the output is already the loud part): delete it or name the mechanism`])
   else if (/\bloud(?:ly)?\b/i.test(noCode))
     findings.push(["WARN", n, `vague loudness claim: name the mechanism and audience (exit code / gate / report section / ping)`])
+  // Send-time stamps (SKILL rule 22): the destination carries a timestamp, so a
+  // relative stamp adds nothing on the day and misleads later. Dates are fine.
+  const STAMP = /\b(?:today|tonight|this (?:morning|afternoon|evening)|just now|right now|at the moment|at this time|as of (?:now|today)|currently)\b/i
+  const stampHit = noCode.match(STAMP)
+  // Intro label: a line that is only a label word (+ optional stamp) and a
+  // colon. "We see:" is the accepted form; anything narrating when or that an
+  // observation happened is the slop shape.
+  const LABEL = /^(?:measured|observed|what we (?:get|see|saw|found)|results?|findings?|tested|as of)\b[^:]{0,24}:\s*$/i
+  if (LABEL.test(noCode.trim()))
+    findings.push(["HARD", n, `intro label: "${noCode.trim().slice(0, 40)}" (use "We see:" or drop the label)`])
+  else if (stampHit)
+    findings.push(["HARD", n, `send-time stamp "${stampHit[0]}": the message carries its own timestamp; use a date only when it is not the send date`])
+  // Locators: counted per document below; collected here (code spans excluded).
+  for (const m of noCode.matchAll(/\bon (?:our|your|their) (?:side|end)\b|\bours:/gi)) locators.push([n, m[0]])
   if (FRAGMENT) return  // sentence-shape checks need the whole document
   // Continuation lines carry no paragraph of their own; their text was folded
   // into the line that starts it.
@@ -229,6 +252,11 @@ LINES.forEach((raw, i) => {
   }
 })
 
+if (!FRAGMENT && locators.length > 1) {
+  for (const [n, t] of locators.slice(1))
+    findings.push(["HARD", n, `locator repeated: "${t}" (at most one per message; name the component instead)`])
+}
+findings.sort((a, b) => a[1] - b[1])
 let hard = 0
 for (const [tier, n, msg] of findings) {
   if (tier === "HARD") hard++
