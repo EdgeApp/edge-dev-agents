@@ -21,6 +21,20 @@ set -euo pipefail
 # the env var alone is wrong because retired sessions keep AGENT_TASK_GID.
 "$(dirname "$0")/../orch-run-context.sh" || exit 0
 
+# Reviewer-bot outage narration is banned from Asana prose (operator ruling
+# 2026-09-02): it belongs in the run report's Finalize Gate as one unchecked
+# box and nowhere else. Same pattern the report gate uses.
+. "$HOME/.config/agent-watcher/hooks/lib/reviewer-outage-noise.sh"
+PROSE=$(printf '%s' "$INPUT" | jq -r '[.tool_input | (.text? // empty), (.html_text? // empty), (.notes? // empty), (.html_notes? // empty), (.comment? // empty), (.description? // empty)] | join("\n")' 2>/dev/null || true)
+if [ -n "$PROSE" ]; then
+  NOISE_TMP=$(mktemp); printf '%s\n' "$PROSE" > "$NOISE_TMP"
+  NOISE=$(reviewer_noise_hits "$NOISE_TMP" | head -4 || true); rm -f "$NOISE_TMP"
+  if [ -n "$NOISE" ]; then
+    jq -nc --arg r "BLOCKED: this Asana text narrates a reviewer-bot outage (quota / did not run). Operator ruling 2026-09-02: that state is ONE unchecked box in the run report's Finalize Gate with its reason, and appears nowhere else (no comment bullet, no re-gate note). Remove these lines and post again: $NOISE" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
+    exit 0
+  fi
+fi
+
 INPUT=$(cat)
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
 case "$TOOL" in

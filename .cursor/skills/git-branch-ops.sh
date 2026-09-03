@@ -7,6 +7,19 @@
 #   git-branch-ops.sh push [--remote <name>] [--branch <name>] [--force-with-lease]
 #   git-branch-ops.sh self-rewrite [--upstream <ref>] [--min-lines N] [--min-ratio N] [--gate]
 #   git-branch-ops.sh self-rewrite --whole-branch [--min-lines N] [--min-ratio N]
+#   git-branch-ops.sh fold-mode
+#
+# fold-mode: may a fixup on this branch be squashed into its target RIGHT NOW?
+# One JSON line: {"fold":true|false,"mode":"autosquash"|"preserve"|"no-pr"|
+# "unknown","reason":"..."}. Asks pr-address.sh review-mode for the branch's
+# open PR; `preserve` (a human is mid-review) means the fixup must stay a
+# fixup! commit so the reviewer sees the delta, UNLESS the operator approved a
+# rewrite (/tmp/agent-history-rewrite-approved-<AGENT_TASK_GID>.md, the same
+# note git-history-gate.sh honors). No PR, or an oracle that cannot answer,
+# folds (fail open: a fresh /im branch has no reviewer to protect).
+# lint-commit.sh consults this before its post-fixup autosquash, so every
+# fixup path (im, pr-land, tdd, self-rewrite folds, pr-address, bugbot) makes
+# the same call without each caller remembering a flag.
 #
 # self-rewrite: find unpublished commits that REWRITE lines this branch already
 # published. A commit whose removed lines were introduced by commits already on
@@ -276,8 +289,8 @@ run_self_rewrite() {
         }' 2>&1
       echo "  Fold, newest flagged commit first while it is the tip:"
       echo "        git reset --soft HEAD~1 && ~/.cursor/skills/lint-commit.sh --fixup <target-sha>"
-      echo "        (lint-commit autosquashes the fixup into its target at once, so the"
-      echo "        next flagged commit becomes the tip). An UNFLAGGED commit above a"
+      echo "        (lint-commit folds the fixup into its target at once when review-mode"
+      echo "        allows, so the next flagged commit becomes the tip). An UNFLAGGED commit above a"
       echo "        flagged one: move it below first with"
       echo "        ~/.cursor/skills/im/scripts/reorder-commits.sh <base> <hashes oldest..newest>."
       echo "  A commit that ADDS a new surface without touching the branch's own lines"
@@ -290,9 +303,38 @@ run_self_rewrite() {
   return 0
 }
 
+run_fold_mode() {
+  local prjson prnum owner rname mode="" note
+  prjson="$(gh pr view --json number,headRepositoryOwner,headRepository 2>/dev/null || true)"
+  if [[ -z "$prjson" ]]; then
+    printf '{"fold":true,"mode":"no-pr","reason":"no open PR for this branch"}\n'; return 0
+  fi
+  prnum="$(printf '%s' "$prjson" | jq -r '.number // empty')"
+  owner="$(printf '%s' "$prjson" | jq -r '.headRepositoryOwner.login // empty')"
+  rname="$(printf '%s' "$prjson" | jq -r '.headRepository.name // empty')"
+  if [[ -n "$prnum" && -n "$owner" && -n "$rname" ]]; then
+    mode="$("$HOME/.cursor/skills/pr-address/scripts/pr-address.sh" review-mode \
+      --owner "$owner" --repo "$rname" --pr "$prnum" 2>/dev/null | jq -r '.mode // empty' 2>/dev/null || true)"
+  fi
+  case "$mode" in
+    preserve)
+      note="/tmp/agent-history-rewrite-approved-${AGENT_TASK_GID:-none}.md"
+      if [[ -n "${AGENT_TASK_GID:-}" && -s "$note" ]]; then
+        printf '{"fold":true,"mode":"preserve","reason":"operator rewrite approval %s"}\n' "$note"
+      else
+        printf '{"fold":false,"mode":"preserve","reason":"a human reviewer is mid-review on PR #%s; keep the fixup! commit so they see the delta"}\n' "$prnum"
+      fi ;;
+    autosquash) printf '{"fold":true,"mode":"autosquash","reason":"no active human review on PR #%s"}\n' "$prnum" ;;
+    *) printf '{"fold":true,"mode":"unknown","reason":"review-mode unavailable; fail open"}\n' ;;
+  esac
+}
+
 case "$CMD" in
   autosquash)
     run_autosquash
+    ;;
+  fold-mode)
+    run_fold_mode
     ;;
   push)
     run_push
@@ -301,7 +343,7 @@ case "$CMD" in
     run_self_rewrite
     ;;
   *)
-    echo "Usage: git-branch-ops.sh {autosquash|push|self-rewrite} [args]" >&2
+    echo "Usage: git-branch-ops.sh {autosquash|push|self-rewrite|fold-mode} [args]" >&2
     exit 1
     ;;
 esac

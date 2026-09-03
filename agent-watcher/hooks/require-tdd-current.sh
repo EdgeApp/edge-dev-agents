@@ -76,7 +76,7 @@ this phase's entry under ## Phase history, then:
   $STAMP_SH $REPO_DIR $DOC_REL
   ~/.cursor/skills/lint-commit.sh --fixup \$(git rev-list --reverse $BASE..HEAD | head -1) $DOC_REL
 (the doc rides in the branch's FIRST commit, tdd doc-rides-the-first-commit;
-lint-commit autosquashes the fixup into it).
+lint-commit folds the fixup into it when review-mode allows).
 Legitimately no doc change owed? Write /tmp/agent-tdd-current-waiver-$AGENT_TASK_GID.md
 with the reason (audited by /eval-run).
 MSG

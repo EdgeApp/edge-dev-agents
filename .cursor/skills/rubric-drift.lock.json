@@ -204,7 +204,7 @@
       ]
     },
     "one-shot:finalize-gate": {
-      "hash": "920957bbfff7",
+      "hash": "e888a1795a95",
       "dims": [
         "A3"
       ]
@@ -576,7 +576,7 @@
       ]
     },
     "file:lint-commit.sh": {
-      "hash": "9dc80abe6ae8",
+      "hash": "8549520857df",
       "dims": [
         "A12"
       ]
@@ -618,7 +618,7 @@
       ]
     },
     "tdd:doc-rides-the-first-commit": {
-      "hash": "eb814bcc4886",
+      "hash": "d9c9da0b4133",
       "dims": [
         "A31"
       ]
@@ -696,8 +696,8 @@
       "hash": "fad0bb17ec63"
     },
     "bugbot:commit-via-script": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "b0dddeacab20"
+      "reason": "2026-09-03: mechanical: lint-commit.sh consults git-branch-ops.sh fold-mode; A12 grades the fold outcome",
+      "hash": "e80fcdb4929b"
     },
     "bugbot:slot-after-each-fixup": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -720,8 +720,8 @@
       "hash": "9bd54096a179"
     },
     "bugbot:script-timeouts": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "d7fecc9c6fcc"
+      "reason": "2026-09-03: caller ergonomics (block_until_ms budget), not a gradeable run behavior",
+      "hash": "4572e08188e0"
     },
     "bugbot:finalize-on-task-gid": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -952,16 +952,16 @@
       "hash": "49ebf1156326"
     },
     "pr-address:commit-via-script": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "aa942efa7dc2"
+      "reason": "2026-09-03: mechanical: lint-commit.sh consults git-branch-ops.sh fold-mode; A12 grades the fold outcome",
+      "hash": "ee8e64c5d0ab"
     },
     "pr-address:slot-after-each-fixup": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "14718b3cf86d"
     },
     "pr-address:script-timeouts": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "1459e2e03cbf"
+      "reason": "2026-09-03: caller ergonomics (block_until_ms budget), not a gradeable run behavior",
+      "hash": "d59c34def8fa"
     },
     "pr-address:operate-in-worktree": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1398,6 +1398,10 @@
     "asana-task-update:current-state-owns-the-tail": {
       "reason": "2026-08-28: 2026-08-28: mechanics-only rule (which flag writes the description tail); the graded OUTCOME — section refreshed when delivered scope diverges, operator prose above the delimiter untouched — is already covered by one-shot:description-current-state, so a second dimension would double-count the same evidence",
       "hash": "f41123c345d5"
+    },
+    "pr-address:retract-your-own-noise": {
+      "reason": "2026-09-03: fires only after an agent mis-posts; the observable is the ABSENCE of stray comments, which agent-eval already reads off live PR state rather than as its own dimension",
+      "hash": "0f0970f03dea"
     }
   },
   "excluded_skills": {

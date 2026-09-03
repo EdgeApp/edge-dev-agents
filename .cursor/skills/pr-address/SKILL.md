@@ -14,11 +14,13 @@ metadata:
 <rule id="no-git-editor">All git commands that may open an editor (`rebase --continue`, `commit` without `-m`) MUST be prefixed with `GIT_EDITOR=true` to prevent blocking on `COMMIT_EDITMSG` in the IDE.</rule>
 <rule id="no-gitkraken">NEVER use `git_log_or_diff:GitKraken`. Use local `git` commands directly.</rule>
 <rule id="this-file-wins">If any other instruction conflicts with this file, **this file wins** for `pr-address`.</rule>
-<rule id="commit-via-script">Commit fixups using `~/.cursor/skills/lint-commit.sh --no-reorder -m "fixup! {headline}" [files...]`. `--no-reorder` is required — the default reorder runs `rebase --autosquash` which squashes fixups immediately, conflicting with step 4's conditional autosquash. Do NOT manually run eslint — the commit script handles it.</rule>
+<rule id="commit-via-script">Commit fixups using `~/.cursor/skills/lint-commit.sh -m "fixup! {headline}" [files...]`. The script asks the review-mode oracle itself (`git-branch-ops.sh fold-mode`): in `preserve` it leaves the fixup at HEAD for `slot-after-each-fixup` and step 4's conditional autosquash; in `autosquash` it folds at once. Do NOT manually run eslint — the commit script handles it.</rule>
 <rule id="slot-after-each-fixup">Immediately after every successful `lint-commit.sh` call, run `~/.cursor/skills/slot-fixup.sh` to slot the new fixup next to its target's group. This keeps the "every fixup sits next to its target" invariant continuously. If `slot-fixup.sh` exits non-zero (rebase conflict), report and STOP — do not continue the address-pass.</rule>
 <rule id="one-fixup-per-target-per-turn">Produce at most ONE `fixup! <target-headline>` per target commit per address-pass (one human-review turn), NOT one per comment: the first fix landing on a target creates its fixup; every later fix this pass that targets the SAME commit amends into that existing fixup (`lint-commit.sh --no-reorder -m "fixup! {targetHeadline}"` targeting it, or `--fixup <its-sha>`) rather than adding another. Reviewer-bot churn (a bot re-reviewing on each push and posting fresh findings) condenses into the same per-target fixup — never a new commit per finding. A finding you REJECT (invalid / out-of-scope / infra-layer / an intentional documented design choice) is handled by reply + resolve with NO code change, so it does not push a commit and re-trigger the review loop. Distinct human-review turns stay separable because `step 1.5` squash-stale folds the prior turn's fixups before this turn's begins.</rule>
 <rule id="one-push-per-round">Reviewer bots bill PER PUSH, not per fixup (the bugbot credit gate, 2026-07-31). All of an address-pass's fixes accumulate LOCALLY (fixup commits + amends per `one-fixup-per-target-per-turn`, slotted per `slot-after-each-fixup`) and reach the remote in exactly ONE push: step 4's `pr-finalize-fixups.sh`, which owns the push. Never push mid-pass "to see CI", never push per-fix — each intermediate push buys a bot review of a HEAD you already know is incomplete. While a review is active (review-mode preserve), raw `git push` is hook-blocked (`git-history-gate.sh`); the sanctioned push path is the finalize script.</rule>
-<rule id="script-timeouts">GitHub API scripts can take up to 30s. Set `block_until_ms: 60000` when invoking `pr-address.sh`.</rule>
+<rule id="script-timeouts">Set `block_until_ms: 60000` when invoking `pr-address.sh` (GitHub API calls take up to 30s), EXCEPT for the body-carrying verbs — `reply`, `mark-addressed`, `comment` — which run the semantic no-slop judge and need `600000`. A judge killed by a short timeout produces NO output and no error, which is indistinguishable from a successful post; the resulting "did it work?" probe is what puts junk comments on a human's PR.</rule>
+
+<rule id="retract-your-own-noise">A comment posted by mistake (a probe, a wrong thread, a duplicate) is retracted with `pr-address.sh delete-comment --owner <o> --repo <r> --comment-id <id>`, which refuses any author but `currentUser`. Never leave agent noise on a human's PR, and never reach for raw `gh api --method DELETE` — it is hook-blocked. Retract only your OWN accidental posts: a substantive reply a reviewer may have already read is amended with a follow-up reply, not deleted.</rule>
 <rule id="reply-before-resolve">ALWAYS reply explaining how a comment was addressed BEFORE resolving or marking it. No silent resolutions.</rule>
 <rule id="non-owner-reply-only">If you do NOT author the PR (`isOwner: false` in `fetch` output — i.e. `currentUser !== prAuthor`), you may reply to threads and push fixups, but you must NEVER resolve threads (`resolve-thread`) or post `mark-addressed` markers. Resolving/marking mutates the owner's PR state; leave every thread unresolved for the owner. This pairs with the finalize ownership guard (non-owner ⇒ `preserve` mode, never autosquash) — on a PR you don't own: push fixups + reply, never rewrite history, never resolve.</rule>
 <rule id="resolution-source-of-truth">Only explicitly resolved threads (`isResolved: true`) or `<!-- addressed:... -->` markers count as resolved. Recency (commits after a comment) does NOT mean resolved.</rule>
@@ -122,7 +124,7 @@ Group the comments by fixup target, and process one TARGET at a time — produci
 2. Apply all of that target's fixes — comment hunks can be narrower than intent; apply consistently within the function/file
 3. Commit ONE fixup for the target with `lint-commit.sh`:
    ```bash
-   ~/.cursor/skills/lint-commit.sh --no-reorder -m "fixup! {targetHeadline}" [files...]
+   ~/.cursor/skills/lint-commit.sh -m "fixup! {targetHeadline}" [files...]
    ```
    If this pass already pushed a fixup for the SAME target (reviewer-bot churn arriving after a re-push), do NOT add a second — amend the new fix into that existing fixup (`git commit --amend --no-edit` when it is HEAD, else `lint-commit.sh --fixup <its-sha>` and let a later autosquash fold it), so the target keeps one fixup.
 4. **Immediately slot the fixup next to its target's group**:
@@ -171,6 +173,14 @@ Use the returned history to decide whether the existing reply still fully reflec
    ```bash
    ~/.cursor/skills/pr-address/scripts/pr-address.sh resolve-thread --thread-id "<PRRT_threadNodeId>"
    ```
+
+If a reply lands wrong (posted to the wrong thread, or a diagnostic probe that
+should never have shipped), retract it per `retract-your-own-noise`:
+
+```bash
+~/.cursor/skills/pr-address/scripts/pr-address.sh delete-comment \
+  --owner <OWNER> --repo <REPO> --comment-id <NUMERIC_ID>
+```
 </sub-step>
 
 <sub-step name="Review bodies and top-level comments (reply → mark addressed)">

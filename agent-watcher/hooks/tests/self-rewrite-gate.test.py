@@ -204,6 +204,31 @@ try:
     os.remove(approval)
     rc, err = hook(f'cd {repo} && git rebase -i --autosquash origin/master', home, shim)
     check('without the approval the preserve squash block returns', rc == 2, f'rc={rc}')
+
+    # ---- fold-mode (lint-commit's post-fixup decision) ----------------------
+    def fold_mode(gid=GID):
+        env = dict(GIT_ENV, HOME=home, PATH=shim + ':' + os.environ['PATH'])
+        if gid:
+            env['AGENT_TASK_GID'] = gid
+        p = subprocess.run([OPS, 'fold-mode'], cwd=repo, capture_output=True, text=True, env=env)
+        return json.loads(p.stdout.strip())
+    with open(mode_file, 'w') as fh:
+        fh.write('preserve')
+    d = fold_mode()
+    check('fold-mode: preserve -> keep the fixup', d['fold'] is False and d['mode'] == 'preserve', d)
+    with open(approval, 'w') as fh:
+        fh.write('operator comment gid 1: rewrite approved\n')
+    d = fold_mode()
+    check('fold-mode: preserve + operator approval -> fold', d['fold'] is True and d['mode'] == 'preserve', d)
+    os.remove(approval)
+    with open(mode_file, 'w') as fh:
+        fh.write('autosquash')
+    d = fold_mode()
+    check('fold-mode: autosquash -> fold', d['fold'] is True and d['mode'] == 'autosquash', d)
+    with open(os.path.join(shim, 'gh'), 'w') as fh:
+        fh.write('#!/bin/bash\nexit 1\n')
+    d = fold_mode()
+    check('fold-mode: no PR -> fold (fail open)', d['fold'] is True and d['mode'] == 'no-pr', d)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
