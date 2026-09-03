@@ -7,6 +7,7 @@
 #   memory-shared/      -> ~/.claude/memory-shared/   (shared memory notes)
 #   claude-workflows/   -> ~/.claude/workflows/       (Workflow-tool scripts)
 #   bin/link-shared-memory.sh -> ~/.claude/link-shared-memory.sh
+#   agent-watcher/launchd/*.plist -> ~/Library/LaunchAgents/ (rendered + loaded)
 # Then: links ~/.claude/skills -> ~/.cursor/skills, regenerates ~/.claude/CLAUDE.md,
 # and links shared memory into the standard entry points (~ and ~/git).
 #
@@ -108,6 +109,13 @@ if [[ -d "$HOME/.cursor/skills" ]]; then
   else
     warn "~/.claude/skills exists and is not a symlink — left as-is."
   fi
+fi
+# 5. launchd jobs (watcher, watchdog, sweeps, guards). Templates live in
+# agent-watcher/launchd; the installer renders __HOME__/__NODE_BIN__, loads
+# each job, and skips any whose program is not on this machine.
+if [[ -x "$HOME/.config/agent-watcher/launchd/install-launchd.sh" ]]; then
+  say "Installing launchd jobs from agent-watcher/launchd"
+  "$HOME/.config/agent-watcher/launchd/install-launchd.sh" || warn "some launchd jobs did not load; see output above"
 fi
 GEN="$HOME/.cursor/skills/convention-sync/scripts/generate-claude-md.sh"
 [[ -x "$GEN" ]] && { say "Regenerating ~/.claude/CLAUDE.md"; "$GEN" >/dev/null || warn "generate-claude-md.sh failed (non-fatal)"; }
