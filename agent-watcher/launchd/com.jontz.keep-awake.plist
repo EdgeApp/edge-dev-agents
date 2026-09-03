@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.jontz.keep-awake</string>
+  <!-- The fleet box must never idle-sleep: system pmset sleep is 1 minute and
+       only Claude Code's transient per-turn caffeinates were holding it off,
+       so idle fleets slept the machine and killed every session's RC bridge
+       (Android disconnect pattern, HOOD mid-response API error, 2026-08-12).
+       -s: prevent system sleep on AC. -i: prevent idle system sleep. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/caffeinate</string>
+    <string>-s</string>
+    <string>-i</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+</dict>
+</plist>

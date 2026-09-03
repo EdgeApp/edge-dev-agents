@@ -32,6 +32,8 @@
 # Exit codes: 0 always (a guard must never wedge the watcher chain).
 
 set -u
+# launchd starts scripts with a bare PATH; add nvm/homebrew/~/.local/bin (lib header has the details).
+source "$HOME/.config/agent-watcher/lib/launchd-env.sh"
 
 THRESHOLD=${RUNAWAY_CLI_THRESHOLD:-50}          # per-pgid cli count that triggers a kill
 RECORD_THRESHOLD=${RUNAWAY_RECORD_THRESHOLD:-25} # earlier count that triggers a forensic capture (parents still alive)

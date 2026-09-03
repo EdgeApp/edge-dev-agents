@@ -583,6 +583,14 @@ reproducible from a single clone + `./bootstrap.sh`:
   docs, and `credentials.example.json`. **Never committed:** `credentials.json`
   (secret) and machine-local state (`pool.json`, `slots.json`,
   `watchdog-state.json`, `*.state`, `*.log`, forensics).
+- **`agent-watcher/launchd/`**: templates for every `com.jontz.*` launchd job
+  (watcher, watchdog, reanchor sweep, checkout refresh, guards) plus
+  `install-launchd.sh`, which renders `__HOME__` and `__NODE_BIN__`, writes
+  `~/Library/LaunchAgents`, and loads each job, skipping any whose program is
+  not on the machine. The templates are the source of truth; the installed
+  plists are generated. Scripts that run under launchd source
+  `lib/launchd-env.sh` for their PATH, so a job definition never has to carry
+  tool paths.
 - **`claude-settings/hooks.json`**: a PROJECTION of the `.hooks` key of
   `~/.claude/settings.json`. Hook scripts ship in the agent-watcher tree;
   without this projection they would be installed but never fire.
@@ -656,7 +664,7 @@ cost is ever paid.
 edge-dev-agents/
 ├── README.md          # Synced copy of ~/.cursor/README.md
 ├── bootstrap.sh       # Fresh-machine installer (repo -> home)
-├── agent-watcher/     # Orchestration system incl. hooks/ (-> ~/.config/agent-watcher)
+├── agent-watcher/     # Orchestration system incl. hooks/, launchd/ (-> ~/.config/agent-watcher)
 ├── claude-settings/   # hooks.json registration projection (-> ~/.claude/settings.json .hooks)
 ├── claude-workflows/  # Workflow scripts (-> ~/.claude/workflows)
 ├── memory-shared/     # Shared Claude memory notes (-> ~/.claude/memory-shared)

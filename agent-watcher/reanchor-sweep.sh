@@ -40,6 +40,8 @@
 # Runs from launchd every 30 min (com.jontz.reanchor-sweep) — ALWAYS from
 # outside the anchors' panes (never-self-respawn). Exit 0 always.
 set -uo pipefail
+# launchd starts scripts with a bare PATH; add nvm/homebrew/~/.local/bin (lib header has the details).
+source "$HOME/.config/agent-watcher/lib/launchd-env.sh"
 
 DIR="$HOME/.config/agent-watcher"
 ST="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"

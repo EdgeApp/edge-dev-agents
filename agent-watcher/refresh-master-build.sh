@@ -66,6 +66,8 @@
 #   1 = a hard error (bad args, or build failed under --strict)
 
 set -euo pipefail
+# launchd starts scripts with a bare PATH; add nvm/homebrew/~/.local/bin (lib header has the details).
+source "$HOME/.config/agent-watcher/lib/launchd-env.sh"
 
 DIR="$HOME/.config/agent-watcher"
 CONFIG="$DIR/asana-config.json"
