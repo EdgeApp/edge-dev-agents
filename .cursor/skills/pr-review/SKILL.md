@@ -15,7 +15,7 @@ metadata:
 <rule id="no-script-bypass">If a companion script fails, report the error and STOP. Do NOT fall back to raw `gh`, `curl`, or other workarounds.</rule>
 <rule id="no-duplicate-feedback">Check existing reviews AND `inlineComments` from the context output (inline comments include resolved threads). Do not repeat feedback already given by another reviewer — this dedupe applies to workflow findings and conventions findings alike.</rule>
 <rule id="posting-gate">Posting is configured, never assumed. Default (no flag): present the formatted draft comments in chat and submit only after the user approves. `--comment`: submit without the ask. `--no-comment`: never submit; findings go to chat (and the run report in orch) only. In an orchestrated hands-off session the interactive ask is unavailable, so the default degrades to `--no-comment` with drafts delivered in the run report — post only when the task text explicitly directs posting.</rule>
-<rule id="never-approve">Never submit an `APPROVE` review. An agent approval can make a PR landable; approval is a human act. Events are `COMMENT`, or `REQUEST_CHANGES` only when there are Critical findings AND the PR is authored by us — on a PR we do not author, always `COMMENT` regardless of severity.</rule>
+<rule id="review-event">Every submitted review carries a verdict. `COMMENT` is never a choice: Critical or Warning findings after curation → `REQUEST_CHANGES`; Suggestion-only or zero findings → `APPROVE`, with the nits riding inline. An approval is a merge authorization here (pr-land discovers on review state and lands on approval), so the curation in 4c is what the verdict rests on — a finding downgraded to Suggestion to avoid blocking is a finding that lands the PR. GitHub refuses a review event on your own PR; the submit script detects that and falls back to `COMMENT`, naming the fallback in its output. When depth was degraded (`--quick`, or the workflow edge case) and the verdict is `APPROVE`, the review body says so.</rule>
 <rule id="curation-owns-truth">Workflow findings are candidates, not conclusions. Before delivery, judge each against your own read of the diff: reject false positives (state the evidence), downgrade findings whose failure mode pre-exists the PR (say so in the comment), and drop findings that only restate a documented intent of the PR. Rejected findings are reported in chat/report, never posted.</rule>
 <rule id="batch-reads">When reviewing changed files, batch independent Read/Grep calls in a single message.</rule>
 <rule id="script-timeouts">The companion script may take up to 30s. Set `block_until_ms: 60000` when invoking it.</rule>
@@ -40,7 +40,7 @@ If the user provides a PR URL or number, pass `--pr`. If they also specify a rep
 
 If the script exits code 2 with `PROMPT_GH_AUTH`, prompt: "`gh` CLI is not authenticated. Run `gh auth login` first."
 
-Save the output JSON — it contains `number`, `title`, `url`, `author`, `headRef`, `baseRef`, `headSha`, `reviews[]`, `inlineComments[]`, and `files[]` (with patches). Note whether the PR author is us (`gh api user --jq .login` vs `author`) — it decides the `never-approve` event mapping.
+Save the output JSON — it contains `number`, `title`, `url`, `author`, `headRef`, `baseRef`, `headSha`, `reviews[]`, `inlineComments[]`, and `files[]` (with patches).
 </step>
 
 <step id="2" name="Checkout PR branch">
@@ -104,10 +104,10 @@ Merge 4a + 4b into one findings set, then per `curation-owns-truth` and `no-dupl
 Resolve the posting decision per `posting-gate`:
 
 1. `--no-comment` (or orch default) → do not submit; findings and drafts go to chat / the run report. Done, go to step 7.
-2. Default interactive → show the drafts (grouped per PR file/line, with category), ask for approval, then submit the approved subset.
+2. Default interactive → show the drafts (grouped per PR file/line, with category) and the verdict `review-event` yields, ask the user which to post, then submit that subset.
 3. `--comment` → submit directly.
 
-Submit via the companion script with the event per `never-approve` (`COMMENT`, or `REQUEST_CHANGES` for Critical findings on an owned PR):
+Submit via the companion script with the event per `review-event` (`REQUEST_CHANGES` when any Critical or Warning finding survived, otherwise `APPROVE`):
 
 ```bash
 echo '<review-json>' | ~/.cursor/skills/pr-review/scripts/github-pr-review.sh submit \
@@ -117,7 +117,7 @@ echo '<review-json>' | ~/.cursor/skills/pr-review/scripts/github-pr-review.sh su
 Review JSON format:
 ```json
 {
-  "event": "COMMENT",
+  "event": "REQUEST_CHANGES",
   "body": "",
   "comments": [
     { "path": "src/file.ts", "line": 42, "side": "RIGHT", "body": "Comment text" }
@@ -125,14 +125,14 @@ Review JSON format:
 }
 ```
 
-0 findings after curation: no review is submitted (never an empty APPROVE).
+The script prints `{id, state, url}`, plus `event_fallback` when GitHub refused the requested event. A run with zero findings still submits: an `APPROVE` whose body states what was reviewed and at what depth.
 </step>
 
 <step id="7" name="Summarize">
 Provide a summary in the chat response:
 - Number of files reviewed, depth used (level or quick)
 - Findings by category (critical, warning, suggestion), plus the rejected-false-positive list with one-line reasons
-- What was posted (link to the submitted review) or that drafts await approval / posting was off
+- What was posted: the verdict submitted, a link to the review, and the `event_fallback` when the script reported one. Otherwise, that drafts await the user's go-ahead or that posting was off
 - PR link as `[PR title](url)`
 </step>
 

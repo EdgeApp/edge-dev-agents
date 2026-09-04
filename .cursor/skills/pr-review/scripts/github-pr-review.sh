@@ -125,9 +125,30 @@ case "$CMD" in
       fi
     fi
 
-    printf '%s' "$REVIEW_JSON" | jq --arg sha "$SHA" '. + {commit_id: $sha}' | \
-      gh api "repos/$OWNER/$REPO/pulls/$PR/reviews" -X POST --input - | \
-      jq '{id: .id, state: .state, url: .html_url}'
+    # Every review carries a verdict (pr-review `review-event`): APPROVE or
+    # REQUEST_CHANGES, never a bare COMMENT. GitHub refuses both events on a PR
+    # you authored yourself, and that is the ONE expected rejection here — the
+    # findings still have to land, so retry once as COMMENT and name the
+    # fallback in the output rather than making the agent decide.
+    PAYLOAD=$(printf '%s' "$REVIEW_JSON" | jq --arg sha "$SHA" '. + {commit_id: $sha}')
+    ENDPOINT="repos/$OWNER/$REPO/pulls/$PR/reviews"
+    ERRF=$(mktemp /tmp/pr-review-submit.XXXXXX)
+    RC=0
+    RESP=$(printf '%s' "$PAYLOAD" | gh api "$ENDPOINT" -X POST --input - 2>"$ERRF") || RC=$?
+    if [[ "$RC" -ne 0 ]]; then
+      if grep -qi 'your own pull request' "$ERRF"; then
+        rm -f "$ERRF"
+        printf '%s' "$PAYLOAD" | jq '.event = "COMMENT"' | \
+          gh api "$ENDPOINT" -X POST --input - | \
+          jq '{id: .id, state: .state, url: .html_url, event_fallback: "self_authored"}'
+        exit 0
+      fi
+      cat "$ERRF" >&2
+      rm -f "$ERRF"
+      exit 1
+    fi
+    rm -f "$ERRF"
+    printf '%s' "$RESP" | jq '{id: .id, state: .state, url: .html_url}'
     ;;
 
   *)
