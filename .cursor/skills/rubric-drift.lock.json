@@ -628,6 +628,18 @@
       "dims": [
         "A31"
       ]
+    },
+    "changelog:final-state-only": {
+      "hash": "e25f6a0346fb",
+      "dims": [
+        "A34"
+      ]
+    },
+    "changelog:few-entries": {
+      "hash": "567066a9bd2b",
+      "dims": [
+        "A34"
+      ]
     }
   },
   "acked_uncovered": {
@@ -1406,6 +1418,18 @@
     "task-review:operator-final-say": {
       "reason": "2026-09-03: graded under A7 as true-blocker condition (e); the gate is mechanical (require-plan-before-developing.sh), no separate dimension",
       "hash": "c7682b76a643"
+    },
+    "changelog:entry-shape": {
+      "reason": "2026-09-04: mechanically enforced by ~/.config/agent-watcher/hooks/lint-md-on-write.sh via ~/.cursor/skills/changelog/scripts/changelog-entry-lint.sh (length cap, mechanism tail, second sentence) on every CHANGELOG.md write vector",
+      "hash": "2e1ddbc3fa60"
+    },
+    "changelog:no-wrap": {
+      "reason": "2026-09-04: mechanically enforced by changelog-entry-lint.sh wrapped-continuation check via lint-md-on-write.sh",
+      "hash": "7f680c2a0f58"
+    },
+    "changelog:reference-old-entries": {
+      "reason": "2026-09-04: process step (which slice to read for calibration); its outcome is graded through entry-shape, which is mechanical",
+      "hash": "2032c13909cb"
     }
   },
   "excluded_skills": {
@@ -1425,7 +1449,7 @@
     "eval-run": "2026-07-19: the eval layer itself; grades orch runs, is not one",
     "resolve-run": "2026-07-19: the eval layer itself; grades orch runs, is not one",
     "coinhub": "2026-07-24: Standalone operator-invocable coinhub maintenance skill; domain-procedure rules (snapshot regen, safe force-push, theme drift), not orchestration-gating behavior. Not wired into one-shot delegation, so not an orch dependent the agent-eval/orch-eval rubrics grade. Re-evaluate if one-shot ever delegates to /coinhub.",
-    "agents-md": "2026-07-31: Non-orch: repo-authoring tooling invoked by the AGENTS.md write gate, not part of the one-shot delegation chain; its correctness is enforced by require-agents-md-skill.sh plus the skill's own checklist, not by a run-eval dimension.",
+    "agents-md": "2026-07-31: Non-orch: repo-authoring tooling invoked by the AGENTS.md write gate, not part of the one-shot delegation chain; its correctness is enforced by require-skill-for-file.sh plus the skill's own checklist, not by a run-eval dimension.",
     "kanban-categorize": "2026-08-10: 2026-08-10: operator tooling for Asana board grooming; invoked by a human, not reachable from one-shot or the watcher",
     "develop-staging": "2026-08-26: operator release tooling: a human cuts the staging release with it. one-shot never delegates to it, so no orchestrated run is graded against its rules.",
     "slack": "2026-08-26: operator comms tooling driven from anchors/chats; orch runs draft comms as gists for human review and never invoke /slack"

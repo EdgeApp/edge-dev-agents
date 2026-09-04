@@ -15,17 +15,25 @@
 # inject-run-context.sh pre-writes markers for the bodies it injects at
 # session start (asana-plan, task-review).
 #
-# Markers: /tmp/agent-skill-read-<gid>-<skill>. Scope: no-ops unless
-# AGENT_TASK_GID is set. Always exit 0 (PostToolUse; never blocks).
+# Markers: /tmp/agent-skill-read-<key>-<skill>. <key> is AGENT_TASK_GID in
+# orch runs and sess-<session_id> in interactive sessions, so the file gates
+# that cover interactive editing (require-skill-for-file.sh, all-sessions
+# entries) can credit a skill loaded ahead of the write. The orch gates only
+# ever look up the gid key. Always exit 0 (PostToolUse; never blocks).
 set -uo pipefail
-
-[ -n "${AGENT_TASK_GID:-}" ] || exit 0
 
 INPUT=$(cat 2>/dev/null || true)
 [ -n "$INPUT" ] || exit 0
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
 
-mark() { touch "/tmp/agent-skill-read-$AGENT_TASK_GID-$1" 2>/dev/null || true; }
+KEY="${AGENT_TASK_GID:-}"
+if [ -z "$KEY" ]; then
+  SID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)
+  [ -n "$SID" ] || exit 0
+  KEY="sess-$SID"
+fi
+
+mark() { touch "/tmp/agent-skill-read-$KEY-$1" 2>/dev/null || true; }
 
 case "$TOOL" in
   Read)
