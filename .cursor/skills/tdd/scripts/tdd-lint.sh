@@ -87,6 +87,33 @@ lines.forEach((line, i) => {
   }
 })
 
+// The number a link DISPLAYS must match the heading its anchor resolves to.
+// Renumbering rewrites the anchor and leaves the text behind, and the result
+// still RESOLVES, so the check above cannot see it: a link reading
+// "decision 9.1" whose anchor points at section 7.1 looks correct to every
+// mechanical check and wrong to every reader.
+const headingBySlug = new Map(headings.map(h => [h.slug, h.text]))
+const numberedLinkRe = /\[([^\]]*)\]\(#([^)]+)\)/g
+lines.forEach((line, i) => {
+  numberedLinkRe.lastIndex = 0
+  let nm
+  while ((nm = numberedLinkRe.exec(line)) != null) {
+    const text = nm[1]
+    const anchor = nm[2]
+    const heading = headingBySlug.get(anchor)
+    if (heading == null) continue
+    const hn = /^(\d+(?:\.\d+)*)\.?\s/.exec(heading)
+    if (hn == null) continue
+    const tn =
+      /(?:^|\s)(?:[Ss]ections?|[Dd]ecisions?)\s+(\d+(?:\.\d+)*)\b/.exec(text) ??
+      /^\s*(\d+(?:\.\d+)*)\s*$/.exec(text)
+    if (tn == null) continue
+    if (tn[1] !== hn[1]) {
+      findings.push(`ref: line ${i + 1} displays "${tn[1]}" but #${anchor} is section ${hn[1]} — renumbering left the link text behind`)
+    }
+  }
+})
+
 // Plain-text section/decision references outside links.
 inFence = false
 lines.forEach((line, i) => {
@@ -191,6 +218,35 @@ if (glossIdx >= 0) {
 
   // Per-section first-use linking is enforced deterministically by
   // tdd-glossary-link.sh --check (run after this node block).
+}
+
+// Decisions: every entry names what would reopen it. The alternatives and the
+// evidence are judgment, but the trigger is checkable, and it is the part that
+// silently goes missing: a decision with no trigger is invisible on the day the
+// condition that would reopen it flips.
+const decIdx = lines.findIndex(l => /^##\s+(\d+\.\s+)?Decisions\s*$/i.test(l))
+if (decIdx >= 0) {
+  let decEnd = lines.length
+  for (let i = decIdx + 1; i < lines.length; i++) {
+    if (/^##\s+/.test(lines[i])) { decEnd = i; break }
+  }
+  let cur = null
+  const flushDecision = () => {
+    if (cur == null) return
+    if (!/reopen/i.test(cur.body.join("\n"))) {
+      findings.push(`decision: "${cur.title}" (line ${cur.line}) names no reopen trigger — say what would reopen it (decisions-with-alternatives)`)
+    }
+  }
+  for (let i = decIdx + 1; i < decEnd; i++) {
+    const dm = /^###\s+(.*)$/.exec(lines[i])
+    if (dm != null) {
+      flushDecision()
+      cur = { title: dm[1].trim(), line: i + 1, body: [] }
+    } else if (cur != null) {
+      cur.body.push(lines[i])
+    }
+  }
+  flushDecision()
 }
 
 // Acronyms that need no explanation to this audience.
