@@ -442,7 +442,8 @@ done.
 | | `no-self-respawn.sh` | No ScheduleWakeup/CronCreate/`claude --resume` self-respawn |
 | | `block-piped-watcher-scripts.sh` | Watcher status scripts run bare (pipes silently masked their exit codes); gated-claim commands hard-block instead of rewriting |
 | | `mark-agent-authored-asana.sh` | In-flight-run Asana prose carries the 🥋/👊 authorship markers; operator-context text stays unmarked |
-| | `require-agents-md-skill.sh` + `mark-agents-md-skill-read.sh` | AGENTS.md edits load the authoring skill first |
+| | `require-skill-for-file.sh` | A file whose NAME has an owning skill (AGENTS.md: agents-md, every session; CHANGELOG.md: changelog, orch runs) is written only after that skill entered context; deny-with-body via the shared gate library, one table for all such files |
+| | `lint-md-on-write.sh` | Markdown written outside the internal allowlist passes the mechanical no-slop tier on every vector (Write, Edit, redirect, tee, sed -i, perl -pi); CHANGELOG.md targets also pass the changelog entry-shape lint (length cap, mechanism tails, second sentences) |
 | | `require-skill-read-for-scripts.sh` + `mark-skill-read.sh` | A skill's companion script runs only after its SKILL.md FULLY entered context; the deny message delivers the complete body itself (deny-with-body) and writes the marker, so the retry passes educated. Marking is strict: full Read (no offset/limit), bare `cat`, Skill tool, or gate/session-start injection; partial reads (sed slices, cat piped to head) earn nothing. Bodies over 50KB (one-shot, pr-land) fall back to a read-in-full pointer without a marker |
 | | `mark-playbook-read.sh` | Records the playbook read the drive gate requires |
 | | `nudge-asana-mcp.sh` | Steers bulk Asana reads to the cheaper script path |

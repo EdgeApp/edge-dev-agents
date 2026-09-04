@@ -102,12 +102,8 @@ This ensures the subsequent feature commit introduces zero pre-existing lint fin
    ~/.cursor/skills/lint-commit.sh --fixup <hash> [files...]
    ```
    This marks the commit for squashing into the target commit; `lint-commit.sh` folds it at once unless the review-mode oracle says a human is mid-review (`preserve`), in which case it stays a `fixup!` commit until the next sanctioned squash. Use `git log --oneline` to find the target hash.
-6. Include a `CHANGELOG.md` entry in the **last feature commit** (not a separate commit) using format: `- type: description`
-   - Types: `added`, `changed`, `fixed`
-   - Example: `- added: New short feature description`
-   - Entries are grouped by type in order: all `added`, then all `changed`, then all `fixed`
+6. Include a `CHANGELOG.md` entry in the **last feature commit** (not a separate commit). Entry shape and calibration are the changelog skill's contract (`changelog` `entry-shape`), which the CHANGELOG.md write gate delivers on the first write.
    - CHANGELOG.md must ONLY appear in the last commit — never in intermediate feature commits
-   - Avoid reading more than 50 lines of the file
    - **Which section** (see CHANGELOG placement rules below)
 </step>
 

@@ -10,13 +10,24 @@
 # shipped unlinted because no boundary between Write and `gh api` ran the lint.)
 #
 # Coverage by vector:
-#   Write  *.md outside the allowlist -> FULL mechanical lint of content
+#   Write  *.md outside the allowlist -> FULL mechanical lint of content when
+#          the file is new; when it already exists, FRAGMENT lint of the lines
+#          the write ADDS (a whole-file rewrite must not be blocked by prose
+#          already on disk, e.g. a banned word deep in a changelog's history)
 #   Edit   *.md outside the allowlist -> FRAGMENT lint of new_string (position-
 #          dependent sentence-shape checks skipped; em dashes / vocabulary /
 #          session links / loudness still apply)
-#   Bash   command REDIRECTING into *.md outside the allowlist (heredoc, > or
-#          >>) -> FRAGMENT lint of the command text (prose interleaved with
-#          shell syntax, so shape checks would false-positive)
+#   Bash   command WRITING a *.md outside the allowlist (redirect, tee, sed -i,
+#          perl -pi; lib/md-write-target.sh owns the vector list) -> FRAGMENT
+#          lint of the command text (prose interleaved with shell syntax, so
+#          shape checks would false-positive)
+#
+# CHANGELOG.md targets additionally run the changelog skill's entry-shape lint
+# (~/.cursor/skills/changelog/scripts/changelog-entry-lint.sh): length cap,
+# mechanism-tail connectives, second sentences. A full Write is diffed against
+# the file on disk so only NEW lines are judged; existing verbose entries are
+# history, not this write's fault. The skill-read gate for CHANGELOG.md lives
+# in require-skill-for-file.sh, not here.
 #
 # MECHANICAL TIER ONLY: no --semantic here. Writes are high-frequency and md
 # files legitimately hold quoted data; the judge tier runs at the posting/attach
@@ -76,6 +87,10 @@ case "$TOOL" in
     allowlisted "$TARGET" && exit 0
     TEXT=$(printf '%s' "$INPUT" | jq -r '.tool_input.content // empty' 2>/dev/null || true)
     MODE=""
+    if [ -f "$TARGET" ]; then
+      TEXT=$(comm -13 <(sort -u "$TARGET") <(printf '%s\n' "$TEXT" | sort -u) 2>/dev/null || printf '%s' "$TEXT")
+      MODE="--fragment"
+    fi
     # Skill-read gate (see header). Only full Writes: an Edit or heredoc
     # fragment presupposes a document already written under the gate.
     if [ -n "${AGENT_TASK_GID:-}" ] && [ -f "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh" ]; then
@@ -99,15 +114,14 @@ case "$TOOL" in
   Bash)
     CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
     [ -n "$CMD" ] || exit 0
-    # A redirect into a .md target ('> x.md', '>> x.md', 'tee x.md'); heredoc
-    # bodies ride inside $CMD so linting the command text covers them. The
-    # operator must be preceded by whitespace/start-of-line: prose like
-    # '<repo>/README.md' inside a heredoc otherwise reads as '> /README.md'
-    # (the 2026-08-26 FP that blocked a SKILL.md rewrite).
-    TARGET=$(printf '%s' "$CMD" | grep -oE '(^|[[:space:]])(>>?|tee([[:space:]]+-a)?)[[:space:]]*"?[^"[:space:];|&]+\.md' | sed -E 's/^[[:space:]]*(>>?|tee([[:space:]]+-a)?)[[:space:]]*"?//' | head -1 || true)
+    # Target from the mention-stripped view (heredoc bodies and quoted spans
+    # blanked): a command that QUOTES 'sed -i x.md' in a report is not a write.
+    # The lint itself runs on the raw text, since the heredoc body IS the prose.
+    [ -f "$HOME/.config/agent-watcher/hooks/lib/md-write-target.sh" ] || exit 0
+    . "$HOME/.config/agent-watcher/hooks/lib/md-write-target.sh"
+    CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+    TARGET=$(bash_write_target "$CMD_M" "$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)")
     [ -n "$TARGET" ] || exit 0
-    TARGET="${TARGET/#\~/$HOME}"
-    case "$TARGET" in /*) ;; *) TARGET="$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)/$TARGET" ;; esac
     allowlisted "$TARGET" && exit 0
     TEXT="$CMD"
     MODE="--fragment"
@@ -132,5 +146,18 @@ if [ "$RC" -eq 1 ]; then
 $HARD
 Carve-outs: internal tooling paths (~/.cursor, ~/.claude, ~/.config, ~/agent-evals) are exempt; a file that holds FETCHED TEXT AS DATA or a deliberate-slop test corpus is exempt by NAME — save it as .txt/.json, or name it raw-*/data-*/*fixture*." >&2
   exit 2
+fi
+
+# CHANGELOG entry shape (see header). Judged on the lines this write ADDS
+# (Write over an existing file is already reduced to them above).
+CL_LINT="$HOME/.cursor/skills/changelog/scripts/changelog-entry-lint.sh"
+if [ "$(basename "$TARGET")" = "CHANGELOG.md" ] && [ -x "$CL_LINT" ]; then
+  CL_FLAG=""; [ "$TOOL" = "Bash" ] && CL_FLAG="--fragment"
+  CL_OUT=$(printf '%s\n' "$TEXT" | "$CL_LINT" $CL_FLAG 2>/dev/null); CL_RC=$?
+  if [ "$CL_RC" -eq 1 ]; then
+    echo "BLOCKED: CHANGELOG entry shape (changelog skill \`entry-shape\`). One line, one clause, under ${CHANGELOG_MAX_LEN:-140} chars, outcome only; the mechanism and the why belong in the commit body:
+$(printf '%s' "$CL_OUT" | grep '^HARD' | head -6)" >&2
+    exit 2
+  fi
 fi
 exit 0

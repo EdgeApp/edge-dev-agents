@@ -12,16 +12,6 @@
     {
       "hooks": [
         {
-          "command": "~/.config/agent-watcher/hooks/mark-agents-md-skill-read.sh",
-          "timeout": 10,
-          "type": "command"
-        }
-      ],
-      "matcher": "Skill|Read|Bash"
-    },
-    {
-      "hooks": [
-        {
           "command": "~/.config/agent-watcher/hooks/mark-skill-read.sh",
           "timeout": 10,
           "type": "command"
@@ -145,8 +135,8 @@
           "type": "command"
         },
         {
-          "command": "~/.config/agent-watcher/hooks/require-agents-md-skill.sh",
-          "timeout": 10,
+          "command": "~/.config/agent-watcher/hooks/require-skill-for-file.sh",
+          "timeout": 15,
           "type": "command"
         },
         {
@@ -170,8 +160,8 @@
           "type": "command"
         },
         {
-          "command": "~/.config/agent-watcher/hooks/require-agents-md-skill.sh",
-          "timeout": 10,
+          "command": "~/.config/agent-watcher/hooks/require-skill-for-file.sh",
+          "timeout": 15,
           "type": "command"
         },
         {
