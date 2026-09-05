@@ -49,6 +49,11 @@
 #   - data/fixture files by NAME: basename starting raw- or data-, or containing
 #     "fixture" — the sanctioned way to save fetched text or deliberate-slop
 #     test corpora as .md (or just use .txt/.json, which are never linted)
+#   - agent skills ANYWHERE (any path segment `skills/<name>/SKILL.md`, and
+#     anything under a `.claude/skills/` dir): skills are agent-facing tooling
+#     wherever they live (repo-local skills, the site-orch install), and the
+#     only skill that must itself read clean is no-slop (operator ruling
+#     2026-09-04). The no-slop exception above still wins.
 #
 # Fail-open on every infra error: a lint outage must never block file writes.
 # Exit 2 = block (stderr -> model). Not gid-gated: interactive sessions post
@@ -68,6 +73,7 @@ allowlisted() { # $1 = absolute-ish path; exit 0 = skip linting
   case "$b" in raw-*|data-*|*fixture*) return 0 ;; esac
   case "$p" in
     "$HOME/.cursor/skills/no-slop/"*) return 1 ;;
+    */skills/*/SKILL.md|*/.claude/skills/*) return 0 ;;
     "$HOME/.cursor/"*|"$HOME/.claude/"*|"$HOME/.config/"*|"$HOME/.local/"*|"$HOME/agent-evals/"*) return 0 ;;
     # Orch run machinery under /tmp: agent-state-<gid>.md (mid-run state file),
     # agent-run-report-*.md (its own boundary is the attach gate, which
