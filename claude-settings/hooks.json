@@ -18,6 +18,16 @@
         }
       ],
       "matcher": "Read|Bash|Skill"
+    },
+    {
+      "hooks": [
+        {
+          "command": "/Users/eddy/git/site-orch/hooks/spec-read-receipt.sh",
+          "timeout": 10,
+          "type": "command"
+        }
+      ],
+      "matcher": "Read"
     }
   ],
   "PreToolUse": [
@@ -142,6 +152,11 @@
         {
           "command": "~/.config/agent-watcher/hooks/lint-md-on-write.sh",
           "timeout": 30,
+          "type": "command"
+        },
+        {
+          "command": "/Users/eddy/git/site-orch/hooks/spec-read-gate.sh",
+          "timeout": 10,
           "type": "command"
         }
       ],

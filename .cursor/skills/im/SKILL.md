@@ -111,7 +111,7 @@ This ensures the subsequent feature commit introduces zero pre-existing lint fin
 The following apply only when working in the `edge-react-gui` repo:
 
 - New string literals should be added to `en_US.ts` in the SAME commit that uses them, not in a separate commit. The `lint-commit.sh` script runs the `localize` script automatically (via npm or yarn, auto-detected) when `en_US.ts` is in the changeset.
-- **Editing `en_US.ts`**: Use grep to find exact insertion points rather than reading the file in chunks. The file is ~2500 lines; reading it piecemeal wastes context. Example:
+- **Editing `en_US.ts`**: the values are user-facing copy and lint like a PR body (`/no-slop`: no em dashes, no banned vocabulary, no count-announcement openers); the write gate runs `no-slop-lint.sh --strings` over the values you add, in this repo and in edge-login-ui-rn's `enUS.json`. Use grep to find exact insertion points rather than reading the file in chunks. The file is ~2500 lines; reading it piecemeal wastes context. Example:
   ```bash
   rg -n "nearby_string_key" src/locales/en_US.ts
   ```
