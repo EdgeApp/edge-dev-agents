@@ -144,7 +144,8 @@
       "eval-run",
       "pokemon",
       "eddy-orch-mining",
-      "main2"
+      "main2",
+      "edge"
     ],
     "idle_reap_hours": 72
   }

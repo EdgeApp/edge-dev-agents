@@ -9,6 +9,11 @@
 # here. (2026-08-19: a PR review with a courtesy ender and a forward reference
 # shipped unlinted because no boundary between Write and `gh api` ran the lint.)
 #
+# LOCALE STRINGS (operator ruling 2026-09-07): user-facing copy is outward
+# prose too. Writes to a locale strings file (any `*/locales/en_US.ts`, any
+# `*/locales/strings/enUS.json`) run the same lint in `--strings` mode, which
+# lints only the quoted values (keys, comments and code are not prose).
+#
 # Coverage by vector:
 #   Write  *.md outside the allowlist -> FULL mechanical lint of content when
 #          the file is new; when it already exists, FRAGMENT lint of the lines
@@ -85,12 +90,15 @@ allowlisted() { # $1 = absolute-ish path; exit 0 = skip linting
   return 1
 }
 
-TEXT="" MODE="" TARGET=""
+TEXT="" MODE="" TARGET="" STRINGS=""
+is_locale() { case "$1" in */locales/en_US.ts|*/locales/strings/enUS.json) return 0 ;; *) return 1 ;; esac; }
+lintable() { case "$1" in *.md) return 0 ;; esac; is_locale "$1"; }
 case "$TOOL" in
   Write)
     TARGET=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
-    case "$TARGET" in *.md) ;; *) exit 0 ;; esac
+    lintable "$TARGET" || exit 0
     allowlisted "$TARGET" && exit 0
+    is_locale "$TARGET" && STRINGS="--strings"
     TEXT=$(printf '%s' "$INPUT" | jq -r '.tool_input.content // empty' 2>/dev/null || true)
     MODE=""
     if [ -f "$TARGET" ]; then
@@ -99,7 +107,7 @@ case "$TOOL" in
     fi
     # Skill-read gate (see header). Only full Writes: an Edit or heredoc
     # fragment presupposes a document already written under the gate.
-    if [ -n "${AGENT_TASK_GID:-}" ] && [ -f "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh" ]; then
+    if [ -z "$STRINGS" ] && [ -n "${AGENT_TASK_GID:-}" ] && [ -f "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh" ]; then
       . "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh"
       if [ -n "$(skill_read_missing no-slop)" ]; then
         {
@@ -112,8 +120,9 @@ case "$TOOL" in
     ;;
   Edit)
     TARGET=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
-    case "$TARGET" in *.md) ;; *) exit 0 ;; esac
+    lintable "$TARGET" || exit 0
     allowlisted "$TARGET" && exit 0
+    is_locale "$TARGET" && STRINGS="--strings"
     TEXT=$(printf '%s' "$INPUT" | jq -r '.tool_input.new_string // empty' 2>/dev/null || true)
     MODE="--fragment"
     ;;
@@ -126,9 +135,16 @@ case "$TOOL" in
     [ -f "$HOME/.config/agent-watcher/hooks/lib/md-write-target.sh" ] || exit 0
     . "$HOME/.config/agent-watcher/hooks/lib/md-write-target.sh"
     CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
-    TARGET=$(bash_write_target "$CMD_M" "$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)")
+    CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)
+    TARGET=$(bash_write_target "$CMD_M" "$CWD")
+    # Locale strings files written from Bash (sed -i / heredoc): exact basenames.
+    [ -n "$TARGET" ] || TARGET=$(bash_write_target "$CMD_M" "$CWD" "en_US.ts")
+    [ -n "$TARGET" ] || TARGET=$(bash_write_target "$CMD_M" "$CWD" "enUS.json")
     [ -n "$TARGET" ] || exit 0
     allowlisted "$TARGET" && exit 0
+    # A shell command is not a `key: value` line, so a locale write from Bash
+    # gets the plain fragment lint over the command text (em dashes, banned
+    # vocabulary); STRINGS stays empty here on purpose.
     TEXT="$CMD"
     MODE="--fragment"
     ;;
@@ -139,15 +155,16 @@ esac
 # (name.XXXXXX.md) as a LITERAL filename — concurrent sessions collide.
 TMP=$(mktemp /tmp/lint-md-write.XXXXXX) || exit 0
 printf '%s\n' "$TEXT" > "$TMP"
-if [ -n "$MODE" ]; then
-  OUT=$("$LINT" "$TMP" "$MODE" 2>/dev/null); RC=$?
-else
-  OUT=$("$LINT" "$TMP" 2>/dev/null); RC=$?
-fi
+OUT=$("$LINT" "$TMP" $MODE $STRINGS 2>/dev/null); RC=$?
 rm -f "$TMP"
 
 if [ "$RC" -eq 1 ]; then
   HARD=$(printf '%s' "$OUT" | grep '^HARD' | head -6)
+  if [ -n "$STRINGS" ]; then
+    echo "BLOCKED: user-facing copy being written to $TARGET fails the shared no-slop lint (locale strings are outward prose: no em dashes, no banned vocabulary, no count-announcement openers, no send-time stamps). Fix these values and rewrite:
+$HARD" >&2
+    exit 2
+  fi
   echo "BLOCKED: markdown being written to $TARGET fails the shared no-slop lint (md is outward-facing prose by default). Fix these and rewrite:
 $HARD
 Carve-outs: internal tooling paths (~/.cursor, ~/.claude, ~/.config, ~/agent-evals) are exempt; a file that holds FETCHED TEXT AS DATA or a deliberate-slop test corpus is exempt by NAME — save it as .txt/.json, or name it raw-*/data-*/*fixture*." >&2

@@ -48,7 +48,16 @@
 # and skips the sentence-shape checks, which false-positive without the
 # surrounding document.
 #
-# Usage: no-slop-lint.sh <file.md> [--warn-only] [--fragment] [--semantic]
+# --strings: the input is a LOCALE STRINGS file (edge-react-gui src/locales/
+# en_US.ts, edge-login-ui-rn src/common/locales/strings/enUS.json). Only the
+# quoted VALUES are prose: each `key: `text``, `key: 'text'` or `"key": "text"`
+# line is reduced to its text (escapes unfolded, %1$s placeholders kept), every
+# other line is blanked, and each value is linted as its own complete sentence
+# set (the count-opener shapes run even under --fragment, since a value never
+# wraps across lines). Operator ruling 2026-09-07: user-facing copy is outward
+# prose and gets the same lint as a PR body.
+#
+# Usage: no-slop-lint.sh <file.md> [--warn-only] [--fragment] [--semantic] [--strings]
 # Output: "HARD <line>: <finding>" / "WARN <line>: <finding>" per finding.
 # Exit: 0 = clean or warnings only (always 0 with --warn-only), 1 = HARD
 #       findings, 2 = usage.
@@ -56,14 +65,15 @@
 set -uo pipefail
 
 FILE="${1:-}"
-[ -f "$FILE" ] || { echo "usage: no-slop-lint.sh <file.md> [--warn-only] [--fragment] [--semantic]" >&2; exit 2; }
+[ -f "$FILE" ] || { echo "usage: no-slop-lint.sh <file.md> [--warn-only] [--fragment] [--semantic] [--strings]" >&2; exit 2; }
 shift
-WARN_ONLY=0 FRAGMENT=0 SEMANTIC=0
+WARN_ONLY=0 FRAGMENT=0 SEMANTIC=0 STRINGS=0
 for a in "$@"; do
   case "$a" in
     --warn-only) WARN_ONLY=1 ;;
     --fragment)  FRAGMENT=1 ;;
     --semantic)  SEMANTIC=1 ;;
+    --strings)   STRINGS=1 ;;
     *) echo "no-slop-lint: unknown flag $a" >&2; exit 2 ;;
   esac
 done
@@ -71,8 +81,9 @@ VOCAB="$(cd "$(dirname "$0")/.." && pwd)/banned-vocabulary.md"
 
 MECH_OUT=$(node -e '
 const fs = require("fs")
-const [file, vocabFile, fragment] = process.argv.slice(1)
+const [file, vocabFile, fragment, strings] = process.argv.slice(1)
 const FRAGMENT = fragment === "1"
+const STRINGS = strings === "1"
 
 // Banned vocabulary: first cell of every table row in the vocab doc; entries
 // like "delve / delve into" split on "/", "(metaphorical)" qualifiers dropped.
@@ -123,7 +134,20 @@ let fence = false
 // line-final colon. PARA[i] holds the joined paragraph for the line that STARTS
 // it and null for continuation lines, so those checks run once per paragraph and
 // report at its first line.
-const LINES = fs.readFileSync(file, "utf8").split("\n")
+let LINES = fs.readFileSync(file, "utf8").split("\n")
+if (STRINGS) {
+  // Reduce a locale line to its VALUE; anything that is not `key: <literal>` is
+  // not prose (comments, braces, imports) and becomes a blank line.
+  // (\x27 = single quote, \x60 = backtick: this JS lives inside a single-quoted
+  // bash string, so neither character may appear literally.)
+  const VAL = new RegExp("^\\s*(?:\"[^\"]+\"|\x27[^\x27]+\x27|[\\w$.-]+)\\s*:\\s*([\x60\"\x27])([^]*)\\1\\s*,?\\s*$")
+  const ESC = new RegExp("\\\\([\"\x27\x60\\\\])", "g")
+  LINES = LINES.map((raw) => {
+    const m = raw.match(VAL)
+    if (!m) return ""
+    return m[2].replace(/\\n/g, " ").replace(ESC, "$1").trim()
+  })
+}
 const PARA = new Array(LINES.length).fill(null)
 {
   let f = false, start = -1, buf = []
@@ -189,7 +213,7 @@ LINES.forEach((raw, i) => {
     findings.push(["HARD", n, `send-time stamp "${stampHit[0]}": the message carries its own timestamp; use a date only when it is not the send date`])
   // Locators: counted per document below; collected here (code spans excluded).
   for (const m of noCode.matchAll(/\bon (?:our|your|their) (?:side|end)\b|\bours:/gi)) locators.push([n, m[0]])
-  if (FRAGMENT) return  // sentence-shape checks need the whole document
+  if (FRAGMENT && !STRINGS) return  // sentence-shape checks need the whole document; a locale value is whole
   // Continuation lines carry no paragraph of their own; their text was folded
   // into the line that starts it.
   if (PARA[i] == null) return
@@ -263,7 +287,7 @@ for (const [tier, n, msg] of findings) {
   console.log(`${tier} ${n}: ${msg}`)
 }
 process.exit(hard > 0 ? 1 : 0)
-' "$FILE" "$VOCAB" "$FRAGMENT")
+' "$FILE" "$VOCAB" "$FRAGMENT" "$STRINGS")
 MECH_RC=$?
 
 JUDGE_OUT="" JUDGE_RC=0
