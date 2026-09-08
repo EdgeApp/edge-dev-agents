@@ -56,6 +56,11 @@ case "$TOOL" in
     while IFS=: read -r base _ _; do
       [ -n "$base" ] || continue
       TARGET=$(bash_write_target "$CMD_M" "$CWD" "$base")
+      # Inline interpreter writes hide the path in the script body (see
+      # md-write-target.sh); retry on the raw command for that vector only.
+      if [ -z "$TARGET" ] && printf '%s' "$CMD_M" | grep -qE "(^|[[:space:]|;&(])(python3?|node)[[:space:]]+(-[[:space:]]*<<|-c[[:space:]]|-e[[:space:]])"; then
+        TARGET=$(bash_write_target "$CMD" "$CWD" "$base")
+      fi
       [ -n "$TARGET" ] && break
     done <<< "$TABLE"
     ;;
