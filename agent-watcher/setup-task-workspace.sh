@@ -28,7 +28,10 @@
 #   --repo         REQUIRED. Repo name under ~/git, e.g. edge-react-gui.
 #   --base         Base ref for the new branch (default: origin/develop).
 #
-# Idempotent: if the worktree already exists it is reused (env.json copy re-ensured)
+# Idempotent: if the worktree already exists it is reused (env.json copy re-ensured;
+# with --existing-branch the branch is first reconciled with origin, see
+# lib/reconcile-branch.sh: a branch another session rewrote while the worktree sat
+# retained is reset to the remote so the resumed run cannot push stale history over it)
 # and its path is returned without re-creating anything.
 #
 # Prints the worktree path on stdout, status on stderr.
@@ -284,6 +287,12 @@ link_shared_memory() {
 git -C "$MAIN_REPO" worktree prune 2>/dev/null || true
 if [[ -d "$WT" ]] && git -C "$MAIN_REPO" worktree list --porcelain | grep -qxF "worktree $WT"; then
   echo ">> setup-task-workspace: worktree already exists, reusing $WT" >&2
+  # Followup/resume: the retained worktree may be behind or diverged from the
+  # PR branch another session rewrote in the meantime (lib/reconcile-branch.sh).
+  if [[ -n "$EXISTING_BRANCH" && -f "$HOME/.config/agent-watcher/lib/reconcile-branch.sh" ]]; then
+    . "$HOME/.config/agent-watcher/lib/reconcile-branch.sh"
+    reconcile_branch "$WT" "$EXISTING_BRANCH" || true
+  fi
   ensure_env_json
   ensure_testconfig_json
   clone_node_modules
