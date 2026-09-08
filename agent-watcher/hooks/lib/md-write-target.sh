@@ -11,6 +11,15 @@
 #   redirect   '> x.md', '>> x.md' (heredoc bodies ride inside the command)
 #   tee        'tee x.md', 'tee -a x.md'
 #   in-place   'sed -i ... x.md', 'perl -pi ... x.md', 'perl -i ... x.md'
+#   inline     an interpreter run inline ('python3 - <<', 'python3 -c',
+#              'node - <<', 'node -e') whose body opens or writes a quoted
+#              path with the matching tail ('open(...)', '.write(', 'write_text(',
+#              'writeFileSync(', 'writeFile('; a bare 'open(' read does not
+#              count). Callers pass the RAW command for this vector: the
+#              mention-stripped view blanks heredoc bodies, and the body is
+#              where the path lives. A 2026-09-07 run rewrote
+#              CHANGELOG.md through a python heredoc and walked past every
+#              write gate, since nothing above sees a path inside a script.
 # The operator must be preceded by whitespace or start-of-line: prose like
 # '<repo>/README.md' inside a heredoc otherwise reads as a redirect. The
 # in-place branch takes the LAST bare path token in the command, since sed and
@@ -34,6 +43,13 @@ bash_write_target() {
     target=$(printf '%s' "$cmd" \
       | grep -oE "(^|[[:space:]])\"?'?[^\"'[:space:];|&]*${tail}([[:space:]]|$|;|\\|)" \
       | sed -E "s/^[[:space:]]*[\"']?//; s/[[:space:];|]+$//" | tail -1 || true)
+  fi
+  if [ -z "$target" ] \
+    && printf '%s' "$cmd" | grep -qE "(^|[[:space:]|;&(])(python3?|node)[[:space:]]+(-[[:space:]]*<<|-c[[:space:]]|-e[[:space:]])" \
+    && printf '%s' "$cmd" | grep -qE "open\([^)]*[\"'][wa][\"']|\.write\(|write_text\(|writeFileSync\(|writeFile\("; then
+    target=$(printf '%s' "$cmd" \
+      | grep -oE "[\"'][^\"'[:space:]]*${tail}[\"']" \
+      | sed -E "s/^[\"']//; s/[\"']$//" | head -1 || true)
   fi
   [ -n "$target" ] || return 0
   target="${target/#\~/$HOME}"

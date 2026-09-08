@@ -140,6 +140,16 @@ case "$TOOL" in
     # Locale strings files written from Bash (sed -i / heredoc): exact basenames.
     [ -n "$TARGET" ] || TARGET=$(bash_write_target "$CMD_M" "$CWD" "en_US.ts")
     [ -n "$TARGET" ] || TARGET=$(bash_write_target "$CMD_M" "$CWD" "enUS.json")
+    # Inline interpreter (python3 - <<, node -e, ...): the path sits inside the
+    # script body, which the mention-stripped view blanks, so retry on the RAW
+    # command for that vector only. The INVOCATION must be visible in the
+    # stripped view (a real command), or a heredoc that merely quotes such a
+    # script (a test file, a report) would read as a write.
+    if [ -z "$TARGET" ] && printf '%s' "$CMD_M" | grep -qE "(^|[[:space:]|;&(])(python3?|node)[[:space:]]+(-[[:space:]]*<<|-c[[:space:]]|-e[[:space:]])"; then
+      TARGET=$(bash_write_target "$CMD" "$CWD")
+      [ -n "$TARGET" ] || TARGET=$(bash_write_target "$CMD" "$CWD" "en_US.ts")
+      [ -n "$TARGET" ] || TARGET=$(bash_write_target "$CMD" "$CWD" "enUS.json")
+    fi
     [ -n "$TARGET" ] || exit 0
     allowlisted "$TARGET" && exit 0
     # A shell command is not a `key: value` line, so a locale write from Bash

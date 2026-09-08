@@ -256,6 +256,11 @@ if [[ -n "$MESSAGE" ]]; then
   esac
 fi
 
+# Step 3b (after staging, below): CHANGELOG entry shape on the STAGED diff. The
+# write gate covers Write/Edit/redirect/sed/inline-interpreter vectors, but a
+# commit is the one boundary every path crosses, so the same lint runs here on
+# the lines this commit adds to CHANGELOG.md (changelog skill `entry-shape`).
+
 # Step 4: Stage files and report effective commit scope
 if [[ "$PRIMARY_SCOPE_DECLARED" == "true" ]]; then
   echo ">> git add (scoped) && git commit"
@@ -347,6 +352,20 @@ if (extraStaged.length > 0) {
   console.log("Proceeding with additional non-generated files by default.")
 }
 ' -- "${FILES[@]}"
+fi
+
+CL_LINT="$HOME/.cursor/skills/changelog/scripts/changelog-entry-lint.sh"
+if [[ -x "$CL_LINT" ]] && git diff --cached --name-only 2>/dev/null | grep -qx 'CHANGELOG.md'; then
+  CL_ADDED=$(git diff --cached -U0 -- CHANGELOG.md | grep -E '^\+' | grep -vE '^\+\+\+' | sed 's/^+//')
+  if [[ -n "$CL_ADDED" ]]; then
+    CL_RC=0
+    CL_OUT=$(printf '%s\n' "$CL_ADDED" | "$CL_LINT" 2>/dev/null) || CL_RC=$?   # set -e: capture the status on the same line
+    if [[ "$CL_RC" -eq 1 ]]; then
+      echo ">> CHANGELOG entry shape (changelog skill entry-shape): one line, one clause, under ${CHANGELOG_MAX_LEN:-140} chars, outcome only; mechanism and why belong in the commit body. Files stay staged; fix the entries and re-run:" >&2
+      printf '%s\n' "$CL_OUT" | grep '^HARD' | head -6 >&2
+      exit 1
+    fi
+  fi
 fi
 
 if [[ -n "$FIXUP" ]]; then

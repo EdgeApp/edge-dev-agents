@@ -441,7 +441,7 @@
       ]
     },
     "pr-land:npm-publish-auth": {
-      "hash": "43d4826ca194",
+      "hash": "e54e92150297",
       "dims": [
         "A15"
       ]
@@ -576,7 +576,7 @@
       ]
     },
     "file:lint-commit.sh": {
-      "hash": "8549520857df",
+      "hash": "43125de19974",
       "dims": [
         "A12"
       ]
@@ -639,6 +639,18 @@
       "hash": "567066a9bd2b",
       "dims": [
         "A34"
+      ]
+    },
+    "staging-cherry-pick:lockfile-conflicts": {
+      "hash": "896ec7d232d3",
+      "dims": [
+        "A8"
+      ]
+    },
+    "pr-land:verification": {
+      "hash": "2e0008ae2f6c",
+      "dims": [
+        "A16"
       ]
     }
   },
@@ -1015,10 +1027,6 @@
       "reason": "2026-07-30: narration ban added; grading surface is A9 report-discipline via the report gate, no new pr-land dimension owed",
       "hash": "833162229956"
     },
-    "pr-land:verification": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "75044fc537e0"
-    },
     "pr-land:no-editors": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "eee173b32852"
@@ -1036,8 +1044,8 @@
       "hash": "8ffce8c6b95d"
     },
     "staging-cherry-pick:changelog-conflicts": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "40e3c725ace2"
+      "reason": "2026-09-08: conflict-resolution mechanics; the graded outcome (no native staging commit, no hand-merged lockfile) is A8 via cherry-picks-only and lockfile-conflicts",
+      "hash": "f5fd009836b8"
     },
     "staging-cherry-pick:no-editors": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1420,8 +1428,8 @@
       "hash": "c7682b76a643"
     },
     "changelog:entry-shape": {
-      "reason": "2026-09-04: mechanically enforced by ~/.config/agent-watcher/hooks/lint-md-on-write.sh via ~/.cursor/skills/changelog/scripts/changelog-entry-lint.sh (length cap, mechanism tail, second sentence) on every CHANGELOG.md write vector",
-      "hash": "2e1ddbc3fa60"
+      "reason": "2026-09-08: mechanical: write gate (lint-md-on-write.sh, all vectors incl. inline python/node) + lint-commit.sh staged-diff lint; A12 grades commit discipline",
+      "hash": "47ae94150c85"
     },
     "changelog:no-wrap": {
       "reason": "2026-09-04: mechanically enforced by changelog-entry-lint.sh wrapped-continuation check via lint-md-on-write.sh",
