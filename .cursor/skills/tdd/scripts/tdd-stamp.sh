@@ -50,24 +50,26 @@ fi
 
 # write: replace an existing stamp, else insert after the metadata table (the
 # first blank line following the first table row), else append.
-python3 - "$DOC_PATH" "$FP" <<'EOF'
-import re,sys
-path,fp=sys.argv[1],sys.argv[2]
-s=open(path).read()
-stamp=f'<!-- tdd-code-fingerprint: {fp} -->'
-if re.search(r'<!-- tdd-code-fingerprint: [0-9a-f]{40} -->', s):
-    s=re.sub(r'<!-- tdd-code-fingerprint: [0-9a-f]{40} -->', stamp, s, count=1)
-else:
-    lines=s.split('\n'); out=[]; placed=False; in_table=False
-    for i,l in enumerate(lines):
-        out.append(l)
-        if not placed:
-            if l.startswith('|'): in_table=True
-            elif in_table and l.strip()=='' :
-                out.append(stamp); out.append(''); placed=True
-    if not placed:
-        out.append(''); out.append(stamp)
-    s='\n'.join(out)
-open(path,'w').write(s)
-print(f'>> tdd-stamp: {path} stamped {fp}')
-EOF
+node - "$DOC_PATH" "$FP" <<'JS'
+const fs = require('fs')
+const [path, fp] = process.argv.slice(2)
+let s = fs.readFileSync(path, 'utf8')
+const stamp = `<!-- tdd-code-fingerprint: ${fp} -->`
+const re = /<!-- tdd-code-fingerprint: [0-9a-f]{40} -->/
+if (re.test(s)) {
+  s = s.replace(re, stamp)
+} else {
+  const lines = s.split('\n'); const out = []
+  let placed = false, inTable = false
+  for (const l of lines) {
+    out.push(l)
+    if (placed) continue
+    if (l.startsWith('|')) inTable = true
+    else if (inTable && l.trim() === '') { out.push(stamp, ''); placed = true }
+  }
+  if (!placed) out.push('', stamp)
+  s = out.join('\n')
+}
+fs.writeFileSync(path, s)
+console.log(`>> tdd-stamp: ${path} stamped ${fp}`)
+JS
