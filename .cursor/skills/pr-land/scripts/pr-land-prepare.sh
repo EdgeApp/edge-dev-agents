@@ -42,17 +42,25 @@ const {
 //   "staging-task-under-unreleased": buildField is "staging" (the linked task's
 //     Build field, operator intent) but the entry sits under `## Unreleased` —
 //     deterministic: the entry belongs in the staging section, no ask needed.
-// Pure inspection — returns an array of { line, text, section, reason }.
-// Does not modify the repo. Empty array means no concerns.
+// The staging-task-under-unreleased check applies only to CHANGELOGs that HAVE
+// a `(staging)` section (the GUI): dependency repos ship by npm version, carry
+// no staging section, and their entries belong under `## Unreleased`, so the
+// check is skipped there rather than flagging every dep-repo land.
+// Pure inspection — returns { misplaced: [{ line, text, section, reason }],
+// newEntrySections: [section heading text, ...] } where newEntrySections lists
+// the distinct sections the branch's NEW entries sit under. A heading with
+// `(staging)` in it is the staging-routing signal step 9 consumes.
+// Does not modify the repo.
 function checkChangelogPlacement(repoDir, baseRef, buildField) {
+  const empty = { misplaced: [], newEntrySections: [] };
   const changelogPath = path.join(repoDir, "CHANGELOG.md");
-  if (!existsSync(changelogPath)) return [];
+  if (!existsSync(changelogPath)) return empty;
 
   let content;
   try {
     content = readFileSync(changelogPath, "utf8");
   } catch (e) {
-    return [];
+    return empty;
   }
   const lines = content.split("\n");
 
@@ -86,10 +94,12 @@ function checkChangelogPlacement(repoDir, baseRef, buildField) {
       { cwd: repoDir, encoding: "utf8" }
     );
   } catch (e) {
-    return [];
+    return empty;
   }
 
+  const hasStagingSection = sections.some((sect) => sect.kind === "staging");
   const misplaced = [];
+  const newEntrySections = new Set();
   let headLine = 0;
   for (const raw of diffOut.split("\n")) {
     const h = raw.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
@@ -102,9 +112,10 @@ function checkChangelogPlacement(repoDir, baseRef, buildField) {
       const text = raw.slice(1);
       if (/^- (added|changed|deprecated|fixed|removed|security):/i.test(text)) {
         const sect = sectionForLine(headLine);
+        if (sect != null) newEntrySections.add(sect.text);
         if (sect != null && sect.kind === "released") {
           misplaced.push({ line: headLine, text, section: sect.text, reason: "released-section" });
-        } else if (sect != null && sect.kind === "unreleased" && buildField === "staging") {
+        } else if (sect != null && sect.kind === "unreleased" && buildField === "staging" && hasStagingSection) {
           misplaced.push({ line: headLine, text, section: sect.text, reason: "staging-task-under-unreleased" });
         }
       }
@@ -116,7 +127,7 @@ function checkChangelogPlacement(repoDir, baseRef, buildField) {
     }
   }
 
-  return misplaced;
+  return { misplaced, newEntrySections: [...newEntrySections] };
 }
 
 // Locate a worktree (other than the canonical clone) that currently has
@@ -352,7 +363,11 @@ async function prepareBranch(repo, branch, buildField) {
   // dated released heading instead of `## Unreleased` or staging. Non-fatal:
   // the agent prompts the user to decide (leave / move to Unreleased / move to
   // staging) before pushing.
-  const misplaced = checkChangelogPlacement(repoDir, upstream, buildField);
+  const { misplaced, newEntrySections } = checkChangelogPlacement(repoDir, upstream, buildField);
+  result.newEntrySections = newEntrySections;
+  if (newEntrySections.length > 0) {
+    console.error(`CHANGELOG entries under: ${newEntrySections.join(" | ")}`);
+  }
   if (misplaced.length > 0) {
     console.error(
       `\n⚠ CHANGELOG placement warning: ${misplaced.length} new entry(s) under a released heading:`

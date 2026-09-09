@@ -27,7 +27,7 @@ const { execSync } = require("child_process");
 const { existsSync, readFileSync, writeFileSync } = require("fs");
 const os = require("os");
 const path = require("path");
-const { getRepoDir, runGit: _runGit, installAndPrepare } = require(path.join(__dirname, "edge-repo.js"));
+const { getRepoDir, runGit: _runGit, installAndPrepare, waitForQuietLoad } = require(path.join(__dirname, "edge-repo.js"));
 
 // Thin wrapper: publish only needs the stdout string from runGit
 function runGit(args, cwd) {
@@ -197,6 +197,7 @@ async function publishRepo(repo, branch, bump) {
     console.error("\nRunning verification...");
     try {
       installAndPrepare(repoDir);
+      waitForQuietLoad();
 
       const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
       const pmScript = path.join(os.homedir(), ".cursor/skills/pm.sh");

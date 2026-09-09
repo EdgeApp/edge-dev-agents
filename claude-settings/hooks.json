@@ -73,6 +73,11 @@
           "type": "command"
         },
         {
+          "command": "~/.config/agent-watcher/hooks/require-force-land-rationale.sh",
+          "timeout": 15,
+          "type": "command"
+        },
+        {
           "command": "~/.config/agent-watcher/hooks/require-skill-read-for-scripts.sh",
           "timeout": 15,
           "type": "command"
