@@ -24,50 +24,54 @@ set -uo pipefail
 #   PUBLISHED <name>@<version>
 #   FAILED <phase> <reason>
 #
-# DELIVERY IS A MESSAGE, NOT A TOOL RESULT (2026-07-24): an AUTH_URL that only
-# appears in command output is INVISIBLE — the operator reads the assistant's
-# MESSAGE text, not tool results, and a session that "relayed" a link by running
-# a grep has delivered nothing (this cost a publish cycle). Every session type,
-# interactive included, must (1) write the bare url into its next MESSAGE as a
-# CLICKABLE link — bare url or [text](url), NEVER inside backticks, since code
-# spans are not linkified (writing-style `Reference links must be clickable`) —
-# AND (2) fire a push notification carrying the url. Orchestrated runs: push is
-# mandatory, never Slack (self-sent Slacks do not notify).
+# Relay contract (owned by pr-land `npm-publish-auth`): every AUTH_URL goes into
+# the assistant's next MESSAGE as a bare clickable url AND into a push
+# notification, the moment it prints. Poll this script's log file directly for
+# new lines; do not rely on a batched event stream. A fresh url supersedes the
+# previous one.
 #
-# LINKS EXPIRE IN ~5 MIN (measured; see PHASE_TIMEOUT). Relay each fresh
-# AUTH_URL as it prints — an older link in an earlier message is already dead,
-# so never tell the operator to "use the link above".
+# Link lifetime: an unclaimed auth session dies server-side in about 5 minutes
+# (its doneUrl poll flips 202 -> 404); login links have died sooner. Each
+# attempt prints a FRESH link and the timeout remints BEFORE the measured
+# expiry, so whenever the operator looks, a live link exists. Re-measure with:
+# curl -s -o /dev/null -w '%{http_code}' "<doneUrl>" in a loop until it stops
+# returning 202.
+#
+# Attempt semantics: only a phase that TIMES OUT (exit 124: link expired or
+# never used) earns a fresh attempt. A phase whose npm process exits on its own
+# without success is a real error (auth completed, then npm rejected the
+# request): the loop STOPS and prints npm's own output, because re-minting
+# links against a registry rejection reads to the operator as their approvals
+# being ignored. Every attempt's PTY capture is kept as <phase>.<n>.out, and the
+# work dir is preserved on any non-zero exit so the error survives the run.
+#
+# Registry replication lags a successful publish by seconds to a minute:
+# published() polls `npm view` for up to REPLICATION_SETTLE seconds before
+# concluding a version is absent, so a completed approval is not mistaken for
+# an expired link.
 #
 # All npm invocations go through the `sfw` wrapper (Socket Firewall shim
 # machines reject bare npm).
 #
-# Usage: npm-publish-web.sh <repo-dir> [--timeout <secs>] [--attempts <n>]
+# Usage: npm-publish-web.sh <repo-dir> [--timeout <secs>] [--attempts <n>] [--settle <secs>]
 # Exit: 0 = published, 1 = error, 2 = auth never completed (all attempts
 #       timed out or were declined)
 
 REPO_DIR=""
-# MEASURED 2026-07-24: an unclaimed npm auth session dies at ~4m52s (the doneUrl
-# poll flips 202 -> 404 "not found"); npm publishes no TTL anywhere, so this is
-# empirical. The old 420s timeout therefore left a ~2-min window every cycle
-# where the relayed link was already dead but no fresh one had been minted —
-# that, not slow operators, is what burned five link cycles on the
-# edge-exchange-plugins 2.52.1 publish. Remint BEFORE expiry: 240s < ~292s TTL.
-# Re-measure with: curl -s -o /dev/null -w '%{http_code}' "<doneUrl>" in a loop
-# until it stops returning 202.
+# Measured unclaimed-session lifetime is ~292s; remint before expiry.
 PHASE_TIMEOUT=240
-# Auth links expire server-side in minutes, and every relay round-trip through
-# chat/push burns most of that window — with 2 attempts the operator has ~14
-# min total and a link is usually stale by the time they open it (the
-# 2026-07-24 edge-exchange-plugins publish burned five link cycles this way).
-# Default to a LONG remint window instead: each attempt prints a FRESH link, so
-# whenever the operator looks, a live one exists. Cost of waiting is one idle
-# PTY; cost of expiry is another full relay cycle.
+# Each attempt prints a FRESH link; a long remint window costs one idle PTY,
+# an expired link costs a full relay round-trip. Only timeouts consume attempts.
 MAX_ATTEMPTS=20
+# Seconds to poll the registry for a just-published version before deciding
+# it is absent (npm read replicas lag the write).
+REPLICATION_SETTLE=90
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --timeout) PHASE_TIMEOUT="$2"; shift 2 ;;
     --attempts) MAX_ATTEMPTS="$2"; shift 2 ;;
+    --settle) REPLICATION_SETTLE="$2"; shift 2 ;;
     *) REPO_DIR="$1"; shift ;;
   esac
 done
@@ -78,11 +82,34 @@ command -v sfw >/dev/null 2>&1 || NPM="npm"
 
 WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/npm-web.XXXXXX")
 CHILD_PID=""
+ATTEMPT=0
+# Kill a process and every descendant. The phase runs as subshell -> script(1)
+# -> sfw -> npm; killing only the subshell orphans the npm poller, which keeps
+# its auth session alive and its PTY open long after this script is gone.
+kill_tree() {
+  local pid="$1" child
+  for child in $(pgrep -P "$pid" 2>/dev/null); do kill_tree "$child"; done
+  kill "$pid" 2>/dev/null
+}
+
 cleanup() {
-  [ -n "$CHILD_PID" ] && kill "$CHILD_PID" 2>/dev/null
-  rm -rf "$WORK_DIR"
+  local rc=$?
+  [ -n "$CHILD_PID" ] && kill_tree "$CHILD_PID"
+  if [ "$rc" -eq 0 ]; then
+    rm -rf "$WORK_DIR"
+  else
+    echo "npm output kept at $WORK_DIR (one <phase>.<attempt>.out per attempt)" >&2
+  fi
 }
 trap cleanup EXIT
+
+# Print the last meaningful lines of a PTY capture: ANSI stripped, spinner
+# frames and per-file `npm notice` lines dropped.
+show_tail() {
+  perl -pe 's/\e\[[0-9;?]*[A-Za-z]//g; s/\r/\n/g' "$1" 2>/dev/null \
+    | grep -a -v -E '^\s*[-\\|/]*\s*$|^\|?npm notice [0-9.]+ ?[kMB]' \
+    | tail -"${2:-12}" >&2
+}
 
 # run_phase <phase-name> <command...>
 # Runs the command under a PTY, tails its output for an auth URL (relayed as
@@ -90,8 +117,9 @@ trap cleanup EXIT
 # Returns the command's exit code, or 124 on timeout.
 run_phase() {
   local phase="$1"; shift
-  local out="$WORK_DIR/$phase.out"
+  local out="$WORK_DIR/$phase.$ATTEMPT.out"
   : > "$out"
+  ln -sf "$out" "$WORK_DIR/$phase.out"
   (cd "$REPO_DIR" && script -q "$out" "$@" < /dev/null > /dev/null 2>&1) &
   CHILD_PID=$!
 
@@ -105,6 +133,7 @@ run_phase() {
       url=$(grep -aoE 'https://www\.npmjs\.com/(login\?next=[^ "[:cntrl:]]+|auth/cli/[a-f0-9-]+)' "$out" 2>/dev/null | head -1 || true)
       if [ -n "$url" ]; then
         echo "AUTH_URL $phase $url"
+        echo "link minted $(date -u +%H:%M:%SZ) (attempt $ATTEMPT)" >&2
         url_seen=1
       fi
     fi
@@ -112,13 +141,13 @@ run_phase() {
     # doneUrl 404s the moment it dies. Reacting to that beats waiting out the
     # timer when npm surfaces the failure early.
     if grep -qiE "WebLoginInvalidResponse|Invalid response from web login|not found" "$out" 2>/dev/null; then
-      kill "$CHILD_PID" 2>/dev/null
+      kill_tree "$CHILD_PID"
       wait "$CHILD_PID" 2>/dev/null
       CHILD_PID=""
       return 124
     fi
     if [ "$waited" -ge "$PHASE_TIMEOUT" ]; then
-      kill "$CHILD_PID" 2>/dev/null
+      kill_tree "$CHILD_PID"
       wait "$CHILD_PID" 2>/dev/null
       CHILD_PID=""
       return 124
@@ -135,9 +164,16 @@ run_phase() {
 if ! (cd "$REPO_DIR" && $NPM whoami > "$WORK_DIR/whoami" 2>/dev/null); then
   ok=""
   for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+    ATTEMPT=$attempt
     echo "login attempt $attempt/$MAX_ATTEMPTS..." >&2
     run_phase login $NPM login --auth-type=web
+    rc=$?
     if (cd "$REPO_DIR" && $NPM whoami > "$WORK_DIR/whoami" 2>/dev/null); then ok=1; break; fi
+    if [ "$rc" -ne 124 ]; then
+      show_tail "$WORK_DIR/login.out"
+      echo "FAILED login npm exited $rc without a session (see stderr tail)"
+      exit 1
+    fi
   done
   [ -n "$ok" ] || { echo "FAILED login auth never completed"; exit 2; }
 fi
@@ -177,63 +213,67 @@ if [ -n "$prev_size" ] && [ "${new_size:-0}" -gt 0 ] && [ "$new_size" -lt $((pre
 fi
 echo "tarball sanity: new ${new_size:-?}B vs previous ${prev_size:-?}B" >&2
 
-published() {
+published_now() {
   local v
   v=$(cd "$REPO_DIR" && $NPM view "$pkg_name@$pkg_version" version 2>/dev/null | tail -1)
   [ "$v" = "$pkg_version" ]
 }
 
-if published; then
+# Poll the registry for up to REPLICATION_SETTLE seconds before deciding the
+# version is absent.
+published() {
+  local waited=0
+  while :; do
+    published_now && return 0
+    [ "$waited" -ge "$REPLICATION_SETTLE" ] && return 1
+    sleep 10; waited=$((waited + 10))
+  done
+}
+
+if published_now; then
   echo "PUBLISHED $pkg_name@$pkg_version (already on npm)"
   exit 0
 fi
 
 for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+  ATTEMPT=$attempt
   echo "publish attempt $attempt/$MAX_ATTEMPTS..." >&2
   run_phase publish $NPM publish
+  rc=$?
   if published; then
     echo "PUBLISHED $pkg_name@$pkg_version"
     exit 0
   fi
-  # TERMINAL registry rejections are not auth expiry: retrying re-mints links
-  # that authenticate fine and then hit the same wall, which reads to the
-  # operator as their taps being ignored (the 2026-08-27 piratechain 403 burned
-  # 20 links twice). Detect and stop. -a: the PTY capture is binary to grep.
-  if grep -qa "cannot publish over the previously published versions" "$WORK_DIR/publish.out" 2>/dev/null; then
-    # This 403 means the version IS on npm (an earlier auth completed server-side
-    # while read replicas still denied it). Confirm with a settle delay.
-    sleep 20
-    if published; then
-      echo "PUBLISHED $pkg_name@$pkg_version (landed earlier; replicas were lagging)"
-      exit 0
-    fi
-    echo "FAILED publish version-conflict: registry claims $pkg_version exists but view cannot see it yet; re-run after replication settles"
+  out="$WORK_DIR/publish.out"
+  # Terminal registry rejections are not auth expiry: re-minting links against
+  # them reads to the operator as their approvals being ignored. -a: the PTY
+  # capture is binary to grep.
+  if grep -qa "cannot publish over the previously published versions" "$out" 2>/dev/null; then
+    echo "FAILED publish version-conflict: registry claims $pkg_version exists but view cannot see it after ${REPLICATION_SETTLE}s; re-run once replication settles"
     exit 3
   fi
-  if grep -qaE "You do not have permission to publish|403 Forbidden|E403" "$WORK_DIR/publish.out" 2>/dev/null; then
-    echo "FAILED publish permission-denied: $(grep -aoE '403 Forbidden[^"]*' "$WORK_DIR/publish.out" | head -1)"
+  if grep -qaE "You do not have permission to publish|403 Forbidden|E403" "$out" 2>/dev/null; then
+    echo "FAILED publish permission-denied: $(grep -aoE '403 Forbidden[^"]*' "$out" | head -1)"
     exit 3
   fi
-  if grep -qaE "E402|payment required" "$WORK_DIR/publish.out" 2>/dev/null; then
+  if grep -qaE "E402|payment required" "$out" 2>/dev/null; then
     echo "FAILED publish payment-required"
     exit 3
   fi
+  if [ "$rc" -ne 124 ]; then
+    # npm exited on its own without publishing: a real error, not an expired
+    # link. Show its output and stop instead of minting another link.
+    show_tail "$out"
+    echo "FAILED publish npm exited $rc after auth (see stderr tail; capture: $out)"
+    exit 1
+  fi
 done
-
-# An auth approval that lands right at the phase deadline can complete on
-# npm's side after the local poller was killed — re-check the registry after
-# a settle delay before declaring failure.
-sleep 20
-if published; then
-  echo "PUBLISHED $pkg_name@$pkg_version"
-  exit 0
-fi
 
 # Distinguish auth-timeout from a real registry error using the last output.
 if grep -qiE "auth|otp|2fa|browser" "$WORK_DIR/publish.out" 2>/dev/null; then
   echo "FAILED publish auth never completed"
   exit 2
 fi
-tail -5 "$WORK_DIR/publish.out" 2>/dev/null | tr -d '\r' >&2
+show_tail "$WORK_DIR/publish.out"
 echo "FAILED publish registry error (see stderr tail)"
 exit 1

@@ -12,7 +12,8 @@ metadata:
 <rule id="cherry-picks-only">Staging takes CHERRY-PICKS ONLY (operator ruling 2026-08-28). Never produce a native commit on staging — no `upgrade-dep.sh` run on staging, no direct commits, no merges — even when the script cannot unpack an input. Staging must carry the SAME commits develop carries, as cherry-picks, so the two lines stay traceable commit-for-commit. If the script skips or fails on a qualifying commit, fix the input or resolve the conflict; do NOT route around it with a fresh commit.</rule>
 <rule id="individual-commits">Cherry-pick each commit individually — NEVER cherry-pick the merge commit itself. The script extracts by parent count: a merge commit unpacks as `git log --reverse <merge>^1..<merge>^2`; a single-parent commit (a dep bump from `upgrade-dep.sh`) cherry-picks as itself.</rule>
 <rule id="pull-first">ALWAYS pull the latest staging branch before cherry-picking.</rule>
-<rule id="changelog-conflicts">CHANGELOG conflicts: Agent resolves semantically (existing staging entries first, then the new entry). Code conflicts: STOP and report.</rule>
+<rule id="changelog-conflicts">CHANGELOG conflicts: Agent resolves semantically (existing staging entries first, then the new entry). Lockfile-only conflicts on a dep-bump cherry-pick follow `lockfile-conflicts`. Any other code conflict: STOP and report.</rule>
+<rule id="lockfile-conflicts">A conflict confined to lockfiles (`package-lock.json`, `yarn.lock`, `ios/Podfile.lock`) while cherry-picking a dependency bump means staging is missing an EARLIER bump whose lines sit next to this one. Never hand-merge a lockfile. Find the missing bump with `git log --cherry-pick --right-only --no-merges --format='%h %s' origin/staging...origin/develop -- <lockfile>`, cherry-pick that commit first (through the script, as its own input entry, oldest first), then re-run the original pick; it applies cleanly once the neighbouring lines match. If the missing commit carries code beyond a bump, STOP and report per `changelog-conflicts` instead of pulling it in.</rule>
 <rule id="no-force-push">Do NOT force-push staging without explicit user confirmation.</rule>
 <rule id="no-editors">Never open editors. All git operations must be non-interactive: `GIT_EDITOR=true` for commit messages.</rule>
 <rule id="push-confirmation">After all cherry-picks succeed, ask user before pushing to origin/staging.</rule>
@@ -86,7 +87,7 @@ git checkout <original-branch>
 
 <edge-cases>
 <case name="Empty cherry-pick">If a commit is already on staging (empty cherry-pick), the script skips it automatically.</case>
-<case name="Code conflict">Script aborts the cherry-pick and reports the conflicting files. Agent STOPs and reports to user.</case>
+<case name="Code conflict">Script aborts the cherry-pick and reports the conflicting files. If every conflicting file is a lockfile, apply `lockfile-conflicts`; otherwise the agent STOPs and reports to user.</case>
 <case name="Multiple PRs">Script processes PRs sequentially. Staging is checked out once and reused across PRs.</case>
 <case name="No merge SHA provided">Script queries the GitHub API for the merge commit SHA.</case>
 </edge-cases>
