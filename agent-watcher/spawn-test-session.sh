@@ -189,6 +189,9 @@ ENV_EXPORTS+="export NODE_OPTIONS=\"\${NODE_OPTIONS:---max-old-space-size=8192}\
 # A stable UUID for this agent run, exported so the agent can stamp it into the
 # plan + run-report docs for traceability. Logged here so the watcher records the
 # task→session-uuid mapping.
+# A fresh session never inherits an operator hold (operator-hold.sh): the hold
+# belonged to the conversation that just ended.
+[[ -n "${TASK_GID:-}" ]] && rm -f "/tmp/agent-operator-hold-$TASK_GID" 2>/dev/null
 AGENT_SESSION_UUID="$(uuidgen 2>/dev/null || true)"
 if [[ -n "$AGENT_SESSION_UUID" ]]; then
   ENV_EXPORTS+="export AGENT_SESSION_UUID=\"$AGENT_SESSION_UUID\"

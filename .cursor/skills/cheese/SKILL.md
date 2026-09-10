@@ -36,7 +36,7 @@ metadata:
 <step id="1" name="Parse inputs">
 From the user message, determine:
 
-1. **Cheese branch** — default `test-feta`. Use the user's explicit name if given (e.g. `test-gouda`). The real cheeses are `feta`, `gouda`, `halloumi`, `cheddar` — a dotted variant like `gouda.1` is not a real cheese; resolve it to the base name (`test-gouda`).
+1. **Cheese branch** — default `test-feta`. Use the user's explicit name if given (e.g. `test-gouda`). An orchestrated run takes the name from the task's Build field (`~/.cursor/skills/asana-build-field.sh <gid>`), never from a roster written here: the cheeses are operator data on that Asana field and they grow, so any list in prose goes stale and drops a build (task 1218291556240193, 2026-09-09, skipped a `String` cheese against a four-name list). A dotted variant like `gouda.1` names the same branch; resolve it to the base name (`test-gouda`).
 2. **Source ref** — default: current HEAD of `edge-react-gui`. Use an explicit ref if the user names one.
 3. **Deps to pin** — from any aliases or paths the user mentions. None is valid (GUI-only cheese build).
 

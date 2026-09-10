@@ -34,6 +34,11 @@
     {
       "hooks": [
         {
+          "command": "~/.config/agent-watcher/hooks/operator-hold-gate.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
           "command": "node ~/.agent-tools/socket-guard.mjs",
           "type": "command"
         },
@@ -301,6 +306,11 @@
         },
         {
           "command": "~/.config/agent-watcher/hooks/mark-operator-present.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/operator-hold-prompt.sh",
           "timeout": 10,
           "type": "command"
         }

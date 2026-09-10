@@ -230,6 +230,13 @@ function capturePane(session) {
 // heuristic — but reviving it is harmful: the revive keystrokes (ping+Enter,
 // /remote-control+Enter, Esc) answer the dialog blindly. The normal idle composer
 // ("❯ " with an empty input line) is NOT a choice prompt and must not match here.
+// Operator hold stamp (see operator-hold.sh): held while the stamp exists. No
+// TTL: a steered run waits for the operator; the park escalation below is the
+// reminder. Read directly (no shell-out) so the tick stays cheap.
+function operatorHeld(taskGid) {
+  return fs.existsSync(`/tmp/agent-operator-hold-${taskGid}`)
+}
+
 function paneAwaitingChoice(content) {
   return /❯\s+\d+\.\s/.test(content)                                  // selected numbered menu option (❯ 1. …)
     || /\bNo, and tell Claude\b/i.test(content)                       // distinctive permission-prompt option text
@@ -1057,6 +1064,11 @@ function main() {
     // context behind it. Both make the pane static, so the idle heuristic alone
     // cannot tell them from a hang.
     const awaitingChoice = paneAwaitingChoice(content)
+    // Operator hold (operator-hold.sh): a human typed into the session within the
+    // hold window and the agent is waiting on them by design. Same handling as a
+    // parked choice prompt: never revive, never treat the quiet as a hang.
+    const isHeld = operatorHeld(taskGid)
+    if (isHeld && !prior?.heldLogged) log(`[${session}] operator hold active — NOT reviving (a human is steering the session).`)
     // Park tracking: a session parked at a human-choice prompt is correctly NOT
     // revived, but the per-tick log used to spam (~60 identical lines for a 2h park).
     // Log ONCE on entering the park, then a SINGLE escalation after PARK_ESCALATE_MS
@@ -1077,7 +1089,7 @@ function main() {
         parkEscalated = true
       }
     }
-    if (stateOk && !isBlocked && !awaitingChoice && !changed && !rcUp && now - prior.lastChange > IDLE_THRESHOLD_MS) {
+    if (stateOk && !isBlocked && !awaitingChoice && !isHeld && !changed && !rcUp && now - prior.lastChange > IDLE_THRESHOLD_MS) {
       // Require stateOk: never revive on an UNCONFIRMED status. A transient Asana
       // fetch failure returns blocked:null (=> isBlocked false); without this gate a
       // blocked/parked session gets pinged on the blip tick (the 2026-06-15 regression).
@@ -1095,7 +1107,7 @@ function main() {
     }
     // On an unconfirmed fetch, preserve the prior heavyFreed rather than letting a
     // null-blocked blip reset it to false and re-free next tick.
-    state.sessions[session] = { lastContent: content, lastChange, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated, respawnedAt }
+    state.sessions[session] = { lastContent: content, lastChange, heldLogged: isHeld, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated, respawnedAt, heldLogged: isHeld }
   }
 
   // Cap retired (completed-but-kept-alive) sessions so they don't accumulate in memory.

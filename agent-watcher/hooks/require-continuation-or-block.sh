@@ -3,7 +3,8 @@
 # must run EVERYTHING in one turn and end ONLY at agent_status=Complete/Archived or a
 # validated blocked=Yes (one-shot `yolo-execution`). Ending the turn any other way —
 # stopping to ask a question as plain text, writing a hand-off, or just giving up — is
-# a premature stop that hard-stalls the headless session (no human is watching). This
+# a premature stop that hard-stalls the headless session (no human is watching; when a
+# human IS steering, operator-hold.sh says so and this hook stands down). This
 # is the bypass the PreToolUse AskUserQuestion guard can't catch: the agent never calls
 # a tool, it just ENDS the turn.
 #
@@ -27,6 +28,14 @@ STUCK_FILE="/tmp/agent-stuck-$GID.md"
 CRED="$HOME/.config/agent-watcher/credentials.json"
 
 allow() { rm -f "$COUNT_FILE" 2>/dev/null || true; exit 0; }   # legit end → reset + allow
+
+# ---- Operator hold: a human is steering this session (operator-hold.sh) ----
+# The premise of this hook ("no human is watching") is false while a hold is
+# active: the agent answered the operator and ended its turn, which is exactly
+# right. Allow the stop and leave the premature-stop counter alone.
+if "$HOME/.config/agent-watcher/operator-hold.sh" status "$GID" >/dev/null 2>&1; then
+  exit 0
+fi
 
 # ---- Fast path: a FRESH final marker = a legit end the agent JUST set ----
 # update-status.sh drops /tmp/agent-final-<gid> right after a successful PUT of

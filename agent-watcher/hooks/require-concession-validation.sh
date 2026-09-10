@@ -103,6 +103,15 @@ case "$TRIGGER" in
   *) exit 0 ;;
 esac
 
+# An operator hold (operator-hold.sh: a human typed into this session within the
+# hold window) makes a formal block OPERATOR-DIRECTED, not a concession the agent
+# is claiming: the human who would judge it is the one asking for it. Downgrade
+# finalizes are still judged; only the block kind passes here.
+if [ "$KIND" = "block" ] && "$HOME/.config/agent-watcher/operator-hold.sh" status "$GID" >/dev/null 2>&1; then
+  echo "operator hold active: block accepted as operator-directed (no concession verdict required)."
+  exit 0
+fi
+
 REASON_HASH=$(printf '%s' "$REASON" | shasum -a 256 | cut -c1-16)
 
 if [ -s "$VERDICT" ]; then

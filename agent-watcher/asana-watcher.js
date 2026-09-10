@@ -232,6 +232,20 @@ function spawnForTask(task, cfg) {
   // task, fall through to the fresh-spawn path below. The watcher is a launchd process (not
   // an agent session), so it is allowed to call resume-task. This is the SINGLE
   // re-engagement entry point: the watchdog no longer un-retires on a phase status.
+
+  // Setting a task back to Pending IS the operator saying "go", so it clears any
+  // operator hold left on the gid. This is the one place that release is safe:
+  // only a Pending task reaches spawnForTask, so a watchdog `/one-shot` re-fire
+  // or a scheduled wake can never trigger it, and a hold can never be cleared
+  // with a human still mid-conversation. Released BEFORE resume-task.sh, which
+  // kills the stale session and moves the status, so the incoming session comes
+  // up with a clean stamp instead of racing one. A spawn that later fails rolls
+  // the task back to Pending with the hold already gone, which is right: the
+  // operator asked for the run, and the next tick retries with nothing to clear.
+  try {
+    execSync(`${DIR}/operator-hold.sh release ${task.gid}`, { stdio: 'ignore' })
+  } catch { /* best-effort: a missing stamp or oracle must never block a spawn */ }
+
   const rt = spawnSync(`${DIR}/resume-task.sh`, ['--task-gid', task.gid], { stdio: 'inherit' })
   if (rt.status === 0) {
     log(`  resumed prior session for ${task.gid} (revisit: memory + fresh slot)`)
