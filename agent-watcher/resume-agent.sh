@@ -7,6 +7,10 @@
 # Filtering on both excludes other claude sessions (this desktop app's history,
 # ad-hoc terminal sessions, etc.) that may incidentally mention the same term.
 #
+# For a FRESH discussion session (no transcript to fork) use
+# spawn-chat-session.sh --name <slug> --brief-file <path>; it hands the session
+# a short pointer to the brief file instead of pasting a long prompt.
+#
 # Usage:
 #   resume-agent.sh                 # picks the most recent watcher session
 #   resume-agent.sh <term> [term..] # filter; ALL words must appear (case-insensitive)

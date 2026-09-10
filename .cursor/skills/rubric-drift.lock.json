@@ -39,7 +39,7 @@
       ]
     },
     "one-shot:yolo-execution": {
-      "hash": "ee20a891b6a0",
+      "hash": "aa2f06865d51",
       "dims": [
         "A7"
       ]
@@ -246,7 +246,7 @@
       ]
     },
     "file:asana-watcher.js": {
-      "hash": "cdd4914f65fa",
+      "hash": "f56f464c1077",
       "dims": [
         "O1"
       ]
@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "0f3dbf1547e1",
+      "hash": "fbcc48eabb96",
       "dims": [
         "O4",
         "O5",
@@ -279,7 +279,7 @@
       ]
     },
     "file:require-concession-validation.sh": {
-      "hash": "0853fb741aaa",
+      "hash": "754f9976e6d9",
       "dims": [
         "O9"
       ]
@@ -387,13 +387,13 @@
       ]
     },
     "one-shot:cheese-build-on-green": {
-      "hash": "5379336a8894",
+      "hash": "9d6763c1d6d9",
       "dims": [
         "A28"
       ]
     },
     "pr-land:build-field-routing": {
-      "hash": "11d0552501f5",
+      "hash": "725f5f619875",
       "dims": [
         "A28"
       ]
@@ -405,7 +405,7 @@
       ]
     },
     "file:asana-build-field.sh": {
-      "hash": "013dd0d945d5",
+      "hash": "298f5d580893",
       "dims": [
         "A28"
       ]
@@ -576,7 +576,7 @@
       ]
     },
     "file:lint-commit.sh": {
-      "hash": "43125de19974",
+      "hash": "6991e4bacaf6",
       "dims": [
         "A12"
       ]
@@ -651,6 +651,18 @@
       "hash": "2e0008ae2f6c",
       "dims": [
         "A16"
+      ]
+    },
+    "one-shot:operator-hold": {
+      "hash": "5290a8684b00",
+      "dims": [
+        "A7"
+      ]
+    },
+    "file:operator-hold-gate.sh": {
+      "hash": "ea41bd1a781d",
+      "dims": [
+        "A7"
       ]
     }
   },

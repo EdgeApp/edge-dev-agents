@@ -356,7 +356,20 @@ fi
 
 CL_LINT="$HOME/.cursor/skills/changelog/scripts/changelog-entry-lint.sh"
 if [[ -x "$CL_LINT" ]] && git diff --cached --name-only 2>/dev/null | grep -qx 'CHANGELOG.md'; then
-  CL_ADDED=$(git diff --cached -U0 -- CHANGELOG.md | grep -E '^\+' | grep -vE '^\+\+\+' | sed 's/^+//')
+  # `|| CL_ADDED=""`: a staged CHANGELOG diff of pure DELETIONS (dropping an
+  # entry that moved to a released section) leaves grep with no match, and
+  # `set -o pipefail` would abort the whole script here with a silent exit 1.
+  CL_ADDED=$(git diff --cached -U0 -- CHANGELOG.md | grep -E '^\+' | grep -vE '^\+\+\+' | sed 's/^+//') || CL_ADDED=""
+  # A MOVED entry reads as an added line although nobody wrote it in this
+  # commit — reordering a section by type, or pr-land's Unreleased→staging
+  # placement move. Lint only lines absent from the pre-commit file, so an
+  # entry that predates the shape rules can still be moved.
+  if [[ -n "$CL_ADDED" ]]; then
+    CL_PREV=$(git show HEAD:CHANGELOG.md 2>/dev/null || true)
+    if [[ -n "$CL_PREV" ]]; then
+      CL_ADDED=$(printf '%s\n' "$CL_ADDED" | grep -vxF -f <(printf '%s\n' "$CL_PREV")) || CL_ADDED=""
+    fi
+  fi
   if [[ -n "$CL_ADDED" ]]; then
     CL_RC=0
     CL_OUT=$(printf '%s\n' "$CL_ADDED" | "$CL_LINT" 2>/dev/null) || CL_RC=$?   # set -e: capture the status on the same line
