@@ -4,8 +4,10 @@
 # answer and wait instead of being pushed onward by the autonomy machinery.
 #
 # A hold is one fact: the stamp file /tmp/agent-operator-hold-<gid> exists.
-# No TTL, no owner. A steered run waits for the operator for as long as it
-# takes; the watchdog's park escalation is the reminder that one is waiting.
+# No owner. The stamp's mtime is its age: session-watchdog.js releases a hold
+# older than watcher.operator_hold_ttl_min (15) once the pane is idle at the
+# composer, and sends <operator-hold-expired> so the run resumes its pre-steer
+# plan (expiry needs an actor; a bare timer only changes a file).
 # The stamp is cleared by the operator's release prompt (hooks/operator-hold-
 # prompt.sh), by setting the task back to Pending (asana-watcher.js) and at
 # every spawn or resume of the task's session (spawn-test-session.sh), so a
