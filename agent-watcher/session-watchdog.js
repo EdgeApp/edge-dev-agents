@@ -99,6 +99,23 @@ const ANDROID_SDK = '/opt/homebrew/share/android-commandlinetools'
 // After this long parked at a human-choice prompt, emit ONE escalation line (instead
 // of the per-tick park log) so an operator notices; never auto-sheds.
 const PARK_ESCALATE_MS = 60 * 60 * 1000
+// Operator-hold TTL (watcher.operator_hold_ttl_min, default 15): a held session
+// whose stamp is older than this AND whose pane has been idle at the composer for a
+// full tick is released here, with a machine prompt that tells the run to resume
+// its pre-steer plan. Expiry needs an actor: with the RC bridge up the revive
+// path never fires, so a bare timer only changed a file (the pre-2026-09-09 TTL).
+function HOLD_TTL_MS() {
+  const env = parseInt(process.env.AGENT_HOLD_TTL_MIN || '', 10)
+  if (Number.isFinite(env) && env > 0) return env * 60 * 1000
+  try {
+    const n = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8'))?.watcher?.operator_hold_ttl_min
+    if (Number.isFinite(n) && n > 0) return n * 60 * 1000
+  } catch { /* config unreadable: default */ }
+  return 15 * 60 * 1000
+}
+function holdAgeMs(taskGid) {
+  try { return Date.now() - fs.statSync(`/tmp/agent-operator-hold-${taskGid}`).mtimeMs } catch { return 0 }
+}
 // Remote-control "up" detection, across TWO claude build styles that render it
 // differently in the bottom status region:
 //   - New builds (--rc / /remote-control): a compact "/rc" token at the right end of the
@@ -1097,8 +1114,21 @@ function main() {
     // Operator hold (operator-hold.sh): a human typed into the session within the
     // hold window and the agent is waiting on them by design. Same handling as a
     // parked choice prompt: never revive, never treat the quiet as a hang.
-    const isHeld = operatorHeld(taskGid)
+    let isHeld = operatorHeld(taskGid)
     if (isHeld && !prior?.heldLogged) log(`[${session}] operator hold active — NOT reviving (a human is steering the session).`)
+    // Hold expiry: the operator went quiet. Only when the pane is genuinely parked
+    // at the composer (unchanged for a full tick, not mid-turn, not a choice
+    // dialog): release the stamp and resume the run with a machine prompt the
+    // prompt hook does not count as steering.
+    if (isHeld && !changed && !awaitingChoice && !/esc to interrupt/.test(content) && holdAgeMs(taskGid) > HOLD_TTL_MS()) {
+      const ageM = Math.round(holdAgeMs(taskGid) / 60000)
+      sh(`"${HOME}/.config/agent-watcher/operator-hold.sh" release ${taskGid}`)
+      sh(`tmux send-keys -t "${session}" C-u`)
+      sh(`tmux send-keys -t "${session}" "<operator-hold-expired>" Enter`)
+      log(`[${session}] operator hold expired (${ageM}m > ${Math.round(HOLD_TTL_MS() / 60000)}m, pane idle) → released + resume prompt sent.`)
+      isHeld = false
+      lastChange = now
+    }
     // Park tracking: a session parked at a human-choice prompt is correctly NOT
     // revived, but the per-tick log used to spam (~60 identical lines for a 2h park).
     // Log ONCE on entering the park, then a SINGLE escalation after PARK_ESCALATE_MS

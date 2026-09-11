@@ -24,7 +24,8 @@
 # file-changed notes, command echoes) are stripped before the text is read, and
 # a prompt that is nothing else stamps nothing. Headless `claude -p` children
 # spawned by scripts inside the run inherit AGENT_TASK_GID and fire this hook on
-# their own payload; hooks/lib/headless-child.sh exits them early.
+# their own payload; hooks/lib/headless-child.sh exits them early. The watchdog's
+# <operator-hold-expired> resume prompt (operator_hold_ttl_min) is machine text too.
 #
 # Fail-open: never blocks a prompt. Scope: no-op unless AGENT_TASK_GID is set
 # and the session is an in-flight run (orch-run-context.sh), so a chat in a
@@ -39,7 +40,7 @@ if [ -x "$H/orch-run-context.sh" ] && ! "$H/orch-run-context.sh" >/dev/null 2>&1
 PROMPT=$(jq -r '.prompt // empty' 2>/dev/null || true)
 [ -n "$PROMPT" ] || exit 0
 case "$PROMPT" in
-  '<watchdog-revive-ping>'*|'/one-shot'*) exit 0 ;;
+  '<watchdog-revive-ping>'*|'<operator-hold-expired>'*|'/one-shot'*) exit 0 ;;
 esac
 
 # Strip harness envelopes and machine notices; what survives is human text.

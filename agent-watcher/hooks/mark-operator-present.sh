@@ -25,7 +25,7 @@ PROMPT=$(jq -r '.prompt // empty' 2>/dev/null || true)
 [ -n "$PROMPT" ] || exit 0
 
 case "$PROMPT" in
-  '<watchdog-revive-ping>'*) exit 0 ;;
+  '<watchdog-revive-ping>'*|'<operator-hold-expired>'*) exit 0 ;;
   '/one-shot'*) exit 0 ;;
 esac
 
