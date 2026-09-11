@@ -34,12 +34,24 @@ The bundle's "Segment scope" line decides what the bar is:
   | Release / Repo / Category changed | re-target the work to that release or repo | the PR base and CHANGELOG section match |
   | any other field that names an outcome | do what the field says | evidence of that outcome |
 
+  PR review signals (the git section's PR record and the GitHub counters) re-arm a
+  task with zero Asana activity, and each is an ask on its own:
+
+  | Re-arm signal | The ask | Delivered when |
+  |---|---|---|
+  | unresolved review threads on an owned PR (any author) | address each: fix or answer, reply, then resolve | `github_blocking_threads` reads zero and the diff or replies show the fixes |
+  | unanswered review bodies or top-level PR comments on an owned PR | reply to each and mark it addressed | `github_unanswered_bodies` reads zero |
+  | reviewDecision CHANGES_REQUESTED | the two rows above, then ready for re-review | counters zero; Complete means "ready for re-review", never "re-approved" |
+  | reviewDecision APPROVED with checks green | land per the landing rules | PR MERGED or auto-merge armed |
+  | a failing or missing check on HEAD | fix the failure, or wait the bots out | checks green or completed on HEAD; a reviewer-bot outage is one unchecked Finalize Gate box |
+  | reviewer bots incomplete on a ready HEAD | let them run and conclude | `github_bots_incomplete` reads zero |
+  | threads on a PR the run does NOT own | reply only, no resolving, no Complete on their behalf | replies present; the thread count is not this segment's to zero |
+
   Fields that are run parameters, not asks: agent_model, agent_effort, agent_lane,
-  Priority, LOE, Estimate, assignee, Board State, agent_status, blocked. GitHub
-  signals: unresolved review threads or unanswered review bodies on an owned PR mean
-  address them (delivered when both counters read zero). When nothing in the deltas
-  or counters names an outcome, the segment's only ask is a clean re-finalize of the
-  existing PR; do not invent one. A field you cannot map is out of scope, never a fail.
+  Priority, LOE, Estimate, assignee, Board State, agent_status, blocked. When nothing
+  in the deltas, the PR record or the counters names an outcome, the segment's only
+  ask is a clean re-finalize of the existing PR; do not invent one. A signal you cannot
+  map is out of scope, never a fail.
 Every dimension below reads "the ask", "the change", "the drive" as THIS SEGMENT'S:
 what these asks required, what this segment changed, what this segment had to exercise.
 When a followup asks only to test or investigate, delivering the test result or the
