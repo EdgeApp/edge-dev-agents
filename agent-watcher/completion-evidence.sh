@@ -91,7 +91,7 @@ fi
 if [ -z "$WM" ]; then
   line "segment: FIRST RUN$SEG_NOTE: no run report was attached before this segment started. THE ASK IS THE TASK DESCRIPTION above; any operator comments below are amendments to it."
 else
-  line "segment: FOLLOWUP$SEG_NOTE: the report attached before it is dated $WM. THE ASKS ARE ONLY THE OPERATOR COMMENTS BELOW, newer than that report. A report attached during this segment does not change the asks. The task description is background: earlier segments already reported on it, and whatever it still leaves open is NOT this segment's bar unless a comment below asks for it."
+  line "segment: FOLLOWUP$SEG_NOTE: the report attached before it is dated $WM. THE ASKS ARE ONLY THE OPERATOR COMMENTS BELOW, newer than that report; when there are none, the re-arm reason is the field deltas and GitHub counters below (Force Land = land the PR; Build = cheese/staging routing; nonzero review threads or bodies = address them). A report attached during this segment does not change the asks. The task description is background: earlier segments already reported on it, and whatever it still leaves open is NOT this segment's bar unless a comment below asks for it."
 fi
 section "Operator asks (this segment's scope)"
 if [ -s "$MARKER" ]; then
