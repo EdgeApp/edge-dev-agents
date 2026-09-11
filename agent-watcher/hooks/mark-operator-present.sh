@@ -17,6 +17,9 @@
 set -uo pipefail
 
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
+# Headless `claude -p` children (no-slop judge, completion judge) inherit this
+# env; their prompt is a script payload, not presence. hooks/lib/headless-child.sh.
+. "$HOME/.config/agent-watcher/hooks/lib/headless-child.sh" 2>/dev/null && headless_child && exit 0
 
 PROMPT=$(jq -r '.prompt // empty' 2>/dev/null || true)
 [ -n "$PROMPT" ] || exit 0

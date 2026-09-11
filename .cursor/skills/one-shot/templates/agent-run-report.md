@@ -55,6 +55,12 @@ _None observed._
        - [ ] Build field routing done (cheese pushed / staging noted / none)  -->
 _None observed._
 
+## Completion Judge
+<!-- cat: completion-judge -->
+<!-- Auto-filled at attach from the judge provenance log (one row per judge call:
+     event, verdict, failed dimensions, summary; operator overrides named). Leave as is. -->
+_No judge call yet._
+
 ## Testing
 <!-- cat: testing -->
 <!-- HOW this run actually verified the change — concrete and reproducible, so a

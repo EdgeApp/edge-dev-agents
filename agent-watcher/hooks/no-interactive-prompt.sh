@@ -6,7 +6,7 @@
 # after a delay — it cannot answer it. So deny AskUserQuestion outright: a --yolo run
 # must pick the defensible default and proceed. The ONLY sanctioned human-input path
 # is a genuine true-blocker via update-status.sh --blocked yes --reason, which the
-# concession-validator gates.
+# completion-judge gates.
 #
 # Scope: no-op (exit 0) unless AGENT_TASK_GID is set, so interactive use is unaffected.
 # Exit 0 = allow. Exit 2 = block (stderr fed to the model).

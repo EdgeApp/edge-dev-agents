@@ -17,11 +17,14 @@
 #   --model       claude model id (default: the CLI default)
 #   --pointer     optional one-sentence summary appended to the pointer prompt
 #   --no-chrome   omit --chrome (default: Chrome bridge on)
+#   --anchor      name the session claude-asana-<slug> with RC <slug> (a named
+#                 anchor, exempt from the chat idle reaper once the slug is in
+#                 watcher.persistent_anchors) instead of the chat-<slug> shape
 # Exit: 0 spawned and pointer verified in the transcript; 1 usage or spawn
 #       failure; 3 spawned but the pointer did not arrive intact (session left
 #       running for inspection; resend by hand with tmux paste-buffer).
 set -uo pipefail
-NAME="" BRIEF="" MODEL="" CWD="$HOME/git" EFFORT="" POINTER="" CHROME=true
+NAME="" BRIEF="" MODEL="" CWD="$HOME/git" EFFORT="" POINTER="" CHROME=true ANCHOR=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --name) NAME="$2"; shift 2 ;;
@@ -31,6 +34,7 @@ while [ $# -gt 0 ]; do
     --effort) EFFORT="$2"; shift 2 ;;
     --pointer) POINTER="$2"; shift 2 ;;
     --no-chrome) CHROME=false; shift ;;
+    --anchor) ANCHOR=true; shift ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -39,14 +43,14 @@ BRIEF="${BRIEF/#\~/$HOME}"
 [ -r "$BRIEF" ] || { echo "brief file not readable: $BRIEF" >&2; exit 1; }
 [ -d "$CWD" ] || { echo "cwd not a directory: $CWD" >&2; exit 1; }
 NAME="${NAME#chat-}"
-S="claude-asana-chat-$NAME"
+if $ANCHOR; then S="claude-asana-$NAME"; RC="$NAME"; else S="claude-asana-chat-$NAME"; RC="chat-$NAME"; fi
 tmux has-session -t "$S" 2>/dev/null && { echo "session already exists: $S (kill it first or pick another --name)" >&2; exit 1; }
 
 cmd="claude"
 [ -n "$MODEL" ] && cmd="$cmd --model $MODEL"
 [ -n "$EFFORT" ] && cmd="$cmd --effort $EFFORT"
 $CHROME && cmd="$cmd --chrome"
-cmd="$cmd --dangerously-skip-permissions --remote-control chat-$NAME"
+cmd="$cmd --dangerously-skip-permissions --remote-control $RC"
 
 # Transcripts land under the project dir derived from cwd; note the newest
 # BEFORE spawning so the new one can be identified afterwards.
@@ -100,5 +104,5 @@ EOF
   exit 3
 done
 [ -n "$ok" ] || { echo "could not confirm the pointer in a transcript within 40s; session running: $S" >&2; exit 3; }
-echo "SPAWNED tmux=$S rc=chat-$NAME transcript=$(basename "$newest") brief=$BRIEF"
+echo "SPAWNED tmux=$S rc=$RC transcript=$(basename "$newest") brief=$BRIEF"
 exit 0

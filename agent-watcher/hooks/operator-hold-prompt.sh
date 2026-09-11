@@ -1,21 +1,30 @@
 #!/usr/bin/env bash
 # operator-hold-prompt.sh -- UserPromptSubmit hook. In an orchestrated session a
 # prompt a HUMAN types sets an operator hold (operator-hold.sh) and prints one
-# context line telling the agent to answer and wait. A prompt whose FIRST WORD
-# is a release word clears the hold instead; the rest of that message is
-# instructions to carry out. Machine prompts touch nothing.
+# context line telling the agent to answer and wait; a release clears it and
+# says so; a stop order keeps it and tells the agent to take the operator-
+# directed block now. Machine prompts and headless children touch nothing.
 #
-# ONE RULE: after a leading ok / okay / yes / sure / please, the first word is
-#   go | resume | continue | proceed
-# and that is the whole grammar. "go, looks good" releases; "looks good, go
-# ahead" holds (answer it; the operator writes "go" when they mean go). No
-# sentence splitting, no acknowledgement list, no expiry: a held run waits.
+# Grammar (hooks/lib/operator-directives.sh owns the sentence rules):
+#   release  the first word (after ok/yes/sure/please) is go|resume|continue|
+#            proceed, or the last bare clause (after the final , ; . ! ? and/then)
+#            is go|go ahead|resume|continue|proceed|complete|finish up|wrap it up,
+#            or a COMPLETION directive opens or closes the message
+#            ("finish up", "set it to complete", "ship it")
+#   stop     a STOP directive opens or closes the message ("stop the task",
+#            "set it to blocked"); the hold stays, the agent is told to block
+#   hold     anything else a human typed, including negated or conditional
+#            directives ("don't finish yet", "finish once QA signs off") and a
+#            bare "stop" (an interrupt, not an order)
+# A completion or stop directive, or an explicit "bypass the judge", also writes
+# /tmp/agent-judge-waiver-<gid>: the completion judge is not consulted for the
+# rest of the segment (require-completion-judgment.sh; spawn clears it).
 #
-# MACHINE PROMPTS ARE NOT STEERING. The harness delivers background-task
-# completions, file-changed notices, command envelopes and reminder blocks
-# through this same hook. A prompt that is nothing but such envelopes and
-# notices stamps nothing; an envelope this list does not know degrades to a
-# spurious hold (visible, answerable) rather than a missed one.
+# Not steering: harness envelopes and notices (background-task completions,
+# file-changed notes, command echoes) are stripped before the text is read, and
+# a prompt that is nothing else stamps nothing. Headless `claude -p` children
+# spawned by scripts inside the run inherit AGENT_TASK_GID and fire this hook on
+# their own payload; hooks/lib/headless-child.sh exits them early.
 #
 # Fail-open: never blocks a prompt. Scope: no-op unless AGENT_TASK_GID is set
 # and the session is an in-flight run (orch-run-context.sh), so a chat in a
@@ -24,6 +33,7 @@ set -uo pipefail
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 GID="$AGENT_TASK_GID"
 H="$HOME/.config/agent-watcher"
+. "$H/hooks/lib/headless-child.sh" 2>/dev/null && headless_child && exit 0
 if [ -x "$H/orch-run-context.sh" ] && ! "$H/orch-run-context.sh" >/dev/null 2>&1; then exit 0; fi
 
 PROMPT=$(jq -r '.prompt // empty' 2>/dev/null || true)
@@ -45,17 +55,31 @@ process.stdout.write(t.split("\n").filter(l => !notice.test(l)).join("\n"))
 ' 2>/dev/null || printf '%s' "$PROMPT")
 printf '%s' "$HUMAN" | tr -d '[:space:]' | grep -q . || exit 0
 
-# First word after a leading acknowledgement; punctuation around it ignored.
-FIRST=$(printf '%s' "$HUMAN" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ' \
-  | sed -E 's/^ +//; s/^(ok|okay|k|yes|yep|yeah|sure|please)[[:punct:] ]+//' \
-  | grep -oE '^[a-z/]+' || true)
-case "$FIRST" in
-  go|resume|continue|proceed|/resume)
-    "$H/operator-hold.sh" release "$GID"
-    echo "[operator hold released] The run is autonomous again: resume the phase you were in. Everything after the release word in this message is steering to carry out."
-    exit 0 ;;
-esac
+NORM=$(printf '%s' "$HUMAN" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ' | sed -E 's/^ +//; s/ +$//')
+. "$H/hooks/lib/operator-directives.sh"
+ANCHOR=$(printf '%s' "$NORM" | release_anchor)
+KINDS=$(printf '%s' "$NORM" | directive_kinds)
+RELEASE=false; STOP=false; COMPLETE_DIRECTIVE=false; BYPASS=false
+case "$ANCHOR" in release*) RELEASE=true ;; esac
+case "$ANCHOR" in "release complete") COMPLETE_DIRECTIVE=true ;; esac
+case " $KINDS " in *" complete "*) RELEASE=true; COMPLETE_DIRECTIVE=true ;; esac
+case " $KINDS " in *" stop "*) STOP=true ;; esac
+case " $KINDS " in *" bypass "*) BYPASS=true ;; esac
+write_waiver() { printf 'operator-directed %s (%s): %s\n' "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(printf '%s' "$PROMPT" | head -c 300 | tr '\n' ' ')" > "/tmp/agent-judge-waiver-$GID" 2>/dev/null || true; }
+if $BYPASS; then write_waiver bypass; fi
+if $STOP; then
+  write_waiver stop
+  "$H/operator-hold.sh" set "$GID"
+  echo "[operator hold: stop directive] The operator asked you to STOP this run. Do it now, in this turn: update-status.sh $GID <current status> --blocked yes --reason \"operator-directed: <their words>\" (this passes every gate while the hold is active), write and attach the run report describing where things stand, then end your turn. Do not resume the phase, push, or open a PR."
+  exit 0
+fi
+if $RELEASE; then
+  $COMPLETE_DIRECTIVE && write_waiver complete
+  "$H/operator-hold.sh" release "$GID"
+  echo "[operator hold released] The run is autonomous again: resume the phase you were in. The rest of this message is steering to carry out; a completion directive (complete / finish / ship) means finalize through the normal gates now."
+  exit 0
+fi
 
 "$H/operator-hold.sh" set "$GID"
-echo "[operator hold] A human is steering this session. Answer this prompt, then END YOUR TURN and wait: do not advance agent_status, push, open or land a PR, or start the next phase until a message from the operator starts with go, resume, continue or proceed. Reading, investigating and local edits are fine. A Stop hook block will NOT fire while the hold is active; do not read its absence as license to continue."
+echo "[operator hold] A human is steering this session. Answer this prompt, then END YOUR TURN and wait: do not advance agent_status, push, open or land a PR, or start the next phase until a message from the operator starts with go, resume, continue or proceed, or ends with one of those (or "complete") as its own clause (e.g. "... and resume", "..., complete."). Reading, investigating and local edits are fine. If the operator asks you to STOP or BLOCK the task, a `--blocked yes --reason "operator-directed: <their words>"` write passes the gates while held. A Stop hook block will NOT fire while the hold is active; do not read its absence as license to continue."
 exit 0

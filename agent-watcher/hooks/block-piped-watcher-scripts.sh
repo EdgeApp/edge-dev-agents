@@ -34,7 +34,7 @@ if printf '%s' "$CMD_M" | grep -qE '\.config/agent-watcher/(hooks/)?[A-Za-z0-9_.
   #
   # SAFETY CARVE-OUT: never rewrite a command carrying a gated concession shape
   # (--blocked / Complete / pr-create). Rewriting implies permissionDecision:allow,
-  # which could short-circuit require-concession-validation on the same command —
+  # which could short-circuit require-completion-judgment on the same command —
   # those keep the old hard block so the retry is evaluated by every gate.
   if printf '%s' "$CMD" | grep -qE -- '--blocked|Complete|pr-create'; then
     echo "BLOCKED: do not pipe an agent-watcher helper script through '| tail' or '| head'. The pipe runs it in a subshell that fails setgid ('failed to change group ID: operation not permitted') and exit-1s, so the write does not happen. Call the script BARE and read its stdout/exit code directly (one-shot rule agent-status-on-pending-task)." >&2

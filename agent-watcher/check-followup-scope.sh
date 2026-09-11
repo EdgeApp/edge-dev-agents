@@ -215,8 +215,26 @@ if command -v gh >/dev/null 2>&1; then
 fi
 GH_UNANSWERED="${GH_UNANSWERED:-0}"
 
+# SEGMENT scope (completion judge, 2026-09-10): the asks that re-armed THIS segment
+# are the operator comments newer than the newest report attached BEFORE the segment
+# started (newest versions stamp = this spawn/resume). The plain watermark above moves
+# whenever a report is attached mid-segment (every Complete attempt attaches one), which
+# would silently drop the followup that spawned the segment out of scope. No stamp file
+# (pre-feature) degrades to the plain watermark.
+SEG_START=""
+[[ -f "$VERSIONS_FILE" ]] && SEG_START=$(jq -rs '[.[] | .ts // empty] | last // empty' "$VERSIONS_FILE" 2>/dev/null || true)
+if [[ -n "$SEG_START" ]]; then
+  SEG_WATERMARK="$(echo "$ATT" | jq -r --arg s "$SEG_START" '[.data[] | select(.name | test("^agent-run-report.*\\.md$")) | select(.created_at < $s) | .created_at] | sort | last // empty')"
+else
+  SEG_WATERMARK="$WATERMARK"
+fi
+SEG_NEWER="$(echo "$STORIES" | jq --arg w "$SEG_WATERMARK" '[.data[] | select(.resource_subtype == "comment_added") | select(($w == "") or (.created_at > $w))]')"
+
 MARKER="/tmp/agent-followup-scope-$TASK_GID.json"
 jq -n \
+  --arg segment_start "$SEG_START" \
+  --arg segment_watermark "$SEG_WATERMARK" \
+  --argjson segment_comments "$(echo "$SEG_NEWER" | jq --arg op "$OP_GID" '[.[] | {created_at, by: (.created_by.name // "?"), authored: (if ((.text // "") | test("^🥋") and test("👊$")) then "agent" elif (.created_by.gid == $op) then "operator" else "other" end), text: (.text // "")}]')" \
   --arg gid "$TASK_GID" \
   --arg checked_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --arg watermark "$WATERMARK" \
@@ -233,6 +251,7 @@ jq -n \
   --argjson gh_bots_incomplete "${GH_BOTS_INCOMPLETE:-0}" \
   --argjson gh_unanswered "${GH_UNANSWERED:-0}" \
   '{task_gid: $gid, checked_at: $checked_at, watermark: $watermark, newest_comment_at: $newest_comment_at, newer_count: $newer_count, agent_comments_after_watermark: $agent_after_wm, comments: $comments,
+    segment_start: $segment_start, segment_watermark: $segment_watermark, segment_comments: $segment_comments,
     field_delta_status: $delta_status, field_baseline_ts: $baseline_ts, field_deltas: $field_deltas,
     github_status: $gh_status, github_prs: $gh_scope, github_blocking_threads: $gh_blocking, github_bots_incomplete: $gh_bots_incomplete, github_unanswered_bodies: $gh_unanswered}' \
   > "$MARKER"

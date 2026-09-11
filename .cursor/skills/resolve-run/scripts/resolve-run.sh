@@ -333,6 +333,12 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
   [ -r "/tmp/agent-concession-reason-$gid.txt" ] && blocker_reason=$(jq -Rs . "/tmp/agent-concession-reason-$gid.txt" 2>/dev/null || echo null)
   local blocker_verdict="null"
   [ -r "/tmp/agent-concession-verdict-$gid.json" ] && blocker_verdict=$(jq -c . "/tmp/agent-concession-verdict-$gid.json" 2>/dev/null || echo null)
+  # Completion judge (2026-09-10, supersedes the concession validator): the verdict
+  # for the LAST judged event, hash-bound to its evidence bundle, plus the provenance
+  # log the judge launcher appends (a verdict whose nonce has no log line is forged).
+  local judge_verdict="null" judge_log="[]"
+  [ -r "/tmp/agent-completion-verdict-$gid.json" ] && judge_verdict=$(jq -c . "/tmp/agent-completion-verdict-$gid.json" 2>/dev/null || echo null)
+  [ -r "$STATE_DIR/judge/$gid.jsonl" ] && judge_log=$(jq -cs . "$STATE_DIR/judge/$gid.jsonl" 2>/dev/null || echo "[]")
 
   jq -cn \
     --arg gid "$gid" --arg name_hint "$name_hint" --arg spawned "$spawned" \
@@ -343,6 +349,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     --arg run_report "$run_report" --argjson revive "$revive_pings" --argjson operator "$operator_msgs" --argjson wd "$watchdog_mentions" \
     --argjson release_receipt "$release_receipt" \
     --argjson attempt_log "$attempt_log" --argjson blocker_reason "$blocker_reason" --argjson blocker_verdict "$blocker_verdict" \
+    --argjson judge_verdict "$judge_verdict" --argjson judge_log "$judge_log" \
     --argjson followup "$followup" --argjson probe_index "$probe_index" \
     --argjson versions "$versions" \
     --argjson forensics "$forensics" --arg state_dir "$STATE_DIR" --arg watchdog_log "$WATCHDOG_LOG" --arg watcher_log "$WATCHER_LOG" \
@@ -364,7 +371,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       pool_entry: $pool,
       run_report: $run_report,
       release_receipt: $release_receipt,
-      blocking: { attempt_log: $attempt_log, last_reason: $blocker_reason, validator_verdict: $blocker_verdict },
+      blocking: { attempt_log: $attempt_log, last_reason: $blocker_reason, validator_verdict: $blocker_verdict, judge_verdict: $judge_verdict, judge_log: $judge_log },
       followup: $followup,
       versions: $versions,
       friction: ($probe_index.friction // {}),

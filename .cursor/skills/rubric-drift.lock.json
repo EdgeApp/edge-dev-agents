@@ -20,7 +20,7 @@
       ]
     },
     "file:update-status.sh": {
-      "hash": "f319111a12de",
+      "hash": "2ff8f0fc138d",
       "dims": [
         "A4",
         "O8"
@@ -45,7 +45,7 @@
       ]
     },
     "one-shot:yolo-true-blockers": {
-      "hash": "55d10f28b633",
+      "hash": "a43dee5e5391",
       "dims": [
         "A7",
         "O7"
@@ -64,7 +64,7 @@
       ]
     },
     "file:agent-run-report.md": {
-      "hash": "e8a3f75b542c",
+      "hash": "0352cdd6bfcd",
       "dims": [
         "A18",
         "A20",
@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "fbcc48eabb96",
+      "hash": "8dd44102120f",
       "dims": [
         "O4",
         "O5",
@@ -276,12 +276,6 @@
       "hash": "d6d4adbcf758",
       "dims": [
         "O8"
-      ]
-    },
-    "file:require-concession-validation.sh": {
-      "hash": "754f9976e6d9",
-      "dims": [
-        "O9"
       ]
     },
     "one-shot:followup-reopens-status": {
@@ -423,7 +417,7 @@
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "eec26bd87823",
+      "hash": "bd30b7afa702",
       "dims": [
         "A9"
       ]
@@ -654,7 +648,7 @@
       ]
     },
     "one-shot:operator-hold": {
-      "hash": "5290a8684b00",
+      "hash": "1322db1f8c43",
       "dims": [
         "A7"
       ]
@@ -663,6 +657,30 @@
       "hash": "ea41bd1a781d",
       "dims": [
         "A7"
+      ]
+    },
+    "file:concession-taxonomy.md": {
+      "hash": "65f7ff37202e",
+      "dims": [
+        "A32"
+      ]
+    },
+    "completion-judge:deny-is-actionable": {
+      "hash": "375b84396a51",
+      "dims": [
+        "A35"
+      ]
+    },
+    "file:require-completion-judgment.sh": {
+      "hash": "2b0f0b6f5d9d",
+      "dims": [
+        "O9"
+      ]
+    },
+    "file:completion-judge.sh": {
+      "hash": "6a4315b85330",
+      "dims": [
+        "O9"
       ]
     }
   },
@@ -839,22 +857,6 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "050b29b6beb8"
     },
-    "concession-validator:default-deny": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "9399f4aeb47d"
-    },
-    "concession-validator:read-only": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "75bbd219b2f8"
-    },
-    "concession-validator:evidence-not-narration": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "8f454e5fc0e0"
-    },
-    "concession-validator:actionable-deny": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "d9884bb8b686"
-    },
     "debugger:pick-the-right-method": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "7cc73e06b0c0"
@@ -960,8 +962,8 @@
       "hash": "3ac88a279063"
     },
     "one-shot:yolo-no-silent-downgrade": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "78bde95df09f"
+      "reason": "2026-09-10: rewired 2026-09-10 to the completion judge; the downgrade case is graded by A32/O9 and the judge J2/J5",
+      "hash": "5e183ab239dd"
     },
     "one-shot:bugbot-in-watch": {
       "reason": "2026-07-31: two-phase ready-flip wording; bot gate itself unchanged, graded via A3",
@@ -1472,6 +1474,7 @@
     "agents-md": "2026-07-31: Non-orch: repo-authoring tooling invoked by the AGENTS.md write gate, not part of the one-shot delegation chain; its correctness is enforced by require-skill-for-file.sh plus the skill's own checklist, not by a run-eval dimension.",
     "kanban-categorize": "2026-08-10: 2026-08-10: operator tooling for Asana board grooming; invoked by a human, not reachable from one-shot or the watcher",
     "develop-staging": "2026-08-26: operator release tooling: a human cuts the staging release with it. one-shot never delegates to it, so no orchestrated run is graded against its rules.",
-    "slack": "2026-08-26: operator comms tooling driven from anchors/chats; orch runs draft comms as gists for human review and never invoke /slack"
+    "slack": "2026-08-26: operator comms tooling driven from anchors/chats; orch runs draft comms as gists for human review and never invoke /slack",
+    "fleet-panel": "2026-09-10: operator tooling: the fleet anchor's artifact loop; never invoked inside an orchestrated run"
   }
 }

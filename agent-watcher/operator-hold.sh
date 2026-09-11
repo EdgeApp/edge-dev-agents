@@ -6,7 +6,7 @@
 # A hold is one fact: the stamp file /tmp/agent-operator-hold-<gid> exists.
 # No TTL, no owner. A steered run waits for the operator for as long as it
 # takes; the watchdog's park escalation is the reminder that one is waiting.
-# The stamp is cleared by the operator's release word (hooks/operator-hold-
+# The stamp is cleared by the operator's release prompt (hooks/operator-hold-
 # prompt.sh), by setting the task back to Pending (asana-watcher.js) and at
 # every spawn or resume of the task's session (spawn-test-session.sh), so a
 # hold never outlives the conversation it was set in.
@@ -17,12 +17,12 @@
 #
 # Consumers (all read `status`; none re-implement the file check):
 #   hooks/operator-hold-prompt.sh      UserPromptSubmit: sets on a human prompt,
-#                                      releases on a leading release word
+#                                      releases on a leading or trailing release word
 #   hooks/require-continuation-or-block.sh  Stop: allows the stop while held
 #   hooks/operator-hold-gate.sh        PreToolUse(Bash): blocks phase advances,
 #                                      pushes and PR/landing actions while held
-#   hooks/require-concession-validation.sh  a --blocked yes while held is
-#                                      operator-directed, not a concession
+#   hooks/require-completion-judgment.sh  a --blocked yes while held is
+#                                      operator-directed, not judged
 #   session-watchdog.js                a held session is never revived
 #
 # Usage:
