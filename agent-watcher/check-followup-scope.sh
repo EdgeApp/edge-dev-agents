@@ -260,12 +260,12 @@ echo ">> check-followup-scope: task $TASK_GID"
 if [[ -n "$WATERMARK" ]]; then
   echo ">>   watermark (latest agent-run-report*.md): $WATERMARK"
 else
-  echo ">>   watermark: NONE — no run-report ever attached; EVERY comment is undischarged scope"
+  echo ">>   watermark: NONE — no run-report ever attached; every comment is undischarged scope where it is addressed to the run"
 fi
 if [[ "$NEWER_COUNT" -eq 0 ]]; then
   echo ">>   0 comments newer than the watermark — no new comment scope"
 else
-  echo ">>   $NEWER_COUNT comment(s) NEWER than the watermark — this is THIS run's scope (followup-scope-is-the-deliverable):"
+  echo ">>   $NEWER_COUNT comment(s) NEWER than the watermark — read all of them; the parts addressed to the run are its scope, clauses handed to someone else are context (followup-scope-is-the-deliverable):"
   echo "$NEWER" | jq -r --arg op "$OP_GID" '.[] | "     [\(.created_at)] [\(if ((.text // "") | test("^🥋") and test("👊$")) then "agent" elif (.created_by.gid == $op) then "operator" else "other" end)] \(.created_by.name // "?"): \(.text // "" | gsub("\n"; "\n       "))"'
 fi
 if [[ "$AGENT_AFTER_WM" -gt 0 ]]; then

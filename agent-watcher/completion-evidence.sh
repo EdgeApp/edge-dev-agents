@@ -89,9 +89,9 @@ if [ -s "$MARKER" ]; then
 fi
 [ -n "$SEG_START" ] && SEG_NOTE=" (segment started $SEG_START)"
 if [ -z "$WM" ]; then
-  line "segment: FIRST RUN$SEG_NOTE: no run report was attached before this segment started. THE ASK IS THE TASK DESCRIPTION above; any operator comments below are amendments to it."
+  line "segment: FIRST RUN$SEG_NOTE: no run report was attached before this segment started. THE ASK IS THE TASK DESCRIPTION above; the parts of any operator comments below that are addressed to the run amend it (clauses handed to someone else are context: rubric Scope, who a comment is for)."
 else
-  line "segment: FOLLOWUP$SEG_NOTE: the report attached before it is dated $WM. THE ASKS ARE ONLY THE OPERATOR COMMENTS BELOW, newer than that report; when there are none, the re-arm reason is the field deltas and GitHub counters below, each mapped to what the orch owes for it (the rubric carries the field table). A report attached during this segment does not change the asks. The task description is background: earlier segments already reported on it, and whatever it still leaves open is NOT this segment's bar unless a comment below asks for it."
+  line "segment: FOLLOWUP$SEG_NOTE: the report attached before it is dated $WM. THE ASKS ARE the parts of the OPERATOR COMMENTS BELOW (newer than that report) that are addressed to the run; clauses handed to someone else are context (rubric Scope, who a comment is for). When there are none, the re-arm reason is the field deltas and GitHub counters below, each mapped to what the orch owes for it (the rubric carries the field table). A report attached during this segment does not change the asks. The task description is background: earlier segments already reported on it, and whatever it still leaves open is NOT this segment's bar unless a comment below asks for it."
 fi
 section "Operator asks (this segment's scope)"
 if [ -s "$MARKER" ]; then
