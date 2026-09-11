@@ -289,7 +289,7 @@ run_self_rewrite() {
           for (const t of f.targets) console.error(`      fold target: ${t}`)
         }' 2>&1
       echo "  Fold, newest flagged commit first while it is the tip:"
-      echo "        git reset --soft HEAD~1 && ~/.cursor/skills/lint-commit.sh --fixup <target-sha> -m \"<what changed and why>\""
+      echo "        git reset --soft HEAD~1 && ~/.cursor/skills/lint-commit.sh --fixup <target-sha> --for auto -m \"<what changed and why>\""
       echo "        (lint-commit folds the fixup into its target at once when review-mode"
       echo "        allows, so the next flagged commit becomes the tip). An UNFLAGGED commit above a"
       echo "        flagged one: move it below first with"
@@ -304,17 +304,21 @@ run_self_rewrite() {
   return 0
 }
 
-# condense-fixups: ONE fixup! per target commit, however many rounds produced
-# them. Every fixup on the branch is grouped by the commit it targets (nested
-# "fixup! fixup! X" counts for X); a group with more than one member is folded
-# into its first member, in place, with the bodies concatenated, and the subject
-# normalized to "fixup! <target subject>". Target commits are never touched, so
-# the reviewer's delta view survives; this is the preserve-mode counterpart of
-# autosquash and pr-finalize-fixups.sh runs it before every preserve push.
-# Orphan fixups (no target in range) stay where they are. Output: one JSON line
-# {"condensed":N,"groups":[{"target":"...","fixups":N}],"base":"..."} where
-# condensed is the number of fixup commits removed. Exit 1 on a rebase conflict
-# (aborted, tree left clean).
+# condense-fixups: ONE fixup! per target commit AND KIND, however many rounds
+# produced them. Every fixup on the branch is grouped by the commit it targets
+# (nested "fixup! fixup! X" counts for X) and by its `Fixup-for:` trailer
+# (human / auto, written by lint-commit.sh --for; a fixup without one is its own
+# legacy group), so the fixes a person asked for stay a separate commit from bot
+# churn. A group with more than one member is folded into its first member, in
+# place, with the bodies concatenated and one trailer kept, and the subject
+# normalized to "fixup! <target subject>". Groups keep the order their first
+# member had. Target commits are never touched, so the reviewer's delta view
+# survives; this is the preserve-mode counterpart of autosquash and
+# pr-finalize-fixups.sh runs it before every preserve push. Orphan fixups (no
+# target in range) stay where they are. Output: one JSON line
+# {"condensed":N,"groups":[{"target":"...","for":"human|auto|","fixups":N}],"base":"..."}
+# where condensed is the number of fixup commits removed. Exit 1 on a rebase
+# conflict (aborted, tree left clean).
 run_condense_fixups() {
   if [[ -n "$BASE" && -n "$MERGE_BASE_WITH" ]]; then
     echo "Error: Use either --base or --merge-base-with, not both" >&2
@@ -341,24 +345,33 @@ const base = process.env.CONDENSE_BASE
 const git = a => execSync('git ' + a, { encoding: 'utf8' })
 
 const strip = s => { let n = 0; while (s.startsWith('fixup! ')) { s = s.slice(7); n++ } return { headline: s, depth: n } }
-const log = git('log --reverse --format=%H%x1f%s ' + base + '..HEAD').trim()
-const commits = log ? log.split('\n').map(l => { const [sha, subj] = l.split('\x1f'); return { sha, subj } }) : []
+const TRAILER = /^Fixup-for:\s*(\S+)\s*$/m
+const log = git('log --reverse --format=%H%x1f%s%x1f%b%x1e ' + base + '..HEAD').trim()
+const commits = log ? log.split('\x1e').map(l => l.replace(/^\n/, '')).filter(Boolean).map(l => {
+  const [sha, subj, body] = l.split('\x1f')
+  const m = (body || '').match(TRAILER)
+  return { sha, subj, body: (body || '').replace(/^Fixup-for:.*$/mg, '').trim(), kind: m ? m[1] : '' }
+}) : []
 const targets = new Map()
 for (const c of commits) {
-  if (strip(c.subj).depth === 0 && !targets.has(c.subj)) targets.set(c.subj, { sha: c.sha, subj: c.subj, fixups: [] })
+  if (strip(c.subj).depth === 0 && !targets.has(c.subj)) targets.set(c.subj, { sha: c.sha, subj: c.subj, groups: [] })
 }
 const member = new Map()
 for (const c of commits) {
   const { headline, depth } = strip(c.subj)
   if (depth === 0) continue
   const t = targets.get(headline)
-  if (t) { t.fixups.push(c); member.set(c.sha, t) }
+  if (!t) continue
+  let g = t.groups.find(g => g.kind === c.kind)
+  if (!g) { g = { kind: c.kind, fixups: [] }; t.groups.push(g) }
+  g.fixups.push(c); member.set(c.sha, t)
 }
-const needsWork = t => t.fixups.length > 1 || (t.fixups.length === 1 && strip(t.fixups[0].subj).depth > 1)
-const groups = [...targets.values()].filter(needsWork)
+const needsWork = g => g.fixups.length > 1 || (g.fixups.length === 1 && strip(g.fixups[0].subj).depth > 1)
+const work = []
+for (const t of targets.values()) for (const g of t.groups) if (needsWork(g)) work.push({ t, g })
 const plan = {
-  condensed: groups.reduce((n, t) => n + t.fixups.length - 1, 0),
-  groups: groups.map(t => ({ target: t.subj, fixups: t.fixups.length })),
+  condensed: work.reduce((n, w) => n + w.g.fixups.length - 1, 0),
+  groups: work.map(w => ({ target: w.t.subj, for: w.g.kind, fixups: w.g.fixups.length })),
   base: base.slice(0, 10)
 }
 
@@ -376,17 +389,17 @@ for (const line of lines) {
   if (sha && member.has(sha)) continue
   out.push(line)
   const t = sha && [...targets.values()].find(t => t.sha === sha)
-  if (!t || t.fixups.length === 0) continue
-  t.fixups.forEach((f, k) => out.push((k === 0 ? 'pick ' : 'fixup ') + f.sha + ' ' + f.subj))
-  if (!needsWork(t)) continue
-  const bodies = []
-  for (const f of t.fixups) {
-    const b = git('log -1 --format=%b ' + f.sha).trim()
-    if (b && !bodies.includes(b)) bodies.push(b)
+  if (!t) continue
+  for (const g of t.groups) {
+    g.fixups.forEach((f, k) => out.push((k === 0 ? 'pick ' : 'fixup ') + f.sha + ' ' + f.subj))
+    if (!needsWork(g)) continue
+    const bodies = []
+    for (const f of g.fixups) if (f.body && !bodies.includes(f.body)) bodies.push(f.body)
+    const trailer = g.kind ? '\n\nFixup-for: ' + g.kind : ''
+    const msg = tmp + '/' + (i++) + '.msg'
+    fs.writeFileSync(msg, 'fixup! ' + t.subj + (bodies.length ? '\n\n' + bodies.join('\n\n') : '') + trailer + '\n')
+    out.push('exec git commit --amend --no-verify -q -F "' + msg + '"')
   }
-  const msg = tmp + '/' + (i++) + '.msg'
-  fs.writeFileSync(msg, 'fixup! ' + t.subj + (bodies.length ? '\n\n' + bodies.join('\n\n') : '') + '\n')
-  out.push('exec git commit --amend --no-verify -q -F "' + msg + '"')
 }
 fs.writeFileSync(arg, out.join('\n'))
 NODEEOF
@@ -405,7 +418,7 @@ NODEEOF
     fi
     exit 1
   fi
-  echo ">> Condensed fixups: $(printf '%s' "$plan" | jq -r '.condensed') commit(s) folded into their target group's first fixup (base: $BASE)" >&2
+  echo ">> Condensed fixups: $(printf '%s' "$plan" | jq -r '.condensed') commit(s) folded into their target+kind group's first fixup (base: $BASE)" >&2
   printf '%s\n' "$plan"
 }
 

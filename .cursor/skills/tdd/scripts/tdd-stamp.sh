@@ -95,7 +95,7 @@ if [[ "$MODE" == "--fold" ]]; then
   MB="$(git -C "$REPO" merge-base "$UPSTREAM" HEAD 2>/dev/null || true)"
   FIRST="$(git -C "$REPO" rev-list --reverse "${MB:+$MB..}HEAD" 2>/dev/null | head -1)"
   [[ -n "$FIRST" ]] || { echo "tdd-stamp: no branch commit to fold the doc into (upstream $UPSTREAM)" >&2; exit 1; }
-  ( cd "$REPO" && "$HOME/.cursor/skills/lint-commit.sh" --fixup "$FIRST" \
+  ( cd "$REPO" && "$HOME/.cursor/skills/lint-commit.sh" --fixup "$FIRST" --for auto \
       -m "Stamp the design doc with the fingerprint of the code tree it documents ($FP)" "$DOC_REL" ) >&2
   # Slot only when the doc fixup is still at the tip (lint-commit may already
   # have folded it; an unrelated fixup at HEAD is not ours to move).

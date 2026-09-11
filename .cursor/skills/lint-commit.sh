@@ -4,8 +4,8 @@
 #
 # Usage:
 #   lint-commit.sh -m "commit message" [file ...]
-#   lint-commit.sh --fixup <hash> -m "why this fixup" [file ...]
-#   lint-commit.sh -m "fixup! Original commit
+#   lint-commit.sh --fixup <hash> --for human|auto -m "why this fixup" [file ...]
+#   lint-commit.sh --for human|auto -m "fixup! Original commit
 #
 #   why this fixup" [file ...]
 #
@@ -13,12 +13,17 @@
 #   -m "msg"       Commit message. With --fixup it is the fixup's BODY (git
 #                  writes the "fixup! <target subject>" line itself).
 #   --fixup <hash> Create a fixup commit targeting <hash>
+#   --for human    A person asked for this fix: a review comment, an operator ask.
+#   --for auto     A machine prompted it: reviewer-bot finding, CI failure,
+#                  lint, a defect the run found itself.
 #
-# A fixup needs a body (BLOCKED otherwise, either form): the subject only names
-# the target, so a reviewer reading the preserved fixup, and the condensed
-# fixup pr-finalize-fixups.sh folds several rounds into, get the what and why
-# from the body. One or two sentences: what the fix changes and which finding
-# or ask it answers.
+# A fixup needs a body and a --for kind (BLOCKED otherwise, either form): the
+# subject only names the target, so a reviewer reading the preserved fixup, and
+# the condensed fixup pr-finalize-fixups.sh folds several rounds into, get the
+# what and why from the body. One or two sentences: what the fix changes and
+# which finding or ask it answers. The kind is written as a `Fixup-for:` trailer;
+# git-branch-ops.sh condense-fixups keeps the two kinds as separate fixups per
+# target, so a reviewer sees the answer to their own comments apart from bot churn.
 #   --reorder      After a fixup commit, autosquash from merge-base with upstream.
 #                  DEFAULT, gated by the review-mode oracle (`git-branch-ops.sh
 #                  fold-mode`): when a human is mid-review on the branch's PR
@@ -71,6 +76,7 @@ run_yarn() {
 
 MESSAGE=""
 FIXUP=""
+FOR=""
 REORDER="auto"  # auto = fold when the review-mode oracle allows; true = forced (interactive only); false = never
 FILES=()
 PRIMARY_SCOPE_DECLARED="false"
@@ -83,6 +89,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --fixup)
       FIXUP="$2"
+      shift 2
+      ;;
+    --for)
+      FOR="$2"
       shift 2
       ;;
     --reorder)
@@ -111,16 +121,29 @@ fi
 # Fixup body gate (both forms). Runs before any lint work so a bounce is cheap.
 if [[ -n "$FIXUP" && -z "$(printf '%s' "$MESSAGE" | tr -d '[:space:]')" ]]; then
   echo "BLOCKED: a fixup commit needs a body. Say what the fix changes and which finding or ask it answers:" >&2
-  echo "  ~/.cursor/skills/lint-commit.sh --fixup $FIXUP -m \"<what changed and why>\" [files...]" >&2
+  echo "  ~/.cursor/skills/lint-commit.sh --fixup $FIXUP --for human|auto -m \"<what changed and why>\" [files...]" >&2
   exit 1
 fi
 if [[ -z "$FIXUP" && "$MESSAGE" == fixup!* ]]; then
   if [[ -z "$(printf '%s\n' "$MESSAGE" | tail -n +2 | tr -d '[:space:]')" ]]; then
     echo "BLOCKED: a fixup commit needs a body. Say what the fix changes and which finding or ask it answers:" >&2
-    echo "  ~/.cursor/skills/lint-commit.sh --fixup <target-sha> -m \"<what changed and why>\" [files...]" >&2
+    echo "  ~/.cursor/skills/lint-commit.sh --fixup <target-sha> --for human|auto -m \"<what changed and why>\" [files...]" >&2
     echo "  (or -m \"fixup! <target subject>\" followed by a blank line and the body)" >&2
     exit 1
   fi
+fi
+if [[ -n "$FIXUP" || "$MESSAGE" == fixup!* ]]; then
+  case "$FOR" in
+    human|auto) ;;
+    *)
+      echo "BLOCKED: a fixup commit needs --for human (a person asked: review comment, operator ask) or --for auto (reviewer-bot finding, CI failure, lint, self-found defect). The kind keeps human-answering fixups separate from bot churn when the push condenses them." >&2
+      exit 1 ;;
+  esac
+  # One Fixup-for trailer, ours, at the end of the body.
+  MESSAGE="$(printf '%s\n' "$MESSAGE" | sed -E '/^Fixup-for:/d' | sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}')"
+  MESSAGE="$MESSAGE
+
+Fixup-for: $FOR"
 fi
 
 # If no files specified, collect all changed/untracked files
