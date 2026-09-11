@@ -79,7 +79,7 @@ current-state-body-phases-in-one-section), rewrite what reality moved, append
 this phase's entry under ## Phase history, then commit the edit as a fixup of
 the branch's FIRST commit with a body, and push through the finalize script,
 which re-stamps the edited doc against the pushed tree:
-  ~/.cursor/skills/lint-commit.sh --fixup ${FIRST_SHA:-<first-commit-sha>} -m "<what the doc now says and why>" $DOC_REL
+  ~/.cursor/skills/lint-commit.sh --fixup ${FIRST_SHA:-<first-commit-sha>} --for human|auto -m "<what the doc now says and why>" $DOC_REL
   ~/.cursor/skills/pr-finalize-fixups.sh --owner <o> --repo <r> --pr <n>
 (tdd doc-rides-the-first-commit).
 Legitimately no doc text change owed? Write /tmp/agent-tdd-current-waiver-$AGENT_TASK_GID.md
@@ -106,7 +106,7 @@ current-state-body-phases-in-one-section):
   - BODY: rewrite every section that reality moved, so it reads as current truth.
   - ## Phase history: append THIS phase's entry (queued / shipped / diverged).
   - Commit it as a fixup of the branch's FIRST commit with a body
-    (~/.cursor/skills/lint-commit.sh --fixup ${FIRST_SHA:-<first-commit-sha>} -m "<what the doc now says and why>" $DOC_REL)
+    (~/.cursor/skills/lint-commit.sh --fixup ${FIRST_SHA:-<first-commit-sha>} --for human|auto -m "<what the doc now says and why>" $DOC_REL)
     and push through ~/.cursor/skills/pr-finalize-fixups.sh, which stamps it
     (tdd doc-rides-the-first-commit).
 Legitimately no doc change owed? Write /tmp/agent-tdd-current-waiver-$AGENT_TASK_GID.md
