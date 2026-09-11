@@ -116,6 +116,8 @@ try:
     check('machine prompt stamps nothing, prints nothing', (not held()) and out == '', out[:60])
     out = prompt('<operator-hold-expired>')
     check('hold-expiry resume prompt stamps nothing (machine text)', (not held()) and out == '', out[:60])
+    out = prompt('<watchdog-dialog-declined>')
+    check('dialog-declined resume prompt stamps nothing (machine text)', (not held()) and out == '', out[:60])
     # headless child: a renamed bash with " -p " in argv runs the hook as its CHILD
     p = subprocess.run(['bash', '-c', 'exec -a "$0" bash -c \'"$HOOK"; exit $?\' claude "$@"', os.path.join(tmp, 'claude'), '-p', '--model', 'haiku'],
                        input=json.dumps({'prompt': 'judge this: update, then resume'}), capture_output=True, text=True, env=dict(ENV, HOOK=HOOK))
