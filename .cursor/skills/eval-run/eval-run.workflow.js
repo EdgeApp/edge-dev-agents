@@ -23,6 +23,10 @@ const MODEL = ['sonnet', 'opus', 'haiku', 'fable'].includes(input && input.model
 const MOPT = MODEL ? { model: MODEL } : {}
 if (!manifests.length) return { error: 'no manifests passed in args.manifests' }
 // optional: per-manifest m.cohort (label) and m.eval_notes (free-text instructions appended to eval prompts)
+// optional args.ledger: the `actions-ledger.sh snapshot` JSON (open remediation
+// classes with script-computed recurrence); the synthesizer reuses its class ids
+// and orders each tier from it. Absent on a first cohort.
+const ledger = (input && input.ledger) || null
 const cohortSplitDate = (input && input.cohortSplitDate) || null
 const cohortInstructions = (input && input.cohortInstructions) || null
 // optional targeted profile (named in agent-eval's <profiles>): grade ONLY that
@@ -93,12 +97,42 @@ const VERDICT_SCHEMA = {
   properties: { refuted: { type: 'boolean' }, reason: { type: 'string' } },
 }
 
+// cohort synthesis output: the markdown report plus the recurring remediation
+// classes as data, which eval-run feeds to actions-ledger.sh record.
+const COHORT_SCHEMA = {
+  type: 'object',
+  required: ['report', 'actions'],
+  properties: {
+    report: { type: 'string', description: 'the full cohort report markdown' },
+    actions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['class_id', 'tier', 'type', 'title'],
+        properties: {
+          class_id: { type: 'string', description: 'kebab-case defect class id; reuse the ledger id when the class is known' },
+          tier: { type: 'integer', minimum: 1, maximum: 4 },
+          type: { enum: ['skill-gap', 'infra-fix', 'ruling'] },
+          title: { type: 'string' },
+          dims: { type: 'array', items: { type: 'string' } },
+          gids: { type: 'array', items: { type: 'string' }, description: 'this cohort\'s runs the class appeared in' },
+          window_ends: { type: 'object', additionalProperties: { type: 'string' }, description: 'gid -> window_end ISO date' },
+        },
+      },
+    },
+  },
+}
+
 const GATES = { 'A3': 'completion-honesty', 'A16': 'halt-discipline', 'O2': 'no-fork-storm', 'O3': 'no-memory-critical' }
 
 const evalPrompt = (skill, m) =>
   `You are running the /${skill} evaluation for ONE orchestrated agent run.\n` +
-  `Read ~/.cursor/skills/${skill}/SKILL.md and ~/.cursor/skills/${skill}/references/rubric.md FIRST and follow them exactly ` +
-  `(read-only; evidence-or-NOT_CAPTURED; targeted greps only; never read whole transcripts/logs).\n` +
+  `Read ~/.cursor/skills/${skill}/SKILL.md FIRST, then the rubric: ` +
+  (profile && skill === 'agent-eval'
+    ? `run \`~/.cursor/skills/agent-eval/scripts/rubric-slice.sh ${profile}\` and treat its output as the WHOLE rubric ` +
+      `(the profile's rows plus the shared preamble; do NOT open references/rubric.md, the other rows are out of scope). `
+    : `~/.cursor/skills/${skill}/references/rubric.md. `) +
+  `Follow them exactly (read-only; evidence-or-NOT_CAPTURED; targeted greps only; never read whole transcripts/logs).\n` +
   `Do NOT write any report file — return findings via StructuredOutput only (the orchestrator writes reports).\n` +
   (m.__fetch_full
     ? `This run was passed to you as a THIN reference (gid + cohort context only) to keep orchestration payload small. ` +
@@ -108,7 +142,11 @@ const evalPrompt = (skill, m) =>
     : `Run manifest (from /resolve-run):\n${JSON.stringify(m)}\n`) +
   `The manifest carries probe_index (pre-computed transcript probe hits: counts + sample line numbers, plus the update-status ladder) ` +
   `and auto_na (manifest-derived NA determinations). START from them: verify at the indexed lines instead of re-deriving discovery greps ` +
-  `(counts are advisory — quoted skill bodies inflate them), and accept each auto_na entry unless evidence contradicts it.\n` +
+  `(counts are advisory — quoted skill bodies inflate them), and accept each auto_na entry unless evidence contradicts it. ` +
+  `The manifest's era block (in_effect / not_yet rows from agent-eval/references/era.md) says which mechanisms and rulings ` +
+  `applied to this run: grade Before for not_yet rows and After for in_effect rows, never compare dates yourself. ` +
+  `pr_commit_stats (per PR: bodyless and untagged fixups, fixups over one per target and kind, subjects over 50 chars) ` +
+  `is the zero-LLM evidence for the commit-discipline and followup-threads rows; cite its shas instead of re-reading git log.\n` +
   (profile
     ? `TARGETED PROFILE "${profile}": grade ONLY the dimensions that profile names in your skill's <profiles> block. ` +
       `Every other dimension is OUT OF SCOPE for this run — do not emit it (not even as NA), do not gather its evidence. ` +
@@ -195,6 +233,13 @@ const cohort = await agent(
     : '') +
   `Verdict policy: gates (${Object.values(GATES).join(', ')}) hard-fail; GOLD = all gates green AND zero confirmed BAD${mode === 'report' ? '; report-evals top out at REPORT_CLEAN' : ''}.\n` +
   `Per-run results:\n${JSON.stringify(runs)}\nSkipped: ${JSON.stringify(skipped)}\n` +
+  `TIERS (hard rule): read ~/.cursor/skills/agent-eval/references/tiers.md. Every finding and every remediation row belongs to ` +
+  `ONE tier (from its dimension; a class with no dimension takes the tier of the consequence it causes). Never merge tiers ` +
+  `into one ranking. Gates sit above every tier.\n` +
+  `ACTIONS LEDGER (open remediation classes with recurrence computed by script across cohorts; null on a first cohort): ` +
+  `${JSON.stringify(ledger)}\nReuse a ledger class id whenever this cohort's finding is the same defect class; mint a new ` +
+  `kebab-case id only for a class the ledger lacks. Within a tier, ledger classes flagged approved_unbuilt or regressed ` +
+  `come first, then recurrence_since_fix descending, then this cohort's new classes.\n` +
   (cohortSplitDate ? `COHORT SPLIT (hard requirement): each run carries a "cohort" label and "window_end". Split EVERY friction statistic ` +
     `(process-friction A29 findings, hook_blocks/tool_errors/build_invocations counts from manifests, and any other friction metric) ` +
     `into two groups by window_end relative to ${cohortSplitDate}: PRIOR (window_end < ${cohortSplitDate}) vs POST-FIX (window_end >= ${cohortSplitDate}). ` +
@@ -213,13 +258,14 @@ const cohort = await agent(
   `ONLY in Appendix A, and every upfront row LINKS down instead of restating): ` +
   `Header paragraph: totals, one-line trend vs the prior cohort (read the newest earlier ~/agent-evals/*/results.json ` +
   `when one exists), and the reading contract. ` +
-  `\"## Needs you\" — one consolidated approval checklist ordered by consequence, each row ONE line: ` +
+  `\"## Needs you\" — the approval checklist GROUPED BY TIER: one \"### Tier N: <name>\" subsection per tier that has rows ` +
+  `(gate failures first, before Tier 1), each row ONE line and typed: ` +
   `[re-run] rows (gid + DoD gap + terminal bar + the update-status Pending command); ` +
   `[field-correction] rows (exact set-tested.sh command + one-line evidence); ` +
-  `the [transcript-eval] shortlist (finding-driven only, per the demotion rule above); ` +
-  `operator rulings the eval cannot settle; ` +
-  `[skill-gap]/[infra-fix] rows in recurrence order (top item first, full per-run evidence in Appendix C); ` +
-  `[playbook-proposal] one-liners and [flow-proposal] one-liners (verbatim texts in Appendix D). ` +
+  `[transcript-eval] rows (finding-driven only, per the demotion rule above); ` +
+  `[ruling] rows the eval cannot settle; ` +
+  `[skill-gap]/[infra-fix] rows tagged with their ledger class id in backticks, in ledger order (full per-run evidence in Appendix C). ` +
+  `After the tier subsections: [playbook-proposal] one-liners and [flow-proposal] one-liners (verbatim texts in Appendix D). ` +
   `\"## Open defect classes\" — the already-fixed inspection INVERTED: lead with NOT-FIXED and PARTIAL classes ` +
   `(named mechanism or its absence, confidence, which upfront row closes it); fully-fixed classes collapse to one ` +
   `reassurance line. Inspection rules: rubric dated carve-outs, hook headers in ~/.config/agent-watcher/hooks/, ` +
@@ -233,8 +279,10 @@ const cohort = await agent(
   `C orchestration friction (substrate prose + the demoted friction-only run mentions, feeding the infra-fix rows); ` +
   `D playbook + flow proposal texts verbatim; E coverage gaps in full. ` +
   `Derive every row ONLY from findings present in the results (no inventions); omit empty subsections. ` +
-  `Return ONLY the markdown.`,
-  { label: 'cohort-report', phase: 'Synthesize', ...SYNTH_OPT }
+  `Return the markdown as \`report\` and, as \`actions\`, one entry per [skill-gap]/[infra-fix]/[ruling] row: its ledger ` +
+  `class_id, tier, type, title, the dimensions it grades under, and the gids (with window_end) of this cohort's runs it ` +
+  `appeared in. Re-run, field-correction, transcript-eval and proposal rows are one-offs and are NOT ledger actions.`,
+  { label: 'cohort-report', phase: 'Synthesize', schema: COHORT_SCHEMA, ...SYNTH_OPT }
 )
 
-return { runDate, runs, skipped, cohortReport: cohort }
+return { runDate, runs, skipped, cohortReport: (cohort && cohort.report) || '', actions: (cohort && cohort.actions) || [] }

@@ -28,6 +28,8 @@
 #   rubric-drift.sh                          # check; exit 0 clean, 1 drift found
 #   rubric-drift.sh --baseline [--reason R]  # snapshot all hashes; ack all
 #                                            #   currently-uncovered rules as R
+#   rubric-drift.sh --forget A [A...]        # drop a lock anchor the rubric no longer
+#                                            # cites on purpose (clears MISSING/UNANCHORED)
 #   rubric-drift.sh --reconcile A [A...]     # after triaging, accept anchor A's
 #                                            #   current hash (A = skill:rule-id
 #                                            #   or file:<basename>)
@@ -78,7 +80,7 @@ const vals = (f) => { // all non-flag tokens after f
   for (let j = i + 1; j < argv.length && !argv[j].startsWith('--'); j++) out.push(argv[j])
   return out
 }
-const MODE = has('--baseline') ? 'baseline' : has('--reconcile') ? 'reconcile' : has('--ack') ? 'ack' : has('--map') ? 'map' : has('--exclude-skill') ? 'exclude' : 'check'
+const MODE = has('--baseline') ? 'baseline' : has('--forget') ? 'forget' : has('--reconcile') ? 'reconcile' : has('--ack') ? 'ack' : has('--map') ? 'map' : has('--exclude-skill') ? 'exclude' : 'check'
 
 const sha = (s) => crypto.createHash('sha256').update(s.replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 12)
 
@@ -221,6 +223,19 @@ if (MODE === 'reconcile') {
     if (!anchors.has(t)) { console.error(`RECONCILE-FAIL ${t}: not a current anchor`); process.exit(2) }
     lock.anchors[t] = { hash: anchors.get(t).hash, dims: [...anchors.get(t).dims].sort() }
     console.log(`RECONCILED ${t} @ ${anchors.get(t).hash}`)
+  }
+  save()
+  process.exit(0)
+}
+
+if (MODE === 'forget') {
+  const targets = vals('--forget')
+  if (!targets.length) { console.error('usage: --forget <skill:rule-id|file:name> [...]'); process.exit(2) }
+  for (const t of targets) {
+    if (anchors.has(t)) { console.error(`FORGET-FAIL ${t}: still cited by the rubric; --reconcile it instead`); process.exit(2) }
+    if (!lock.anchors[t]) { console.error(`FORGET-FAIL ${t}: not in the lock`); process.exit(2) }
+    delete lock.anchors[t]
+    console.log(`FORGOT ${t}`)
   }
   save()
   process.exit(0)
