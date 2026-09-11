@@ -20,8 +20,22 @@ The bundle's "Segment scope" line decides what the bar is:
   reproduced but unfixed, a feature not shipped) is NOT a fail on a followup segment
   unless one of those comments asks for it; earlier segments already reported on it and
   the operator chose this followup's scope knowing that.
-- FOLLOWUP WITH NO OPERATOR COMMENTS: the operator re-armed the task by changing
-  something else, and that change is the ask. Read the bundle's "field deltas since
+- WHO A COMMENT IS FOR: an operator comment is an ask for the run only in the parts
+  that tell the run what to do or ask the run something. Operators also write to
+  people in the same thread (QA, a reviewer, a teammate): a clause that hands work or
+  a question to someone else is theirs, not the run's. Read those clauses for context
+  (what that person was asked, what the operator expects next) and never grade them
+  as asks, never grade them as undelivered, and never require the run to wait on them
+  unless the comment tells the run to wait. Decide by who is being told to act, not by
+  surface markers: an @mention or a name is a signal, not a rule ("@Sam says the fee
+  row is wrong, fix it" is an ask for the run; "@Sam can you verify on prod?" is Sam's).
+  Split a mixed comment by clause. A comment with no clause for the run is context
+  only, and a followup whose comments are all context is judged like a followup with
+  no operator comments (next bullet). A clause a careful reader cannot place is the
+  run's: doing it is the cheaper error, and the run's report should say it read the
+  clause as its own.
+- FOLLOWUP WITH NO OPERATOR COMMENTS (or none carrying an ask for the run): the
+  operator re-armed the task by changing something else, and that change is the ask. Read the bundle's "field deltas since
   the previous segment" and the GitHub counters, and map each to what the orch owes
   for it. Fields that name a deliverable:
 
@@ -94,7 +108,11 @@ in `asks`.
   outside the task and the report says so.
 - `unaddressed`: no evidence either way, or evidence of a narrower delivery than asked
   (one token when "multiple" was asked; a static check when "actually test" was asked).
-List only the segment's asks (see Scope). On a followup, do NOT add the task
+- `not-for-run`: the clause hands work or a question to someone else (Scope, "who a
+  comment is for"); name the addressee in `evidence`. Never a fail. Use it also when
+  the run delivered such a clause anyway: that is neither a fail nor credit.
+List only the segment's asks (see Scope), one line per clause when a comment mixes
+asks for the run with clauses for others. On a followup, do NOT add the task
 description as an ask. Any `unaddressed` ask on a `complete` event is a `fail`. On `pr-create`, asks that
 concern the PR's content count; asks about testing that happens after the PR are `na`.
 On `block`, an ask the block reason ignores is a `fail` (the block must speak to it).
@@ -181,7 +199,7 @@ Return ONE JSON object, in a ```json fence, nothing after it:
   "summary": "<one sentence>",
   "asks": [
     {"ask": "<quoted or paraphrased ask>", "source": "description|comment <ISO ts>",
-     "status": "delivered|surfaced|unaddressed", "evidence": "<artifact + what it shows>"}
+     "status": "delivered|surfaced|unaddressed|not-for-run", "evidence": "<artifact + what it shows; for not-for-run, the addressee>"}
   ],
   "items": [
     {"id": "J1", "dimension": "asks-satisfied", "status": "pass|fail|na",
