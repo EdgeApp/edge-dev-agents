@@ -167,9 +167,9 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   CLI is the proof path), and re-pin the swap pair via the corePlugins hack so
   the keypad/confirm steps land deterministically. Stopping here — or finalizing
   Complete/pr-create via direct verification — WITHOUT applying this workaround
-  is a DOWNGRADE concession the `require-concession-validation.sh` gate catches;
-  the concession-validator DENIES it because a documented continue-workaround
-  exists. **The direct-verification fallback below is GATED: it is legitimate
+  is a DOWNGRADE concession the `require-completion-judgment.sh` gate catches;
+  the completion judge DENIES it (J5, concession taxonomy) because a documented
+  continue-workaround exists. **The direct-verification fallback below is GATED: it is legitimate
   ONLY after you have actually funded and driven a REAL, available swap to the
   point where THIS crash interrupts execution AND no continue-workaround remains.
   It is NOT a substitute for an executable swap you already hold.** Invoking the

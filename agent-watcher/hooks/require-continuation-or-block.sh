@@ -67,7 +67,7 @@ BLOCKED=$(printf '%s' "$RESP" | jq -r '(.data.custom_fields[]? | select((.name /
 [ -z "$STATUS" ] && allow
 
 case "$STATUS" in Complete|Archived) allow ;; esac
-[ "$BLOCKED" = "Yes" ] && allow   # a block IS a legit end (the concession-validator already gated it)
+[ "$BLOCKED" = "Yes" ] && allow   # a block IS a legit end (the completion judge already gated it)
 
 # ---- Premature stop: count, then block or escalate ----
 N=$(cat "$COUNT_FILE" 2>/dev/null || echo 0)

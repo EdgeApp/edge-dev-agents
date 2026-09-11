@@ -18,7 +18,7 @@
 //
 // Variants handled:
 //  - Variant 1 (RC bridge dead, claude alive): the pane footer ("Remote Control active") is the source of truth. Absent + idle past IDLE_THRESHOLD_MS → revive by RESPAWN: kill the pane's claude (verified dead first), relaunch in place with `--remote-control <name> --resume <live-id>` + the preserved argv flags. A fresh process arms RC at startup; the old keystroke re-arm (`/remote-control` typed into the pane) stopped existing as a slash command on CLI 2.1.220 and burned ~232 no-op attempts during the 2026-08-02/03 auth outage. Present → do NOT touch at all (a half-open bridge is left for the operator to reconnect on next attach). This is NOT the removed Variant 2 (see below): it only ever fires on a VERIFIED-ALIVE claude, kills it and confirms death before the one replacement spawn, and is bound by a per-session cooldown — process count is 1→0→1, never additive.
-//  - Completion sweep: if Asana agent_status is Complete for a session's task GID, RETIRE the session — rename claude-asana-<gid> → done-asana-<gid> and free the sim+Metro+slot, but leave claude alive so it stays attachable / re-engageable. Retired sessions no longer count toward the concurrency cap; the oldest beyond keep_completed_sessions are killed to bound memory.
+//  - Completion sweep: if Asana agent_status is Complete for a session's task GID, RETIRE the session — rename claude-asana-<gid> → done-asana-<gid> and free the sim+Metro+slot+Maestro MCP JVM, but leave claude alive so it stays attachable / re-engageable. Retired sessions no longer count toward the concurrency cap; the oldest beyond keep_completed_sessions are killed to bound memory.
 //  - Blocked sweep: if a session's task has blocked=Yes, shed its heavy resources (sim + Metro) so it stops squatting while it waits on a human — but keep the session + slot alive so it can resume on unblock (done once, re-armed when unblocked).
 //
 // REMOVED 2026-05-28 — Variant 2 (process-death auto-resume):
@@ -755,6 +755,34 @@ function listRetiredSessions() {
 //   resume-task) when a prior transcript exists, else fresh-spawns. So phase statuses are
 //   progress-only (set by the running agent), never a manual re-engagement trigger, and
 //   this watchdog stays out of re-engagement entirely (see the header BOUNDARY note).
+// Every orch claude is launched with maestro-mcp.json, so it carries a
+// `maestro mcp --device <udid>` JVM as a stdio child (~160 MB, ~50 threads). At
+// retirement the sim it points at is deleted, so the JVM serves nothing for the
+// rest of the retiree's life; kill it and keep only the claude process. Also swept
+// on every prune tick so a JVM that outlives or respawns after retirement dies too.
+// Resume paths (resume-agent, the fleet page) fork a fresh claude that starts its
+// own server, so nothing depends on the retiree's JVM.
+function descendantPids(pid, depth = 5) {
+  if (depth <= 0) return []
+  const out = sh(`pgrep -P ${pid}`)
+  if (!out) return []
+  const kids = out.split('\n').filter(Boolean).map((x) => parseInt(x, 10)).filter(Number.isFinite)
+  return kids.concat(...kids.map((k) => descendantPids(k, depth - 1)))
+}
+function killMaestroMcp(session) {
+  const root = getPanePid(session)
+  if (root === null) return 0
+  const jvms = descendantPids(root).filter((pid) => /maestro\.cli\.AppKt/.test(sh(`ps -o args= -p ${pid}`)))
+  for (const pid of jvms) {
+    const dev = (sh(`ps -o args= -p ${pid}`).match(/--device (\S+)/) || [])[1] || '?'
+    sh(`kill -TERM ${pid} 2>/dev/null`)
+    sh('sleep 1')
+    if (sh(`ps -o pid= -p ${pid}`).trim()) sh(`kill -KILL ${pid} 2>/dev/null`)
+    log(`[${session}] killed retired Maestro MCP JVM pid ${pid} (device ${dev.slice(0, 8)}); claude kept alive`)
+  }
+  return jvms.length
+}
+
 
 // Retire a completed session instead of killing it: rename it out of the
 // slot-counted `claude-asana-<gid>` namespace (so the watcher stops counting it and
@@ -777,7 +805,8 @@ function retireSession(session, taskGid, agentStatus = 'Complete') {
   releaseSimAndSlot(taskGid)
   freeMetroPort(metroPort)
   writeReleaseReceipt(taskGid, slot, metroPort)
-  log(`[${session}] agent_status=${agentStatus} → RETIRED as ${dest} (claude kept alive; Metro+sim+slot freed; worktree retained)`)
+  killMaestroMcp(dest)
+  log(`[${session}] agent_status=${agentStatus} → RETIRED as ${dest} (claude kept alive; Metro+sim+slot+Maestro MCP freed; worktree retained)`)
 }
 
 // Monitor-liveness heartbeat check: memory-monitor logs every 30s tick; a stale
@@ -848,6 +877,7 @@ function pruneRetiredSessions(state) {
     log(`[${s.name}] retired pane's claude gone → killed`)
   }
   if (dead.length) retired = retired.filter((s) => !dead.includes(s))
+  for (const s of retired) killMaestroMcp(s.name)
   // Idle TTL — the SAME content-change clock and idle_reap_hours key as the
   // discussion reaper. The clock starts at retirement (first prune tick seeds
   // the baseline) and resets on any pane-content change, so a retiree the

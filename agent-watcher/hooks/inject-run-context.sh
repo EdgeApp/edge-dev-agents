@@ -41,20 +41,9 @@ SRC=$(jq -r '.source // empty' 2>/dev/null || true)
 # wrapper shells (zsh -c snapshot) quote arbitrary text in argv, so a
 # whole-argv substring match false-positives on any command mentioning
 # ".claude" paths or "-p" flags.
-PP=$PPID
-for _ in 1 2 3; do
-  PCMD=$(ps -o command= -p "$PP" 2>/dev/null) || break
-  EXE="${PCMD%% *}"
-  case "$EXE" in
-    claude|*/claude)
-      case " $PCMD " in
-        *" -p "*|*" --print "*|*" --print") exit 0 ;;
-      esac
-      break ;;
-  esac
-  PP=$(ps -o ppid= -p "$PP" 2>/dev/null | tr -d ' ')
-  [[ -n "$PP" && "$PP" != 0 ]] || break
-done
+# Shared with operator-hold-prompt.sh / mark-operator-present.sh (2026-09-10):
+# hooks/lib/headless-child.sh owns the ancestor walk.
+. "$DIR/hooks/lib/headless-child.sh" 2>/dev/null && headless_child && exit 0
 
 emit_run() {
   local gid="$1" tok

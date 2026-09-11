@@ -98,8 +98,8 @@
           "type": "command"
         },
         {
-          "command": "~/.config/agent-watcher/hooks/require-concession-validation.sh",
-          "timeout": 15,
+          "command": "~/.config/agent-watcher/hooks/require-completion-judgment.sh",
+          "timeout": 600,
           "type": "command"
         },
         {

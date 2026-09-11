@@ -283,6 +283,21 @@ $(echo "$SLOP" | sed 's/^/    /')
 "
 fi
 
+# Completion Judge section: generated from the judge provenance log (one row per
+# judge call), replaced on every attach so re-attached reports stay current.
+if [ -x "$HOME/.config/agent-watcher/judge-report-section.sh" ]; then
+  SECTION="$("$HOME/.config/agent-watcher/judge-report-section.sh" --gid "$AGENT_TASK_GID" 2>/dev/null || true)"
+  if [ -n "$SECTION" ]; then
+    SECTION="$SECTION" node -e '
+const fs=require("fs"); const f=process.argv[1]; let s=fs.readFileSync(f,"utf8"); const sec=process.env.SECTION.trimEnd()+"\n";
+const re=/^## Completion Judge[^\n]*\n[\s\S]*?(?=^## |(?![\s\S]))/m;
+if(re.test(s)) s=s.replace(re, sec+"\n");
+else if(/^## Testing/m.test(s)) s=s.replace(/^## Testing/m, sec+"\n## Testing");
+else s=s.trimEnd()+"\n\n"+sec;
+fs.writeFileSync(f,s);' "$REPORT" 2>/dev/null || true
+  fi
+fi
+
 # 3. Missing template sections (headings read live from the template).
 if [ -f "$TEMPLATE" ]; then
   MISSING=""
