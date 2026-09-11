@@ -803,6 +803,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`tdd-lint.sh`](.cursor/skills/tdd/scripts/tdd-lint.sh) | TDD form lint (calls the shared prose lint) |
 | [`install-deps.sh`](.cursor/skills/install-deps.sh) | Install dependencies and run project prepare steps |
 | [`rubric-drift.sh`](.cursor/skills/rubric-drift.sh) | Anchor tracking between eval rubrics and the rules/scripts they grade against |
+| [`mermaid-png.sh`](.cursor/skills/mermaid-png.sh) | Render one mermaid diagram to a cropped PNG (headless Chrome) for SendUserFile from CLI sessions |
 
 ### Asana and orchestration
 

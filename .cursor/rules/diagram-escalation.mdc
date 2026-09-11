@@ -10,12 +10,13 @@ When a chat explanation covers ordering, a race, or state-machine behavior — a
 Delivery, first match wins (the fence branch is a Cursor-compat shim — see memory `cursor-first-migration-debt`):
 
 1. A visualize widget tool is present in-session (Claude Code desktop app) → render the diagram with it.
-2. No widget tool but SendUserFile exists (Claude Code CLI, incl. tmux-wrapped orch sessions) → write the diagram to a scratchpad `.md` file (mermaid fence inside) and SendUserFile with `display: 'render'`; it renders in the side panel. Do NOT also paste the fence in chat — one delivery per diagram.
+2. No widget tool but SendUserFile exists (Claude Code CLI, incl. tmux-wrapped orch sessions) → write the diagram to a scratchpad `.mmd` file, render it with `~/.cursor/skills/mermaid-png.sh <file.mmd>` (headless Chrome, cropped PNG; the desktop markdown viewer does not render mermaid fences, so sending the `.md` shows source), and SendUserFile the PNG with `display: 'render'`. A render failure (exit 1) is a diagram bug to fix, never a reason to send the source instead. Do NOT also paste the fence in chat — one delivery per diagram.
 3. Otherwise (Cursor chat) → a plain ```mermaid fence inline; Cursor renders it, and it degrades to readable text anywhere else.
 
 Constraints:
 
 - One diagram per explanation, and only when the ordering trigger fires. Prose-only stays correct for everything else; never decorate.
 - Sequence diagram for cross-component ordering, flowchart for gates/branches, before/after pairs for behavior changes.
+- Orientation follows the reader's scroll, not the flow's metaphor: flowcharts default to `TD`. `LR` only when the longest path is five nodes or fewer, every label is one short line, and there are no side-by-side subgraphs; anything longer laid out `LR` becomes a strip wider than any screen, and a multi-line label doubles the damage. Subgraphs stack vertically in `TD`, which is the reason a pipeline-of-phases diagram (run, then eval, then ledger) still goes top-down. Sequence diagrams are vertical by construction. This applies to every mermaid the agent writes, chat or doc; tdd's `diagrams-and-signatures` defers here for it.
 - Participant IDs must not be mermaid keywords; tdd's `diagrams-and-signatures` owns the pitfall list.
 - The diagram carries the mechanism; the prose states the conclusion and the consequence. If the prose still walks the interleaving step by step, the diagram has not done its job.
