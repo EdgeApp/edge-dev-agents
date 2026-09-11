@@ -254,6 +254,19 @@ function operatorHeld(taskGid) {
   return fs.existsSync(`/tmp/agent-operator-hold-${taskGid}`)
 }
 
+// A CLI SAFETY DIALOG in an orchestrated run ("Dangerous rm operation on
+// possibly-empty variable path ... Do you want to proceed? 1. Yes 2. No"): the
+// bypass-permissions flag does not skip it, and nothing else answers it, so the
+// run parks until a human presses a key. Declining is always safe (the model gets
+// the rejection and re-plans), so the watchdog answers No, then once the pane has
+// settled at the composer sends <watchdog-dialog-declined>, a machine prompt the
+// one-shot rule of that name turns into "rewrite the command, continue".
+function paneSafetyDialog(content) {
+  return /\bDangerous\b[^\n]*\boperation\b/i.test(content)
+    && /\bDo you want to proceed\b/i.test(content)
+    && /\b2\.\s*No\b/.test(content)
+}
+
 function paneAwaitingChoice(content) {
   return /❯\s+\d+\.\s/.test(content)                                  // selected numbered menu option (❯ 1. …)
     || /\bNo, and tell Claude\b/i.test(content)                       // distinctive permission-prompt option text
@@ -1110,7 +1123,22 @@ function main() {
     // kill+respawn — firing it mid-decision would discard the pending dialog and any
     // context behind it. Both make the pane static, so the idle heuristic alone
     // cannot tell them from a hang.
-    const awaitingChoice = paneAwaitingChoice(content)
+    let awaitingChoice = paneAwaitingChoice(content)
+    let declinedAt = prior?.declinedAt ?? null
+    const isRunSession = !isChat && /^\d+$/.test(taskGid)   // never answer dialogs in chat/anchor sessions
+    if (isRunSession && awaitingChoice && paneSafetyDialog(content)) {
+      sh(`tmux send-keys -t "${session}" "2" Enter`)
+      log(`[${session}] CLI safety dialog (dangerous-operation confirm) → answered No; resume prompt follows once the pane settles.`)
+      declinedAt = now
+      awaitingChoice = false
+      lastChange = now
+    } else if (isRunSession && declinedAt && !changed && !awaitingChoice && !/esc to interrupt/.test(content) && !operatorHeld(taskGid)) {
+      sh(`tmux send-keys -t "${session}" C-u`)
+      sh(`tmux send-keys -t "${session}" "<watchdog-dialog-declined>" Enter`)
+      log(`[${session}] declined dialog ${Math.round((now - declinedAt) / 60000)}m ago, pane idle → <watchdog-dialog-declined> sent.`)
+      declinedAt = null
+      lastChange = now
+    }
     // Operator hold (operator-hold.sh): a human typed into the session within the
     // hold window and the agent is waiting on them by design. Same handling as a
     // parked choice prompt: never revive, never treat the quiet as a hang.
@@ -1167,7 +1195,7 @@ function main() {
     }
     // On an unconfirmed fetch, preserve the prior heavyFreed rather than letting a
     // null-blocked blip reset it to false and re-free next tick.
-    state.sessions[session] = { lastContent: content, lastChange, heldLogged: isHeld, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated, respawnedAt, heldLogged: isHeld }
+    state.sessions[session] = { lastContent: content, lastChange, heldLogged: isHeld, declinedAt, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated, respawnedAt, heldLogged: isHeld }
   }
 
   // Cap retired (completed-but-kept-alive) sessions so they don't accumulate in memory.

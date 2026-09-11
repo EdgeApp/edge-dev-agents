@@ -40,7 +40,7 @@ if [ -x "$H/orch-run-context.sh" ] && ! "$H/orch-run-context.sh" >/dev/null 2>&1
 PROMPT=$(jq -r '.prompt // empty' 2>/dev/null || true)
 [ -n "$PROMPT" ] || exit 0
 case "$PROMPT" in
-  '<watchdog-revive-ping>'*|'<operator-hold-expired>'*|'/one-shot'*) exit 0 ;;
+  '<watchdog-revive-ping>'*|'<operator-hold-expired>'*|'<watchdog-dialog-declined>'*|'/one-shot'*) exit 0 ;;
 esac
 
 # Strip harness envelopes and machine notices; what survives is human text.

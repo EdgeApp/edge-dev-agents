@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "66743c77e157",
+      "hash": "697e8d2baac7",
       "dims": [
         "O4",
         "O5",
@@ -1452,6 +1452,10 @@
     "changelog:reference-old-entries": {
       "reason": "2026-09-04: process step (which slice to read for calibration); its outcome is graded through entry-shape, which is mechanical",
       "hash": "2032c13909cb"
+    },
+    "one-shot:watchdog-dialog-declined": {
+      "reason": "2026-09-11: machine-prompt handling driven by session-watchdog.js; the agent's rewrite is ordinary command craft graded under A16/A19, no separate dimension",
+      "hash": "844bc093a159"
     }
   },
   "excluded_skills": {
