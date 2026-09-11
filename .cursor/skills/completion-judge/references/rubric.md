@@ -20,15 +20,26 @@ The bundle's "Segment scope" line decides what the bar is:
   reproduced but unfixed, a feature not shipped) is NOT a fail on a followup segment
   unless one of those comments asks for it; earlier segments already reported on it and
   the operator chose this followup's scope knowing that.
-- FOLLOWUP WITH NO OPERATOR COMMENTS: the re-arm reason is in the bundle's field
-  deltas and GitHub counters, and that reason is the ask. A `Force Land` delta means
-  land the PR (delivered when the git section shows the PR MERGED, or the report says
-  auto-merge is armed). A `Build` delta means the cheese or staging routing (the
-  Finalize Gate box). Unresolved review threads or unanswered review bodies on an
-  owned PR mean address them (delivered when both counters read zero; the mechanical
-  gate also blocks on them, so a nonzero count is a fail with "address per
-  /pr-address" as what_to_do). Nothing else is owed: no comments and no such signal
-  means the segment's only ask is a clean re-finalize of the existing PR.
+- FOLLOWUP WITH NO OPERATOR COMMENTS: the operator re-armed the task by changing
+  something else, and that change is the ask. Read the bundle's "field deltas since
+  the previous segment" and the GitHub counters, and map each to what the orch owes
+  for it. Fields that name a deliverable:
+
+  | Field delta | The ask | Delivered when |
+  |---|---|---|
+  | Force Land set | land the PR | git section shows the PR MERGED, or the report says auto-merge is armed |
+  | Build (staging/cheese) set or changed | route the build (cheese pushed, staging noted) | the Finalize Gate build box is checked with the routing named |
+  | TDD? set | the TDD flow: design doc in the first commit, kept current | the report's tdd fields and the diff show the doc |
+  | tested changed to a platform | re-verify on that platform | an attempt-log success drive on it and matching proof frames |
+  | Release / Repo / Category changed | re-target the work to that release or repo | the PR base and CHANGELOG section match |
+  | any other field that names an outcome | do what the field says | evidence of that outcome |
+
+  Fields that are run parameters, not asks: agent_model, agent_effort, agent_lane,
+  Priority, LOE, Estimate, assignee, Board State, agent_status, blocked. GitHub
+  signals: unresolved review threads or unanswered review bodies on an owned PR mean
+  address them (delivered when both counters read zero). When nothing in the deltas
+  or counters names an outcome, the segment's only ask is a clean re-finalize of the
+  existing PR; do not invent one. A field you cannot map is out of scope, never a fail.
 Every dimension below reads "the ask", "the change", "the drive" as THIS SEGMENT'S:
 what these asks required, what this segment changed, what this segment had to exercise.
 When a followup asks only to test or investigate, delivering the test result or the
