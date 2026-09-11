@@ -102,7 +102,7 @@
       ]
     },
     "im:commit-script": {
-      "hash": "1316ceaf9a10",
+      "hash": "43c9f8475517",
       "dims": [
         "A12"
       ]
@@ -515,7 +515,7 @@
       ]
     },
     "pr-address:one-fixup-per-target-per-turn": {
-      "hash": "a3d1968e39bc",
+      "hash": "f09b09aaadc0",
       "dims": [
         "A24"
       ]
@@ -570,7 +570,7 @@
       ]
     },
     "file:lint-commit.sh": {
-      "hash": "6991e4bacaf6",
+      "hash": "91c282be97a9",
       "dims": [
         "A12"
       ]
@@ -612,13 +612,13 @@
       ]
     },
     "tdd:doc-rides-the-first-commit": {
-      "hash": "d9c9da0b4133",
+      "hash": "49819e621d66",
       "dims": [
         "A31"
       ]
     },
     "file:tdd-stamp.sh": {
-      "hash": "6380bdd297a4",
+      "hash": "43f427f83153",
       "dims": [
         "A31"
       ]
@@ -750,16 +750,16 @@
       "hash": "fad0bb17ec63"
     },
     "bugbot:commit-via-script": {
-      "reason": "2026-09-03: mechanical: lint-commit.sh consults git-branch-ops.sh fold-mode; A12 grades the fold outcome",
-      "hash": "e80fcdb4929b"
+      "reason": "2026-09-11: mechanically enforced: lint-commit.sh bounces bodyless fixups, git-history-gate.sh blocks raw commits",
+      "hash": "e21e594714d4"
     },
     "bugbot:slot-after-each-fixup": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "c3122674c28e"
     },
     "bugbot:fixup-target-headline": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "6c08c729b02d"
+      "reason": "2026-09-11: target choice is judgment inside bugbot cycles; A24 grades the fixup model, bugbot is a delegate of pr-address",
+      "hash": "a4825c3dba1d"
     },
     "bugbot:no-summary-comment": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -990,8 +990,8 @@
       "hash": "49ebf1156326"
     },
     "pr-address:commit-via-script": {
-      "reason": "2026-09-03: mechanical: lint-commit.sh consults git-branch-ops.sh fold-mode; A12 grades the fold outcome",
-      "hash": "ee8e64c5d0ab"
+      "reason": "2026-09-11: mechanically enforced: lint-commit.sh bounces bodyless fixups, git-history-gate.sh blocks raw commits",
+      "hash": "a4038997d190"
     },
     "pr-address:slot-after-each-fixup": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",

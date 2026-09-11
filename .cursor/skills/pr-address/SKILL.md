@@ -14,9 +14,9 @@ metadata:
 <rule id="no-git-editor">All git commands that may open an editor (`rebase --continue`, `commit` without `-m`) MUST be prefixed with `GIT_EDITOR=true` to prevent blocking on `COMMIT_EDITMSG` in the IDE.</rule>
 <rule id="no-gitkraken">NEVER use `git_log_or_diff:GitKraken`. Use local `git` commands directly.</rule>
 <rule id="this-file-wins">If any other instruction conflicts with this file, **this file wins** for `pr-address`.</rule>
-<rule id="commit-via-script">Commit fixups using `~/.cursor/skills/lint-commit.sh -m "fixup! {headline}" [files...]`. The script asks the review-mode oracle itself (`git-branch-ops.sh fold-mode`): in `preserve` it leaves the fixup at HEAD for `slot-after-each-fixup` and step 4's conditional autosquash; in `autosquash` it folds at once. Do NOT manually run eslint — the commit script handles it.</rule>
+<rule id="commit-via-script">Commit fixups using `~/.cursor/skills/lint-commit.sh --fixup <target-sha> -m "<what the fix changes and which finding it answers>" [files...]` (the body is required; the script bounces a bodyless fixup). The script asks the review-mode oracle itself (`git-branch-ops.sh fold-mode`): in `preserve` it leaves the fixup at HEAD for `slot-after-each-fixup` and step 4's finalize; in `autosquash` it folds at once. Do NOT manually run eslint — the commit script handles it.</rule>
 <rule id="slot-after-each-fixup">Immediately after every successful `lint-commit.sh` call, run `~/.cursor/skills/slot-fixup.sh` to slot the new fixup next to its target's group. This keeps the "every fixup sits next to its target" invariant continuously. If `slot-fixup.sh` exits non-zero (rebase conflict), report and STOP — do not continue the address-pass.</rule>
-<rule id="one-fixup-per-target-per-turn">Produce at most ONE `fixup! <target-headline>` per target commit per address-pass (one human-review turn), NOT one per comment: the first fix landing on a target creates its fixup; every later fix this pass that targets the SAME commit amends into that existing fixup (`lint-commit.sh --no-reorder -m "fixup! {targetHeadline}"` targeting it, or `--fixup <its-sha>`) rather than adding another. Reviewer-bot churn (a bot re-reviewing on each push and posting fresh findings) condenses into the same per-target fixup — never a new commit per finding. A finding you REJECT (invalid / out-of-scope / infra-layer / an intentional documented design choice) is handled by reply + resolve with NO code change, so it does not push a commit and re-trigger the review loop. Distinct human-review turns stay separable because `step 1.5` squash-stale folds the prior turn's fixups before this turn's begins.</rule>
+<rule id="one-fixup-per-target-per-turn">Group a pass's fixes by TARGET commit, one fixup per target, not one per comment; a later fix for the same target in the same pass may be its own fixup, since `pr-finalize-fixups.sh` condenses same-target fixups into one before every preserve push (bodies concatenated, target untouched), so bot churn across rounds never multiplies commits. A finding you REJECT (invalid / out-of-scope / infra-layer / an intentional documented design choice) is handled by reply + resolve with NO code change, so it does not push a commit and re-trigger the review loop. Distinct human-review turns stay separable because `step 1.5` squash-stale folds the prior turn's fixups before this turn's begins.</rule>
 <rule id="one-push-per-round">Reviewer bots bill PER PUSH, not per fixup (the bugbot credit gate, 2026-07-31). All of an address-pass's fixes accumulate LOCALLY (fixup commits + amends per `one-fixup-per-target-per-turn`, slotted per `slot-after-each-fixup`) and reach the remote in exactly ONE push: step 4's `pr-finalize-fixups.sh`, which owns the push. Never push mid-pass "to see CI", never push per-fix — each intermediate push buys a bot review of a HEAD you already know is incomplete. While a review is active (review-mode preserve), raw `git push` is hook-blocked (`git-history-gate.sh`); the sanctioned push path is the finalize script.</rule>
 <rule id="script-timeouts">Set `block_until_ms: 60000` when invoking `pr-address.sh` (GitHub API calls take up to 30s), EXCEPT for the body-carrying verbs — `reply`, `mark-addressed`, `comment` — which run the semantic no-slop judge and need `600000`. A judge killed by a short timeout produces NO output and no error, which is indistinguishable from a successful post; the resulting "did it work?" probe is what puts junk comments on a human's PR.</rule>
 
@@ -122,11 +122,11 @@ Group the comments by fixup target, and process one TARGET at a time — produci
 
 1. Read the file(s) for every comment on this target
 2. Apply all of that target's fixes — comment hunks can be narrower than intent; apply consistently within the function/file
-3. Commit ONE fixup for the target with `lint-commit.sh`:
+3. Commit ONE fixup for the target with `lint-commit.sh`, body required:
    ```bash
-   ~/.cursor/skills/lint-commit.sh -m "fixup! {targetHeadline}" [files...]
+   ~/.cursor/skills/lint-commit.sh --fixup <targetSha> -m "<what changed and which finding it answers>" [files...]
    ```
-   If this pass already pushed a fixup for the SAME target (reviewer-bot churn arriving after a re-push), do NOT add a second — amend the new fix into that existing fixup (`git commit --amend --no-edit` when it is HEAD, else `lint-commit.sh --fixup <its-sha>` and let a later autosquash fold it), so the target keeps one fixup.
+   A fixup this pass already pushed for the same target needs no amend: step 4's finalize condenses same-target fixups into one.
 4. **Immediately slot the fixup next to its target's group**:
    ```bash
    ~/.cursor/skills/slot-fixup.sh
@@ -207,7 +207,7 @@ The script appends `<!-- addressed:review:ID -->` or `<!-- addressed:comment:ID 
 </step>
 
 <step id="4" name="Finalize fixups (autosquash or push, mode-dependent)">
-Delegate the autosquash-vs-push decision and execution to the shared finalize helper. It calls `pr-address.sh review-mode` to derive the mode from the latest human activity, then either autosquashes + force-pushes (autosquash mode) or just force-pushes (preserve mode). Policy lives in that one script and is shared with other skills (bugbot) so behavior never drifts.
+Delegate the autosquash-vs-push decision and execution to the shared finalize helper. It calls `pr-address.sh review-mode` to derive the mode from the latest human activity, then either autosquashes + force-pushes (autosquash mode) or condenses same-target fixups into one and force-pushes (preserve mode); in both modes it re-stamps a committed TDD the pass edited. Policy lives in that one script and is shared with other skills (bugbot) so behavior never drifts.
 
 **Ownership guard:** if you are not the PR author (`currentUser !== prAuthor`), the helper forces `preserve` mode and never autosquashes — we never rewrite the history of a PR we don't own. Fixups stay on top for the owner to squash at merge.
 
@@ -217,7 +217,7 @@ Delegate the autosquash-vs-push decision and execution to the shared finalize he
 
 Output is one line of JSON:
 - `{"action": "autosquash", "mode": "autosquash", "newHead": "<sha>"}` — branch history rewritten, force-pushed.
-- `{"action": "push", "mode": "preserve", "newHead": "<sha>"}` — fixups left in place for the reviewer to see; force-pushed (per-fixup slotting rewrote tip).
+- `{"action": "push", "mode": "preserve", "newHead": "<sha>", "condensed": N, "stamped": bool}` — one fixup per target left in place for the reviewer to see (N surplus fixups folded away); force-pushed (slotting and condensing rewrote tip).
 
 If the script exits non-zero, the autosquash hit a conflict mid-rebase. The working tree is in `REBASE_HEAD` state; report the error and STOP so the user can resolve manually (`git status`, fix files, `GIT_EDITOR=true git rebase --continue`, or `git rebase --abort`).
 </step>

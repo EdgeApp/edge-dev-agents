@@ -55,6 +55,10 @@ done
 [ -n "$DOC" ] && [ -n "$REPO_DIR" ] || exit 0
 
 BASE=$(git -C "$REPO_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || echo "origin/develop")
+# The branch's FIRST commit is measured from the DEFAULT branch, not @{upstream}
+# (after a push, origin/<branch>..HEAD would name the first unpushed commit).
+DEFAULT_UPSTREAM=$(git -C "$REPO_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo "origin/develop")
+FIRST_SHA=$(git -C "$REPO_DIR" rev-list --reverse "$(git -C "$REPO_DIR" merge-base "$DEFAULT_UPSTREAM" HEAD 2>/dev/null || echo HEAD)..HEAD" 2>/dev/null | head -1)
 STAMP_SH="$HOME/.cursor/skills/tdd/scripts/tdd-stamp.sh"
 DOC_REL="${DOC#$REPO_DIR}"; DOC_REL="${DOC_REL#/}"
 # Stamped doc: compare against the COMMITTED doc at HEAD (the gate is about what
@@ -72,12 +76,13 @@ Code changed after the doc was last stamped. Re-read the WHOLE doc against
 \`git diff $BASE..HEAD\` (not just the section you touched: followups drift by
 patching one section while the rest describes an earlier phase, tdd
 current-state-body-phases-in-one-section), rewrite what reality moved, append
-this phase's entry under ## Phase history, then:
-  $STAMP_SH $REPO_DIR $DOC_REL
-  ~/.cursor/skills/lint-commit.sh --fixup \$(git rev-list --reverse $BASE..HEAD | head -1) $DOC_REL
-(the doc rides in the branch's FIRST commit, tdd doc-rides-the-first-commit;
-lint-commit folds the fixup into it when review-mode allows).
-Legitimately no doc change owed? Write /tmp/agent-tdd-current-waiver-$AGENT_TASK_GID.md
+this phase's entry under ## Phase history, then commit the edit as a fixup of
+the branch's FIRST commit with a body, and push through the finalize script,
+which re-stamps the edited doc against the pushed tree:
+  ~/.cursor/skills/lint-commit.sh --fixup ${FIRST_SHA:-<first-commit-sha>} -m "<what the doc now says and why>" $DOC_REL
+  ~/.cursor/skills/pr-finalize-fixups.sh --owner <o> --repo <r> --pr <n>
+(tdd doc-rides-the-first-commit).
+Legitimately no doc text change owed? Write /tmp/agent-tdd-current-waiver-$AGENT_TASK_GID.md
 with the reason (audited by /eval-run).
 MSG
   exit 2
@@ -100,8 +105,9 @@ the rest still describes an earlier phase (one-shot tdd-when-flagged, tdd
 current-state-body-phases-in-one-section):
   - BODY: rewrite every section that reality moved, so it reads as current truth.
   - ## Phase history: append THIS phase's entry (queued / shipped / diverged).
-  - Stamp it ($STAMP_SH $REPO_DIR $DOC_REL) and fold it into the branch's
-    FIRST commit: ~/.cursor/skills/lint-commit.sh --fixup <first-commit-sha> $DOC_REL
+  - Commit it as a fixup of the branch's FIRST commit with a body
+    (~/.cursor/skills/lint-commit.sh --fixup ${FIRST_SHA:-<first-commit-sha>} -m "<what the doc now says and why>" $DOC_REL)
+    and push through ~/.cursor/skills/pr-finalize-fixups.sh, which stamps it
     (tdd doc-rides-the-first-commit).
 Legitimately no doc change owed? Write /tmp/agent-tdd-current-waiver-$AGENT_TASK_GID.md
 with the reason (audited by /eval-run).

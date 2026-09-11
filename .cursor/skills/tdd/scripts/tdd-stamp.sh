@@ -16,12 +16,21 @@
 #   tdd-stamp.sh <repo-dir> --fingerprint         # print HEAD's code fingerprint
 #   tdd-stamp.sh <repo-dir> <doc-path> --check    # exit 0 when stamp == HEAD, 1 when
 #                                                 # stale, 3 when the doc has no stamp
+#   tdd-stamp.sh <repo-dir> <doc-path> --fold     # stamp, then commit the doc as a
+#                                                 # fixup of the branch's FIRST commit
+#                                                 # (lint-commit.sh, body names the
+#                                                 # fingerprint) and slot it; no-op
+#                                                 # when the stamp is already current
+#                                                 # and the doc is committed
 #
 # The stamp is one HTML comment placed right after the metadata table (invisible
 # in the rendered doc, survives tdd-lint):
 #   <!-- tdd-code-fingerprint: <40 hex> -->
 # Stamp AFTER the last code commit of the turn and BEFORE committing the doc
 # (the doc commit itself changes only src/docs, which the fingerprint excludes).
+# Callers of --fold: the tdd skill on the doc's first write (before pr-create),
+# and pr-finalize-fixups.sh before every push when the doc was edited since the
+# remote head, so a run never re-stamps by hand between rounds.
 #
 # Exit codes: 0 ok, 1 stale (--check) or error, 2 usage, 3 no stamp (--check)
 set -euo pipefail
@@ -73,3 +82,26 @@ if (re.test(s)) {
 fs.writeFileSync(path, s)
 console.log(`>> tdd-stamp: ${path} stamped ${fp}`)
 JS
+
+if [[ "$MODE" == "--fold" ]]; then
+  DOC_REL="${DOC_PATH#$REPO/}"
+  if git -C "$REPO" diff --quiet HEAD -- "$DOC_REL" 2>/dev/null && git -C "$REPO" cat-file -e "HEAD:$DOC_REL" 2>/dev/null; then
+    echo ">> tdd-stamp: $DOC_REL already committed with this stamp; nothing to fold"; exit 0
+  fi
+  UPSTREAM="$(git -C "$REPO" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
+    || echo "origin/$(git -C "$REPO" remote show origin 2>/dev/null | sed -n '/HEAD branch/s/.*: //p')" \
+    || echo "origin/master")"
+  [[ -z "$UPSTREAM" || "$UPSTREAM" == "origin/" ]] && UPSTREAM="origin/master"
+  MB="$(git -C "$REPO" merge-base "$UPSTREAM" HEAD 2>/dev/null || true)"
+  FIRST="$(git -C "$REPO" rev-list --reverse "${MB:+$MB..}HEAD" 2>/dev/null | head -1)"
+  [[ -n "$FIRST" ]] || { echo "tdd-stamp: no branch commit to fold the doc into (upstream $UPSTREAM)" >&2; exit 1; }
+  ( cd "$REPO" && "$HOME/.cursor/skills/lint-commit.sh" --fixup "$FIRST" \
+      -m "Stamp the design doc with the fingerprint of the code tree it documents ($FP)" "$DOC_REL" ) >&2
+  # Slot only when the doc fixup is still at the tip (lint-commit may already
+  # have folded it; an unrelated fixup at HEAD is not ours to move).
+  if git -C "$REPO" log -1 --format=%s | grep -q '^fixup! ' \
+     && git -C "$REPO" diff --name-only HEAD~1 HEAD -- "$DOC_REL" | grep -q .; then
+    ( cd "$REPO" && "$HOME/.cursor/skills/slot-fixup.sh" ) >&2 || exit 1
+  fi
+  echo ">> tdd-stamp: $DOC_REL folded into $(git -C "$REPO" rev-parse --short "$FIRST")"
+fi
