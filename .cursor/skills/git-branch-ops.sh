@@ -4,6 +4,7 @@
 #
 # Usage:
 #   git-branch-ops.sh autosquash [--base <ref> | --merge-base-with <ref>]
+#   git-branch-ops.sh condense-fixups [--base <ref> | --merge-base-with <ref>]
 #   git-branch-ops.sh push [--remote <name>] [--branch <name>] [--force-with-lease]
 #   git-branch-ops.sh self-rewrite [--upstream <ref>] [--min-lines N] [--min-ratio N] [--gate]
 #   git-branch-ops.sh self-rewrite --whole-branch [--min-lines N] [--min-ratio N]
@@ -288,7 +289,7 @@ run_self_rewrite() {
           for (const t of f.targets) console.error(`      fold target: ${t}`)
         }' 2>&1
       echo "  Fold, newest flagged commit first while it is the tip:"
-      echo "        git reset --soft HEAD~1 && ~/.cursor/skills/lint-commit.sh --fixup <target-sha>"
+      echo "        git reset --soft HEAD~1 && ~/.cursor/skills/lint-commit.sh --fixup <target-sha> -m \"<what changed and why>\""
       echo "        (lint-commit folds the fixup into its target at once when review-mode"
       echo "        allows, so the next flagged commit becomes the tip). An UNFLAGGED commit above a"
       echo "        flagged one: move it below first with"
@@ -301,6 +302,111 @@ run_self_rewrite() {
     return 2
   fi
   return 0
+}
+
+# condense-fixups: ONE fixup! per target commit, however many rounds produced
+# them. Every fixup on the branch is grouped by the commit it targets (nested
+# "fixup! fixup! X" counts for X); a group with more than one member is folded
+# into its first member, in place, with the bodies concatenated, and the subject
+# normalized to "fixup! <target subject>". Target commits are never touched, so
+# the reviewer's delta view survives; this is the preserve-mode counterpart of
+# autosquash and pr-finalize-fixups.sh runs it before every preserve push.
+# Orphan fixups (no target in range) stay where they are. Output: one JSON line
+# {"condensed":N,"groups":[{"target":"...","fixups":N}],"base":"..."} where
+# condensed is the number of fixup commits removed. Exit 1 on a rebase conflict
+# (aborted, tree left clean).
+run_condense_fixups() {
+  if [[ -n "$BASE" && -n "$MERGE_BASE_WITH" ]]; then
+    echo "Error: Use either --base or --merge-base-with, not both" >&2
+    exit 1
+  fi
+  if [[ -z "$BASE" ]]; then
+    [[ -n "$MERGE_BASE_WITH" ]] || MERGE_BASE_WITH="$(resolve_default_upstream)"
+    BASE="$(git merge-base "$MERGE_BASE_WITH" HEAD 2>/dev/null || true)"
+    if [[ -z "$BASE" ]]; then
+      echo "Error: Could not determine merge-base with '$MERGE_BASE_WITH'" >&2
+      exit 1
+    fi
+  fi
+  local tmp plan
+  tmp="$(mktemp -d -t condense-fixups.XXXXXX)"
+  # shellcheck disable=SC2064  # expand now: the local is gone when EXIT fires
+  trap "rm -rf '$tmp'" EXIT
+  cat > "$tmp/condense.js" <<'NODEEOF'
+const fs = require('fs')
+const { execSync } = require('child_process')
+const [mode, arg] = process.argv.slice(2)
+const tmp = process.env.CONDENSE_TMP
+const base = process.env.CONDENSE_BASE
+const git = a => execSync('git ' + a, { encoding: 'utf8' })
+
+const strip = s => { let n = 0; while (s.startsWith('fixup! ')) { s = s.slice(7); n++ } return { headline: s, depth: n } }
+const log = git('log --reverse --format=%H%x1f%s ' + base + '..HEAD').trim()
+const commits = log ? log.split('\n').map(l => { const [sha, subj] = l.split('\x1f'); return { sha, subj } }) : []
+const targets = new Map()
+for (const c of commits) {
+  if (strip(c.subj).depth === 0 && !targets.has(c.subj)) targets.set(c.subj, { sha: c.sha, subj: c.subj, fixups: [] })
+}
+const member = new Map()
+for (const c of commits) {
+  const { headline, depth } = strip(c.subj)
+  if (depth === 0) continue
+  const t = targets.get(headline)
+  if (t) { t.fixups.push(c); member.set(c.sha, t) }
+}
+const needsWork = t => t.fixups.length > 1 || (t.fixups.length === 1 && strip(t.fixups[0].subj).depth > 1)
+const groups = [...targets.values()].filter(needsWork)
+const plan = {
+  condensed: groups.reduce((n, t) => n + t.fixups.length - 1, 0),
+  groups: groups.map(t => ({ target: t.subj, fixups: t.fixups.length })),
+  base: base.slice(0, 10)
+}
+
+if (mode === 'plan') { process.stdout.write(JSON.stringify(plan) + '\n'); process.exit(0) }
+
+// todo mode: rewrite git's rebase todo (path in arg)
+const full = s => commits.find(c => c.sha.startsWith(s) || s.startsWith(c.sha))?.sha
+const lines = fs.readFileSync(arg, 'utf8').split('\n')
+const out = []
+let i = 0
+for (const line of lines) {
+  const m = line.match(/^(pick|p)\s+([0-9a-f]+)(\s.*)?$/)
+  if (!m) { out.push(line); continue }
+  const sha = full(m[2])
+  if (sha && member.has(sha)) continue
+  out.push(line)
+  const t = sha && [...targets.values()].find(t => t.sha === sha)
+  if (!t || t.fixups.length === 0) continue
+  t.fixups.forEach((f, k) => out.push((k === 0 ? 'pick ' : 'fixup ') + f.sha + ' ' + f.subj))
+  if (!needsWork(t)) continue
+  const bodies = []
+  for (const f of t.fixups) {
+    const b = git('log -1 --format=%b ' + f.sha).trim()
+    if (b && !bodies.includes(b)) bodies.push(b)
+  }
+  const msg = tmp + '/' + (i++) + '.msg'
+  fs.writeFileSync(msg, 'fixup! ' + t.subj + (bodies.length ? '\n\n' + bodies.join('\n\n') : '') + '\n')
+  out.push('exec git commit --amend --no-verify -q -F "' + msg + '"')
+}
+fs.writeFileSync(arg, out.join('\n'))
+NODEEOF
+  plan="$(CONDENSE_TMP="$tmp" CONDENSE_BASE="$BASE" node "$tmp/condense.js" plan)"
+  if [[ "$(printf '%s' "$plan" | jq -r '.condensed')" == "0" ]]; then
+    printf '%s\n' "$plan"
+    return 0
+  fi
+  rm -f "$(git rev-parse --git-path index.lock)"
+  if ! CONDENSE_TMP="$tmp" CONDENSE_BASE="$BASE" GIT_SEQUENCE_EDITOR="node $tmp/condense.js todo" GIT_EDITOR=true \
+      git rebase --autostash -i "$BASE" >"$tmp/rebase.log" 2>&1; then
+    echo "Error: rebase failed while condensing fixups" >&2
+    sed 's/^/  /' "$tmp/rebase.log" | tail -20 >&2
+    if [[ -d "$(git rev-parse --git-path rebase-merge)" ]] || [[ -d "$(git rev-parse --git-path rebase-apply)" ]]; then
+      git rebase --abort 2>&1 | sed 's/^/  /' >&2 || true
+    fi
+    exit 1
+  fi
+  echo ">> Condensed fixups: $(printf '%s' "$plan" | jq -r '.condensed') commit(s) folded into their target group's first fixup (base: $BASE)" >&2
+  printf '%s\n' "$plan"
 }
 
 run_fold_mode() {
@@ -336,6 +442,9 @@ case "$CMD" in
   fold-mode)
     run_fold_mode
     ;;
+  condense-fixups)
+    run_condense_fixups
+    ;;
   push)
     run_push
     ;;
@@ -343,7 +452,7 @@ case "$CMD" in
     run_self_rewrite
     ;;
   *)
-    echo "Usage: git-branch-ops.sh {autosquash|push|self-rewrite|fold-mode} [args]" >&2
+    echo "Usage: git-branch-ops.sh {autosquash|condense-fixups|push|self-rewrite|fold-mode} [args]" >&2
     exit 1
     ;;
 esac

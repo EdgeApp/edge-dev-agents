@@ -78,7 +78,7 @@ if echo "$CMD_M" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+(-[^[:space:]]+[[:
   if echo "$CMD_M" | grep -q -- '--amend'; then
     exit 0
   fi
-  echo "BLOCKED: raw 'git commit' is forbidden in agent sessions. Use ~/.cursor/skills/lint-commit.sh -m \"...\" [files...] (or --fixup <hash>) per ~/.cursor/skills/im/SKILL.md. The only raw-git exception is 'git commit --amend' inside the step-6 watch loop." >&2
+  echo "BLOCKED: raw 'git commit' is forbidden in agent sessions. Use ~/.cursor/skills/lint-commit.sh -m \"...\" [files...] (or --fixup <hash> -m \"<why>\") per ~/.cursor/skills/im/SKILL.md. The only raw-git exception is 'git commit --amend' inside the step-6 watch loop." >&2
   exit 2
 fi
 
@@ -132,9 +132,10 @@ MSG
       cat >&2 <<'MSG'
 BLOCKED: raw `git push` while review-mode is PRESERVE (a review is active on
 this PR). Reviewer bots bill PER PUSH (bugbot credit gate, 2026-07-31): finish
-the WHOLE address round locally (fixups + amends per one-fixup-per-target-per-
-turn), then push ONCE via ~/.cursor/skills/pr-finalize-fixups.sh — it owns the
-push (and the squash-vs-preserve decision). Never push mid-round to "see CI";
+the WHOLE address round locally (one fixup per target per one-fixup-per-target-
+per-turn), then push ONCE via ~/.cursor/skills/pr-finalize-fixups.sh — it owns
+the push, the squash-vs-preserve decision, and the condense to one fixup per
+target. Never push mid-round to "see CI";
 that buys a bot review of a HEAD you already know is incomplete.
 MSG
     fi

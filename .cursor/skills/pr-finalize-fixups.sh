@@ -37,9 +37,16 @@
 #                   re-reviewed → start fresh on Fixups B). No-op otherwise.
 #
 #     finalize      (default subcommand) Run AFTER all new fixups are committed
-#                   and slotted. In autosquash mode → autosquash + force-push.
-#                   In preserve mode → just push (force-with-lease since the
-#                   per-fixup slotting rewrote tip).
+#                   and slotted. Both modes first re-stamp a committed TDD that
+#                   was EDITED since the remote head (tdd-stamp.sh --fold: the
+#                   stamp asserts the doc was re-read against this tree, so an
+#                   unedited stale doc is left for the Complete gate to bounce).
+#                   In autosquash mode → autosquash + force-push.
+#                   In preserve mode → condense (git-branch-ops.sh
+#                   condense-fixups: one fixup! per target commit, bodies
+#                   concatenated, targets untouched) + force-with-lease push.
+#                   However many bot rounds a review turn takes, the reviewer
+#                   sees one delta per target.
 #
 #   Skill pre-conditions (caller's responsibility):
 #     - All fixup commits for this cycle are committed on HEAD and slotted next
@@ -55,7 +62,8 @@
 #
 # Output (stdout, one line of compact JSON):
 #   finalize / squash-stale shared schema:
-#     {"action": "autosquash" | "push" | "noop", "mode": "...", "newHead": "...", "reason": "..."}
+#     {"action": "autosquash" | "push" | "noop", "mode": "...", "newHead": "...", "reason": "...",
+#      "condensed": N (preserve push: fixup commits folded away), "stamped": true|false (TDD re-stamped)}
 #   With --check-only the action becomes "wouldAutosquash" / "wouldPush" / "wouldNoop".
 #
 # Exit codes:
@@ -158,16 +166,45 @@ else
   LATEST_FIXUP_TS=""
 fi
 
+TDD_STAMPED="false"
+CONDENSED=0
+
+# Re-stamp a committed TDD (src/docs/*.md on the branch) when its stamp is stale
+# AND the doc text (minus the stamp line) changed since the remote head, or has
+# never been pushed. An unedited stale doc is deliberately NOT stamped: the stamp
+# means "re-read against this tree", which only the run can do.
+stamp_tdd_if_edited() {
+  local stamp_sh="$SKILLS_DIR/tdd/scripts/tdd-stamp.sh" doc branch head_doc remote_doc
+  [[ -x "$stamp_sh" && -n "$MERGE_BASE" ]] || return 0
+  doc="$(git diff --name-only "$MERGE_BASE..HEAD" -- 'src/docs/*.md' 2>/dev/null | head -1)"
+  [[ -n "$doc" ]] && git cat-file -e "HEAD:$doc" 2>/dev/null || return 0
+  "$stamp_sh" . "$doc" --check >/dev/null 2>&1 && return 0
+  branch="$(git branch --show-current)"
+  if git cat-file -e "origin/$branch:$doc" 2>/dev/null; then
+    head_doc="$(git show "HEAD:$doc" | grep -v 'tdd-code-fingerprint:' || true)"
+    remote_doc="$(git show "origin/$branch:$doc" | grep -v 'tdd-code-fingerprint:' || true)"
+    if [[ "$head_doc" == "$remote_doc" ]]; then
+      echo ">> pr-finalize-fixups: $doc stamp is stale and the doc was not edited since origin/$branch; not re-stamping (the Complete gate wants it re-read: tdd doc-rides-the-first-commit)" >&2
+      return 0
+    fi
+  fi
+  "$stamp_sh" . "$doc" --fold >&2 || return 1
+  TDD_STAMPED="true"
+}
+
 run_autosquash_and_push() {
   "$GIT_BRANCH_OPS_SH" autosquash >&2
   "$GIT_BRANCH_OPS_SH" push --force-with-lease >&2
-  emit_json "{action: '$(prefix_action autosquash)', mode: '$MODE', newHead: '$(git rev-parse --short=10 HEAD)'}"
+  emit_json "{action: '$(prefix_action autosquash)', mode: '$MODE', newHead: '$(git rev-parse --short=10 HEAD)', stamped: $TDD_STAMPED}"
 }
 
-run_push_only() {
-  # Force-with-lease because per-fixup slotting may have rewritten tip.
+run_condense_and_push() {
+  local plan
+  plan="$("$GIT_BRANCH_OPS_SH" condense-fixups --base "$MERGE_BASE")" || exit 1
+  CONDENSED="$(printf '%s' "$plan" | jq -r '.condensed // 0')"
+  # Force-with-lease because per-fixup slotting and the condense rewrote tip.
   "$GIT_BRANCH_OPS_SH" push --force-with-lease >&2
-  emit_json "{action: '$(prefix_action push)', mode: '$MODE', newHead: '$(git rev-parse --short=10 HEAD)'}"
+  emit_json "{action: '$(prefix_action push)', mode: '$MODE', newHead: '$(git rev-parse --short=10 HEAD)', condensed: $CONDENSED, stamped: $TDD_STAMPED}"
 }
 
 emit_noop() {
@@ -224,14 +261,16 @@ if [[ "$MODE" == "autosquash" && "$IS_OWNER" == "true" ]]; then
   if ! "$GIT_BRANCH_OPS_SH" self-rewrite --gate >/dev/null; then
     exit 1
   fi
+  stamp_tdd_if_edited || exit 1
   run_autosquash_and_push
   exit 0
 fi
 
 # preserve mode
 if [[ "$CHECK_ONLY" == "true" ]]; then
-  emit_json "{action: '$(prefix_action push)', mode: '$MODE', reason: 'reviewer still active — preserving fixups'}"
+  emit_json "{action: '$(prefix_action push)', mode: '$MODE', reason: 'reviewer still active; preserving fixups, condensed to one per target'}"
   exit 0
 fi
 
-run_push_only
+stamp_tdd_if_edited || exit 1
+run_condense_and_push
