@@ -101,6 +101,8 @@ try:
     check('collector: hash stable across runs', collect() == h1)
     marker([ASK], watermark='')
     collect(); check('collector: no report before the segment -> FIRST RUN scope', 'segment: FIRST RUN' in open(EVID).read())
+    marker([])
+    collect(); check('collector: followup with no comments names the re-arm signals as the ask', '(no operator comments in scope)' in open(EVID).read() and 'Force Land = land the PR' in open(EVID).read())
     marker([ASK])
     open(ALOG, 'a').write(json.dumps({'ts': 't2', 'gid': GID, 'category': 'test-drive', 'action': 'WHYPE custom', 'result': 'success'}) + '\n')
     h2 = collect(); check('collector: hash moves with new evidence', h2 != h1)

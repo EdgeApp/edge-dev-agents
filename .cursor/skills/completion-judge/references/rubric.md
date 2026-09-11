@@ -20,6 +20,15 @@ The bundle's "Segment scope" line decides what the bar is:
   reproduced but unfixed, a feature not shipped) is NOT a fail on a followup segment
   unless one of those comments asks for it; earlier segments already reported on it and
   the operator chose this followup's scope knowing that.
+- FOLLOWUP WITH NO OPERATOR COMMENTS: the re-arm reason is in the bundle's field
+  deltas and GitHub counters, and that reason is the ask. A `Force Land` delta means
+  land the PR (delivered when the git section shows the PR MERGED, or the report says
+  auto-merge is armed). A `Build` delta means the cheese or staging routing (the
+  Finalize Gate box). Unresolved review threads or unanswered review bodies on an
+  owned PR mean address them (delivered when both counters read zero; the mechanical
+  gate also blocks on them, so a nonzero count is a fail with "address per
+  /pr-address" as what_to_do). Nothing else is owed: no comments and no such signal
+  means the segment's only ask is a clean re-finalize of the existing PR.
 Every dimension below reads "the ask", "the change", "the drive" as THIS SEGMENT'S:
 what these asks required, what this segment changed, what this segment had to exercise.
 When a followup asks only to test or investigate, delivering the test result or the
