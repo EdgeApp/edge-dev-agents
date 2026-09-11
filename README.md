@@ -545,9 +545,13 @@ finding carrying a citation an auditor can open.
   PRs, Asana state, attempt log, friction block (hook blocks, tool errors,
   compactions), version stamps, release receipt.
 - **`/agent-eval`** grades process compliance and outcome honesty against the
-  agent-behavior rubric (dimensions A1-A32: status hygiene, completion
+  agent-behavior rubric (dimensions A1-A35: status hygiene, completion
   honesty, report discipline, testing depth, tested-field accuracy, deferral
-  validity, and more).
+  validity, and more). A profile run reads only its rows
+  (`scripts/rubric-slice.sh <profile>`); dated expectations live in one era
+  table (`references/era.md`, split per run by `scripts/era.sh` into the
+  manifest's `era` block) instead of inside the rows; `references/tiers.md`
+  says who pays when a finding is real (trust, lost scope, budget, hygiene).
 - **`/orch-eval`** grades infrastructure health (fork storms, memory
   pressure, liveness, resource accounting, gate coverage) against the O-dims.
 - **`/eval-run`** orchestrates cohorts through a background multi-agent
@@ -556,9 +560,13 @@ finding carrying a citation an auditor can open.
   opened; ceiling REPORT_CLEAN), and the heavier TRANSCRIPT-EVAL (the only
   path to GOLD) runs the full process pass plus orch-eval on named or
   escalated runs. Every BAD is adversarially re-verified before it lands in a
-  report. Cohort reports end in a typed Actions checklist (re-runs, field
-  corrections, infra fixes, playbook and flow promotions) that the operator
-  approves row by row; nothing executes unapproved.
+  report. Cohort reports open with a "Needs you" checklist grouped by tier
+  (re-runs, field corrections, infra fixes, rulings, then playbook and flow
+  promotions) that the operator approves row by row; nothing executes
+  unapproved. Recurring remediation classes live in an actions ledger
+  (`scripts/actions-ledger.sh`, `~/agent-evals/actions-ledger.json`) so
+  recurrence across cohorts and "approved but unbuilt" are counted by script,
+  and a class that recurs after its fix shipped shows as regressed.
 - **Coverage ledger** (`eval-coverage.sh`): which runs have been evaluated
   under which lens, and which are STALE (new segments since their last eval)
   or NEVER-evaluated. Default cohort scope comes from this queue, not date
@@ -566,8 +574,9 @@ finding carrying a citation an auditor can open.
 - **Rubric drift** (`rubric-drift.sh`): every rubric row anchors to the rule
   and script content it grades against, by content digest. A changed anchor
   means dimensions may grade against stale expectations; CHANGED/UNCOVERED
-  findings block until reconciled, and rubric rows carry dated era notes so
-  runs are graded against the rules in force when they ran.
+  findings block until reconciled (`--forget` drops an anchor the rubric
+  stopped citing on purpose). The era table keeps old runs graded by the
+  rules in force when they ran; rubric rows themselves carry no dates.
 - **Friction scorecard** (`friction-scorecard.sh`): a zero-LLM trend table
   between cohorts (hook blocks, tool errors, builds, compactions, drives,
   attempt walls) straight from manifests.
@@ -842,8 +851,9 @@ scripts live at `skills/` top level. The ones most worth knowing:
 7. **Canonical local copy.** `~/.cursor/` is the working source of truth;
    `edge-dev-agents` is the distribution and review copy.
 8. **Evals close the loop.** Runs are graded against anchored rubrics, findings
-   become gates, and rubric era notes keep old runs graded by the rules in
-   force when they ran.
+   become gates, the era table keeps old runs graded by the rules in force
+   when they ran, and the actions ledger keeps remediation ranked by tier
+   and recurrence across cohorts.
 9. **Interactive sessions over headless.** Every agent runs as an interactive
    `claude` in tmux, never `claude -p`. The pane is an interface: the operator
    can attach or remote-control any run mid-flight and steer it by typing;

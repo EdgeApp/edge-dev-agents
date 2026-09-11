@@ -13,6 +13,9 @@
 # Never prints credential VALUES; reads token only to query Asana.
 
 set -euo pipefail
+# Attachment naming lives in the orch lib; the fallback keeps this skill script
+# working on a machine without the orch (convention-sync copies skills only).
+source "$HOME/.config/agent-watcher/lib/attach-names.sh" 2>/dev/null || REPORT_ATTACH_RE='^([0-9]+-)?agent-run-report.*\.md$'
 
 WATCHER_LOG="/tmp/asana-watcher.out"
 WATCHDOG_LOG="/tmp/session-watchdog.out"
@@ -100,7 +103,7 @@ asana_followup() { # $1=gid → {last_report_attached_at, prev_report_attached_a
   sto=$(curl -sf --max-time 20 "https://app.asana.com/api/1.0/tasks/$gid/stories?opt_fields=resource_subtype,created_at,text" -H "Authorization: Bearer $token" 2>/dev/null || echo '{"data":[]}')
   sub=$(curl -sf --max-time 20 "https://app.asana.com/api/1.0/tasks/$gid/subtasks?opt_fields=name,completed,created_at" -H "Authorization: Bearer $token" 2>/dev/null || echo '{"data":[]}')
   # ISO8601-UTC created_at strings sort lexicographically, so no date parsing needed.
-  reports=$(echo "$att" | jq -c '[.data[]? | select((.name // "") | test("agent-run-report")) | .created_at] | sort | reverse' 2>/dev/null || echo '[]')
+  reports=$(echo "$att" | jq -c --arg re "$REPORT_ATTACH_RE" '[.data[]? | select((.name // "") | test($re)) | .created_at] | sort | reverse' 2>/dev/null || echo '[]')
   last=$(echo "$reports" | jq -r '.[0] // empty' 2>/dev/null || echo "")
   prev=$(echo "$reports" | jq -r '.[1] // empty' 2>/dev/null || echo "")
   echo "$sto" "$sub" | jq -cs --arg prev "$prev" --arg last "$last" '
@@ -324,6 +327,18 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
   # Orch-version stamps: one line per spawn/resume segment (stamp-orch-version.sh).
   # Lets evals slice findings by the orch version actually in force per segment, and
   # makes "run predates rule X" determinations mechanical via repo_head.
+  # Era split (agent-eval/references/era.md rows in effect vs not yet for this
+  # run, keyed on the window end, else the spawn time) and zero-LLM commit-shape
+  # facts per PR, so graders read Before/After and fixup counts from the
+  # manifest instead of comparing dates or re-reading git log.
+  local era="{}" pr_commit_stats="[]"
+  era=$("$HOME/.cursor/skills/agent-eval/scripts/era.sh" "${win_end:-$spawned}" 2>/dev/null || echo "{}")
+  [ -n "$era" ] || era="{}"
+  if [ "$prs" != "[]" ]; then
+    pr_commit_stats=$(echo "$prs" | jq -r '.[]' | while read -r u; do "$HOME/.cursor/skills/resolve-run/scripts/pr-commit-stats.sh" "$u" 2>/dev/null || true; done | jq -cs . 2>/dev/null || echo "[]")
+    [ -n "$pr_commit_stats" ] || pr_commit_stats="[]"
+  fi
+
   local versions="[]"
   if [ -r "$STATE_DIR/versions/$gid.jsonl" ]; then
     versions=$(jq -cs . "$STATE_DIR/versions/$gid.jsonl" 2>/dev/null || echo "[]")
@@ -351,7 +366,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     --argjson attempt_log "$attempt_log" --argjson blocker_reason "$blocker_reason" --argjson blocker_verdict "$blocker_verdict" \
     --argjson judge_verdict "$judge_verdict" --argjson judge_log "$judge_log" \
     --argjson followup "$followup" --argjson probe_index "$probe_index" \
-    --argjson versions "$versions" \
+    --argjson versions "$versions" --argjson era "$era" --argjson pr_commit_stats "$pr_commit_stats" \
     --argjson forensics "$forensics" --arg state_dir "$STATE_DIR" --arg watchdog_log "$WATCHDOG_LOG" --arg watcher_log "$WATCHER_LOG" \
     --argjson runaway_log_exists "$([ -f "$STATE_DIR/runaway-guard.log" ] && echo true || echo false)" \
     '{
@@ -374,6 +389,8 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       blocking: { attempt_log: $attempt_log, last_reason: $blocker_reason, validator_verdict: $blocker_verdict, judge_verdict: $judge_verdict, judge_log: $judge_log },
       followup: $followup,
       versions: $versions,
+      era: $era,
+      pr_commit_stats: $pr_commit_stats,
       friction: ($probe_index.friction // {}),
       probe_index: ($probe_index | del(.friction)),
       auto_na: ( {}
