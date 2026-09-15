@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6176/20260827-182422-agent-proof-1213821580712784-01-reminder-shows-after-pin-login.png",
+      "caption": "reminder shows after pin login",
+      "hacked": false,
+      "phase": null,
+      "subject": "Fix password reminder after settings unlock",
+      "hackNote": null,
+      "migratedFrom": 5447220077
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6176/20260827-182422-agent-proof-1213821580712784-02-username-changed.png",
+      "caption": "username changed",
+      "hacked": false,
+      "phase": null,
+      "subject": "Fix password reminder after settings unlock",
+      "hackNote": null,
+      "migratedFrom": 5447220077
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6176/20260827-182422-agent-proof-1213821580712784-03-reminder-returns-after-username-change.png",
+      "caption": "reminder returns after username change",
+      "hacked": false,
+      "phase": null,
+      "subject": "Fix password reminder after settings unlock",
+      "hackNote": null,
+      "migratedFrom": 5447220077
+    }
+  ]
+}
