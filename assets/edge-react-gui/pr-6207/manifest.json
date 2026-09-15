@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6207/20260908-180305-agent-proof-1210071879529859-01-wallet-options-menu.png",
+      "caption": "wallet options menu",
+      "hacked": false,
+      "phase": null,
+      "subject": "Show both the seed phrase and private key",
+      "hackNote": null,
+      "migratedFrom": 5594155634
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6207/20260908-180305-agent-proof-1210071879529859-02-eth-seed-and-private-key.png",
+      "caption": "eth seed and private key",
+      "hacked": false,
+      "phase": null,
+      "subject": "Show both the seed phrase and private key",
+      "hackNote": null,
+      "migratedFrom": 5594155634
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6207/20260908-180305-agent-proof-1210071879529859-03-imported-key-only.png",
+      "caption": "imported key only",
+      "hacked": false,
+      "phase": null,
+      "subject": "Show both the seed phrase and private key",
+      "hackNote": null,
+      "migratedFrom": 5594155634
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6207/20260908-182335-agent-proof-1210071879529859-04-btc-single-value.png",
+      "caption": "btc single value",
+      "hacked": false,
+      "phase": null,
+      "subject": "Show both the seed phrase and private key",
+      "hackNote": null,
+      "migratedFrom": 5594332210
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6207/20260908-182335-agent-proof-1210071879529859-05-evm-both-after-fix.png",
+      "caption": "evm both after fix",
+      "hacked": false,
+      "phase": null,
+      "subject": "Show both the seed phrase and private key",
+      "hackNote": null,
+      "migratedFrom": 5594332210
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6207/20260908-184441-agent-proof-1210071879529859-06-fio-seed.png",
+      "caption": "fio seed",
+      "hacked": false,
+      "phase": null,
+      "subject": "Show both the seed phrase and private key",
+      "hackNote": null,
+      "migratedFrom": 5594500785
+    }
+  ]
+}
