@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-currency-plugins/pr-451/20260612-152633-01-pivx-transaction-list.png",
+      "caption": "pivx transaction list",
+      "hacked": false,
+      "phase": null,
+      "subject": "Replace defunct PIVX explorer with explorer.duddino.com",
+      "hackNote": null,
+      "migratedFrom": 4695920161
+    },
+    {
+      "path": "assets/edge-currency-plugins/pr-451/20260612-152633-02-in-app-show-in-explorer.png",
+      "caption": "in app show in explorer",
+      "hacked": false,
+      "phase": null,
+      "subject": "Replace defunct PIVX explorer with explorer.duddino.com",
+      "hackNote": null,
+      "migratedFrom": 4695920161
+    },
+    {
+      "path": "assets/edge-currency-plugins/pr-451/20260612-152633-03-duddino-explorer-loaded-transaction.png",
+      "caption": "duddino explorer loaded transaction",
+      "hacked": false,
+      "phase": null,
+      "subject": "Replace defunct PIVX explorer with explorer.duddino.com",
+      "hackNote": null,
+      "migratedFrom": 4695920161
+    }
+  ]
+}
