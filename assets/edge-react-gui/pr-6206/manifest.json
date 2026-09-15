@@ -45,6 +45,15 @@
       "subject": "Add slow-sync card for large UTXO wallets",
       "hackNote": "lowered LARGE_UTXO_WALLET_TX_COUNT from 100 to 20 locally so a real 28-transaction DASH wallet crosses the real threshold comparison; reverted before commit.",
       "migratedFrom": 5593551316
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6206/20260915-161801-agent-proof-1216111164285203-06-HACKED-warning-card-restyle.png",
+      "caption": "warning card restyle",
+      "hacked": true,
+      "phase": null,
+      "subject": "Add slow-sync card for large UTXO wallets",
+      "hackNote": "LARGE_UTXO_WALLET_TX_COUNT lowered from 100 to 20 locally so a real large-history wallet crosses the threshold; reverted before commit.",
+      "addedAt": "2026-09-15T23:18:05.921Z"
     }
   ]
 }
