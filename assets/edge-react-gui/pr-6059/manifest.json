@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6059/20260624-173335-agent-proof-1207967192999590-01-send-address-set.png",
+      "caption": "agent proof 1207967192999590 01 send address set",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add missing testIDs for maestro selectors",
+      "hackNote": null,
+      "migratedFrom": 4794792064
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6059/20260624-173335-agent-proof-1207967192999590-02-makemaxspend-amount.png",
+      "caption": "agent proof 1207967192999590 02 makemaxspend amount",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add missing testIDs for maestro selectors",
+      "hackNote": null,
+      "migratedFrom": 4794792064
+    }
+  ]
+}
