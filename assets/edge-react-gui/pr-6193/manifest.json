@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260903-161139-agent-proof-1216274035296616-01-wallet-picker.png",
+      "caption": "wallet picker",
+      "hacked": false,
+      "phase": null,
+      "subject": "Handle bip122 WalletConnect sign requests",
+      "hackNote": null,
+      "migratedFrom": 5533314180
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260903-161139-agent-proof-1216274035296616-02-connect-scene.png",
+      "caption": "connect scene",
+      "hacked": false,
+      "phase": null,
+      "subject": "Handle bip122 WalletConnect sign requests",
+      "hackNote": null,
+      "migratedFrom": 5533314180
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260903-161139-agent-proof-1216274035296616-03-sign-modal.png",
+      "caption": "sign modal",
+      "hacked": false,
+      "phase": null,
+      "subject": "Handle bip122 WalletConnect sign requests",
+      "hackNote": null,
+      "migratedFrom": 5533314180
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260903-161139-agent-proof-1216274035296616-04-signature-sent.png",
+      "caption": "signature sent",
+      "hacked": false,
+      "phase": null,
+      "subject": "Handle bip122 WalletConnect sign requests",
+      "hackNote": null,
+      "migratedFrom": 5533314180
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260903-164229-agent-proof-1216274035296616-01-wallet-picker.png",
+      "caption": "wallet picker",
+      "hacked": false,
+      "phase": null,
+      "subject": "Handle bip122 WalletConnect sign requests",
+      "hackNote": null,
+      "migratedFrom": 5533564115
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260903-164229-agent-proof-1216274035296616-02-connect-scene.png",
+      "caption": "connect scene",
+      "hacked": false,
+      "phase": null,
+      "subject": "Handle bip122 WalletConnect sign requests",
+      "hackNote": null,
+      "migratedFrom": 5533564115
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260903-164229-agent-proof-1216274035296616-03-sign-modal.png",
+      "caption": "sign modal",
+      "hacked": false,
+      "phase": null,
+      "subject": "Handle bip122 WalletConnect sign requests",
+      "hackNote": null,
+      "migratedFrom": 5533564115
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260903-164229-agent-proof-1216274035296616-04-signature-sent.png",
+      "caption": "signature sent",
+      "hacked": false,
+      "phase": null,
+      "subject": "Handle bip122 WalletConnect sign requests",
+      "hackNote": null,
+      "migratedFrom": 5533564115
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260903-171503-agent-proof-1216274035296616-01-wallet-picker.png",
+      "caption": "wallet picker",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add testIDs to WcSignMessageModal buttons",
+      "hackNote": null,
+      "migratedFrom": 5533814341
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260903-171503-agent-proof-1216274035296616-02-connect-scene.png",
+      "caption": "connect scene",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add testIDs to WcSignMessageModal buttons",
+      "hackNote": null,
+      "migratedFrom": 5533814341
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260903-171503-agent-proof-1216274035296616-03-sign-modal.png",
+      "caption": "sign modal",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add testIDs to WcSignMessageModal buttons",
+      "hackNote": null,
+      "migratedFrom": 5533814341
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260903-171503-agent-proof-1216274035296616-04-signature-sent.png",
+      "caption": "signature sent",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add testIDs to WcSignMessageModal buttons",
+      "hackNote": null,
+      "migratedFrom": 5533814341
+    }
+  ]
+}
