@@ -88,6 +88,24 @@
       "phase": null,
       "subject": "fixup! Wire the swaps.xyz Solana DEX registration",
       "hackNote": null
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6128/20260915-163908-agent-proof-1217036054017879-30-defi-quote-after-rebase.png",
+      "caption": "defi quote after rebase",
+      "hacked": false,
+      "phase": null,
+      "subject": "Wire the swaps.xyz Solana DEX registration",
+      "hackNote": null,
+      "addedAt": "2026-09-15T23:39:12.268Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6128/20260915-163908-agent-proof-1217036054017879-31-defi-swap-success-after-rebase.png",
+      "caption": "defi swap success after rebase",
+      "hacked": false,
+      "phase": null,
+      "subject": "Wire the swaps.xyz Solana DEX registration",
+      "hackNote": null,
+      "addedAt": "2026-09-15T23:39:12.269Z"
     }
   ]
 }
