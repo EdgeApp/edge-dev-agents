@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6080/20260717-175052-agent-proof-1216673467164267-01-cold-login-wallet-list.png",
+      "caption": "agent proof 1216673467164267 01 cold login wallet list",
+      "hacked": false,
+      "phase": null,
+      "subject": "Gate balance effects and FIO refresh on engine readiness",
+      "hackNote": null,
+      "migratedFrom": 5008947321
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6080/20260717-175052-agent-proof-1216673467164267-02-warm-login-cached-wallet-list.png",
+      "caption": "agent proof 1216673467164267 02 warm login cached wallet list",
+      "hacked": false,
+      "phase": null,
+      "subject": "Gate balance effects and FIO refresh on engine readiness",
+      "hackNote": null,
+      "migratedFrom": 5008947321
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6080/20260717-175052-agent-proof-1216673467164267-03-wallet-detail-engine-loaded.png",
+      "caption": "agent proof 1216673467164267 03 wallet detail engine loaded",
+      "hacked": false,
+      "phase": null,
+      "subject": "Gate balance effects and FIO refresh on engine readiness",
+      "hackNote": null,
+      "migratedFrom": 5008947321
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6080/20260717-181322-agent-proof-1216673467164267-04-warm-login-after-review-fixes.png",
+      "caption": "agent proof 1216673467164267 04 warm login after review fixes",
+      "hacked": false,
+      "phase": null,
+      "subject": "Gate balance effects and FIO refresh on engine readiness",
+      "hackNote": null,
+      "migratedFrom": 5009101633
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6080/20260719-024433-agent-proof-1216673467164267-05-warm-login-list.png",
+      "caption": "agent proof 1216673467164267 05 warm login list",
+      "hacked": false,
+      "phase": null,
+      "subject": "Prioritize an opened wallet's engine startup",
+      "hackNote": null,
+      "migratedFrom": 5015250167
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6080/20260719-024433-agent-proof-1216673467164267-06-sepolia-detail-after-tap.png",
+      "caption": "agent proof 1216673467164267 06 sepolia detail after tap",
+      "hacked": false,
+      "phase": null,
+      "subject": "Prioritize an opened wallet's engine startup",
+      "hackNote": null,
+      "migratedFrom": 5015250167
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6080/20260723-043123-agent-proof-1216673467164267-p6-01-ltc-receive-cached.png",
+      "caption": "agent proof 1216673467164267 p6 01 ltc receive cached",
+      "hacked": false,
+      "phase": null,
+      "subject": "Prioritize an opened wallet's engine startup",
+      "hackNote": null,
+      "migratedFrom": 5057885348
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6080/20260723-043123-agent-proof-1216673467164267-p6-02-ltc-receive-warmlogin.png",
+      "caption": "agent proof 1216673467164267 p6 02 ltc receive warmlogin",
+      "hacked": false,
+      "phase": null,
+      "subject": "Prioritize an opened wallet's engine startup",
+      "hackNote": null,
+      "migratedFrom": 5057885348
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6080/20260723-133059-agent-proof-1216673467164267-01-HACKED-provisional-affordance.png",
+      "caption": "🩹 HACK-FORCED: provisional affordance",
+      "hacked": true,
+      "phase": null,
+      "subject": "Prioritize an opened wallet's engine startup",
+      "hackNote": null,
+      "migratedFrom": 5063107324
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6080/20260731-191625-agent-proof-1216673467164267-02-receive-address-no-affordance.png",
+      "caption": "receive address no affordance",
+      "hacked": false,
+      "phase": null,
+      "subject": "Prioritize an opened wallet's engine startup",
+      "hackNote": null,
+      "migratedFrom": 5149128788
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6080/20260731-191625-agent-proof-1216673467164267-01-warm-login-wallet-list.png",
+      "caption": "warm login wallet list",
+      "hacked": false,
+      "phase": null,
+      "subject": "Prioritize an opened wallet's engine startup",
+      "hackNote": null,
+      "migratedFrom": 5149128788
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6080/20260909-174136-agent-proof-1216673467164267-01-warm-login-wallet-list.png",
+      "caption": "warm login wallet list",
+      "hacked": false,
+      "phase": null,
+      "subject": "Gate balance effects and FIO refresh on engine readiness",
+      "hackNote": null,
+      "migratedFrom": 5610882899
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6080/20260909-174136-agent-proof-1216673467164267-02-HACKED-engine-error-row.png",
+      "caption": "engine error row",
+      "hacked": true,
+      "phase": null,
+      "subject": "Gate balance effects and FIO refresh on engine readiness",
+      "hackNote": "forced engineError to a non-null Error in WalletListCurrencyRow, since an engine failure has no natural trigger on the sim; reverted, tree clean.",
+      "migratedFrom": 5610882899
+    }
+  ]
+}
