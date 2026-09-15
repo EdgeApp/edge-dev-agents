@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260818-180426-agent-proof-1216998636347236-01-buy-menu-teller-removed.png",
+      "caption": "buy menu teller removed",
+      "hacked": false,
+      "phase": null,
+      "subject": "Surface errors from a buy/sell plugin row tap",
+      "hackNote": null,
+      "migratedFrom": 5336220951
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260818-180426-agent-proof-1216998636347236-02-buy-menu-scrolled.png",
+      "caption": "buy menu scrolled",
+      "hacked": false,
+      "phase": null,
+      "subject": "Surface errors from a buy/sell plugin row tap",
+      "hackNote": null,
+      "migratedFrom": 5336220951
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260818-180426-agent-proof-1216998636347236-03-exchange-opens-browser.png",
+      "caption": "exchange opens browser",
+      "hacked": false,
+      "phase": null,
+      "subject": "Surface errors from a buy/sell plugin row tap",
+      "hackNote": null,
+      "migratedFrom": 5336220951
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260818-180426-agent-proof-1216998636347236-04-funded-opens-browser.png",
+      "caption": "funded opens browser",
+      "hacked": false,
+      "phase": null,
+      "subject": "Surface errors from a buy/sell plugin row tap",
+      "hackNote": null,
+      "migratedFrom": 5336220951
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260818-180426-agent-proof-1216998636347236-05-sell-menu-ach-and-exchange.png",
+      "caption": "sell menu ach and exchange",
+      "hacked": false,
+      "phase": null,
+      "subject": "Surface errors from a buy/sell plugin row tap",
+      "hackNote": null,
+      "migratedFrom": 5336220951
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260818-180426-agent-proof-1216998636347236-06-ach-no-provider-toast.png",
+      "caption": "ach no provider toast",
+      "hacked": false,
+      "phase": null,
+      "subject": "Surface errors from a buy/sell plugin row tap",
+      "hackNote": null,
+      "migratedFrom": 5336220951
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260818-180426-agent-proof-1216998636347236-07-app-name-coinhub-wallet.png",
+      "caption": "app name coinhub wallet",
+      "hacked": false,
+      "phase": null,
+      "subject": "Surface errors from a buy/sell plugin row tap",
+      "hackNote": null,
+      "migratedFrom": 5336220951
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260818-181240-agent-proof-1216998636347236-08-exchange-opens-browser-after-fix.png",
+      "caption": "exchange opens browser after fix",
+      "hacked": false,
+      "phase": null,
+      "subject": "Surface errors from a buy/sell plugin row tap",
+      "hackNote": null,
+      "migratedFrom": 5336272794
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260818-182321-agent-proof-1216998636347236-09-deeplink-opens-browser.png",
+      "caption": "deeplink opens browser",
+      "hacked": false,
+      "phase": null,
+      "subject": "Honor externalBrowser on plugin deep links",
+      "hackNote": null,
+      "migratedFrom": 5336340752
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260818-182845-agent-proof-1216998636347236-10-row-tap-after-makepluginuri.png",
+      "caption": "row tap after makepluginuri",
+      "hacked": false,
+      "phase": null,
+      "subject": "Honor externalBrowser on plugin deep links",
+      "hackNote": null,
+      "migratedFrom": 5336374187
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260818-182845-agent-proof-1216998636347236-11-deeplink-funded-after-makepluginuri.png",
+      "caption": "deeplink funded after makepluginuri",
+      "hacked": false,
+      "phase": null,
+      "subject": "Honor externalBrowser on plugin deep links",
+      "hackNote": null,
+      "migratedFrom": 5336374187
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260818-184036-agent-proof-1216998636347236-12-sell-asset-picker-moonpay-assets.png",
+      "caption": "sell asset picker moonpay assets",
+      "hacked": false,
+      "phase": null,
+      "subject": "Honor externalBrowser on plugin deep links",
+      "hackNote": null,
+      "migratedFrom": 5336453037
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260818-184036-agent-proof-1216998636347236-13-moonpay-ach-sell-quote.png",
+      "caption": "moonpay ach sell quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Honor externalBrowser on plugin deep links",
+      "hackNote": null,
+      "migratedFrom": 5336453037
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260820-173814-agent-proof-1216998636347236-01-buy-quotes-coinhub-providers.png",
+      "caption": "buy quotes coinhub providers",
+      "hacked": false,
+      "phase": null,
+      "subject": "Move Coinhub buy and sell to ramp plugins",
+      "hackNote": null,
+      "migratedFrom": 5363770242
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260820-173814-agent-proof-1216998636347236-02-coinhub-exchange-browser.png",
+      "caption": "coinhub exchange browser",
+      "hacked": false,
+      "phase": null,
+      "subject": "Move Coinhub buy and sell to ramp plugins",
+      "hackNote": null,
+      "migratedFrom": 5363770242
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260820-173814-agent-proof-1216998636347236-03-coinhub-funded-browser.png",
+      "caption": "coinhub funded browser",
+      "hacked": false,
+      "phase": null,
+      "subject": "Move Coinhub buy and sell to ramp plugins",
+      "hackNote": null,
+      "migratedFrom": 5363770242
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260820-173814-agent-proof-1216998636347236-04-coinhub-atm-webview.png",
+      "caption": "coinhub atm webview",
+      "hacked": false,
+      "phase": null,
+      "subject": "Move Coinhub buy and sell to ramp plugins",
+      "hackNote": null,
+      "migratedFrom": 5363770242
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260820-173814-agent-proof-1216998636347236-05-moonpay-ach-sell-quote.png",
+      "caption": "moonpay ach sell quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Move Coinhub buy and sell to ramp plugins",
+      "hackNote": null,
+      "migratedFrom": 5363770242
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260820-173814-agent-proof-1216998636347236-06-sell-quotes-coinhub-providers.png",
+      "caption": "sell quotes coinhub providers",
+      "hacked": false,
+      "phase": null,
+      "subject": "Move Coinhub buy and sell to ramp plugins",
+      "hackNote": null,
+      "migratedFrom": 5363770242
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6165/20260820-173814-agent-proof-1216998636347236-07-coinhub-atm-sell-webview.png",
+      "caption": "coinhub atm sell webview",
+      "hacked": false,
+      "phase": null,
+      "subject": "Move Coinhub buy and sell to ramp plugins",
+      "hackNote": null,
+      "migratedFrom": 5363770242
+    }
+  ]
+}
