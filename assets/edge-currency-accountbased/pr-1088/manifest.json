@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260814-102226-agent-proof-1216839790397157-01-rango-trx-usdt-quote.png",
+      "caption": "rango trx usdt quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5296212989
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260814-102226-agent-proof-1216839790397157-02-rango-trx-swap-success.png",
+      "caption": "rango trx swap success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5296212989
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260814-102226-agent-proof-1216839790397157-03-rango-trx-tx-details.png",
+      "caption": "rango trx tx details",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5296212989
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260910-163232-agent-proof-1216839790397157-09-rango-trx-usdt-quote.png",
+      "caption": "rango trx usdt quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5626889243
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260910-163232-agent-proof-1216839790397157-10-rango-trx-usdt-swap-success.png",
+      "caption": "rango trx usdt swap success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5626889243
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260910-163232-agent-proof-1216839790397157-11-rango-usdt-trx-quote.png",
+      "caption": "rango usdt trx quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5626889243
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260910-163232-agent-proof-1216839790397157-12-rango-usdt-trx-swap-success.png",
+      "caption": "rango usdt trx swap success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5626889243
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260910-172150-agent-proof-1216839790397157-13-trx-swap-history-before-fix.png",
+      "caption": "trx swap history before fix",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5627395594
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260910-172150-agent-proof-1216839790397157-14-trx-swap-history-after-fix.png",
+      "caption": "trx swap history after fix",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5627395594
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260911-103423-agent-proof-1216839790397157-15-rango-usdt-trx-quote-final.png",
+      "caption": "rango usdt trx quote final",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5638297673
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260911-103423-agent-proof-1216839790397157-16-rango-usdt-trx-swap-success-final.png",
+      "caption": "rango usdt trx swap success final",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5638297673
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260915-114921-agent-proof-1216839790397157-17-rango-usdt-trx-quote-followup.png",
+      "caption": "rango usdt trx quote followup",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5686187551
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260915-114921-agent-proof-1216839790397157-18-rango-usdt-trx-swap-success-followup.png",
+      "caption": "rango usdt trx swap success followup",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5686187551
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260915-114921-agent-proof-1216839790397157-19-tron-history-net-payouts.png",
+      "caption": "tron history net payouts",
+      "hacked": false,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": null,
+      "migratedFrom": 5686187551
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1088/20260915-122600-agent-proof-1216839790397157-20-HACKED-zero-fee-approval-confirms-pending.png",
+      "caption": "zero fee approval confirms pending",
+      "hacked": true,
+      "phase": null,
+      "subject": "Tron: Spend a prebuilt TriggerSmartContract call",
+      "hackNote": "temporary uncommitted edit in processTRXTransaction set the confirmed fee to 0 for approve() calls made after the hack, standing in for staked energy; reverted before any commit.",
+      "migratedFrom": 5686827214
+    }
+  ]
+}
