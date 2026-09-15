@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-exchange-plugins/pr-488/20260819-162348-agent-proof-1217205278669378-01-simpleswap-terms-modal.png",
+      "caption": "simpleswap terms modal",
+      "hacked": false,
+      "phase": null,
+      "subject": "Harden the SimpleSwap plugin against provider-side failures",
+      "hackNote": null,
+      "migratedFrom": 5349203170
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-488/20260819-162348-agent-proof-1217205278669378-02-simpleswap-quote.png",
+      "caption": "simpleswap quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Harden the SimpleSwap plugin against provider-side failures",
+      "hackNote": null,
+      "migratedFrom": 5349203170
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-488/20260819-162348-agent-proof-1217205278669378-03-swap-success.png",
+      "caption": "swap success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Harden the SimpleSwap plugin against provider-side failures",
+      "hackNote": null,
+      "migratedFrom": 5349203170
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-488/20260819-162348-agent-proof-1217205278669378-04-xlm-tx-with-memo.png",
+      "caption": "xlm tx with memo",
+      "hacked": false,
+      "phase": null,
+      "subject": "Harden the SimpleSwap plugin against provider-side failures",
+      "hackNote": null,
+      "migratedFrom": 5349203170
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-488/20260819-162348-agent-proof-1217205278669378-05-stellar-broadcast.png",
+      "caption": "stellar broadcast",
+      "hacked": false,
+      "phase": null,
+      "subject": "Harden the SimpleSwap plugin against provider-side failures",
+      "hackNote": null,
+      "migratedFrom": 5349203170
+    }
+  ]
+}
