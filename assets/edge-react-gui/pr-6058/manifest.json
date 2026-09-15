@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6058/20260624-171028-agent-proof-1206403488324344-01-zero-send-ready.png",
+      "caption": "agent proof 1206403488324344 01 zero send ready",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add confirmSliderThumb testID for maestro selectors",
+      "hackNote": null,
+      "migratedFrom": 4794679133
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6058/20260624-171028-agent-proof-1206403488324344-02-zero-send-warning-modal.png",
+      "caption": "agent proof 1206403488324344 02 zero send warning modal",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add confirmSliderThumb testID for maestro selectors",
+      "hackNote": null,
+      "migratedFrom": 4794679133
+    }
+  ]
+}
