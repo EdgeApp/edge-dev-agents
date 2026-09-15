@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/react-native-monero/pr-9/20260907-162305-agent-proof-1218248088754561-01-untrimmed-debug-build-launched.png",
+      "caption": "untrimmed debug build launched",
+      "hacked": false,
+      "phase": null,
+      "subject": "Flag lmdb text_env as code so Debug iOS links",
+      "hackNote": null,
+      "migratedFrom": 5576643581
+    },
+    {
+      "path": "assets/react-native-monero/pr-9/20260907-162305-agent-proof-1218248088754561-02-xmr-wallet-synced.png",
+      "caption": "xmr wallet synced",
+      "hacked": false,
+      "phase": null,
+      "subject": "Flag lmdb text_env as code so Debug iOS links",
+      "hackNote": null,
+      "migratedFrom": 5576643581
+    },
+    {
+      "path": "assets/react-native-monero/pr-9/20260907-162305-agent-proof-1218248088754561-03-xmr-send-transaction-success.png",
+      "caption": "xmr send transaction success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Flag lmdb text_env as code so Debug iOS links",
+      "hackNote": null,
+      "migratedFrom": 5576643581
+    }
+  ]
+}
