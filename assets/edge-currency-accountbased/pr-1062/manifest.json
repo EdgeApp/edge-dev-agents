@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-currency-accountbased/pr-1062/20260624-181220-agent-proof-1212369205065499-01-eth-wallet-balance-synced.png",
+      "caption": "agent proof 1212369205065499 01 eth wallet balance synced",
+      "hacked": false,
+      "phase": null,
+      "subject": "Remove deprecated BlockCypher network adapter",
+      "hackNote": null,
+      "migratedFrom": 4794963612
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1062/20260624-181220-agent-proof-1212369205065499-02-eth-transactions-synced.png",
+      "caption": "agent proof 1212369205065499 02 eth transactions synced",
+      "hacked": false,
+      "phase": null,
+      "subject": "Remove deprecated BlockCypher network adapter",
+      "hackNote": null,
+      "migratedFrom": 4794963612
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1062/20260624-181220-agent-proof-1212369205065499-03-eth-wallets-list-synced.png",
+      "caption": "agent proof 1212369205065499 03 eth wallets list synced",
+      "hacked": false,
+      "phase": null,
+      "subject": "Remove deprecated BlockCypher network adapter",
+      "hackNote": null,
+      "migratedFrom": 4794963612
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1062/20260904-013403-agent-proof-1212369205065499-01-eth-mainnet-send-ready.png",
+      "caption": "eth mainnet send ready",
+      "hacked": false,
+      "phase": null,
+      "subject": "Remove deprecated BlockCypher network adapter",
+      "hackNote": null,
+      "migratedFrom": 5537889663
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1062/20260904-013403-agent-proof-1212369205065499-02-eth-mainnet-send-broadcast.png",
+      "caption": "eth mainnet send broadcast",
+      "hacked": false,
+      "phase": null,
+      "subject": "Remove deprecated BlockCypher network adapter",
+      "hackNote": null,
+      "migratedFrom": 5537889663
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1062/20260904-013403-agent-proof-1212369205065499-03-eth-mainnet-wallet-synced.png",
+      "caption": "eth mainnet wallet synced",
+      "hacked": false,
+      "phase": null,
+      "subject": "Remove deprecated BlockCypher network adapter",
+      "hackNote": null,
+      "migratedFrom": 5537889663
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1062/20260904-013403-agent-proof-1212369205065499-04-eth-tx-history-synced.png",
+      "caption": "eth tx history synced",
+      "hacked": false,
+      "phase": null,
+      "subject": "Remove deprecated BlockCypher network adapter",
+      "hackNote": null,
+      "migratedFrom": 5537889663
+    }
+  ]
+}
