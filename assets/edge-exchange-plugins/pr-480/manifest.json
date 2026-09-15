@@ -252,6 +252,24 @@
       "subject": "Split Solana same-chain swaps.xyz routes as a DEX",
       "hackNote": null,
       "migratedFrom": 5589150645
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260915-163852-agent-proof-1217036054017879-30-defi-quote-after-rebase.png",
+      "caption": "defi quote after rebase",
+      "hacked": false,
+      "phase": null,
+      "subject": "Split Solana same-chain swaps.xyz routes as a DEX",
+      "hackNote": null,
+      "addedAt": "2026-09-15T23:38:57.731Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260915-163852-agent-proof-1217036054017879-31-defi-swap-success-after-rebase.png",
+      "caption": "defi swap success after rebase",
+      "hacked": false,
+      "phase": null,
+      "subject": "Split Solana same-chain swaps.xyz routes as a DEX",
+      "hackNote": null,
+      "addedAt": "2026-09-15T23:38:57.732Z"
     }
   ]
 }
