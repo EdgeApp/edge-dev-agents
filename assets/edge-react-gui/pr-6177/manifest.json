@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6177/20260827-182850-agent-proof-1211152484915503-01-recovery-reminder-on-funded-account.png",
+      "caption": "recovery reminder on funded account",
+      "hacked": false,
+      "phase": null,
+      "subject": "Fix password recovery reminder triggering",
+      "hackNote": null,
+      "migratedFrom": 5447250432
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6177/20260827-182850-agent-proof-1211152484915503-02-HACKED-rate-refresh-trigger.png",
+      "caption": "rate refresh trigger",
+      "hacked": true,
+      "phase": null,
+      "subject": "Fix password recovery reminder triggering",
+      "hackNote": "commented out the newTransactions dispatch and forced passwordRecoveryRemindersShown to all-false, so the rate-refresh trigger was the only one that could fire; both edits reverted after capture.",
+      "migratedFrom": 5447250432
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6177/20260901-123057-agent-proof-1211152484915503-04-recovery-reminder-after-review-fix.png",
+      "caption": "recovery reminder after review fix",
+      "hacked": false,
+      "phase": null,
+      "subject": "Fix password recovery reminder triggering",
+      "hackNote": null,
+      "migratedFrom": 5499294638
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6177/20260901-123057-agent-proof-1211152484915503-05-HACKED-unpriced-funded-balances-diag.png",
+      "caption": "unpriced funded balances diag",
+      "hacked": true,
+      "phase": null,
+      "subject": "Fix password recovery reminder triggering",
+      "hackNote": "temporary uncommitted ButtonsModal instrumentation inside checkPasswordRecovery that printed the gate inputs on roster-primary; reverted, tree clean.",
+      "migratedFrom": 5499294638
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6177/20260903-141643-agent-proof-1211152484915503-01-recovery-reminder-second-login-same-session.png",
+      "caption": "recovery reminder second login same session",
+      "hacked": false,
+      "phase": null,
+      "subject": "Fix password recovery reminder triggering",
+      "hackNote": null,
+      "migratedFrom": 5532249922
+    }
+  ]
+}
