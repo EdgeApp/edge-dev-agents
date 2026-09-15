@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6206/20260908-163233-agent-proof-1216111164285203-01-under-threshold-no-card.png",
+      "caption": "under threshold no card",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add slow-sync card for large UTXO wallets",
+      "hackNote": null,
+      "migratedFrom": 5593356350
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6206/20260908-163233-agent-proof-1216111164285203-02-HACKED-card-on-utxo-wallet.png",
+      "caption": "card on utxo wallet",
+      "hacked": true,
+      "phase": null,
+      "subject": "Add slow-sync card for large UTXO wallets",
+      "hackNote": "lowered LARGE_UTXO_WALLET_TX_COUNT from 100 to 20 locally so a real 28-transaction DASH wallet crosses the real threshold comparison; reverted before commit.",
+      "migratedFrom": 5593356350
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6206/20260908-163233-agent-proof-1216111164285203-03-HACKED-no-card-on-non-utxo-wallet.png",
+      "caption": "no card on non utxo wallet",
+      "hacked": true,
+      "phase": null,
+      "subject": "Add slow-sync card for large UTXO wallets",
+      "hackNote": "lowered LARGE_UTXO_WALLET_TX_COUNT from 100 to 20 locally so a real 28-transaction DASH wallet crosses the real threshold comparison; reverted before commit.",
+      "migratedFrom": 5593356350
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6206/20260908-163233-agent-proof-1216111164285203-04-HACKED-learn-more-opens-article.png",
+      "caption": "learn more opens article",
+      "hacked": true,
+      "phase": null,
+      "subject": "Add slow-sync card for large UTXO wallets",
+      "hackNote": "lowered LARGE_UTXO_WALLET_TX_COUNT from 100 to 20 locally so a real 28-transaction DASH wallet crosses the real threshold comparison; reverted before commit.",
+      "migratedFrom": 5593356350
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6206/20260908-165059-agent-proof-1216111164285203-05-HACKED-no-stale-card-after-wallet-switch.png",
+      "caption": "no stale card after wallet switch",
+      "hacked": true,
+      "phase": null,
+      "subject": "Add slow-sync card for large UTXO wallets",
+      "hackNote": "lowered LARGE_UTXO_WALLET_TX_COUNT from 100 to 20 locally so a real 28-transaction DASH wallet crosses the real threshold comparison; reverted before commit.",
+      "migratedFrom": 5593551316
+    }
+  ]
+}
