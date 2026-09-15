@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6178/20260827-193400-agent-proof-1209203315991847-01-max-present-single-recipient.png",
+      "caption": "max present single recipient",
+      "hacked": false,
+      "phase": null,
+      "subject": "Make MAX and multi-recipient send exclusive",
+      "hackNote": null,
+      "migratedFrom": 5447678919
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6178/20260827-193400-agent-proof-1209203315991847-02-max-set-add-address-hidden.png",
+      "caption": "max set add address hidden",
+      "hacked": false,
+      "phase": null,
+      "subject": "Make MAX and multi-recipient send exclusive",
+      "hackNote": null,
+      "migratedFrom": 5447678919
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6178/20260827-193400-agent-proof-1209203315991847-03-manual-amount-add-address-visible.png",
+      "caption": "manual amount add address visible",
+      "hacked": false,
+      "phase": null,
+      "subject": "Make MAX and multi-recipient send exclusive",
+      "hackNote": null,
+      "migratedFrom": 5447678919
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6178/20260827-193400-agent-proof-1209203315991847-04-max-hidden-second-recipient.png",
+      "caption": "max hidden second recipient",
+      "hacked": false,
+      "phase": null,
+      "subject": "Make MAX and multi-recipient send exclusive",
+      "hackNote": null,
+      "migratedFrom": 5447678919
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6178/20260827-193400-agent-proof-1209203315991847-05-multisend-broadcast-success.png",
+      "caption": "multisend broadcast success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Make MAX and multi-recipient send exclusive",
+      "hackNote": null,
+      "migratedFrom": 5447678919
+    }
+  ]
+}
