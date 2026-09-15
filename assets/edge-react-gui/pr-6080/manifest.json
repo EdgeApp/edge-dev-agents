@@ -8,7 +8,8 @@
       "phase": null,
       "subject": "Gate balance effects and FIO refresh on engine readiness",
       "hackNote": null,
-      "migratedFrom": 5008947321
+      "migratedFrom": 5008947321,
+      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/g6080/01-cold-login-wallet-7ed37e.png"
     },
     {
       "path": "assets/edge-react-gui/pr-6080/20260717-175052-agent-proof-1216673467164267-02-warm-login-cached-wallet-list.png",
@@ -17,7 +18,8 @@
       "phase": null,
       "subject": "Gate balance effects and FIO refresh on engine readiness",
       "hackNote": null,
-      "migratedFrom": 5008947321
+      "migratedFrom": 5008947321,
+      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/g6080/02-warm-login-cached-b92196.png"
     },
     {
       "path": "assets/edge-react-gui/pr-6080/20260717-175052-agent-proof-1216673467164267-03-wallet-detail-engine-loaded.png",
@@ -26,7 +28,8 @@
       "phase": null,
       "subject": "Gate balance effects and FIO refresh on engine readiness",
       "hackNote": null,
-      "migratedFrom": 5008947321
+      "migratedFrom": 5008947321,
+      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/g6080/03-wallet-detail-engi-696006.png"
     },
     {
       "path": "assets/edge-react-gui/pr-6080/20260717-181322-agent-proof-1216673467164267-04-warm-login-after-review-fixes.png",
@@ -35,7 +38,8 @@
       "phase": null,
       "subject": "Gate balance effects and FIO refresh on engine readiness",
       "hackNote": null,
-      "migratedFrom": 5009101633
+      "migratedFrom": 5009101633,
+      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/g6080/04-warm-login-after-r-3f7986.png"
     },
     {
       "path": "assets/edge-react-gui/pr-6080/20260719-024433-agent-proof-1216673467164267-05-warm-login-list.png",
@@ -44,7 +48,8 @@
       "phase": null,
       "subject": "Prioritize an opened wallet's engine startup",
       "hackNote": null,
-      "migratedFrom": 5015250167
+      "migratedFrom": 5015250167,
+      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/g6080/05-warm-login-list-988f98.png"
     },
     {
       "path": "assets/edge-react-gui/pr-6080/20260719-024433-agent-proof-1216673467164267-06-sepolia-detail-after-tap.png",
@@ -53,7 +58,8 @@
       "phase": null,
       "subject": "Prioritize an opened wallet's engine startup",
       "hackNote": null,
-      "migratedFrom": 5015250167
+      "migratedFrom": 5015250167,
+      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/g6080/06-sepolia-detail-aft-fecf42.png"
     },
     {
       "path": "assets/edge-react-gui/pr-6080/20260723-043123-agent-proof-1216673467164267-p6-01-ltc-receive-cached.png",
@@ -62,7 +68,8 @@
       "phase": null,
       "subject": "Prioritize an opened wallet's engine startup",
       "hackNote": null,
-      "migratedFrom": 5057885348
+      "migratedFrom": 5057885348,
+      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/g6080/07-p6-01-ltc-receive-1c908e.png"
     },
     {
       "path": "assets/edge-react-gui/pr-6080/20260723-043123-agent-proof-1216673467164267-p6-02-ltc-receive-warmlogin.png",
@@ -71,7 +78,8 @@
       "phase": null,
       "subject": "Prioritize an opened wallet's engine startup",
       "hackNote": null,
-      "migratedFrom": 5057885348
+      "migratedFrom": 5057885348,
+      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/g6080/08-p6-02-ltc-receive-0ad1c2.png"
     },
     {
       "path": "assets/edge-react-gui/pr-6080/20260723-133059-agent-proof-1216673467164267-01-HACKED-provisional-affordance.png",
@@ -80,7 +88,8 @@
       "phase": null,
       "subject": "Prioritize an opened wallet's engine startup",
       "hackNote": null,
-      "migratedFrom": 5063107324
+      "migratedFrom": 5063107324,
+      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/g6080/09-HACKED-provisional-034303.png"
     },
     {
       "path": "assets/edge-react-gui/pr-6080/20260731-191625-agent-proof-1216673467164267-02-receive-address-no-affordance.png",
@@ -89,7 +98,8 @@
       "phase": null,
       "subject": "Prioritize an opened wallet's engine startup",
       "hackNote": null,
-      "migratedFrom": 5149128788
+      "migratedFrom": 5149128788,
+      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/g6080/10-receive-address-no-8aed1e.png"
     },
     {
       "path": "assets/edge-react-gui/pr-6080/20260731-191625-agent-proof-1216673467164267-01-warm-login-wallet-list.png",
@@ -98,7 +108,8 @@
       "phase": null,
       "subject": "Prioritize an opened wallet's engine startup",
       "hackNote": null,
-      "migratedFrom": 5149128788
+      "migratedFrom": 5149128788,
+      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/g6080/11-warm-login-wallet-fa7d06.png"
     },
     {
       "path": "assets/edge-react-gui/pr-6080/20260909-174136-agent-proof-1216673467164267-01-warm-login-wallet-list.png",
@@ -107,7 +118,8 @@
       "phase": null,
       "subject": "Gate balance effects and FIO refresh on engine readiness",
       "hackNote": null,
-      "migratedFrom": 5610882899
+      "migratedFrom": 5610882899,
+      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/g6080/12-warm-login-wallet-f1d0d6.png"
     },
     {
       "path": "assets/edge-react-gui/pr-6080/20260909-174136-agent-proof-1216673467164267-02-HACKED-engine-error-row.png",
@@ -116,7 +128,8 @@
       "phase": null,
       "subject": "Gate balance effects and FIO refresh on engine readiness",
       "hackNote": "forced engineError to a non-null Error in WalletListCurrencyRow, since an engine failure has no natural trigger on the sim; reverted, tree clean.",
-      "migratedFrom": 5610882899
+      "migratedFrom": 5610882899,
+      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/g6080/13-HACKED-engine-erro-d573f3.png"
     }
   ]
 }
