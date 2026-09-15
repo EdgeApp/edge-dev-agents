@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-currency-accountbased/pr-1084/20260810-130854-agent-proof-1214062657363212-01-max-amount-and-fee.png",
+      "caption": "max amount and fee",
+      "hacked": false,
+      "phase": null,
+      "subject": "Include the declared gas fee in MAYAChain/THORChain fees",
+      "hackNote": null,
+      "migratedFrom": 5245392943
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1084/20260810-130854-agent-proof-1214062657363212-02-tx-success.png",
+      "caption": "tx success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Include the declared gas fee in MAYAChain/THORChain fees",
+      "hackNote": null,
+      "migratedFrom": 5245392943
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1084/20260810-130854-agent-proof-1214062657363212-03-postfix-max-amount-and-fee.png",
+      "caption": "postfix max amount and fee",
+      "hacked": false,
+      "phase": null,
+      "subject": "Include the declared gas fee in MAYAChain/THORChain fees",
+      "hackNote": null,
+      "migratedFrom": 5245392943
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1084/20260810-130854-agent-proof-1214062657363212-04-postfix-tx-success.png",
+      "caption": "postfix tx success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Include the declared gas fee in MAYAChain/THORChain fees",
+      "hackNote": null,
+      "migratedFrom": 5245392943
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1084/20260810-130854-agent-proof-1214062657363212-05-postfix-txid-detail.png",
+      "caption": "postfix txid detail",
+      "hacked": false,
+      "phase": null,
+      "subject": "Include the declared gas fee in MAYAChain/THORChain fees",
+      "hackNote": null,
+      "migratedFrom": 5245392943
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1084/20260810-130854-agent-proof-1214062657363212-06-postfix-wallet-emptied.png",
+      "caption": "postfix wallet emptied",
+      "hacked": false,
+      "phase": null,
+      "subject": "Include the declared gas fee in MAYAChain/THORChain fees",
+      "hackNote": null,
+      "migratedFrom": 5245392943
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1084/20260810-130854-agent-proof-1214062657363212-07-postfix-normal-send-success.png",
+      "caption": "postfix normal send success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Include the declared gas fee in MAYAChain/THORChain fees",
+      "hackNote": null,
+      "migratedFrom": 5245392943
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1084/20260828-154026-agent-proof-1214062657363212-08-per-engine-max-amount-and-fee.png",
+      "caption": "per engine max amount and fee",
+      "hacked": false,
+      "phase": null,
+      "subject": "Include the declared gas fee in MAYAChain/THORChain fees",
+      "hackNote": null,
+      "migratedFrom": 5458505172
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1084/20260828-154026-agent-proof-1214062657363212-09-app-success-modal-while-chain-halted.png",
+      "caption": "app success modal while chain halted",
+      "hacked": false,
+      "phase": null,
+      "subject": "Include the declared gas fee in MAYAChain/THORChain fees",
+      "hackNote": null,
+      "migratedFrom": 5458505172
+    }
+  ]
+}
