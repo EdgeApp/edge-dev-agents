@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6026/20260610-002732-agent-proof-1213742694496279-01-own-receive-address.png",
+      "caption": "agent proof 1213742694496279 01 own receive address",
+      "hacked": false,
+      "phase": null,
+      "subject": "Prevent send-to-self for EVM assets",
+      "hackNote": null,
+      "migratedFrom": 4667685559
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6026/20260610-002732-agent-proof-1213742694496279-02-send-to-self-error.png",
+      "caption": "agent proof 1213742694496279 02 send to self error",
+      "hacked": false,
+      "phase": null,
+      "subject": "Prevent send-to-self for EVM assets",
+      "hackNote": null,
+      "migratedFrom": 4667685559
+    }
+  ]
+}
