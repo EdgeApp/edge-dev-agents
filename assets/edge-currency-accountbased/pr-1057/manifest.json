@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-currency-accountbased/pr-1057/20260609-232539-01-AVAX-receive-PRE-FIX-derives-coinType-9000-address-does-not-match-Exodus.png",
+      "caption": "AVAX receive PRE FIX derives coinType 9000 address does not match Exodus",
+      "hacked": false,
+      "phase": null,
+      "subject": "Derive Avalanche C-Chain addresses at coin type 60",
+      "hackNote": null,
+      "migratedFrom": 4667198291
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1057/20260612-150734-01-imported-seed-fixed-coin-type-60-0x21D45Fd06e291C49AbFa135460DE827b6579Cef5.png",
+      "caption": "imported seed fixed coin type 60 0x21D45Fd06e291C49AbFa135460DE827b6579Cef5",
+      "hacked": false,
+      "phase": null,
+      "subject": "Derive Avalanche C-Chain addresses at coin type 60",
+      "hackNote": null,
+      "migratedFrom": 4695818837
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1057/20260612-150734-02-same-seed-pre-fix-coin-type-9000-0xc0Ee5411B61513Bea1853692463e28D6c32A0b50.png",
+      "caption": "same seed pre fix coin type 9000 0xc0Ee5411B61513Bea1853692463e28D6c32A0b50",
+      "hacked": false,
+      "phase": null,
+      "subject": "Derive Avalanche C-Chain addresses at coin type 60",
+      "hackNote": null,
+      "migratedFrom": 4695818837
+    }
+  ]
+}
