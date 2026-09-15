@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-exchange-plugins/pr-469/20260702-200825-agent-proof-1216251688512498-01-stealth-send-toggle.png",
+      "caption": "agent proof 1216251688512498 01 stealth send toggle",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add the HoudiniSwap swap plugin",
+      "hackNote": null,
+      "migratedFrom": 4872231399
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-469/20260702-200825-agent-proof-1216251688512498-06-stealth-swap-houdini-only.png",
+      "caption": "agent proof 1216251688512498 06 stealth swap houdini only",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add the HoudiniSwap swap plugin",
+      "hackNote": null,
+      "migratedFrom": 4872231399
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-469/20260911-151311-agent-proof-1216251688512498-29-monad-dex-quote-armed.png",
+      "caption": "monad dex quote armed",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add the HoudiniSwap swap plugin",
+      "hackNote": null,
+      "migratedFrom": 5641227629
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-469/20260911-151311-agent-proof-1216251688512498-30-monad-dex-success.png",
+      "caption": "monad dex success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add the HoudiniSwap swap plugin",
+      "hackNote": null,
+      "migratedFrom": 5641227629
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-469/20260911-151311-agent-proof-1216251688512498-34-monad-dex-txdetails.png",
+      "caption": "monad dex txdetails",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add the HoudiniSwap swap plugin",
+      "hackNote": null,
+      "migratedFrom": 5641227629
+    }
+  ]
+}
