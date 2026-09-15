@@ -1,0 +1,257 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260730-185043-agent-proof-1217036054017879-01-swapsxyz-quote.png",
+      "caption": "swapsxyz quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add swaps.xyz swap provider",
+      "hackNote": null,
+      "migratedFrom": 5138306504
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260730-185043-agent-proof-1217036054017879-02-swapsxyz-success.png",
+      "caption": "swapsxyz success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add swaps.xyz swap provider",
+      "hackNote": null,
+      "migratedFrom": 5138306504
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260803-163702-agent-proof-1217036054017879-01-swapsxyz-quote.png",
+      "caption": "swapsxyz quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add AGENTS.md for exchange-plugins",
+      "hackNote": null,
+      "migratedFrom": 5172873704
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260803-163702-agent-proof-1217036054017879-02-swap-success.png",
+      "caption": "swap success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add AGENTS.md for exchange-plugins",
+      "hackNote": null,
+      "migratedFrom": 5172873704
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260803-163702-agent-proof-1217036054017879-03-tx-details.png",
+      "caption": "tx details",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add AGENTS.md for exchange-plugins",
+      "hackNote": null,
+      "migratedFrom": 5172873704
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260803-163702-agent-proof-1217036054017879-04-tx-list-row.png",
+      "caption": "tx list row",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add AGENTS.md for exchange-plugins",
+      "hackNote": null,
+      "migratedFrom": 5172873704
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260804-120242-agent-proof-1217036054017879-05-sonic-quote-decimal-limits.png",
+      "caption": "sonic quote decimal limits",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add swaps.xyz error-condition unit tests",
+      "hackNote": null,
+      "migratedFrom": 5183402026
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260804-120242-agent-proof-1217036054017879-06-sonic-swap-success.png",
+      "caption": "sonic swap success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add swaps.xyz error-condition unit tests",
+      "hackNote": null,
+      "migratedFrom": 5183402026
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260804-182142-agent-proof-1217036054017879-07-evm-to-altvm-quote.png",
+      "caption": "evm to altvm quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add AGENTS.md for exchange-plugins",
+      "hackNote": null,
+      "migratedFrom": 5186440792
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260804-182142-agent-proof-1217036054017879-08-evm-to-altvm-success.png",
+      "caption": "evm to altvm success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add AGENTS.md for exchange-plugins",
+      "hackNote": null,
+      "migratedFrom": 5186440792
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260804-182142-agent-proof-1217036054017879-09-altvm-source-quote.png",
+      "caption": "altvm source quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add AGENTS.md for exchange-plugins",
+      "hackNote": null,
+      "migratedFrom": 5186440792
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260804-182142-agent-proof-1217036054017879-10-altvm-source-success.png",
+      "caption": "altvm source success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add AGENTS.md for exchange-plugins",
+      "hackNote": null,
+      "migratedFrom": 5186440792
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260804-182142-agent-proof-1217036054017879-11-solana-quote.png",
+      "caption": "solana quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add AGENTS.md for exchange-plugins",
+      "hackNote": null,
+      "migratedFrom": 5186440792
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260804-182142-agent-proof-1217036054017879-12-solana-success.png",
+      "caption": "solana success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add AGENTS.md for exchange-plugins",
+      "hackNote": null,
+      "migratedFrom": 5186440792
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260804-184026-agent-proof-1217036054017879-13-retest-after-review-fixes.png",
+      "caption": "retest after review fixes",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add AGENTS.md for exchange-plugins",
+      "hackNote": null,
+      "migratedFrom": 5186546904
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260819-105747-agent-proof-1217036054017879-14-fixed-quote-no-tilde.png",
+      "caption": "fixed quote no tilde",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add swaps.xyz error-condition unit tests",
+      "hackNote": null,
+      "migratedFrom": 5346013726
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260819-105747-agent-proof-1217036054017879-15-fixed-quotes-section.png",
+      "caption": "fixed quotes section",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add swaps.xyz error-condition unit tests",
+      "hackNote": null,
+      "migratedFrom": 5346013726
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260819-105747-agent-proof-1217036054017879-16-swap-success.png",
+      "caption": "swap success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add swaps.xyz error-condition unit tests",
+      "hackNote": null,
+      "migratedFrom": 5346013726
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260819-105747-agent-proof-1217036054017879-17-delivered-balance.png",
+      "caption": "delivered balance",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add swaps.xyz error-condition unit tests",
+      "hackNote": null,
+      "migratedFrom": 5346013726
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260901-130058-agent-proof-1217036054017879-18-solana-dex-quote.png",
+      "caption": "solana dex quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Split Solana same-chain swaps.xyz routes as a DEX",
+      "hackNote": null,
+      "migratedFrom": 5499667139
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260901-130058-agent-proof-1217036054017879-19-provider-sheet-dex-label.png",
+      "caption": "provider sheet dex label",
+      "hacked": false,
+      "phase": null,
+      "subject": "Split Solana same-chain swaps.xyz routes as a DEX",
+      "hackNote": null,
+      "migratedFrom": 5499667139
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260901-130058-agent-proof-1217036054017879-20-solana-dex-swap-success.png",
+      "caption": "solana dex swap success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Split Solana same-chain swaps.xyz routes as a DEX",
+      "hackNote": null,
+      "migratedFrom": 5499667139
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260901-130058-agent-proof-1217036054017879-21-solana-crosschain-stays-centralized.png",
+      "caption": "solana crosschain stays centralized",
+      "hacked": false,
+      "phase": null,
+      "subject": "Split Solana same-chain swaps.xyz routes as a DEX",
+      "hackNote": null,
+      "migratedFrom": 5499667139
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260908-102444-agent-proof-1217036054017879-22-defi-quote-moonpay-trade-name.png",
+      "caption": "defi quote moonpay trade name",
+      "hacked": false,
+      "phase": null,
+      "subject": "Split Solana same-chain swaps.xyz routes as a DEX",
+      "hackNote": null,
+      "migratedFrom": 5589150645
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260908-102444-agent-proof-1217036054017879-23-provider-sheet-defi-label.png",
+      "caption": "provider sheet defi label",
+      "hacked": false,
+      "phase": null,
+      "subject": "Split Solana same-chain swaps.xyz routes as a DEX",
+      "hackNote": null,
+      "migratedFrom": 5589150645
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260908-102444-agent-proof-1217036054017879-24-defi-swap-success.png",
+      "caption": "defi swap success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Split Solana same-chain swaps.xyz routes as a DEX",
+      "hackNote": null,
+      "migratedFrom": 5589150645
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260908-102444-agent-proof-1217036054017879-25-exchange-details-service-name.png",
+      "caption": "exchange details service name",
+      "hacked": false,
+      "phase": null,
+      "subject": "Split Solana same-chain swaps.xyz routes as a DEX",
+      "hackNote": null,
+      "migratedFrom": 5589150645
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260908-102444-agent-proof-1217036054017879-26-centralized-quote-moonpay-trade-name.png",
+      "caption": "centralized quote moonpay trade name",
+      "hacked": false,
+      "phase": null,
+      "subject": "Split Solana same-chain swaps.xyz routes as a DEX",
+      "hackNote": null,
+      "migratedFrom": 5589150645
+    }
+  ]
+}
