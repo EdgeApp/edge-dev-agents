@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-core-js/pr-733/20260720-184602-agent-proof-1216673467164267-p3-03-warm-fixed.png",
+      "caption": "agent proof 1216673467164267 p3 03 warm fixed",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5029291423
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260720-184602-agent-proof-1216673467164267-p3-04-warm-pin-list.png",
+      "caption": "agent proof 1216673467164267 p3 04 warm pin list",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5029291423
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260720-195300-agent-proof-1216673467164267-p3-05-final-warm.png",
+      "caption": "agent proof 1216673467164267 p3 05 final warm",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5029647999
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260721-165642-agent-proof-1216673467164267-p4-01-cold-boot.png",
+      "caption": "agent proof 1216673467164267 p4 01 cold boot",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5040276693
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260721-165642-agent-proof-1216673467164267-p4-02-warm-wallets.png",
+      "caption": "agent proof 1216673467164267 p4 02 warm wallets",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5040276693
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260721-165642-agent-proof-1216673467164267-p4-03-warm-final.png",
+      "caption": "agent proof 1216673467164267 p4 03 warm final",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5040276693
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260722-145810-agent-proof-1216673467164267-p5-01-warm-list.png",
+      "caption": "agent proof 1216673467164267 p5 01 warm list",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5052050935
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260722-145810-agent-proof-1216673467164267-p5-02-receive.png",
+      "caption": "agent proof 1216673467164267 p5 02 receive",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5052050935
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260722-145810-agent-proof-1216673467164267-p5-03-warm-final.png",
+      "caption": "agent proof 1216673467164267 p5 03 warm final",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5052050935
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260731-191613-agent-proof-1216673467164267-01-warm-login-wallet-list.png",
+      "caption": "warm login wallet list",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5149126687
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260731-191613-agent-proof-1216673467164267-02-receive-address-no-affordance.png",
+      "caption": "receive address no affordance",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5149126687
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260910-124106-agent-proof-1216673467164267-01-warm-login-wallet-list.png",
+      "caption": "warm login wallet list",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5624430488
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260910-133619-agent-proof-1216673467164267-02-warm-login-after-bot-fixes.png",
+      "caption": "warm login after bot fixes",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5625094976
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260910-152513-agent-proof-1216673467164267-03-logged-out-mid-startup.png",
+      "caption": "logged out mid startup",
+      "hacked": false,
+      "phase": null,
+      "subject": "Accept hash-suffixed routes in the fake server",
+      "hackNote": null,
+      "migratedFrom": 5626255183
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260910-152513-agent-proof-1216673467164267-04-relogin-after-mid-startup-logout.png",
+      "caption": "relogin after mid startup logout",
+      "hacked": false,
+      "phase": null,
+      "subject": "Accept hash-suffixed routes in the fake server",
+      "hackNote": null,
+      "migratedFrom": 5626255183
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260910-162607-agent-proof-1216673467164267-06-HACKED-dai-enabled-while-etc-wallet-still-queued.png",
+      "caption": "dai enabled while etc wallet still queued",
+      "hacked": true,
+      "phase": null,
+      "subject": "Accept hash-suffixed routes in the fake server",
+      "hackNote": "removed withWallet's waitForCurrencyWallet priority bump locally so the opened ETC wallet stayed in the engine queue while DAI was enabled; reverted.",
+      "migratedFrom": 5626810711
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260910-162607-agent-proof-1216673467164267-07-HACKED-dai-row-from-cache-after-relaunch.png",
+      "caption": "dai row from cache after relaunch",
+      "hacked": true,
+      "phase": null,
+      "subject": "Accept hash-suffixed routes in the fake server",
+      "hackNote": "removed withWallet's waitForCurrencyWallet priority bump locally so the opened ETC wallet stayed in the engine queue while DAI was enabled; reverted.",
+      "migratedFrom": 5626810711
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260914-122645-agent-proof-1216673467164267-08-warm-login-before-create.png",
+      "caption": "warm login before create",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5669564152
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260914-122645-agent-proof-1216673467164267-09-probe-wallet-created.png",
+      "caption": "probe wallet created",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5669564152
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260914-122645-agent-proof-1216673467164267-10-probe-wallet-archived.png",
+      "caption": "probe wallet archived",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5669564152
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260914-122645-agent-proof-1216673467164267-11-probe-wallet-restored-from-cache.png",
+      "caption": "probe wallet restored from cache",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5669564152
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260914-122645-agent-proof-1216673467164267-12-probe-wallet-rearchived.png",
+      "caption": "probe wallet rearchived",
+      "hacked": false,
+      "phase": null,
+      "subject": "Document the wallet cache v2 design",
+      "hackNote": null,
+      "migratedFrom": 5669564152
+    }
+  ]
+}
