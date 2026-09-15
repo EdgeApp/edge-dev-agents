@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6199/20260907-172602-agent-proof-1210180856778864-01-buy-deeplink-btc-wallet-filter.png",
+      "caption": "buy deeplink btc wallet filter",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add exchange deep links with promo attribution",
+      "hackNote": null,
+      "migratedFrom": 5577188142
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6199/20260907-172602-agent-proof-1210180856778864-02-swap-deeplink-both-assets.png",
+      "caption": "swap deeplink both assets",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add exchange deep links with promo attribution",
+      "hackNote": null,
+      "migratedFrom": 5577188142
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6199/20260907-175609-agent-proof-1210180856778864-03-token-deeplink-usdc.png",
+      "caption": "token deeplink usdc",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add exchange deep links with promo attribution",
+      "hackNote": null,
+      "migratedFrom": 5577434106
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6199/20260907-181103-agent-proof-1210180856778864-04-retest-after-fixes.png",
+      "caption": "retest after fixes",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add exchange deep links with promo attribution",
+      "hackNote": null,
+      "migratedFrom": 5577554679
+    }
+  ]
+}
