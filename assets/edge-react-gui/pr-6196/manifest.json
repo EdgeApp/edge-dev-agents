@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6196/20260904-020907-agent-proof-1217260776555871-01-confirm-connection.png",
+      "caption": "confirm connection",
+      "hacked": false,
+      "phase": null,
+      "subject": "Clarify WalletConnect connection and request risks",
+      "hackNote": null,
+      "migratedFrom": 5538247485
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6196/20260904-020907-agent-proof-1217260776555871-02-connected.png",
+      "caption": "connected",
+      "hacked": false,
+      "phase": null,
+      "subject": "Clarify WalletConnect connection and request risks",
+      "hackNote": null,
+      "migratedFrom": 5538247485
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6196/20260904-020907-agent-proof-1217260776555871-03-smart-contract-warning.png",
+      "caption": "smart contract warning",
+      "hacked": false,
+      "phase": null,
+      "subject": "Clarify WalletConnect connection and request risks",
+      "hackNote": null,
+      "migratedFrom": 5538247485
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6196/20260908-192720-agent-proof-1217260776555871-01-confirm-connection.png",
+      "caption": "confirm connection",
+      "hacked": false,
+      "phase": null,
+      "subject": "Fix lint warnings in WcConnectScene",
+      "hackNote": null,
+      "migratedFrom": 5594846996
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6196/20260908-192720-agent-proof-1217260776555871-02-connected.png",
+      "caption": "connected",
+      "hacked": false,
+      "phase": null,
+      "subject": "Fix lint warnings in WcConnectScene",
+      "hackNote": null,
+      "migratedFrom": 5594846996
+    }
+  ]
+}
