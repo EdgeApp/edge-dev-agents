@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-currency-plugins/pr-453/20260624-185435-agent-proof-1213046875952149-01-xec-wallets-funded.png",
+      "caption": "agent proof 1213046875952149 01 xec wallets funded",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add NowNodes blockbook server to eCash for sync/send recovery",
+      "hackNote": null,
+      "migratedFrom": 4795145450
+    },
+    {
+      "path": "assets/edge-currency-plugins/pr-453/20260624-185435-agent-proof-1213046875952149-02-xec-wallet-balance.png",
+      "caption": "agent proof 1213046875952149 02 xec wallet balance",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add NowNodes blockbook server to eCash for sync/send recovery",
+      "hackNote": null,
+      "migratedFrom": 4795145450
+    },
+    {
+      "path": "assets/edge-currency-plugins/pr-453/20260624-185435-agent-proof-1213046875952149-03-resync-confirm.png",
+      "caption": "agent proof 1213046875952149 03 resync confirm",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add NowNodes blockbook server to eCash for sync/send recovery",
+      "hackNote": null,
+      "migratedFrom": 4795145450
+    },
+    {
+      "path": "assets/edge-currency-plugins/pr-453/20260624-185435-agent-proof-1213046875952149-04-resync-complete-synced.png",
+      "caption": "agent proof 1213046875952149 04 resync complete synced",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add NowNodes blockbook server to eCash for sync/send recovery",
+      "hackNote": null,
+      "migratedFrom": 4795145450
+    }
+  ]
+}
