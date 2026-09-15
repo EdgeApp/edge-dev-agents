@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260814-102242-agent-proof-1216839790397157-01-rango-trx-usdt-quote.png",
+      "caption": "rango trx usdt quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Rango: Add Tron swap support",
+      "hackNote": null,
+      "migratedFrom": 5296217156
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260814-102242-agent-proof-1216839790397157-02-rango-trx-swap-success.png",
+      "caption": "rango trx swap success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Rango: Add Tron swap support",
+      "hackNote": null,
+      "migratedFrom": 5296217156
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260814-102242-agent-proof-1216839790397157-03-rango-trx-tx-details.png",
+      "caption": "rango trx tx details",
+      "hacked": false,
+      "phase": null,
+      "subject": "Rango: Add Tron swap support",
+      "hackNote": null,
+      "migratedFrom": 5296217156
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260910-143508-agent-proof-1216839790397157-04-rango-usdc-pol-quote.png",
+      "caption": "rango usdc pol quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Send the Rango API key as the apikey param",
+      "hackNote": null,
+      "migratedFrom": 5625759035
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260910-143508-agent-proof-1216839790397157-05-rango-usdc-pol-swap-success.png",
+      "caption": "rango usdc pol swap success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Send the Rango API key as the apikey param",
+      "hackNote": null,
+      "migratedFrom": 5625759035
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260910-143508-agent-proof-1216839790397157-06-rango-usdc-pol-tx-details.png",
+      "caption": "rango usdc pol tx details",
+      "hacked": false,
+      "phase": null,
+      "subject": "Send the Rango API key as the apikey param",
+      "hackNote": null,
+      "migratedFrom": 5625759035
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260910-163217-agent-proof-1216839790397157-07-rango-usdc-pol-quote-branch.png",
+      "caption": "rango usdc pol quote branch",
+      "hacked": false,
+      "phase": null,
+      "subject": "Send the Rango API key as the apikey param",
+      "hackNote": null,
+      "migratedFrom": 5626885879
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260910-163217-agent-proof-1216839790397157-08-rango-usdc-pol-swap-success-branch.png",
+      "caption": "rango usdc pol swap success branch",
+      "hacked": false,
+      "phase": null,
+      "subject": "Send the Rango API key as the apikey param",
+      "hackNote": null,
+      "migratedFrom": 5626885879
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260910-163217-agent-proof-1216839790397157-09-rango-trx-usdt-quote.png",
+      "caption": "rango trx usdt quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Send the Rango API key as the apikey param",
+      "hackNote": null,
+      "migratedFrom": 5626885879
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260910-163217-agent-proof-1216839790397157-10-rango-trx-usdt-swap-success.png",
+      "caption": "rango trx usdt swap success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Send the Rango API key as the apikey param",
+      "hackNote": null,
+      "migratedFrom": 5626885879
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260910-163217-agent-proof-1216839790397157-11-rango-usdt-trx-quote.png",
+      "caption": "rango usdt trx quote",
+      "hacked": false,
+      "phase": null,
+      "subject": "Send the Rango API key as the apikey param",
+      "hackNote": null,
+      "migratedFrom": 5626885879
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260910-163217-agent-proof-1216839790397157-12-rango-usdt-trx-swap-success.png",
+      "caption": "rango usdt trx swap success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Send the Rango API key as the apikey param",
+      "hackNote": null,
+      "migratedFrom": 5626885879
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260911-103416-agent-proof-1216839790397157-15-rango-usdt-trx-quote-final.png",
+      "caption": "rango usdt trx quote final",
+      "hacked": false,
+      "phase": null,
+      "subject": "Send the Rango API key as the apikey param",
+      "hackNote": null,
+      "migratedFrom": 5638296289
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260911-103416-agent-proof-1216839790397157-16-rango-usdt-trx-swap-success-final.png",
+      "caption": "rango usdt trx swap success final",
+      "hacked": false,
+      "phase": null,
+      "subject": "Send the Rango API key as the apikey param",
+      "hackNote": null,
+      "migratedFrom": 5638296289
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260915-114909-agent-proof-1216839790397157-17-rango-usdt-trx-quote-followup.png",
+      "caption": "rango usdt trx quote followup",
+      "hacked": false,
+      "phase": null,
+      "subject": "Rango: Add Tron swap support",
+      "hackNote": null,
+      "migratedFrom": 5686183754
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260915-114909-agent-proof-1216839790397157-18-rango-usdt-trx-swap-success-followup.png",
+      "caption": "rango usdt trx swap success followup",
+      "hacked": false,
+      "phase": null,
+      "subject": "Rango: Add Tron swap support",
+      "hackNote": null,
+      "migratedFrom": 5686183754
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-484/20260915-114909-agent-proof-1216839790397157-19-tron-history-net-payouts.png",
+      "caption": "tron history net payouts",
+      "hacked": false,
+      "phase": null,
+      "subject": "Rango: Add Tron swap support",
+      "hackNote": null,
+      "migratedFrom": 5686183754
+    }
+  ]
+}
