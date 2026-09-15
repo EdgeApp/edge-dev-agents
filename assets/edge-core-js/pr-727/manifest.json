@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-core-js/pr-727/20260908-175252-agent-proof-1207967192999590-01-eth-max-spend-built.png",
+      "caption": "eth max spend built",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add makeMaxSpend wallet API with core fallback shim",
+      "hackNote": null,
+      "migratedFrom": 5594078463
+    },
+    {
+      "path": "assets/edge-core-js/pr-727/20260908-175252-agent-proof-1207967192999590-02-eth-max-spend-sent.png",
+      "caption": "eth max spend sent",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add makeMaxSpend wallet API with core fallback shim",
+      "hackNote": null,
+      "migratedFrom": 5594078463
+    }
+  ]
+}
