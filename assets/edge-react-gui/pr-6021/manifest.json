@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260817-145710-agent-proof-1216926437132721-01-arrr-synced-0.3.0.png",
+      "caption": "arrr synced 0.3.0",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add missing testIDs for maestro selectors",
+      "hackNote": null,
+      "migratedFrom": 5320734909
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260817-145710-agent-proof-1216926437132721-02-arrr-send-ready.png",
+      "caption": "arrr send ready",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add missing testIDs for maestro selectors",
+      "hackNote": null,
+      "migratedFrom": 5320734909
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260817-145710-agent-proof-1216926437132721-03-arrr-send-success.png",
+      "caption": "arrr send success",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add missing testIDs for maestro selectors",
+      "hackNote": null,
+      "migratedFrom": 5320734909
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260817-145710-agent-proof-1216926437132721-04-arrr-balance-after-send.png",
+      "caption": "arrr balance after send",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add missing testIDs for maestro selectors",
+      "hackNote": null,
+      "migratedFrom": 5320734909
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260825-162624-agent-proof-1216926437132721-00-arrr-synced-0.3.2-tls-pool.png",
+      "caption": "arrr synced 0.3.2 tls pool",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add missing testIDs for maestro selectors",
+      "hackNote": null,
+      "migratedFrom": 5418336341
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260825-162624-agent-proof-1216926437132721-05-arrr-send-success-0.3.2-tls.png",
+      "caption": "arrr send success 0.3.2 tls",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add missing testIDs for maestro selectors",
+      "hackNote": null,
+      "migratedFrom": 5418336341
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260825-162624-agent-proof-1216926437132721-06-arrr-txid-0.3.2-tls.png",
+      "caption": "arrr txid 0.3.2 tls",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add missing testIDs for maestro selectors",
+      "hackNote": null,
+      "migratedFrom": 5418336341
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260831-134448-agent-proof-1216926437132721-01-before-generic-error.png",
+      "caption": "before generic error",
+      "hacked": false,
+      "phase": null,
+      "subject": "Name the not-yet-spendable send error",
+      "hackNote": null,
+      "migratedFrom": 5484322888
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260831-134448-agent-proof-1216926437132721-03-not-spendable-error.png",
+      "caption": "not spendable error",
+      "hacked": false,
+      "phase": null,
+      "subject": "Name the not-yet-spendable send error",
+      "hackNote": null,
+      "migratedFrom": 5484322888
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260902-113624-agent-proof-1216926437132721-01-keychain-registry-syncing.png",
+      "caption": "keychain registry syncing",
+      "hacked": false,
+      "phase": null,
+      "subject": "Name the not-yet-spendable send error",
+      "hackNote": null,
+      "migratedFrom": 5514503158
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260902-113624-agent-proof-1216926437132721-03-transaction-success.png",
+      "caption": "transaction success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Name the not-yet-spendable send error",
+      "hackNote": null,
+      "migratedFrom": 5514503158
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260902-113624-agent-proof-1216926437132721-04-txid.png",
+      "caption": "txid",
+      "hacked": false,
+      "phase": null,
+      "subject": "Name the not-yet-spendable send error",
+      "hackNote": null,
+      "migratedFrom": 5514503158
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260914-175701-agent-proof-1216926437132721-01-max-fills-spendable-balance.png",
+      "caption": "max fills spendable balance",
+      "hacked": false,
+      "phase": null,
+      "subject": "Name the not-yet-spendable send error",
+      "hackNote": null,
+      "migratedFrom": 5673032571
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260914-175701-agent-proof-1216926437132721-02-send-armed.png",
+      "caption": "send armed",
+      "hacked": false,
+      "phase": null,
+      "subject": "Name the not-yet-spendable send error",
+      "hackNote": null,
+      "migratedFrom": 5673032571
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260914-175701-agent-proof-1216926437132721-03-transaction-success.png",
+      "caption": "transaction success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Name the not-yet-spendable send error",
+      "hackNote": null,
+      "migratedFrom": 5673032571
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260914-183846-agent-proof-1216926437132721-04-HACKED-max-refused-witness-repair.png",
+      "caption": "max refused witness repair",
+      "hacked": true,
+      "phase": null,
+      "subject": "Name the not-yet-spendable send error",
+      "hackNote": "forced the bridge's getSpendability in the updot-baked plugin copy to return spendable:false with reasonCode ERR_WITNESS_REPAIR_QUEUED (frames 04, 05) then ERR_SYNC_FINALIZING (frame 06); reverted, git status clean.",
+      "migratedFrom": 5673361776
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260914-183846-agent-proof-1216926437132721-05-HACKED-not-spendable-witness-repair.png",
+      "caption": "not spendable witness repair",
+      "hacked": true,
+      "phase": null,
+      "subject": "Name the not-yet-spendable send error",
+      "hackNote": "forced the bridge's getSpendability in the updot-baked plugin copy to return spendable:false with reasonCode ERR_WITNESS_REPAIR_QUEUED (frames 04, 05) then ERR_SYNC_FINALIZING (frame 06); reverted, git status clean.",
+      "migratedFrom": 5673361776
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260914-183846-agent-proof-1216926437132721-06-HACKED-not-spendable-sync-finalizing.png",
+      "caption": "not spendable sync finalizing",
+      "hacked": true,
+      "phase": null,
+      "subject": "Name the not-yet-spendable send error",
+      "hackNote": "forced the bridge's getSpendability in the updot-baked plugin copy to return spendable:false with reasonCode ERR_WITNESS_REPAIR_QUEUED (frames 04, 05) then ERR_SYNC_FINALIZING (frame 06); reverted, git status clean.",
+      "migratedFrom": 5673361776
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260914-193356-agent-proof-1216926437132721-07-send-armed-fresh-registry.png",
+      "caption": "send armed fresh registry",
+      "hacked": false,
+      "phase": null,
+      "subject": "Name the not-yet-spendable send error",
+      "hackNote": null,
+      "migratedFrom": 5673803758
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6021/20260914-193356-agent-proof-1216926437132721-08-transaction-success-fresh-registry.png",
+      "caption": "transaction success fresh registry",
+      "hacked": false,
+      "phase": null,
+      "subject": "Name the not-yet-spendable send error",
+      "hackNote": null,
+      "migratedFrom": 5673803758
+    }
+  ]
+}
