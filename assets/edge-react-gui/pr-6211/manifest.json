@@ -18,6 +18,22 @@
       "hackNote": "Forced by a temporary throw at the top of SendScene2.handleSliderComplete, reverted before commit. The marked frames prove the rendering, not the trigger."
     },
     {
+      "path": "assets/edge-react-gui/pr-6211/20260911-155707-agent-proof-1218408624974487-01-sell-scene-pol.png",
+      "caption": "sell scene pol",
+      "hacked": false,
+      "phase": "before",
+      "subject": "Quote Paybis sell max at the wallet max",
+      "hackNote": null
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6211/20260911-155707-agent-proof-1218408624974487-02-max-quote-full-amount.png",
+      "caption": "max quote full amount",
+      "hacked": false,
+      "phase": "before",
+      "subject": "Quote Paybis sell max at the wallet max",
+      "hackNote": null
+    },
+    {
       "path": "assets/edge-react-gui/pr-6211/20260911-161129-agent-proof-1218408624974487-01-sell-scene-pol.png",
       "caption": "sell scene pol",
       "hacked": false,
