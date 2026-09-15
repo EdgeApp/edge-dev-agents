@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-exchange-plugins/pr-460/20260612-181909-01-exolix-provider-enabled.png",
+      "caption": "exolix provider enabled",
+      "hacked": false,
+      "phase": null,
+      "subject": "Stringify Exolix swap error response for readable logs",
+      "hackNote": null,
+      "migratedFrom": 4696925412
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-460/20260612-181909-02-lld-to-eth-swap-rejected.png",
+      "caption": "lld to eth swap rejected",
+      "hacked": false,
+      "phase": null,
+      "subject": "Stringify Exolix swap error response for readable logs",
+      "hackNote": null,
+      "migratedFrom": 4696925412
+    }
+  ]
+}
