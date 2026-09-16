@@ -36,6 +36,60 @@
       "subject": "Add exchange deep links with promo attribution",
       "hackNote": null,
       "migratedFrom": 5577554679
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6199/20260916-021336-agent-proof-1210180856778864-01-swap-link-asks-source-wallet-first.png",
+      "caption": "swap link asks source wallet first",
+      "hacked": false,
+      "phase": null,
+      "subject": "fixup! Add exchange deep links with promo attribution",
+      "hackNote": null,
+      "addedAt": "2026-09-16T09:13:55.491Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6199/20260916-021336-agent-proof-1210180856778864-02-then-asks-receiving-wallet.png",
+      "caption": "then asks receiving wallet",
+      "hacked": false,
+      "phase": null,
+      "subject": "fixup! Add exchange deep links with promo attribution",
+      "hackNote": null,
+      "addedAt": "2026-09-16T09:13:55.493Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6199/20260916-021336-agent-proof-1210180856778864-03-swap-scene-both-sides-set.png",
+      "caption": "swap scene both sides set",
+      "hacked": false,
+      "phase": null,
+      "subject": "fixup! Add exchange deep links with promo attribution",
+      "hackNote": null,
+      "addedAt": "2026-09-16T09:13:55.493Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6199/20260916-021336-agent-proof-1210180856778864-04-buy-link-forces-picked-btc-wallet.png",
+      "caption": "buy link forces picked btc wallet",
+      "hacked": false,
+      "phase": null,
+      "subject": "fixup! Add exchange deep links with promo attribution",
+      "hackNote": null,
+      "addedAt": "2026-09-16T09:13:55.493Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6199/20260916-021336-agent-proof-1210180856778864-05-dropdown-pick-replaces-forced-wallet.png",
+      "caption": "dropdown pick replaces forced wallet",
+      "hacked": false,
+      "phase": null,
+      "subject": "fixup! Add exchange deep links with promo attribution",
+      "hackNote": null,
+      "addedAt": "2026-09-16T09:13:55.493Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6199/20260916-021336-agent-proof-1210180856778864-06-unresolvable-asset-opens-buy-with-no-picker.png",
+      "caption": "unresolvable asset opens buy with no picker",
+      "hacked": false,
+      "phase": null,
+      "subject": "fixup! Add exchange deep links with promo attribution",
+      "hackNote": null,
+      "addedAt": "2026-09-16T09:13:55.493Z"
     }
   ]
 }
