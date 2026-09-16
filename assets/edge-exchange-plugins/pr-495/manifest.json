@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20260916-155930-agent-proof-1218563157181138-02-lifi-quote-polygon-usdc-to-arc.png",
+      "caption": "lifi quote polygon usdc to arc",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc swaps via LI.FI",
+      "hackNote": null,
+      "addedAt": "2026-09-16T22:59:38.772Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20260916-155930-agent-proof-1218563157181138-03-lifi-swap-into-arc-success.png",
+      "caption": "lifi swap into arc success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc swaps via LI.FI",
+      "hackNote": null,
+      "addedAt": "2026-09-16T22:59:38.773Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20260916-155930-agent-proof-1218563157181138-06-lifi-quote-arc-to-polygon-usdc.png",
+      "caption": "lifi quote arc to polygon usdc",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc swaps via LI.FI",
+      "hackNote": null,
+      "addedAt": "2026-09-16T22:59:38.773Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20260916-155930-agent-proof-1218563157181138-07-lifi-swap-out-of-arc-success.png",
+      "caption": "lifi swap out of arc success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc swaps via LI.FI",
+      "hackNote": null,
+      "addedAt": "2026-09-16T22:59:38.773Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20260916-155930-agent-proof-1218563157181138-08-arc-history-send-swap-approval-receive.png",
+      "caption": "arc history send swap approval receive",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc swaps via LI.FI",
+      "hackNote": null,
+      "addedAt": "2026-09-16T22:59:38.773Z"
+    }
+  ]
+}
