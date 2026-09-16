@@ -78,6 +78,18 @@ tmux paste-buffer -b "spawn-$NAME" -d -t "$S"
 sleep 1
 tmux send-keys -t "$S" Enter
 
+# Record the spawn (lib/chat-spawns.js): a prompt-spawned transcript carries no
+# --resume id and no /one-shot signature, so this line is the only thing that
+# lets resume-agent --list, the Fleet page, and a --uuid resume find it again
+# under its original name after the watchdog reaps the pane.
+REGISTRY="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/chat-spawns.jsonl"
+record_spawn() { # $1=transcript path
+  mkdir -p "$(dirname "$REGISTRY")"
+  jq -nc --arg uuid "$(basename "$1" .jsonl)" --arg rc "$RC" --arg tmux "$S" --argjson anchor "$ANCHOR" --argjson chrome "$CHROME" \
+    --arg brief "$BRIEF" --arg created "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{uuid:$uuid,rc:$rc,tmux:$tmux,anchor:$anchor,chrome:$chrome,brief:$brief,created:$created}' >> "$REGISTRY"
+}
+
 # Verify: the newest transcript in the project dir should be new and its first
 # human message should equal the pointer.
 ok=""
@@ -99,10 +111,12 @@ EOF
 )
   [ -n "$first" ] || continue
   if [ "$first" = "$pointer" ]; then ok=1; break; fi
+  record_spawn "$newest"   # the session is real and resumable even with a mangled pointer
   echo "pointer arrived altered (len ${#first} vs ${#pointer}); session left running: $S" >&2
   echo "  got: ${first:0:160}" >&2
   exit 3
 done
 [ -n "$ok" ] || { echo "could not confirm the pointer in a transcript within 40s; session running: $S" >&2; exit 3; }
+record_spawn "$newest"
 echo "SPAWNED tmux=$S rc=$RC transcript=$(basename "$newest") brief=$BRIEF"
 exit 0

@@ -67,6 +67,11 @@ android_guard() { # $1 = adb serial
 }
 
 case "$TOOL" in
+  mcp__maestro__list_devices)
+    # Enumerating devices drives nothing, and it is the natural first probe
+    # when the slot sim is down; the booted guard would block the diagnosis.
+    exit 0
+    ;;
   mcp__maestro__*)
     # The daemon is BOUND to the slot sim; per-call device_id is ignored on
     # this host (wrapper launches with a global --device). A call naming a
@@ -84,33 +89,48 @@ case "$TOOL" in
 esac
 [ -n "$CMD" ] || exit 0
 
-# Only gate maestro test/record/studio/hierarchy runs (global flags may sit
-# between `maestro` and the subcommand); `maestro --help`, mcp, etc. pass.
-echo "$CMD_M" | grep -qE '\bmaestro\b[^|;&]*[[:space:]](test|record|studio|hierarchy)([[:space:]]|$)' || exit 0
+# Drive detection and --device extraction live in lib/maestro-cmd.sh (shared
+# with require-playbook-before-drive.sh): only segments whose command word is
+# maestro with a test/record/studio/hierarchy subcommand gate; `maestro
+# --version`, mcp, and reads of maestro paths pass. Every drive segment in the
+# command is checked, not only the first.
+LIB="$HOME/.config/agent-watcher/hooks/lib"
+[ -f "$LIB/maestro-cmd.sh" ] && [ -f "$LIB/shell-word-resolve.sh" ] || exit 0
+. "$LIB/maestro-cmd.sh"
+. "$LIB/shell-word-resolve.sh"
+SEGS=$(maestro_cmd_segments "$CMD" "$CMD_M" 2>/dev/null | grep '^drive' || true)
+[ -n "$SEGS" ] || exit 0
 
-# Extract the --device/--udid value (first one; comma lists take the first).
-DEV=$(printf '%s' "$CMD" | sed -nE 's/.*--(device|udid)[= ]+"?([^" ,]+)"?.*/\2/p' | head -1)
-
-if [ -z "$DEV" ]; then
-  echo "BLOCKED: maestro run has no --device. Multiple devices can be live on this host (parallel slot sims, Android emulators, physical devices) and an unpinned run attaches to an arbitrary one — it may drive ANOTHER slot's app. iOS slot work: maestro --device $AGENT_SIM_UDID --driver-host-port \$((AGENT_METRO_PORT + 1000)) test <flow>. Android work: maestro --device <adb-serial> test <flow> (serial from 'adb devices'; no driver port needed). Note the maestro MCP daemon is bound to the iOS slot sim and ignores per-call device_id — the CLI is the only Android path." >&2
-  exit 2
-fi
-
-if printf '%s' "$DEV" | grep -qE "$IOS_UDID_RE"; then
-  # iOS target: must be THIS slot's sim, booted, with a pinned driver port.
-  if [ "$DEV" != "$AGENT_SIM_UDID" ]; then
-    echo "BLOCKED: --device $DEV is an iOS sim that is NOT this session's slot sim ($AGENT_SIM_UDID) — driving a neighbor slot's sim is the cross-slot contention this gate exists for. Use \$AGENT_SIM_UDID." >&2
+TAB=$(printf '\t')
+while IFS="$TAB" read -r _ OFF WORD; do
+  if [ -z "$WORD" ]; then
+    echo "BLOCKED: maestro run has no --device. Multiple devices can be live on this host (parallel slot sims, Android emulators, physical devices) and an unpinned run attaches to an arbitrary one, so it may drive ANOTHER slot's app. iOS slot work: maestro --device $AGENT_SIM_UDID --driver-host-port \$((AGENT_METRO_PORT + 1000)) test <flow>. Android work: maestro --device <adb-serial> test <flow> (serial from 'adb devices'; no driver port needed). Note the maestro MCP daemon is bound to the iOS slot sim and ignores per-call device_id, so the CLI is the only Android path." >&2
     exit 2
   fi
-  booted_guard
-  if [ -n "${AGENT_METRO_PORT:-}" ] && ! echo "$CMD_M" | grep -q -- '--driver-host-port'; then
-    echo "BLOCKED: iOS maestro run is missing --driver-host-port — parallel slots' iOS drivers contend on the default port. Use: maestro --device $AGENT_SIM_UDID --driver-host-port \$((AGENT_METRO_PORT + 1000)) test <flow>." >&2
+  # Resolve $VAR / ${VAR}: the last same-command assignment before this
+  # segment, then this hook's environment (lib/shell-word-resolve.sh). No eval.
+  if ! DEV=$(resolve_shell_word "$WORD" "$CMD" "$CMD_M" "$OFF"); then
+    echo "BLOCKED: cannot resolve maestro --device $WORD statically (a variable with no assignment earlier in this command and not in the session environment, or a command/arithmetic substitution). This gate must know which device the run drives: pass a literal UDID/serial, a variable assigned earlier in the same command (U=<udid>; maestro --device \$U ...), or \$AGENT_SIM_UDID." >&2
     exit 2
   fi
-else
-  # Android target (adb serial): attached is the strongest available check;
-  # emulators are not slot-tracked. No booted guard (the iOS sim is not
-  # involved) and no --driver-host-port (iOS-driver isolation only).
-  android_guard "$DEV"
-fi
+  DEV="${DEV%%,*}"   # comma lists take the first device
+
+  if printf '%s' "$DEV" | grep -qE "$IOS_UDID_RE"; then
+    # iOS target: must be THIS slot's sim, booted, with a pinned driver port.
+    if [ "$DEV" != "$AGENT_SIM_UDID" ]; then
+      echo "BLOCKED: --device $DEV is an iOS sim that is NOT this session's slot sim ($AGENT_SIM_UDID); driving a neighbor slot's sim is the cross-slot contention this gate exists for. Use \$AGENT_SIM_UDID." >&2
+      exit 2
+    fi
+    booted_guard
+    if [ -n "${AGENT_METRO_PORT:-}" ] && ! echo "$CMD_M" | grep -q -- '--driver-host-port'; then
+      echo "BLOCKED: iOS maestro run is missing --driver-host-port; parallel slots' iOS drivers contend on the default port. Use: maestro --device $AGENT_SIM_UDID --driver-host-port \$((AGENT_METRO_PORT + 1000)) test <flow>." >&2
+      exit 2
+    fi
+  else
+    # Android target (adb serial): attached is the strongest available check;
+    # emulators are not slot-tracked. No booted guard (the iOS sim is not
+    # involved) and no --driver-host-port (iOS-driver isolation only).
+    android_guard "$DEV"
+  fi
+done <<< "$SEGS"
 exit 0

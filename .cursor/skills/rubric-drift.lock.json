@@ -14,7 +14,7 @@
       ]
     },
     "one-shot:agent-status-on-pending-task": {
-      "hash": "9a79a27f16d7",
+      "hash": "22e8b4be2290",
       "dims": [
         "A4"
       ]
@@ -27,7 +27,7 @@
       ]
     },
     "one-shot:pr-watch-bounded-poll": {
-      "hash": "f55f396f28a1",
+      "hash": "a3c980236d0a",
       "dims": [
         "A5"
       ]
@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "697e8d2baac7",
+      "hash": "d58221046bd3",
       "dims": [
         "O4",
         "O5",
@@ -273,7 +273,7 @@
       ]
     },
     "file:setup-task-workspace.sh": {
-      "hash": "d6d4adbcf758",
+      "hash": "ebd59c4afcfe",
       "dims": [
         "O8"
       ]
@@ -417,13 +417,13 @@
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "423b701e7a90",
+      "hash": "a1c3f0a649f9",
       "dims": [
         "A9"
       ]
     },
     "build-and-test:preflight-before-build-decisions": {
-      "hash": "d700de8e8049",
+      "hash": "cfb4bb8b97eb",
       "dims": [
         "A29"
       ]
@@ -557,14 +557,14 @@
       ]
     },
     "file:require-followup-scope-on-complete.sh": {
-      "hash": "4e72c5bae163",
+      "hash": "82168e24f53a",
       "dims": [
         "A14",
         "A9"
       ]
     },
     "file:lint-commit.sh": {
-      "hash": "6493312ecce2",
+      "hash": "b51033020748",
       "dims": [
         "A12"
       ]
@@ -796,8 +796,8 @@
       "hash": "8bb3e0cd59cf"
     },
     "build-and-test:blocking-in-turn-waits": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "ecad5b018ad4"
+      "reason": "2026-09-15: graded under A5/A6 via era: chunked waits; build detach+wait is mechanized by ios-rn-build.sh --detach and ios-rn-build-wait.sh",
+      "hash": "a75763ac4fa4"
     },
     "build-and-test:lockfile-driven-pm": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -984,8 +984,8 @@
       "hash": "49ebf1156326"
     },
     "pr-address:commit-via-script": {
-      "reason": "2026-09-11: mechanically enforced: lint-commit.sh bounces fixups without a body or --for kind, git-history-gate.sh blocks raw commits",
-      "hash": "93813ce14aae"
+      "reason": "2026-09-16: 2026-09-15: mechanically enforced: lint-commit.sh picks the fold path itself (git-branch-ops.sh fold-mode --target, then fold-one for that one fixup); A12 grades the outcome",
+      "hash": "0603d97670c0"
     },
     "pr-address:slot-after-each-fixup": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1012,8 +1012,8 @@
       "hash": "467a6a08c08d"
     },
     "pr-create:flag-contract": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "fd26325efd86"
+      "reason": "2026-09-15: flag syntax and asana_attached reading; the attach outcome itself is graded under one-shot attach-prs-by-default",
+      "hash": "f1fda2c8a58b"
     },
     "pr-create:script-timeouts": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",

@@ -361,22 +361,32 @@ skipping: rules INSIDE the prompt a session holds are followed almost
 universally, while obligations that require reading ANOTHER skill file
 mid-flow get skipped or satisfied with a partial slice. The enforcement
 stack therefore never trusts "go read X". A contract reaches a run's context
-in exactly one of three ways, all of which stamp the same per-segment marker,
-and the marker is what the read-gate checks before letting any companion
-script execute:
+in one of these ways, all of which stamp the same per-segment marker, and
+the marker is what the read-gate checks before letting any companion script
+execute:
 
 1. **Injected at the boundary** — every fresh segment gets the planning
    contracts (asana-plan + task-review) pushed in whole by
    `inject-run-context.sh`.
-2. **Read whole by the agent** — strict marking: a full `Read` (no
-   offset/limit), a bare `cat`, or a Skill-tool invocation. A `sed` slice or
-   `cat | head` earns nothing, because partial credit would suppress
-   delivery.
+2. **Read whole by the agent**: strict marking, every check made against the
+   current file on disk. Reads of the SKILL.md whose returned lines together
+   cover every line (one uncapped Read, or pages when the token cap cuts a
+   Read short), a `cat` whose unaltered stdout holds the body (no pipe,
+   redirect, capture, or persisted output), or a Skill-tool invocation. A
+   `sed` slice or `cat | head` earns nothing, because partial credit would
+   suppress delivery.
 3. **Delivered by the gate itself** — a script call with no marker is DENIED,
    and the deny message IS the full SKILL.md body (marker written at
    delivery). The uneducated call never executes; the retry arrives with the
    complete contract. This is one round-trip cheaper than the old
    block→read→retry loop.
+4. **Proven from the transcript**: before denying, the gate scans the
+   session transcript from the last compaction boundary for the complete
+   current body (a `/skill` slash-command delivery, compaction's
+   `invoked_skills` re-injection when not cut at 20k chars, a `file`
+   attachment, or covering Read pages) and credits it. A skill edited since
+   delivery never matches; any scan failure credits nothing
+   (`lib/skill-read-evidence.js`).
 
 Markers are evidence about what is IN CONTEXT, so they expire when the
 context does: startup/resume (a new segment) kills all of them plus the
@@ -389,16 +399,18 @@ actually touches again.
 ```mermaid
 flowchart TB
     SPAWN["segment boundary:<br/>planning contracts injected whole"]
-    READ["agent reads it whole:<br/>full Read / bare cat / Skill tool<br/>(sed slices earn nothing)"]
+    READ["agent reads it whole:<br/>Read pages covering every line / bare cat / Skill tool<br/>(sed slices earn nothing)"]
+    SCAN["would-block path: transcript since last<br/>compact_boundary holds the current body"]
     GATE["gate denies, message = full SKILL.md<br/>(deny-with-body)"]
     M[("per-segment marker<br/>/tmp/agent-skill-read-&lt;gid&gt;-&lt;skill&gt;")]
     CALL{"companion-script call:<br/>owning skill's marker present?"}
     RUN["script executes"]
-    PTR["deny with read-in-full pointer,<br/>no marker until the full read"]
+    PTR["deny with read-in-pages pointer,<br/>no marker until every line is covered"]
     EXP["expiry: startup/resume → all markers;<br/>compact/clear → read markers;<br/>claude -p children ignored"]
     SPAWN --> M
     READ --> M
     GATE --> M
+    SCAN --> M
     M -.attests.-> CALL
     CALL -->|yes| RUN
     CALL -->|"no, body ≤ 50KB"| GATE
@@ -418,7 +430,7 @@ done.
 |---|---|---|
 | Status gates | `require-plan-before-developing.sh` | No Developing until ingestion evidence (`asana-get-context.sh` ran, attachments downloaded) AND the plan doc exist |
 | | `require-concession-validation.sh` | A block or a downgrade-finalize needs a fresh concession-validator verdict bound to the exact reason |
-| | `require-followup-scope-on-complete.sh` | Complete needs a fresh live scope check: no newer operator comments unaddressed, zero blocking threads, reviewer bots concluded, watermark last |
+| | `require-followup-scope-on-complete.sh` | Complete needs a fresh live scope check: no newer operator comments unaddressed, zero blocking threads, reviewer bots concluded, watermark last; refreshes the check itself when only the run's own comments postdate it |
 | | `require-continuation-or-block.sh` (Stop) | A turn may not end except at Complete or a validated block |
 | | `require-tdd-current.sh` | TDD-flagged tasks keep the design doc current before finalize |
 | PR / git gates | `git-history-gate.sh` | Commits go through `lint-commit.sh`; no raw `git commit`, no `--no-verify` |
@@ -440,11 +452,12 @@ done.
 | | `slack-prose-gate.sh` | Outbound Slack text passes the shared lint with the judge tier; brevity nudge over ~900 chars |
 | Hygiene / injectors | `no-interactive-prompt.sh` | No AskUserQuestion in hands-off runs; pick the defensible default |
 | | `no-self-respawn.sh` | No ScheduleWakeup/CronCreate/`claude --resume` self-respawn |
-| | `block-piped-watcher-scripts.sh` | Watcher status scripts run bare (pipes silently masked their exit codes); gated-claim commands hard-block instead of rewriting |
+| | `guard-piped-watcher-scripts.sh` | Watcher status scripts run bare (pipes silently masked their exit codes); gated-claim commands hard-block instead of rewriting |
 | | `mark-agent-authored-asana.sh` | In-flight-run Asana prose carries the 🥋/👊 authorship markers; operator-context text stays unmarked |
+| | `record-own-asana-story.sh` (PostToolUse) | Records the story gid of each in-flight run's own MCP comment so the Complete gate can tell it from operator scope (`asana-task-update.sh --comment-file` records the script path) |
 | | `require-skill-for-file.sh` | A file whose NAME has an owning skill (AGENTS.md: agents-md, every session; CHANGELOG.md: changelog, orch runs) is written only after that skill entered context; deny-with-body via the shared gate library, one table for all such files |
 | | `lint-md-on-write.sh` | Markdown written outside the internal allowlist passes the mechanical no-slop tier on every vector (Write, Edit, redirect, tee, sed -i, perl -pi); CHANGELOG.md targets also pass the changelog entry-shape lint (length cap, mechanism tails, second sentences) |
-| | `require-skill-read-for-scripts.sh` + `mark-skill-read.sh` | A skill's companion script runs only after its SKILL.md FULLY entered context; the deny message delivers the complete body itself (deny-with-body) and writes the marker, so the retry passes educated. Marking is strict: full Read (no offset/limit), bare `cat`, Skill tool, or gate/session-start injection; partial reads (sed slices, cat piped to head) earn nothing. Bodies over 50KB (one-shot, pr-land) fall back to a read-in-full pointer without a marker |
+| | `require-skill-read-for-scripts.sh` + `mark-skill-read.sh` | A skill's companion script runs only after its SKILL.md FULLY entered context; the deny message delivers the complete body itself (deny-with-body) and writes the marker, so the retry passes educated, and states that the whole Bash command was cancelled. Marking is strict and content-checked against the current file: Read pages covering every line (a token-capped Read counts only the lines it returned), a `cat` whose unaltered stdout holds the body, Skill tool, or gate/session-start injection; partial reads (sed slices, cat piped to head or redirected) earn nothing. Before denying, the gate credits a body the transcript proves is in context since the last compaction (slash-command delivery, uncut `invoked_skills` re-injection, covering Read pages). `--help`/`-h`-only invocations are exempt. Bodies over 50KB (one-shot, pr-land) fall back to a read-in-pages pointer without a marker |
 | | `mark-playbook-read.sh` | Records the playbook read the drive gate requires |
 | | `nudge-asana-mcp.sh` | Steers bulk Asana reads to the cheaper script path |
 | | `block-raw-asana-api.sh` | Raw Asana API calls go through the sanctioned scripts (ingestion with attachment download, field reads, writes, scope checks) |
@@ -775,7 +788,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`pr-address.sh`](.cursor/skills/pr-address/scripts/pr-address.sh) | Fetch unresolved feedback (with an obligation trailer so filtered JSON cannot hide review bodies), reply, resolve, mark addressed; outbound bodies linted |
 | [`github-pr-review.sh`](.cursor/skills/pr-review/scripts/github-pr-review.sh) | Fetch PR context and submit reviews; review bodies linted at submit |
 | [`pr-finalize-fixups.sh`](.cursor/skills/pr-finalize-fixups.sh) | Finalize fixup commits before the ready flip |
-| [`git-branch-ops.sh`](.cursor/skills/git-branch-ops.sh) | Shared deterministic autosquash and push operations |
+| [`git-branch-ops.sh`](.cursor/skills/git-branch-ops.sh) | Shared deterministic history ops: `fold-one` (one fixup into its target), whole-branch `autosquash`, condense, push, and the `fold-mode` oracle that reads the operator rewrite-approval note's `Targets:` scope |
 
 ### PR landing pipeline (`/pr-land`)
 

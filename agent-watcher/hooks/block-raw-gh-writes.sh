@@ -11,7 +11,11 @@
 #   1. `gh pr create` WITHOUT --draft  -> pr-create.sh (draft dep PRs are
 #      sanctioned raw, per one-shot dep-pr-draft-vs-bump / pre-pr-gate header)
 #   2. `gh pr comment` / `gh pr review` -> pr-address.sh / github-pr-review.sh
-#   3. `gh api` WRITES to comment/review endpoints (POST/PATCH/DELETE shapes)
+#   3. `gh pr edit` carrying --body/--body-file/--title -> the PR body is the
+#      test-evidence surface (pr-evidence-table.js sentinels) and a prose
+#      surface the creation funnel lints; a raw edit skips both. Structural
+#      edits (labels, base, reviewers) carry no prose and stay allowed.
+#   4. `gh api` WRITES to comment/review endpoints (POST/PATCH/DELETE shapes)
 #      -> same scripts. Reads (bare GET listings) stay allowed. DELETE is
 #      matched too: the sanctioned retraction is pr-address.sh delete-comment,
 #      which is author-scoped to currentUser, so an agent can clean up its own
@@ -21,26 +25,50 @@
 # block-raw-thread-resolve.sh owns resolveReviewThread; extend here if a
 # graphql-comment substitution ever shows up.
 #
-# Scope: no-ops unless AGENT_TASK_GID is set. Companion scripts are exempt by
-# path. Exit 0 allow, exit 2 block.
+# Scope: EVERY session, orchestrated or chat. The funnels carry the same gates
+# either way, and a chat session skips them just as easily. Companion scripts
+# are exempt by DIRECTORY, so a script added under those roots is covered
+# without editing a name list here. Exit 0 allow, exit 2 block.
 set -uo pipefail
 
-[ -n "${AGENT_TASK_GID:-}" ] || exit 0
 
-CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
+# Read the payload ONCE: stdin is consumable, and both the command and the
+# cwd (used to resolve which repo this targets) come out of it.
+INPUT=$(cat)
+CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
 
 # Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
 # backticked spans blanked): a command that merely QUOTES a trigger string
 # must not fire this hook. Fail-open to the raw command if the helper is
 # unavailable.
+# Scope: EdgeApp repos only. The sanctioned funnels this gate redirects to
+# (pr-address.sh, github-pr-review.sh, pr-create.sh) are Edge-specific, so
+# applying it to another orchestrator's repos blocks work with no compliant
+# path. Resolution order: a repo named in the command, else the cwd's origin
+# remote. Unresolvable means fail open, never block work this gate cannot own.
+gh_target_is_edge() {
+  local cmd="$1" cwd="$2" named
+  named=$(printf '%s' "$cmd" | grep -oE '(repos/|--repo[ =]+)([A-Za-z0-9_.-]+)/[A-Za-z0-9_.-]+' | head -1 \
+          | sed -E 's#(repos/|--repo[ =]+)##')
+  if [ -n "$named" ]; then
+    case "$named" in EdgeApp/*) return 0 ;; *) return 1 ;; esac
+  fi
+  [ -n "$cwd" ] || return 1
+  local remote
+  remote=$(cd "$cwd" 2>/dev/null && git remote get-url origin 2>/dev/null) || return 1
+  case "$remote" in *EdgeApp/*|*EdgeApp.git*) return 0 ;; *) return 1 ;; esac
+}
+
+CWD_IN=$(printf '%s' "${INPUT:-}" | jq -r '.cwd // empty' 2>/dev/null || true)
+gh_target_is_edge "$CMD" "$CWD_IN" || exit 0
+
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
 # Sanctioned scripts first — they invoke gh internally (invisible here), so
 # this exempts mixed commands that both run a script and match a trigger.
 case "$CMD" in
-  *pr-create.sh*|*pr-address.sh*|*github-pr-review.sh*|*github-pr-comments.sh*|\
-  *pr-finalize-fixups.sh*|*pr-land*|*bugbot*/scripts/*) exit 0 ;;
+  *".cursor/skills/"*|*".config/agent-watcher/"*) exit 0 ;;
 esac
 
 block() {
@@ -60,6 +88,15 @@ fi
 # anywhere in the raw command (endpoints sit inside quotes) AND an actual
 # `gh api` invocation AND a write marker in the stripped view. gh api defaults
 # to POST when -f/-F fields are present.
+if printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])gh[[:space:]]+pr[[:space:]]+edit([[:space:]]|$)' && \
+   printf '%s' "$CMD_M" | grep -qE '(^|[[:space:]])--(body|body-file|title)([[:space:]]|=|$)'; then
+  block "raw \`gh pr edit --body/--body-file/--title\` is forbidden — the PR body carries the test-evidence table between its sentinels, and a raw rewrite can drop it and skips the no-slop prose lint. Use instead:
+  add/refresh test evidence: ~/.cursor/skills/pr-create/scripts/pr-attach-screenshots.sh --repo <owner/repo> --pr <num> [--commit <sha-or-subject>] <png...>
+  convert a PR's legacy screenshot comments: ~/.cursor/skills/pr-create/scripts/pr-evidence-migrate.sh --repo <owner/repo> --pr <num> --apply
+  create the PR (owns the templated, linted body): ~/.cursor/skills/pr-create/scripts/pr-create.sh
+Structural edits (--add-label, --base, --add-reviewer) are not blocked."
+fi
+
 if echo "$CMD" | grep -qE '(issues|pulls)/[0-9]+/(comments|reviews)|issues/comments/[0-9]+|pulls/comments/[0-9]+'; then
   if printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])gh[[:space:]]+api([[:space:]]|$)' && \
      printf '%s' "$CMD_M" | grep -qE '(^|[[:space:]])(-f|-F|--field|--raw-field|--input)([[:space:]]|$|=)|--method[[:space:]=]+(POST|PATCH|DELETE)|-X[[:space:]]+(POST|PATCH|DELETE)'; then

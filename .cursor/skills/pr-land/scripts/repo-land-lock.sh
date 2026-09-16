@@ -11,6 +11,15 @@
 #   acquire --repo R --owner O [--ttl 1800]
 #       free, or expired, or already OURS (renew)  -> exit 0
 #       held by another live owner                 -> exit 75 (EX_TEMPFAIL: wait+retry)
+#   renew   --repo R --owner O [--ttl 1800]
+#       held by O and unexpired -> extend TTL, exit 0
+#       held by another owner, or O's lease already expired (reapable) -> exit 1
+#       no lease file (nothing held)  -> exit 3, silent
+#     Long waits inside a land (verify-repo.sh steps, pr-merge-watch.sh and
+#     watch-pr.sh polls) call renew so a live train never outlives its TTL; a
+#     dead session stops renewing and its lease still expires. Renew never
+#     resurrects an expired lease: another session may already be reaping it,
+#     so the caller re-acquires instead.
 #   release --repo R --owner O    only the owner releases; missing lock is fine -> exit 0
 #   status  --repo R              prints the lock JSON or "free"
 #
@@ -30,7 +39,7 @@ while [[ $# -gt 0 ]]; do
     *) echo "repo-land-lock: unknown arg $1" >&2; exit 2 ;;
   esac
 done
-[[ -n "$CMD" && -n "$REPO" ]] || { echo "usage: repo-land-lock.sh <acquire|release|status> --repo <name> [--owner <id>] [--ttl <s>]" >&2; exit 2; }
+[[ -n "$CMD" && -n "$REPO" ]] || { echo "usage: repo-land-lock.sh <acquire|renew|release|status> --repo <name> [--owner <id>] [--ttl <s>]" >&2; exit 2; }
 REPO="${REPO##*/}"   # accept owner/name, key by name
 LOCK="$STATE_DIR/$REPO.json"
 mkdir -p "$STATE_DIR"
@@ -63,6 +72,22 @@ case "$CMD" in
       jq -c --argjson ex "$((NOW+TTL))" '.expires=$ex' "$LOCK" > "$LOCK.tmp" 2>/dev/null && mv "$LOCK.tmp" "$LOCK"
     fi
     echo "repo-land-lock: $REPO leased to $OWNER for ${TTL}s"
+    ;;
+  renew)
+    [[ -n "$OWNER" ]] || { echo "repo-land-lock: renew needs --owner" >&2; exit 2; }
+    [[ -f "$LOCK" ]] || exit 3
+    CUR_OWNER=$(jq -r '.owner // ""' "$LOCK" 2>/dev/null || echo "")
+    EXPIRES=$(jq -r '.expires // 0' "$LOCK" 2>/dev/null || echo 0)
+    if [[ "$CUR_OWNER" != "$OWNER" ]]; then
+      echo "repo-land-lock: NOT renewing $REPO: held by ${CUR_OWNER:-<unreadable>}, not $OWNER" >&2
+      exit 1
+    fi
+    # 5s margin: an acquire racing the expiry may be reaping this file right now.
+    if [[ $((NOW + 5)) -ge "$EXPIRES" ]]; then
+      echo "repo-land-lock: NOT renewing $REPO: lease owned by $OWNER is expired (expires=$EXPIRES, now=$NOW); re-acquire" >&2
+      exit 1
+    fi
+    jq -c --argjson ex "$((NOW+TTL))" '.expires=$ex' "$LOCK" > "$LOCK.tmp.$$" 2>/dev/null && mv "$LOCK.tmp.$$" "$LOCK" || { rm -f "$LOCK.tmp.$$"; exit 1; }
     ;;
   release)
     if [[ -f "$LOCK" ]]; then

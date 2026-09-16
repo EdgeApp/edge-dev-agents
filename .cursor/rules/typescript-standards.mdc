@@ -283,4 +283,11 @@ For generic error message extraction:
 ✅ `e instanceof Error ? e.message : String(e)`
 </pattern>
 
+<pattern id="jsx-duplicate-props" rule="react/jsx-no-duplicate-props">A JSX element carries the same prop twice; `tsc` reports it as TS17001.
+Cause: usually a rebase. Two branches each added the same attribute (most often `testID`) to one element, and git merged both lines with no textual conflict, so only the typecheck or this rule catches it.
+Fix: keep exactly one. When the base branch added its own value, keep the base's and move this branch's callers (maestro selectors, tests) onto it, since the base owns the component going forward.
+❌ `<SimpleTextInput testID={`searchFooter.${name}`} ... testID={name} />`
+✅ `<SimpleTextInput ... testID={name} />` with the walk selecting `${name}.textInput`
+</pattern>
+
 </lint-fix-patterns>

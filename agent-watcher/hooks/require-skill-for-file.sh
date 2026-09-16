@@ -22,7 +22,11 @@
 # Key: AGENT_TASK_GID in orch runs; sess-<session_id> for all-scope rows in
 # interactive sessions (mark-skill-read.sh writes the same key there). A
 # marker lasts the run segment (inject-run-context.sh expires gid markers at
-# segment and compaction boundaries) or the interactive session.
+# segment and compaction boundaries) or the interactive session. On the
+# would-block path the transcript is scanned for proof the current body is
+# already in context (skill_read_credit_from_transcript: slash-command
+# delivery, post-compaction re-injection, paged Reads), which writes the
+# marker and allows.
 #
 # No escape hatch: the denial is the remedy, one round trip, so a loop only
 # occurs if the agent refuses the body. Exit 0 allow, exit 2 block.
@@ -55,7 +59,7 @@ case "$TOOL" in
     CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)
     while IFS=: read -r base _ _; do
       [ -n "$base" ] || continue
-      TARGET=$(bash_write_target "$CMD_M" "$CWD" "$base")
+      TARGET=$(bash_write_target "$CMD_M" "$CWD" "$base" "$CMD")
       # Inline interpreter writes hide the path in the script body (see
       # md-write-target.sh); retry on the raw command for that vector only.
       if [ -z "$TARGET" ] && printf '%s' "$CMD_M" | grep -qE "(^|[[:space:]|;&(])(python3?|node)[[:space:]]+(-[[:space:]]*<<|-c[[:space:]]|-e[[:space:]])"; then
@@ -87,6 +91,8 @@ else
   exit 0
 fi
 
+[ -n "$(skill_read_missing "$SKILL")" ] || exit 0
+skill_read_credit_from_transcript "$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null || true)" "$SKILL"
 [ -n "$(skill_read_missing "$SKILL")" ] || exit 0
 {
   echo "BLOCKED: $TARGET is owned by the \`$SKILL\` skill and its contract has not entered this session's context yet. The full skill is below; it now counts as read. Apply it, then retry the write (the retry passes this gate)."

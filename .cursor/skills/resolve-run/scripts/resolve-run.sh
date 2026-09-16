@@ -117,6 +117,19 @@ asana_followup() { # $1=gid → {last_report_attached_at, prev_report_attached_a
       subtasks: [ $t.data[]? | {gid, name, completed, created_at} ] }' 2>/dev/null || echo "$empty"
 }
 
+# PR fallback when no transcript survives (session files get pruned): the GitHub
+# widget attaches each PR as an `external` attachment whose view_url is the PR,
+# on the task or on its per-repo subtask. Same five-URL cap as the transcript grep.
+asana_pr_attachments() { # $1=gid $2=followup JSON (for subtask gids) → JSON array of PR URLs
+  local gid="$1" token g
+  token="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$CRED" 2>/dev/null)}"
+  [ -n "$token" ] || { echo "[]"; return 0; }
+  for g in "$gid" $(echo "$2" | jq -r '.subtasks[]?.gid' 2>/dev/null); do
+    curl -sf --max-time 20 "https://app.asana.com/api/1.0/tasks/$g/attachments?opt_fields=resource_subtype,view_url" -H "Authorization: Bearer $token" 2>/dev/null \
+      | jq -r '.data[]? | select(.resource_subtype == "external") | .view_url // empty' 2>/dev/null || true
+  done | { grep -oE '^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/pull/[0-9]+$' || true; } | sort -u | head -5 | jq -R . | jq -cs . 2>/dev/null || echo "[]"
+}
+
 find_transcript() { # $1=gid → newest RUN jsonl whose FIRST asana URL gid equals the target
   # (mirrors resume-task.sh's first-URL semantics: a later MENTION of the gid in
   #  another session must not match — six runs once resolved to one shared
@@ -272,6 +285,16 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
   [ -n "$asana" ] || asana='{"name":null,"status":null,"blocked":null}'
   local followup; followup=$(asana_followup "$gid" || true)
   [ -n "$followup" ] || followup='{"last_report_attached_at":null,"prev_report_attached_at":null,"comments_after_prev_report":[],"subtasks":[]}'
+  # Union with the Asana PR attachments: the newest surviving transcript can
+  # predate a later segment's PRs, or be gone entirely.
+  local asana_prs prs_source
+  asana_prs=$(asana_pr_attachments "$gid" "$followup" || true)
+  [ -n "$asana_prs" ] || asana_prs="[]"
+  prs_source=$(jq -rn --argjson t "$prs" --argjson a "$asana_prs" '
+    [ (if ($t | length) > 0 then "transcript" else empty end),
+      (if ($a - $t | length) > 0 then "asana-attachments" else empty end) ]
+    | if length == 0 then "none" else join("+") end')
+  prs=$(jq -cn --argjson t "$prs" --argjson a "$asana_prs" '$t + ($a - $t)')
 
   local slot
   slot=$(node "$HOME/.config/agent-watcher/lib/slots.js" get --task-gid "$gid" 2>/dev/null | jq -c . 2>/dev/null || true)
@@ -327,23 +350,36 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
   # Orch-version stamps: one line per spawn/resume segment (stamp-orch-version.sh).
   # Lets evals slice findings by the orch version actually in force per segment, and
   # makes "run predates rule X" determinations mechanical via repo_head.
+  local versions="[]"
+  if [ -r "$STATE_DIR/versions/$gid.jsonl" ]; then
+    versions=$(jq -cs . "$STATE_DIR/versions/$gid.jsonl" 2>/dev/null || echo "[]")
+    [ -n "$versions" ] || versions="[]"
+  fi
   # Era split (agent-eval/references/era.md rows in effect vs not yet for this
-  # run, keyed on the window end, else the spawn time) and zero-LLM commit-shape
-  # facts per PR, so graders read Before/After and fixup counts from the
-  # manifest instead of comparing dates or re-reading git log.
-  local era="{}" pr_commit_stats="[]"
-  era=$("$HOME/.cursor/skills/agent-eval/scripts/era.sh" "${win_end:-$spawned}" 2>/dev/null || echo "{}")
+  # run) and zero-LLM commit-shape facts per PR, so graders read Before/After and
+  # fixup counts from the manifest instead of comparing dates or re-reading git log.
+  # The era date is the LATEST of: transcript window end, watchdog retirement,
+  # last run-report attachment, last version stamp (the newest surviving
+  # transcript can predate a later segment); the spawn hint only when none of
+  # those exist. An empty date puts every era row in effect, which mis-grades
+  # any run older than the newest row.
+  local era="{}" pr_commit_stats="[]" era_asof="" era_source="none" era_pick
+  era_pick=$(jq -rn --arg w "$win_end" --argjson r "$release_receipt" --argjson f "$followup" --argjson v "$versions" --arg s "$spawned" '
+    [ {src: "window_end", at: $w},
+      {src: "release_receipt", at: ($r.retired_at? // "")},
+      {src: "report_attached", at: ($f.last_report_attached_at // "")},
+      {src: "version_stamp", at: ([$v[]?.ts // empty] | max // "")} ]
+    | map(select(.at != ""))
+    | if length > 0 then max_by(.at) else ({src: "spawned_at", at: $s} | select(.at != "")) end
+    | .src + " " + .at' 2>/dev/null || true)
+  if [ -n "$era_pick" ]; then era_source="${era_pick%% *}"; era_asof="${era_pick#* }"; fi
+  era=$("$HOME/.cursor/skills/agent-eval/scripts/era.sh" "$era_asof" || echo "{}")
   [ -n "$era" ] || era="{}"
   if [ "$prs" != "[]" ]; then
     pr_commit_stats=$(echo "$prs" | jq -r '.[]' | while read -r u; do "$HOME/.cursor/skills/resolve-run/scripts/pr-commit-stats.sh" "$u" 2>/dev/null || true; done | jq -cs . 2>/dev/null || echo "[]")
     [ -n "$pr_commit_stats" ] || pr_commit_stats="[]"
   fi
 
-  local versions="[]"
-  if [ -r "$STATE_DIR/versions/$gid.jsonl" ]; then
-    versions=$(jq -cs . "$STATE_DIR/versions/$gid.jsonl" 2>/dev/null || echo "[]")
-    [ -n "$versions" ] || versions="[]"
-  fi
   local blocker_reason="null"
   [ -r "/tmp/agent-concession-reason-$gid.txt" ] && blocker_reason=$(jq -Rs . "/tmp/agent-concession-reason-$gid.txt" 2>/dev/null || echo null)
   local blocker_verdict="null"
@@ -367,6 +403,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     --argjson judge_verdict "$judge_verdict" --argjson judge_log "$judge_log" \
     --argjson followup "$followup" --argjson probe_index "$probe_index" \
     --argjson versions "$versions" --argjson era "$era" --argjson pr_commit_stats "$pr_commit_stats" \
+    --arg prs_source "$prs_source" --arg era_source "$era_source" \
     --argjson forensics "$forensics" --arg state_dir "$STATE_DIR" --arg watchdog_log "$WATCHDOG_LOG" --arg watcher_log "$WATCHER_LOG" \
     --argjson runaway_log_exists "$([ -f "$STATE_DIR/runaway-guard.log" ] && echo true || echo false)" \
     '{
@@ -391,6 +428,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       versions: $versions,
       era: $era,
       pr_commit_stats: $pr_commit_stats,
+      evidence_sources: { prs: $prs_source, era_as_of: $era_source },
       friction: ($probe_index.friction // {}),
       probe_index: ($probe_index | del(.friction)),
       auto_na: ( {}

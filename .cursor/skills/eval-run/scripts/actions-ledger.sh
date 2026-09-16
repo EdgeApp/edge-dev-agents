@@ -14,7 +14,7 @@
 #   actions-ledger.sh snapshot                       # JSON: open classes with computed
 #                                                    #   recurrence, for the synthesizer prompt
 #   actions-ledger.sh record --cohort <date> --actions <file.json>
-#       file: [{class_id, type, title, tier?, dims?, gids?, window_ends?}] as the
+#       file: [{class_id, type, title, owner?, tier?, dims?, gids?, window_ends?}] as the
 #       workflow returned them; merges into the ledger (new ids created, known ids
 #       gain the cohort and its gids)
 #   actions-ledger.sh set <class_id> <proposed|approved|built|declined> [--ref <text>] [--date <YYYY-MM-DD>]
@@ -58,7 +58,7 @@ exec node -e '
   if(cmd==="tier-of"){const t=tierOf((argv[0]||"").split(","));if(t===null)die("no tier for "+argv[0]);console.log(t);process.exit(0)}
   if(cmd==="snapshot"){
     const l=load(); const open=Object.values(l.classes).filter(c=>c.status!=="declined").map(computed).sort(order);
-    console.log(JSON.stringify({tiers:tiers.map(t=>({tier:t.tier,name:t.name})),classes:open.map(c=>({id:c.id,tier:c.tier,type:c.type,title:c.title,dims:c.dims,status:c.status,recurrence:c.recurrence,recurrence_since_fix:c.recurrence_since_fix,approved_unbuilt:c.approved_unbuilt,regressed:c.regressed,cohorts:c.cohorts,fixed_at:c.fixed_at||null,fixed_ref:c.fixed_ref||null}))}));
+    console.log(JSON.stringify({tiers:tiers.map(t=>({tier:t.tier,name:t.name})),classes:open.map(c=>({id:c.id,tier:c.tier,type:c.type,title:c.title,owner:c.owner||null,dims:c.dims,status:c.status,recurrence:c.recurrence,recurrence_since_fix:c.recurrence_since_fix,approved_unbuilt:c.approved_unbuilt,regressed:c.regressed,cohorts:c.cohorts,fixed_at:c.fixed_at||null,fixed_ref:c.fixed_ref||null}))}));
     process.exit(0);
   }
   if(cmd==="record"){
@@ -71,7 +71,8 @@ exec node -e '
       const dims=Array.isArray(a.dims)?a.dims:[]; let c=l.classes[id];
       let tier=a.tier!=null?+a.tier:tierOf(dims); if(tier===null&&c)tier=c.tier;
       if(!(tier>=1&&tier<=4)){console.error("skip "+id+": no tier (give tier or dims)");continue}
-      if(!c){c=l.classes[id]={id,tier,type:a.type||"infra-fix",title:a.title||id,dims,status:"proposed",first_seen:cohort,cohorts:[],runs:{}};created++}else updated++;
+      if(!c){c=l.classes[id]={id,tier,type:a.type||"infra-fix",title:a.title||id,owner:a.owner||null,dims,status:"proposed",first_seen:cohort,cohorts:[],runs:{}};created++}else updated++;
+      if(a.owner)c.owner=a.owner;
       if(!c.cohorts.includes(cohort))c.cohorts.push(cohort);
       for(const d of dims)if(!c.dims.includes(d))c.dims.push(d);
       const gids=Array.isArray(a.gids)?a.gids:[]; const we=a.window_ends||{};
@@ -101,7 +102,7 @@ exec node -e '
       out.push("### Tier "+t.tier+": "+t.name);
       for(const c of rows){
         const flag=c.approved_unbuilt?"APPROVED, UNBUILT":c.regressed?"REGRESSED after "+c.fixed_at:c.status==="built"?"built "+c.fixed_at+(c.fixed_ref?" ("+c.fixed_ref+")":""):c.status;
-        out.push("- ["+c.type+"] `"+c.id+"` "+c.title+" | "+flag+" | "+c.recurrence_since_fix+" run(s) since fix, "+c.recurrence+" total across "+c.cohorts.length+" cohort(s)"+(c.dims.length?" | "+c.dims.join(", "):""));
+        out.push("- ["+c.type+"] `"+c.id+"`"+(c.owner?" ("+c.owner+")":"")+" "+c.title+" | "+flag+" | "+c.recurrence_since_fix+" run(s) since fix, "+c.recurrence+" total across "+c.cohorts.length+" cohort(s)"+(c.dims.length?" | "+c.dims.join(", "):""));
       }
       out.push("");
     }

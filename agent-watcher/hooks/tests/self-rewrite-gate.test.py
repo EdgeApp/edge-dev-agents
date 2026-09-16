@@ -18,6 +18,18 @@ easy to break later:
   6. git-history-gate.sh runs the check on a raw `git push` only when the
      review-mode oracle says autosquash; preserve mode keeps its own block.
 
+Also covered, because an operator rewrite approval is not blanket permission:
+
+  7. fold-mode reads the note's `Targets:` scope against the fixup's target:
+     named (full or abbreviated) folds, `all` approves the whole branch,
+     a target the note does not name keeps its fixup, and the legacy note with
+     no `Targets:` line folds one fixup and never the branch.
+  8. fold-one squashes exactly ONE fixup into its target and leaves every other
+     pending fixup alone; it exits 1 on a target that is not on the branch, a
+     non-fixup commit, a detached HEAD, and a conflict (aborted, fixup kept).
+     git-history-gate.sh allows a whole-branch autosquash only on `Targets: all`
+     while still allowing the push on any note.
+
 Repos are synthetic (a bare "origin" plus a clone); the oracle and gh are
 stubbed via a temp HOME and a PATH shim, so nothing touches the network.
 """
@@ -200,17 +212,24 @@ try:
     rc, err = hook(f'cd {repo} && git push --force-with-lease origin feature', home, shim)
     check('preserve mode + operator rewrite approval allows the push', rc == 0, f'rc={rc} {err[:200]}')
     rc, err = hook(f'cd {repo} && git rebase -i --autosquash origin/master', home, shim)
-    check('preserve mode + operator rewrite approval allows the autosquash', rc == 0, f'rc={rc} {err[:200]}')
+    check('preserve mode + an UNSCOPED approval still blocks the whole-branch autosquash',
+          rc == 2 and 'does not cover it' in err, f'rc={rc} {err[:200]}')
+    with open(approval, 'w') as fh:
+        fh.write('operator comment gid 1: rewrite approved\nTargets: all\n')
+    rc, err = hook(f'cd {repo} && git rebase -i --autosquash origin/master', home, shim)
+    check('preserve mode + an approval saying Targets: all allows the autosquash',
+          rc == 0, f'rc={rc} {err[:200]}')
     os.remove(approval)
     rc, err = hook(f'cd {repo} && git rebase -i --autosquash origin/master', home, shim)
     check('without the approval the preserve squash block returns', rc == 2, f'rc={rc}')
 
     # ---- fold-mode (lint-commit's post-fixup decision) ----------------------
-    def fold_mode(gid=GID):
+    def fold_mode(gid=GID, cwd=None, target=None):
         env = dict(GIT_ENV, HOME=home, PATH=shim + ':' + os.environ['PATH'])
         if gid:
             env['AGENT_TASK_GID'] = gid
-        p = subprocess.run([OPS, 'fold-mode'], cwd=repo, capture_output=True, text=True, env=env)
+        args = [OPS, 'fold-mode'] + (['--target', target] if target else [])
+        p = subprocess.run(args, cwd=cwd or repo, capture_output=True, text=True, env=env)
         return json.loads(p.stdout.strip())
     with open(mode_file, 'w') as fh:
         fh.write('preserve')
@@ -229,6 +248,142 @@ try:
         fh.write('#!/bin/bash\nexit 1\n')
     d = fold_mode()
     check('fold-mode: no PR -> fold (fail open)', d['fold'] is True and d['mode'] == 'no-pr', d)
+
+    # ---- the approval is scoped, and a fold is ONE fixup --------------------
+    # The reported failure: an operator note approving one rewrite was read as
+    # blanket permission, and the whole-branch autosquash under it squashed a
+    # fixup the reviewer had not seen.
+    with open(os.path.join(shim, 'gh'), 'w') as fh:       # restore the PR stub
+        fh.write('#!/bin/bash\necho \'{"number":7,"headRepositoryOwner":{"login":"o"},"headRepository":{"name":"r"}}\'\n')
+    os.chmod(os.path.join(shim, 'gh'), 0o755)
+    with open(mode_file, 'w') as fh:
+        fh.write('preserve')
+
+    def two_fixup_repo(name):
+        """A pushed branch with targets A and B, each carrying one pending fixup."""
+        org, wt = os.path.join(tmp, name + '.git'), os.path.join(tmp, name)
+        sh(f'git init -q --bare -b master {org}', tmp)
+        sh(f'git clone -q {org} {wt}', tmp)
+        write(wt, 'base.txt', ['base'])
+        commit(wt, 'Base file', 'base.txt')
+        sh('git push -q origin master', wt)
+        sh('git checkout -q -b feature', wt)
+        write(wt, 'a.txt', [f'a {i}' for i in range(5)])
+        ta = commit(wt, 'Add surface A', 'a.txt')
+        write(wt, 'b.txt', [f'b {i}' for i in range(5)])
+        tb = commit(wt, 'Add surface B', 'b.txt')
+        sh('git push -q -u origin feature', wt)
+        write(wt, 'a.txt', [f'a {i} fixed' if i < 2 else f'a {i}' for i in range(5)])
+        fa = commit(wt, 'fixup! Add surface A', 'a.txt')
+        write(wt, 'b.txt', [f'b {i} fixed' if i < 2 else f'b {i}' for i in range(5)])
+        fb = commit(wt, 'fixup! Add surface B', 'b.txt')
+        return wt, ta, tb, fa, fb
+
+    def note(*lines):
+        with open(approval, 'w') as fh:
+            fh.write('Operator comment 1234567890 approved this rewrite.\n' + ''.join(l + '\n' for l in lines))
+
+    fr, ta, tb, fa, fb = two_fixup_repo('scoped')
+
+    note(f'Targets: {ta}')
+    d = fold_mode(cwd=fr, target=ta)
+    check('fold-mode: note names this target -> fold one fixup',
+          d['fold'] is True and d['whole_branch'] is False and d['approved_targets'] == [ta]
+          and 'names this fixup target' in d['reason'], d)
+    d = fold_mode(cwd=fr, target=tb)
+    check('fold-mode: note does not name this target -> keep the fixup',
+          d['fold'] is False and d['approved_targets'] == [ta] and 'does not cover' in d['reason'], d)
+    d = fold_mode(cwd=fr)
+    check('fold-mode: scoped note, no --target -> keep the fixup', d['fold'] is False, d)
+
+    note(f'Targets: {ta[:8]}')
+    d = fold_mode(cwd=fr, target=ta)
+    check('fold-mode: an abbreviated sha in the note names the target',
+          d['fold'] is True and d['whole_branch'] is False, d)
+
+    note('Targets: all')
+    d = fold_mode(cwd=fr, target=tb)
+    check('fold-mode: Targets: all -> the whole branch is approved',
+          d['fold'] is True and d['whole_branch'] is True and d['approved_targets'] == ['all'], d)
+
+    note()  # legacy shape: cites the comment, names no targets
+    d = fold_mode(cwd=fr, target=tb)
+    check('fold-mode: unscoped note folds this one fixup, never the branch',
+          d['fold'] is True and d['whole_branch'] is False and d['approved_targets'] == []
+          and 'unscoped' in d['reason'], d)
+
+    os.remove(approval)
+    d = fold_mode(cwd=fr, target=ta)
+    check('fold-mode: no note under preserve -> keep the fixup', d['fold'] is False, d)
+
+    # fold-one: the approved fixup folds, the other one survives untouched.
+    def ops(*args, cwd=None):
+        return subprocess.run([OPS, *args], cwd=cwd or fr, capture_output=True,
+                              text=True, env=GIT_ENV)
+
+    p = ops('fold-one', '--fixup', fa)
+    subjects = sh('git log --format=%s origin/master..HEAD', fr).stdout.split('\n')
+    check('fold-one: folds the named fixup and leaves the other pending',
+          p.returncode == 0 and 'fixup! Add surface A' not in subjects
+          and 'fixup! Add surface B' in subjects
+          and subjects.count('Add surface A') == 1, f'rc={p.returncode} {subjects} {p.stderr[:200]}')
+    check('fold-one: the fold reached the target commit',
+          'a 0 fixed' in sh('git show HEAD~2:a.txt', fr).stdout, sh('git log --oneline', fr).stdout)
+    check('fold-one: the surviving fixup still holds its own change',
+          'b 0 fixed' not in sh('git show HEAD~1:b.txt', fr).stdout
+          and 'b 0 fixed' in sh('git show HEAD:b.txt', fr).stdout, '')
+
+    p = ops('fold-one', '--fixup', sh('git rev-parse HEAD', fr).stdout.strip() + '~1')
+    check('fold-one: refuses a commit that is not a fixup!',
+          p.returncode == 1 and 'not a fixup! commit' in p.stderr, f'rc={p.returncode} {p.stderr[:200]}')
+
+    write(fr, 'c.txt', ['c 0'])
+    orphan = commit(fr, 'fixup! A target that is not on this branch', 'c.txt')
+    p = ops('fold-one', '--fixup', orphan)
+    check('fold-one: target not on the branch exits 1 and keeps the fixup',
+          p.returncode == 1 and 'is not on this branch' in p.stderr
+          and sh('git log -1 --format=%s', fr).stdout.strip().startswith('fixup!'),
+          f'rc={p.returncode} {p.stderr[:200]}')
+    sh('git reset -q --hard HEAD~1', fr)
+
+    sh('git checkout -q --detach HEAD', fr)
+    p = ops('fold-one', '--fixup', sh('git rev-parse HEAD', fr).stdout.strip())
+    check('fold-one: detached HEAD exits 1', p.returncode == 1 and 'detached' in p.stderr,
+          f'rc={p.returncode} {p.stderr[:200]}')
+    sh('git checkout -q feature', fr)
+
+    # A fixup whose target was itself rewritten later conflicts; the rebase is
+    # aborted and the fixup stays where it was.
+    write(fr, 'a.txt', ['rewritten entirely'])
+    commit(fr, 'Replace surface A wholesale', 'a.txt')
+    write(fr, 'a.txt', [f'a {i} again' for i in range(5)])
+    conflicting = commit(fr, 'fixup! Add surface A', 'a.txt')
+    p = ops('fold-one', '--fixup', conflicting)
+    rebase_dir = sh('git rev-parse --git-path rebase-merge', fr).stdout.strip()
+    if not os.path.isabs(rebase_dir):
+        rebase_dir = os.path.join(fr, rebase_dir)
+    check('fold-one: a conflict aborts the rebase and leaves the fixup at HEAD',
+          p.returncode == 1
+          and sh('git log -1 --format=%H', fr).stdout.strip() == conflicting
+          and not os.path.isdir(rebase_dir),
+          f'rc={p.returncode} {p.stderr[:300]}')
+    sh('git reset -q --hard HEAD~2', fr)   # drop the conflict fixture commits
+
+    # ---- git-history-gate reads the same scope -----------------------------
+    note(f'Targets: {tb}')
+    rc, err = hook(f'cd {fr} && git rebase -i --autosquash origin/master', home, shim)
+    check('gate: a note naming targets does not allow a whole-branch autosquash',
+          rc == 2 and 'does not cover it' in err and 'fold-one' in err, f'rc={rc} {err[:300]}')
+    rc, err = hook(f'cd {fr} && git push --force-with-lease origin feature', home, shim)
+    check('gate: that same note still allows the push', rc == 0, f'rc={rc} {err[:200]}')
+    note()
+    rc, err = hook(f'cd {fr} && git rebase -i --autosquash origin/master', home, shim)
+    check('gate: an unscoped note does not allow a whole-branch autosquash either',
+          rc == 2 and 'does not cover it' in err, f'rc={rc} {err[:300]}')
+    note('Targets: all')
+    rc, err = hook(f'cd {fr} && git rebase -i --autosquash origin/master', home, shim)
+    check('gate: Targets: all allows the whole-branch autosquash', rc == 0, f'rc={rc} {err[:200]}')
+    os.remove(approval)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 

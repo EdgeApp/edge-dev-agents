@@ -6,14 +6,24 @@
 # deliveries count, because a partial read that earns the marker also
 # suppresses the gate's deny-with-body delivery, recreating the under-read
 # hole (the Cacao run credited pr-address from a 150-235 line slice).
-#   Read tool  — file_path is a skills/<name>/SKILL.md AND no offset/limit
-#   Bash       — `cat` of the SKILL.md in a command with no truncation tool
-#                (sed/head/tail/awk) anywhere in it
-#   Skill tool — the invocation injects the body wholesale
-# Partial reads earn nothing; the gate then denies the first script call and
-# delivers the full body itself (writing the marker as it does).
+#   Read tool: each Read of a skills/<name>/SKILL.md adds the lines it showed
+#                (checked line by line against the current file) to
+#                /tmp/agent-skill-read-<key>-<name>.ranges; the marker is
+#                written once every line is covered. One uncapped full Read
+#                covers everything; a Read cut at the token cap covers only
+#                the lines it returned, so paging finishes the job.
+#   Bash: `cat` of the SKILL.md whose output reaches the transcript
+#                unaltered: no truncation tool (sed/head/tail/awk) anywhere in
+#                the command, no pipe, stdout redirect, or $( ) capture on the
+#                cat, output not persisted to a side file, and stdout contains
+#                the current body.
+#   Skill tool: the invocation injects the body wholesale
+# Content checks live in lib/skill-read-evidence.js (post mode). Partial reads
+# earn nothing; the gate then scans the transcript for other proof and
+# otherwise denies and delivers the full body itself (writing the marker).
 # inject-run-context.sh pre-writes markers for the bodies it injects at
-# session start (asana-plan, task-review).
+# session start (asana-plan, task-review), and expires markers and .ranges
+# files together at segment and compaction boundaries.
 #
 # Markers: /tmp/agent-skill-read-<key>-<skill>. <key> is AGENT_TASK_GID in
 # orch runs and sess-<session_id> in interactive sessions, so the file gates
@@ -34,26 +44,31 @@ if [ -z "$KEY" ]; then
 fi
 
 mark() { touch "/tmp/agent-skill-read-$KEY-$1" 2>/dev/null || true; }
+EVIDENCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/lib/skill-read-evidence.js"
+
+# post_evidence : marks every skill the content check credits for this payload.
+post_evidence() {
+  command -v node >/dev/null 2>&1 && [ -f "$EVIDENCE" ] || return 0
+  local sk
+  for sk in $(printf '%s' "$INPUT" | node "$EVIDENCE" post "$KEY" 2>/dev/null); do
+    mark "$sk"
+  done
+}
 
 case "$TOOL" in
   Read)
     FP=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
-    RANGED=$(printf '%s' "$INPUT" | jq -r 'if (.tool_input.offset // null) != null or (.tool_input.limit // null) != null then "yes" else "no" end' 2>/dev/null || echo yes)
-    if [ "$RANGED" = "no" ] && printf '%s' "$FP" | grep -qE 'skills/[a-z0-9-]+/SKILL\.md$'; then
-      mark "$(printf '%s' "$FP" | sed -E 's|.*skills/([a-z0-9-]+)/SKILL\.md$|\1|')"
+    if printf '%s' "$FP" | grep -qE 'skills/[a-z0-9-]+/SKILL\.md$'; then
+      post_evidence
     fi
     ;;
   Bash)
     CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
-    # Full-read heuristic: a cat of the file counts unless the command also
-    # wields a truncation/slicing tool. Coarse on purpose — under-marking is
-    # cheap now (the gate backfills with the full body), over-marking is the
-    # failure mode this strictness exists to prevent.
+    # Coarse shape filter first (cheap); the content check decides. Under-
+    # marking is cheap (the gate backfills), over-marking is the failure mode.
     if printf '%s' "$CMD" | grep -qE '(^|[;&|(]|\$\()[[:space:]]*cat[[:space:]][^|;&]*skills/[a-z0-9-]+/SKILL\.md' \
        && ! printf '%s' "$CMD" | grep -qE '\b(sed|head|tail|awk)\b'; then
-      for sk in $(printf '%s' "$CMD" | grep -oE 'skills/[a-z0-9-]+/SKILL\.md' | sed -E 's|skills/([a-z0-9-]+)/SKILL\.md|\1|' | sort -u); do
-        mark "$sk"
-      done
+      post_evidence
     fi
     ;;
   Skill)

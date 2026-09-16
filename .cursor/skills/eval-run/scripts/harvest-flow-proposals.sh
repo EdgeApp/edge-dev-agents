@@ -18,6 +18,9 @@
 # Read-only outside ~/maestro-flow-corpus. Safe to re-run; safe while sessions
 # run (writes only corpus files, single flat dir).
 set -euo pipefail
+# Attachment naming lives in the orch lib; the fallback keeps this skill script
+# working on a machine without the orch (convention-sync copies skills only).
+source "$HOME/.config/agent-watcher/lib/attach-names.sh" 2>/dev/null || REPORT_ATTACH_RE='^([0-9]+-)?agent-run-report.*\.md$'
 
 DAYS=14
 while [ $# -gt 0 ]; do case "$1" in
@@ -89,7 +92,7 @@ if [ -n "$TOKEN" ]; then
     resp=$(curl -sf --max-time 20 \
       "https://app.asana.com/api/1.0/tasks/$gid/attachments?opt_fields=name,created_at,download_url" \
       -H "Authorization: Bearer $TOKEN" 2>/dev/null) || continue
-    read -r url created < <(echo "$resp" | jq -r '[.data[] | select(.name | startswith("agent-run-report"))] | sort_by(.created_at) | last | "\(.download_url) \(.created_at)"' 2>/dev/null) || true
+    read -r url created < <(echo "$resp" | jq -r --arg re "$REPORT_ATTACH_RE" '[.data[] | select(.name | test($re))] | sort_by(.created_at) | last | "\(.download_url) \(.created_at)"' 2>/dev/null) || true
     [ -n "${url:-}" ] && [ "$url" != "null" ] || continue
     out="$CORPUS/proposals/$gid.md"
     # skip when we already harvested this attachment vintage

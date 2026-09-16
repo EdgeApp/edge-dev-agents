@@ -23,7 +23,9 @@
 #      report doc, updated and re-attached in place (stable slug/ordinal). A
 #      second doc with a different slug splinters the record (2 runs in the
 #      2026-08-19 cohort attached parallel report docs). Cross-segment followup
-#      reports (new session id) pass untouched. Marker: /tmp/agent-report-doc-<gid>.
+#      reports (new session id) pass untouched. Marker: /tmp/agent-report-doc-<gid>
+#      (session|slug|path); the block prints the exact re-attach command for the
+#      stored path, and asana-task-update.sh replaces a same-name report.
 #   6. Dead GitHub citations: every cited github.com PR/issue/comment/commit URL
 #      is resolved via gh api; a definitive HTTP 404 blocks (a 2026-08-19 report
 #      cited a PR comment that does not exist anywhere on the PR). Network and
@@ -47,10 +49,11 @@
 #                      the doc state it audited even after the branch moves on.
 #                      The PR body carries the branch-HEAD form instead
 #                      (ensure-tdd-pr-link.sh) — operator ruling 2026-07-28.
-#   iteration          1-based report ordinal: count of agent-run-report*
-#                      attachments already on the task + 1. Also normalized into
-#                      the attach NAME (agent-run-report-NN-<slug>.md, via
-#                      updatedInput) and an H1 title (# Run report NN: <slug>,
+#   iteration          1-based report ordinal: max existing report ordinal on
+#                      the task + 1 (lib/attach-names.sh). Also normalized into
+#                      the attach NAME (<N>-agent-run-report.md, via
+#                      updatedInput; scheme 2026-09-11, was
+#                      agent-run-report-NN-<slug>.md) and an H1 title (# Run report NN: <slug>,
 #                      inserted when the report has no H1), so which followup
 #                      turn a report belongs to is obvious from the attachment
 #                      list alone (operator request 2026-07-29; Maya's four
@@ -71,6 +74,8 @@
 set -euo pipefail
 
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
+# Shared attachment naming (report ordinal + name): one scheme for every surface.
+source "$HOME/.config/agent-watcher/lib/attach-names.sh"
 
 INPUT=$(cat)
 CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
@@ -104,18 +109,28 @@ REPORT="${REPORT/#\~/$HOME}"
 
 # Doc identity: slug from --attach-name, else the file basename. Computed early
 # because both the second-doc check (5) and the ordinal/H1 logic below need it.
-SLUG=$(printf '%s' "$CMD" | sed -E 's/.*--attach-name[= ]+"?agent-run-report-?([^" ]*)\.md"?.*/\1/; s/^[0-9]+-//')
-[ -n "$SLUG" ] && [ "$SLUG" != "$CMD" ] || SLUG=$(basename "$REPORT" .md | sed -E "s/^agent-run-report-?//; s/^$AGENT_TASK_GID-?//; s/^[0-9]+-//")
+# sed -n + p + head -1: sed works line by line, so a substitution without -n
+# leaves every other line of a multi-line command in the result.
+SLUG=$(printf '%s' "$CMD" | sed -nE 's/.*--attach-name[= ]+"?([0-9]+-)?agent-run-report-?([^" ]*)\.md.*/\2/p' | head -1 | sed -E 's/^[0-9]+-//')
+[ -n "$SLUG" ] || SLUG=$(basename "$REPORT" .md | sed -E "s/^agent-run-report-?//; s/^$AGENT_TASK_GID-?//; s/^[0-9]+-//")
 SESS=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)
 
 # 5. One report doc per run segment. A second attach in the SAME session with a
 #    DIFFERENT slug is a parallel report doc — blocked; update the existing doc
 #    and re-attach it instead. A new session (followup segment) resets the marker.
+#    Marker line: <session>|<slug>|<report path> (legacy "<session> <slug>" read too).
 DOCMARK="/tmp/agent-report-doc-$AGENT_TASK_GID"
 if [ -s "$DOCMARK" ] && [ -n "$SESS" ]; then
-  read -r PREV_SESS PREV_SLUG < "$DOCMARK" || true
+  PREV_LINE=$(head -1 "$DOCMARK")
+  case "$PREV_LINE" in
+    *"|"*) IFS='|' read -r PREV_SESS PREV_SLUG PREV_PATH <<<"$PREV_LINE" || true ;;
+    *) read -r PREV_SESS PREV_SLUG <<<"$PREV_LINE" || true; PREV_PATH="" ;;
+  esac
   if [ "${PREV_SESS:-}" = "$SESS" ] && [ -n "${PREV_SLUG:-}" ] && [ "$PREV_SLUG" != "$SLUG" ]; then
-    echo "BLOCKED: this session already attached report doc '$PREV_SLUG'; attaching a second doc ('$SLUG') splinters the run record. One segment produces ONE report: fold this content into the existing doc and re-attach it under the SAME name (its iteration ordinal stays stable on re-attach, per the watermark rule)." >&2
+    FIX_PATH="${PREV_PATH:-<the existing report file>}"
+    echo "BLOCKED: this session already attached report doc '$PREV_SLUG'; attaching a second doc ('$SLUG') splinters the run record. One segment produces ONE report: fold this content into the existing doc ($FIX_PATH) and re-attach it with exactly:
+  ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh --task $AGENT_TASK_GID --attach-file $FIX_PATH --attach-name agent-run-report.md
+That re-attach REPLACES the report already on the task (same name, same iteration ordinal), so the corrected content lands and the watermark moves." >&2
     exit 2
   fi
 fi
@@ -177,22 +192,39 @@ set_frontmatter agent_lane "$("$HOME/.cursor/skills/asana-field-value.sh" "$AGEN
 # unstamped report gets a fresh ordinal: max existing name ordinal + 1
 # (falling back to attachment count + 1 for the pre-scheme era), over the same
 # attachment set the watermark reads, so ordinals survive worktree pruning.
+# STALE STAMP: stability holds within ONE segment only. A followup segment that
+# reuses a report file still stamped N, where the task's N report was attached
+# before this segment started (newest ts in versions/<gid>.jsonl, the source
+# check-followup-scope.sh and asana-task-update.sh's replace guard use), would
+# collide with the prior segment's report and never upload. That stamp is
+# stale: take the next ordinal as if unstamped and rewrite the stamp, H1, and
+# visible stamp line.
 ITER=$(grep -m1 -E '^iteration: "?[0-9]+' "$REPORT" 2>/dev/null | grep -oE '[0-9]+' | head -1 || true)
 ATOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null)}"
-if [ -z "$ITER" ] && [ -n "$ATOKEN" ]; then
-  NAMES=$(curl -sf --max-time 20 -H "Authorization: Bearer $ATOKEN" \
-    "https://app.asana.com/api/1.0/tasks/$AGENT_TASK_GID/attachments?opt_fields=name" 2>/dev/null \
-    | jq -r '.data[]? | .name | select(test("^agent-run-report.*\\.md$"))' 2>/dev/null || true)
-  if [ -n "$NAMES" ]; then
-    MAXORD=$(printf '%s\n' "$NAMES" | sed -nE 's/^agent-run-report-([0-9]+)-.*/\1/p' | sort -n | tail -1)
-    if [ -n "$MAXORD" ]; then
-      ITER=$((MAXORD + 1))
-    else
-      N=$(printf '%s\n' "$NAMES" | grep -c . || true)
-      case "$N" in (*[!0-9]*|"") ;; (*) ITER=$((N + 1)) ;; esac
-    fi
+if [ -n "$ATOKEN" ]; then
+  ATT_JSON=$(curl -sf --max-time 20 -H "Authorization: Bearer $ATOKEN" \
+    "https://app.asana.com/api/1.0/tasks/$AGENT_TASK_GID/attachments?opt_fields=name,created_at" 2>/dev/null || true)
+  NAMES=$(printf '%s' "$ATT_JSON" | jq -r '.data[]? | .name' 2>/dev/null || true)
+  if [ -z "$ITER" ]; then
+    ITER=$(printf '%s\n' "$NAMES" | next_attach_ordinal report)
   else
-    ITER=1
+    SEG_START=$(jq -rs '[.[] | .ts // empty] | last // empty' "${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/versions/$AGENT_TASK_GID.jsonl" 2>/dev/null || true)
+    if [ -n "$SEG_START" ]; then
+      PRIOR_SEG=$(printf '%s' "$ATT_JSON" | jq -r --arg re "$REPORT_ATTACH_RE" --arg n "$ITER" --arg s "$SEG_START" '
+          def norm: (. // "") | sub("\\.[0-9]+Z$"; "Z");
+          def ord: (capture("^(?<o>[0-9]+)-agent-run-report") // capture("^agent-run-report-(?<o>[0-9]+)-") // {o: ""}) | .o | ltrimstr("0");
+          [.data[]? | select(.name | test($re)) | select((.name | ord) == ($n | ltrimstr("0")))
+           | select((.created_at | norm) < ($s | norm))] | length' 2>/dev/null || echo 0)
+      if [ "${PRIOR_SEG:-0}" != "0" ]; then
+        OLD_ITER="$ITER"
+        ITER=$(printf '%s\n' "$NAMES" | next_attach_ordinal report)
+        sed -i '' -E \
+          -e "s/^iteration:[[:space:]]*\"?$OLD_ITER\"?[[:space:]]*\$/iteration: \"$ITER\"/" \
+          -e "s/^# Run report $OLD_ITER:/# Run report $ITER:/" \
+          -e "s/^_iteration $OLD_ITER /_iteration $ITER /" "$REPORT"
+        echo ">> require-clean-run-report: iteration $OLD_ITER is stale (report $OLD_ITER was attached before this segment started at $SEG_START); re-stamped as iteration $ITER" >&2
+      fi
+    fi
   fi
 fi
 if [ -n "$ITER" ]; then
@@ -357,14 +389,14 @@ if [ -z "$FAIL" ]; then
   # session id + slug. Re-attaches (same slug) rewrite it harmlessly. NOT a
   # bare `[ -n ] &&` — a false test as the last command would trip set -e
   # (same failure shape as the TDD_SUFFIX incident above).
-  if [ -n "$SESS" ]; then printf '%s %s\n' "$SESS" "$SLUG" > "$DOCMARK"; fi
-  # Allow path: normalize the attach NAME to agent-run-report-NN-<slug>.md via
+  if [ -n "$SESS" ]; then printf '%s|%s|%s\n' "$SESS" "$SLUG" "$REPORT" > "$DOCMARK"; fi
+  # Allow path: normalize the attach NAME to <N>-agent-run-report.md via
   # updatedInput, so the attachment list orders itself. Idempotent: a name
   # already carrying the computed ordinal passes untouched.
-  if [ -n "$ITER" ] && [ -n "${SLUG:-}" ]; then
-    WANT="agent-run-report-$ITER-$SLUG.md"
-    CUR=$(printf '%s' "$CMD" | sed -E 's/.*--attach-name[= ]+"?([^" ]+)"?.*/\1/')
-    if [ "$CUR" != "$CMD " ] && [ -n "$CUR" ] && [ "$CUR" != "$WANT" ]; then
+  if [ -n "$ITER" ]; then
+    WANT="$(report_attach_name "$ITER")"
+    CUR=$(printf '%s' "$CMD" | sed -nE 's/.*--attach-name[= ]+"?([^" ]+)"?.*/\1/p' | head -1)
+    if [ -n "$CUR" ] && [ "$CUR" != "$WANT" ]; then
       NEW_CMD=$(printf '%s' "$CMD" | sed -E "s/(--attach-name[= ]+\"?)[^\" ]+(\"?)/\1$WANT\2/")
       jq -n --arg c "$NEW_CMD" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {command: $c}}}'
     fi

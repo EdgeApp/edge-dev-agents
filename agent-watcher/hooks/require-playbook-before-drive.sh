@@ -26,19 +26,29 @@ INPUT=$(cat)
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
 IS_DRIVE=0
 case "$TOOL" in
+  # Read-only calls drive nothing: enumerating devices (the natural first
+  # probe), a screenshot, a hierarchy read. They still hit
+  # require-maestro-device.sh's booted guard (a downed bound sim re-latches the
+  # daemon, so a screenshot could show the wrong device).
+  mcp__maestro__list_devices|mcp__maestro__take_screenshot|mcp__maestro__inspect_screen) ;;
   mcp__maestro__*) IS_DRIVE=1 ;;
   Bash)
     CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
-# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
-# backticked spans blanked): a command that merely QUOTES a trigger string --
-# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
-# argument extraction, where quoted values are load-bearing. Fail-open to the
-# raw command if the helper is unavailable.
-CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
-    # CLI drives: `maestro ... test/studio ...`. Reads/inspections of maestro
-    # dirs, capture-buy-quote.sh (which wraps the CLI), and the mcp wrapper all
-    # count as drives too — every path to the sim goes through the playbook.
-    if printf '%s' "$CMD_M" | grep -qE '(^|[;&|[:space:]])(maestro|capture-buy-quote\.sh|maestro-mcp-wrapper\.sh)[[:space:]]'; then
+    [ -n "$CMD" ] || exit 0
+    case "$CMD" in *maestro*|*capture-buy-quote*) ;; *) exit 0 ;; esac
+    # Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
+    # backticked spans blanked): a command that merely QUOTES a trigger string
+    # (a report heredoc, an echo) must not fire this hook.
+    CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+    # A drive is what lib/maestro-cmd.sh says it is (shared with
+    # require-maestro-device.sh): maestro EXECUTED with a test/record/studio/
+    # hierarchy subcommand, or capture-buy-quote.sh / maestro-mcp-wrapper.sh
+    # executed. `maestro --version`, `ls .../maestro`, and grep/cat of maestro
+    # paths are not drives.
+    LIB="$HOME/.config/agent-watcher/hooks/lib"
+    [ -f "$LIB/maestro-cmd.sh" ] || exit 0
+    . "$LIB/maestro-cmd.sh"
+    if [ -n "$(maestro_cmd_segments "$CMD" "$CMD_M" 2>/dev/null || true)" ]; then
       IS_DRIVE=1
     fi
     ;;

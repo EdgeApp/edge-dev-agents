@@ -393,6 +393,26 @@ function landLock(cmd, repo) {
   const r = require("child_process").spawnSync(LAND_LOCK, [cmd, "--repo", repo, "--owner", LAND_LOCK_OWNER], { stdio: ["ignore", "pipe", "inherit"] });
   return (r.status || 0) === 0;
 }
+function landLockHeldByUs(repo) {
+  const r = require("child_process").spawnSync(LAND_LOCK, ["status", "--repo", repo], { encoding: "utf8" });
+  try { return JSON.parse(r.stdout).owner === LAND_LOCK_OWNER; } catch { return false; }
+}
+
+// RELEASE ON FAILURE: a successful prepare keeps the lease (the train continues
+// into push + automerge/merge, which release on exit). A repo whose prepare
+// ended with nothing ready and no in-progress conflict to resolve is a dead
+// train: release its lease now instead of squatting the TTL. The same applies
+// to a crash or signal. A busy exit (75) releases only leases this call took
+// fresh, never one an earlier call (e.g. a conflict re-run) already held.
+const leaseRelease = { fresh: [], all: [] };
+function releaseLeases(repos) {
+  for (const repo of repos) landLock("release", repo);
+  leaseRelease.all = leaseRelease.all.filter((r) => !repos.includes(r));
+  leaseRelease.fresh = leaseRelease.fresh.filter((r) => !repos.includes(r));
+}
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.on(sig, () => { releaseLeases([...leaseRelease.all]); process.exit(130); });
+}
 
 async function main() {
   let input = "";
@@ -403,10 +423,14 @@ async function main() {
   const branches = JSON.parse(input);
 
   for (const repo of [...new Set(branches.map((b) => b.repo))]) {
+    const wasOurs = landLockHeldByUs(repo);
     if (!landLock("acquire", repo)) {
       console.error(`pr-land-prepare: land lock busy for ${repo} — another session is landing there; wait and retry.`);
+      releaseLeases([...leaseRelease.fresh]);
       process.exit(75);
     }
+    leaseRelease.all.push(repo);
+    if (!wasOurs) leaseRelease.fresh.push(repo);
   }
   const results = {
     prepared: [],
@@ -506,11 +530,21 @@ async function main() {
     exitCode = 1;
   }
 
+  const liveRepos = new Set(
+    [...results.prepared, ...results.codeConflicts, ...results.changelogConflicts].map((r) => r.repo)
+  );
+  const deadRepos = leaseRelease.all.filter((repo) => !liveRepos.has(repo));
+  if (deadRepos.length > 0) {
+    console.error(`\nReleasing land lease (nothing ready or resolvable): ${deadRepos.join(", ")}`);
+    releaseLeases(deadRepos);
+  }
+
   console.log(JSON.stringify(results, null, 2));
   process.exit(exitCode);
 }
 
 main().catch((e) => {
   console.error(e);
+  releaseLeases([...leaseRelease.all]);
   process.exit(1);
 });

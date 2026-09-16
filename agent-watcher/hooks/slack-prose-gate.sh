@@ -32,9 +32,13 @@ TEXT=$(printf '%s' "$INPUT" | jq -r '[.tool_input // {} | .. | strings] | join("
 # Skill-read gate (orch runs only): outbound Slack text is outward prose, so
 # the first send/draft in a segment without the no-slop marker is denied with
 # the full skill body (lib/skill-read-gate.sh); the retry passes this check and
-# is then linted. Same mechanism as lint-md-on-write.sh's Write path.
+# is then linted. Same mechanism as lint-md-on-write.sh's Write path,
+# including the transcript-evidence credit tried before denying.
 if [ -n "${AGENT_TASK_GID:-}" ] && [ -f "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh" ]; then
   . "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh"
+  if [ -n "$(skill_read_missing no-slop)" ]; then
+    skill_read_credit_from_transcript "$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null || true)" no-slop
+  fi
   if [ -n "$(skill_read_missing no-slop)" ]; then
     BODY=$(skill_read_deliver no-slop)
     REASON="Slack text is outward prose and the no-slop contract has not entered this session yet. The full skill is below; it now counts as read. Rewrite the message against it, then retry (the retry is linted)."

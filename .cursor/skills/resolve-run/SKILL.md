@@ -27,7 +27,8 @@ Output is a JSON array of manifests (stdout only; diagnostics on stderr). Exit 0
 <step id="2" name="Interpret">
 Key manifest fields:
 - `in_flight: true` — run is still executing; evaluators must SKIP it (incomplete evidence).
-- `transcript: null` — transcript not found; agent-eval cannot run for this gid (report it).
+- `transcript: null` — transcript not found; a transcript-eval cannot run for this gid (report it). A report-eval still can: `prs` and `era` fall back to Asana data.
+- `evidence_sources` — where `prs` (`transcript`, `asana-attachments`, both, or `none`) and the `era.as_of` date (`window_end`, `release_receipt`, `report_attached`, `version_stamp`, `spawned_at`, or `none`) came from. `era_as_of: none` means every era row is in effect regardless of the run's age; say so when grading a dated dimension.
 - `asana.status: "__MISSING__"` — task deleted/404; `"__NO_AUTH__"` — no token available.
 - `signals.revive_pings_in_transcript > 0` — durable evidence of a watchdog revive (orch-eval liveness dimension).
 - `slot`/`pool_entry` non-null on a Complete run — leaked resources (orch-eval release dimension); null on a completed run is the EXPECTED state, not evidence of clean release.

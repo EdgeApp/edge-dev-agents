@@ -20,9 +20,17 @@
 #   a PR under active review (a fold of a squiggly path the reviewer will
 #   re-read anyway). The authority is the operator's task comment; the agent
 #   records it as /tmp/agent-history-rewrite-approved-<gid>.md citing that
-#   comment, and the note flips preserve-mode squash + push to allowed here and
-#   in pr-finalize-fixups.sh. Audited by /eval-run: a note with no matching
-#   operator comment is a finding.
+#   comment AND naming its scope on a `Targets:` line (shape and parser:
+#   git-branch-ops.sh header, `note-scope`). The note is never blanket
+#   permission: `Targets: all` is the ONLY shape that flips a whole-branch
+#   autosquash here, because that rebase squashes every pending fixup on the
+#   branch, including ones the reviewer has not read. A note naming specific
+#   shas, or the legacy note with no `Targets:` line, authorizes only a
+#   one-fixup fold (lint-commit.sh --fixup, which calls git-branch-ops.sh
+#   fold-one) and leaves the whole-branch block standing. Any non-empty note
+#   still flips the preserve-mode PUSH, which is how an approved rewrite
+#   reaches the remote. Audited by /eval-run: a note with no matching operator
+#   comment is a finding.
 #
 #   PUSHES that ADD REWRITES of published branch work are blocked when the
 #   oracle says AUTOSQUASH (no human reviewer yet): a standalone commit whose
@@ -48,12 +56,13 @@
 #   cannot be determined (no PR, network error): a gate that guesses would
 #   block legitimate pre-review autosquashes.
 #
-# Scope: no-ops unless AGENT_TASK_GID is set (exported by spawn-test-session.sh),
+# Scope: EVERY session, orchestrated or chat. A history rewrite loses the same
+# work either way. Companion scripts are exempt by DIRECTORY.
+# Was: no-ops unless AGENT_TASK_GID is set (exported by spawn-test-session.sh),
 # so interactive human sessions are never affected.
 # Exit 0 = allow. Exit 2 = block (stderr is fed back to the model).
 set -euo pipefail
 
-[ -n "${AGENT_TASK_GID:-}" ] || exit 0
 
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
@@ -65,8 +74,7 @@ CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
 case "$CMD" in
-  *lint-commit.sh*) exit 0 ;;
-  *pr-finalize-fixups.sh*) exit 0 ;;
+  *".cursor/skills/"*|*".config/agent-watcher/"*) exit 0 ;;
 esac
 
 # ---- commit discipline ------------------------------------------------------
@@ -108,13 +116,41 @@ if [ -n "$NEEDS_MODE" ]; then
         | jq -r '.mode // empty' 2>/dev/null || true)
     fi
   fi
-  REWRITE_OK="/tmp/agent-history-rewrite-approved-$AGENT_TASK_GID.md"
+  # Scope the approval file per run, falling back to a shared chat path: this
+  # gate now runs outside orch too, where AGENT_TASK_GID is unset and `set -u`
+  # would abort the hook.
+  REWRITE_OK="/tmp/agent-history-rewrite-approved-${AGENT_TASK_GID:-chat}.md"
+  NOTE_TOO_NARROW=""
   if [ "$MODE" = "preserve" ] && [ -s "$REWRITE_OK" ]; then
-    echo ">> git-history-gate: preserve-mode $NEEDS_MODE allowed by operator rewrite approval ($REWRITE_OK)" >&2
-    MODE="autosquash"
+    if [ "$NEEDS_MODE" = "push" ]; then
+      echo ">> git-history-gate: preserve-mode push allowed by operator rewrite approval ($REWRITE_OK)" >&2
+      MODE="autosquash"
+    elif "$HOME/.cursor/skills/git-branch-ops.sh" note-scope --note "$REWRITE_OK" 2>/dev/null | grep -qx 'all'; then
+      echo ">> git-history-gate: preserve-mode whole-branch autosquash allowed by operator rewrite approval ($REWRITE_OK says Targets: all)" >&2
+      MODE="autosquash"
+    else
+      # The note exists but does not approve rewriting the WHOLE branch.
+      NOTE_TOO_NARROW="$REWRITE_OK"
+    fi
   fi
   if [ "$MODE" = "preserve" ]; then
     if [ "$NEEDS_MODE" = "squash" ]; then
+      if [ -n "$NOTE_TOO_NARROW" ]; then
+        cat >&2 <<MSG
+BLOCKED: whole-branch autosquash while review-mode is PRESERVE. The operator
+rewrite approval at $NOTE_TOO_NARROW does not cover it: it names
+specific targets (or no \`Targets:\` line at all), and \`rebase --autosquash\`
+squashes EVERY pending fixup on the branch, including the ones this reviewer
+has not read yet.
+  - Fold ONE approved fixup into its target:
+    ~/.cursor/skills/lint-commit.sh --fixup <target-sha> --for human|auto -m "<why>"
+    (or ~/.cursor/skills/git-branch-ops.sh fold-one --fixup <fixup-sha> for a
+    fixup that already exists). The target must be named on a \`Targets:\` line.
+  - The whole branch is in scope only when the operator approved that and the
+    note says so: \`Targets: all\`, citing the operator comment.
+MSG
+        exit 2
+      fi
       cat >&2 <<'MSG'
 BLOCKED: autosquash while review-mode is PRESERVE (a human reviewer is active
 on this PR). Preserved fixup! commits are what let the reviewer see exactly
@@ -126,7 +162,13 @@ what changed since their review — squashing now destroys that.
     and squashes only when allowed.
   - The OPERATOR can approve a rewrite under review (a task comment saying so):
     record it as /tmp/agent-history-rewrite-approved-<gid>.md citing that
-    comment, and this gate allows the squash and the force-with-lease push.
+    comment and naming what it covers on a scope line:
+        Targets: <sha> [<sha> ...]   those commits may be rewritten
+        Targets: all                 the whole branch may be rewritten
+    A named target lets `lint-commit.sh --fixup <sha>` fold THAT fixup into it
+    (git-branch-ops.sh fold-one, one fixup, the rest of the branch untouched).
+    Only `Targets: all` unblocks this whole-branch autosquash. Either way the
+    note allows the force-with-lease push.
 MSG
     else
       cat >&2 <<'MSG'

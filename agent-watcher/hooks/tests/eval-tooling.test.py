@@ -52,6 +52,16 @@ check('era splits by window end', e['as_of'] == '2026-08-10' and all(r['shipped'
 check('era rows carry dims and Before/After', all(r['dims'] and r['after'] for r in e['in_effect']) and all(r['before'] for r in e['not_yet']))
 e2 = json.loads(sh(f'{ERA} ""').stdout)
 check('empty date = all rows in effect', e2['as_of'] is None and not e2['not_yet'] and len(e2['in_effect']) == len(e['in_effect']) + len(e['not_yet']))
+etmp = tempfile.mkdtemp(prefix='evaltool-era-')
+hdr = '| Shipped | Dims | Name | Mechanism or ruling | Before | After |\n|---|---|---|---|---|---|\n'
+good = os.path.join(etmp, 'good.md'); bad = os.path.join(etmp, 'bad.md')
+open(good, 'w').write(hdr + '| 2026-01-01 | A1 | pipe row | `--for a\\|b` kind | old | new |\n')
+open(bad, 'w').write(hdr + '| 2026-01-01 | A1 | pipe row | `--for a|b` kind | old | new |\n')
+g = sh(f'{ERA} 2026-02-01 --table {good}')
+gr = json.loads(g.stdout)['in_effect'][0] if g.returncode == 0 else {}
+check('escaped pipe stays in its cell', gr.get('mechanism') == '`--for a|b` kind' and gr.get('after') == 'new', g.stdout + g.stderr)
+b = sh(f'{ERA} 2026-02-01 --table {bad}')
+check('unescaped pipe row exits 1 naming the line', b.returncode == 1 and 'bad.md:3' in b.stderr, b.stderr)
 
 # ---- 3. rubric rows are date-free and cite real era names ----
 names = {r['name'] for r in e2['in_effect']}

@@ -43,7 +43,10 @@
 # script for require-skill-read-for-scripts.sh to key on. So the first such
 # Write in a segment without the no-slop marker is denied with the full skill
 # body (lib/skill-read-gate.sh); the retry passes this check and is then
-# linted. Interactive sessions (no AGENT_TASK_GID) skip the read check.
+# linted. Before denying, the transcript is scanned for proof the current body
+# is already in context (skill_read_credit_from_transcript: slash-command
+# delivery, post-compaction re-injection, paged Reads), which writes the marker
+# and allows. Interactive sessions (no AGENT_TASK_GID) skip the read check.
 #
 # Allowlist (never linted):
 #   - internal tooling and state: ~/.cursor, ~/.claude, ~/.config, ~/.local,
@@ -54,6 +57,8 @@
 #   - data/fixture files by NAME: basename starting raw- or data-, or containing
 #     "fixture" — the sanctioned way to save fetched text or deliberate-slop
 #     test corpora as .md (or just use .txt/.json, which are never linted)
+#   - the harness scratchpad (/private/tmp/claude-*/<project>/<session>/
+#     scratchpad/), session-private working files
 #   - agent skills ANYWHERE (any path segment `skills/<name>/SKILL.md`, and
 #     anything under a `.claude/skills/` dir): skills are agent-facing tooling
 #     wherever they live (repo-local skills, the site-orch install), and the
@@ -86,6 +91,10 @@ allowlisted() { # $1 = absolute-ish path; exit 0 = skip linting
     # cost a live run two full heredoc regenerations on 2026-08-19), blocker
     # notes, plan docs. These are internal or later-gated; never block them.
     /tmp/agent-*|/private/tmp/agent-*|/tmp/plan-*|/private/tmp/plan-*) return 0 ;;
+    # Harness scratchpad (/private/tmp/claude-<uid>/<project>/<session>/
+    # scratchpad/): session-private working files. Anything from there that
+    # ships is linted again at its posting or attach boundary.
+    /tmp/claude-*/*/scratchpad/*|/private/tmp/claude-*/*/scratchpad/*) return 0 ;;
   esac
   return 1
 }
@@ -109,6 +118,9 @@ case "$TOOL" in
     # fragment presupposes a document already written under the gate.
     if [ -z "$STRINGS" ] && [ -n "${AGENT_TASK_GID:-}" ] && [ -f "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh" ]; then
       . "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh"
+      if [ -n "$(skill_read_missing no-slop)" ]; then
+        skill_read_credit_from_transcript "$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null || true)" no-slop
+      fi
       if [ -n "$(skill_read_missing no-slop)" ]; then
         {
           echo "BLOCKED: $TARGET is outward prose and the no-slop contract has not entered this session's context yet. The full skill is below; it now counts as read. Rewrite the file against it, then retry the Write (the retry is linted)."
@@ -136,10 +148,10 @@ case "$TOOL" in
     . "$HOME/.config/agent-watcher/hooks/lib/md-write-target.sh"
     CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
     CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)
-    TARGET=$(bash_write_target "$CMD_M" "$CWD")
+    TARGET=$(bash_write_target "$CMD_M" "$CWD" md "$CMD")
     # Locale strings files written from Bash (sed -i / heredoc): exact basenames.
-    [ -n "$TARGET" ] || TARGET=$(bash_write_target "$CMD_M" "$CWD" "en_US.ts")
-    [ -n "$TARGET" ] || TARGET=$(bash_write_target "$CMD_M" "$CWD" "enUS.json")
+    [ -n "$TARGET" ] || TARGET=$(bash_write_target "$CMD_M" "$CWD" "en_US.ts" "$CMD")
+    [ -n "$TARGET" ] || TARGET=$(bash_write_target "$CMD_M" "$CWD" "enUS.json" "$CMD")
     # Inline interpreter (python3 - <<, node -e, ...): the path sits inside the
     # script body, which the mention-stripped view blanks, so retry on the RAW
     # command for that vector only. The INVOCATION must be visible in the

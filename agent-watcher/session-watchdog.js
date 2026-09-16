@@ -39,6 +39,7 @@ const { execSync } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
 const slots = require('./lib/slots.js')
+const chatSpawns = require('./lib/chat-spawns.js')
 
 const HOME = process.env.HOME || ''
 const DIR = path.join(HOME, '.config/agent-watcher')
@@ -126,14 +127,10 @@ function holdAgeMs(taskGid) {
 // the tail so the same words appearing in the scrolled CONVERSATION can never false-match
 // (the original plain whole-buffer substring marker did exactly that, and also missed the
 // "/rc" style entirely). A genuinely dead bridge shows neither → revive.
-const RC_FOOTER_RE = /shift\+tab to cycle|for agents/
-const RC_TOKEN_RE = /(^|\s)\/rc(\s|$)/
-function rcBridgeUp(content) {
-  const lines = content.split('\n')
-  if (lines.some((l) => RC_FOOTER_RE.test(l) && RC_TOKEN_RE.test(l))) return true // new style
-  if (/Remote Control active/.test(lines.slice(-3).join('\n'))) return true        // old style
-  return false
-}
+// RC liveness: one shared check with lib/fleet-model.js (footer pill when
+// visible, session-record bridge id when the build hides the pill). See
+// lib/rc-state.js for why the footer alone stopped working on >= 2.1.268.
+const { rcBridgeUp } = require('./lib/rc-state.js')
 const RC_HALFOPEN_BACKSTOP_MS = 3 * 60 * 60 * 1000      // DISABLED 2026-06-05 (backstop removed to eval zero-ping-on-healthy); kept for easy revert
 const SESSION_PREFIX = 'claude-asana-'
 // Completed sessions are RENAMED to this prefix instead of being killed, so the
@@ -374,6 +371,7 @@ function attemptRcRespawn(session, prior) {
   const proc = claudeProcUnder(panePid)
   if (!proc) return false // liveness path above owns the dead-claude case
   const resumeArg = (proc.args.match(/--resume\s+([0-9a-fA-F-]{36})/) || [])[1]
+    || chatSpawns.load().byTmux.get(session)?.uuid   // prompt-spawned: the spawn registry knows its transcript
   if (!resumeArg) {
     log(`[${session}] RC respawn skipped: no --resume id in argv (prompt-spawned) — leaving for the operator.`)
     return false
@@ -426,18 +424,18 @@ function attemptRcRespawn(session, prior) {
   sh(`tmux send-keys -t "${session}" Enter`)
   let armed = false
   for (let i = 0; i < 45; i++) {
-    if (rcBridgeUp(capturePane(session))) { armed = true; break }
+    if (rcBridgeUp(capturePane(session), claudeProcUnder(panePid)?.pid)) { armed = true; break }
     sh('sleep 1')
   }
   if (armed) {
-    log(`[${session}] RC respawn: bridge armed (/rc footer token present).`)
+    log(`[${session}] RC respawn: bridge armed (pill or session-record bridge id).`)
     // Wake ping, same as the old revive: confirms the resumed session answers.
     // C-u first: remote-control clients can sync drafts into the composer;
     // typing without clearing concatenates the draft.
     sh(`tmux send-keys -t "${session}" C-u`)
     sh(`tmux send-keys -t "${session}" "<watchdog-revive-ping>" Enter`)
   } else {
-    log(`[${session}] RC respawn: relaunched but no /rc token after 45s — leaving it; cooldown armed, re-check next ticks.`)
+    log(`[${session}] RC respawn: relaunched but no RC signal after 45s — leaving it; cooldown armed, re-check next ticks.`)
   }
   return true
 }
@@ -1068,7 +1066,7 @@ function main() {
     }
 
     const content = capturePane(session)
-    const rcUp = rcBridgeUp(content)   // footer "/rc" token = RC bridge up (idle near-end view)
+    const rcUp = rcBridgeUp(content, claudeProcUnder(panePid)?.pid)   // pill, else session-record bridge id
     const prior = state.sessions[session]
     const isBlocked = /^yes$/i.test(blocked || '')
 
@@ -1107,7 +1105,10 @@ function main() {
       // path releases; the worktree stays for inspection.
       const isRun = !isChat && /^\d+$/.test(taskGid)
       const kind = isChat ? 'chat session' : isRun ? 'run session (task not Complete)' : `unlisted anchor '${anchorName}'`
-      log(`[${session}] ${kind} idle ${Math.round((now - prior.lastChange) / 3600000)}h > ${Math.round(IDLE_REAP_MS() / 3600000)}h → reaped (transcript survives; resurrect: resume-agent --uuid <id> --chat${isChat ? '' : ' --name <name>'}; keep one permanently via watcher.persistent_anchors)`)
+      // A registered spawn gets its exact resurrect command (the registry restores the name).
+      const spawned = chatSpawns.load().byTmux.get(session)
+      const resurrect = spawned ? chatSpawns.resumeCommand(spawned) : `resume-agent --uuid <id> --chat${isChat ? '' : ' --name <name>'}`
+      log(`[${session}] ${kind} idle ${Math.round((now - prior.lastChange) / 3600000)}h > ${Math.round(IDLE_REAP_MS() / 3600000)}h → reaped (transcript survives; resurrect: ${resurrect}; keep one permanently via watcher.persistent_anchors)`)
       sh(`tmux kill-session -t "${session}"`)
       if (isRun) {
         let slot = null

@@ -21,6 +21,15 @@ set -euo pipefail
 # the env var alone is wrong because retired sessions keep AGENT_TASK_GID.
 "$(dirname "$0")/../orch-run-context.sh" || exit 0
 
+# Read stdin and filter to the prose-writing tools BEFORE the outage check, which
+# inspects the tool input (reads such as searches carry a `text` field too).
+INPUT=$(cat)
+TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
+case "$TOOL" in
+  mcp__claude_ai_Asana__add_comment|mcp__claude_ai_Asana__create_task*|mcp__claude_ai_Asana__create_tasks|mcp__claude_ai_Asana__update_tasks|mcp__claude_ai_Asana__save_task_changes_confirm) ;;
+  *) exit 0 ;;
+esac
+
 # Reviewer-bot outage narration is banned from Asana prose (operator ruling
 # 2026-09-02): it belongs in the run report's Finalize Gate as one unchecked
 # box and nowhere else. Same pattern the report gate uses.
@@ -34,13 +43,6 @@ if [ -n "$PROSE" ]; then
     exit 0
   fi
 fi
-
-INPUT=$(cat)
-TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
-case "$TOOL" in
-  mcp__claude_ai_Asana__add_comment|mcp__claude_ai_Asana__create_task*|mcp__claude_ai_Asana__create_tasks|mcp__claude_ai_Asana__update_tasks|mcp__claude_ai_Asana__save_task_changes_confirm) ;;
-  *) exit 0 ;;
-esac
 
 # Rewrite every PRESENT prose field, top-level and inside the batch tools'
 # `tasks[]` / `subtasks[]` arrays.

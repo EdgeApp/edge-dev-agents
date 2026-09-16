@@ -33,12 +33,35 @@ else
   PM="npm"
 fi
 
+# Orchestrated worktrees: setup-task-workspace.sh may still be reinstalling
+# node_modules in the background (.stale-node-modules carries installer_pid).
+# Installing concurrently into the same tree corrupts it, so wait for that
+# worker first; after our own install, drop the marker once the installed tree
+# matches the lockfile (lib/node-modules-freshness.sh). No-op outside the orch.
+NM_LIB="$HOME/.config/agent-watcher/lib/node-modules-freshness.sh"
+if [ -f "$NM_LIB" ] && [ -f "$repo_dir/.stale-node-modules" ]; then
+  . "$NM_LIB"
+  if nm_installer_alive "$repo_dir"; then
+    echo "Waiting for the background node_modules reinstall (up to ${INSTALL_DEPS_REINSTALL_WAIT:-900}s)..." >&2
+    nm_wait_installer "$repo_dir" "${INSTALL_DEPS_REINSTALL_WAIT:-900}" || {
+      echo "✗ background node_modules reinstall still running; not installing over it" >&2
+      exit 1
+    }
+  fi
+fi
+
 echo "Installing dependencies (using $PM)..." >&2
 
 if [ "$PM" = "npm" ]; then
   (cd "$repo_dir" && npm install --no-audit --no-fund)
 else
   (cd "$repo_dir" && yarn install)
+fi
+
+if [ -f "$NM_LIB" ] && [ -f "$repo_dir/.stale-node-modules" ]; then
+  . "$NM_LIB"
+  nm_clear_marker_if_fresh "$repo_dir" \
+    || echo "⚠ $repo_dir/.stale-node-modules kept: node_modules still differs from package-lock.json" >&2
 fi
 
 # Run the verification-safe prepare command. A trailing runtime-setup step

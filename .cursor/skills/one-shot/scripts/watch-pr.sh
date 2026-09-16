@@ -47,12 +47,23 @@
 #                                              at finalize when pr-finalize-fixups
 #                                              legitimately squashes)
 #       1   a check failed, Travis included (read `gh run view --log-failed`, fix)
+#       76  ZERO checks on the PR for NOCHECKS_GRACE seconds (default 300; a
+#             draft posts no bot check-runs, and `[skip travis]` suppresses Travis,
+#             so a misconfigured or draft PR can show nothing to wait on). Final
+#             line: RESULT: no-checks. The caller reports it as a CI-configuration
+#             problem; it is NOT a budget exhaustion and NOT a green.
+#       7   CONTINUE: this call hit its per-call cap (MAX_CALL, default 540s, under
+#             the Bash tool's 600s foreground limit) with checks still pending.
+#             Final line: RESULT: continue. Re-invoke the SAME command at once; the
+#             remaining round budget carries over. Not a failure, not exhaustion.
 #       75  budget already exhausted — stop watching, take the blocked=Yes path
 #       124 this watch hit the remaining-budget timeout (same: budget is gone)
 #       2   usage error / missing tool
 set -euo pipefail
 
 PR="" REPO="" TASK_GID="" BUDGET=1800 INTERVAL=30
+NOCHECKS_GRACE="${NOCHECKS_GRACE:-300}"
+ZERO_SINCE=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --pr) PR="$2"; shift 2 ;;
@@ -93,7 +104,10 @@ command -v timeout >/dev/null || { echo "ERROR: timeout not on PATH (shim: ~/.cu
 #     legitimate 4-round review loop is 4 bounded waits, not one 30-min pool
 #     (the old semantics exhausted mid-loop and forced hand-rolled polling).
 #   - Staleness: a file older than 6h is a prior run's carryover; reset.
-BUDGET_FILE="/tmp/agent-watch-budget-${TASK_GID:-pr$PR}"
+#   - Keyed by task + repo + PR, so a task alternating two PRs keeps a budget
+#     per PR instead of each watch resetting the other's (the HEAD check below
+#     would otherwise see a foreign HEAD every call).
+BUDGET_FILE="/tmp/agent-watch-budget-${TASK_GID:-notask}-$(printf '%s' "${REPO:-norepo}" | tr -c 'A-Za-z0-9' '-')-pr$PR"
 NOW=$(date +%s)
 CUR_HEAD=$(gh pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefOid -q .headRefOid 2>/dev/null || echo "unknown")
 REMAINING="$BUDGET"
@@ -122,6 +136,23 @@ persist_budget() {
 }
 trap persist_budget EXIT
 DEADLINE=$((NOW + REMAINING))
+# CHUNKED WATCH: one call never outlives the Bash tool's foreground cap, so it
+# self-bounds to MAX_CALL and exits 7 with the budget persisted by the trap
+# above (same pattern as pr-land's pr-merge-watch.sh).
+MAX_CALL="${MAX_CALL:-540}"
+CALL_DEADLINE=$((WATCH_START + MAX_CALL))
+# Land-lease upkeep: when this session holds the repo's land lease (a land is
+# in flight), each poll renews it so the lease cannot expire under a long
+# watch. renew exits 3 when no lease exists; that is the common case.
+LAND_LOCK="$HOME/.cursor/skills/pr-land/scripts/repo-land-lock.sh"
+LAND_LOCK_OWNER="${AGENT_SESSION_UUID:-op-${USER:-shell}}"
+renew_land_lease() {
+  [ -n "$REPO" ] && [ -x "$LAND_LOCK" ] || return 0
+  local rc=0
+  "$LAND_LOCK" renew --repo "$REPO" --owner "$LAND_LOCK_OWNER" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 1 ] && echo ">> watch-pr: WARNING: land lease on ${REPO##*/} is not ours or expired; re-acquire before any push" >&2
+  return 0
+}
 echo ">> watch-pr: ${REMAINING}s of round budget remain (HEAD ${CUR_HEAD:0:8}); watching ${REPO:+$REPO }PR #$PR" >&2
 
 # Poll loop instead of `gh pr checks --watch`: --watch blocks on ALL checks with
@@ -185,9 +216,24 @@ reviewer_reviewed_head() {
 while :; do
   NOW=$(date +%s)
   [ "$NOW" -ge "$DEADLINE" ] && { echo ">> watch-pr: remaining-budget timeout" >&2; exit 124; }
+  renew_land_lease
   JSON=$(gh pr checks "$PR" ${REPO:+--repo "$REPO"} --json name,bucket 2>/dev/null || true)
   [ -n "$JSON" ] || JSON="[]"
   TOTAL=$(jq 'length' <<<"$JSON" 2>/dev/null || echo 0)
+  # ZERO checks: nothing has posted at all (draft PR, [skip travis] HEAD, or a
+  # repo whose CI never triggered for this branch). The green test below needs
+  # TOTAL > 0, so without this escape the watch waits out the whole budget and
+  # reports a false blocked (explorer run, 2026-09-11).
+  if [ "$TOTAL" -eq 0 ]; then
+    [ -n "$ZERO_SINCE" ] || ZERO_SINCE=$(date +%s)
+    if [ $(( $(date +%s) - ZERO_SINCE )) -ge "$NOCHECKS_GRACE" ]; then
+      echo ">> watch-pr: NO checks on HEAD ${CUR_HEAD:0:8} after $((NOCHECKS_GRACE / 60))m — nothing to gate on. Is the PR a draft, does HEAD carry [skip travis], or does this repo run no CI on this branch?" >&2
+      echo "RESULT: no-checks"
+      exit 76
+    fi
+  else
+    ZERO_SINCE=""
+  fi
   FAILS_REAL=$(jq -r --arg w "$WIP_GUARD_PATTERN" '[.[] | select(.bucket=="fail" or .bucket=="cancel") | .name | select(startswith($w) | not)] | join(", ")' <<<"$JSON" 2>/dev/null || true)
   FAILS_WIP=$(jq -r --arg w "$WIP_GUARD_PATTERN" '[.[] | select(.bucket=="fail" or .bucket=="cancel") | .name | select(startswith($w))] | join(", ")' <<<"$JSON" 2>/dev/null || true)
   if [ -n "$FAILS_REAL" ]; then
@@ -241,6 +287,11 @@ while :; do
       echo "RESULT: green-travis-pending ($PENDING_SLOW)$REVIEWER_NOTE"
     fi
     exit 0
+  fi
+  if [ $(( $(date +%s) + INTERVAL )) -ge "$CALL_DEADLINE" ]; then
+    echo ">> watch-pr: per-call cap (${MAX_CALL}s) reached with checks pending; budget persisted" >&2
+    echo "RESULT: continue ($(( DEADLINE - $(date +%s) ))s of round budget remain; re-invoke the same command)"
+    exit 7
   fi
   sleep "$INTERVAL"
 done

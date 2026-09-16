@@ -113,6 +113,7 @@ const COHORT_SCHEMA = {
           class_id: { type: 'string', description: 'kebab-case defect class id; reuse the ledger id when the class is known' },
           tier: { type: 'integer', minimum: 1, maximum: 4 },
           type: { enum: ['skill-gap', 'infra-fix', 'ruling'] },
+          owner: { type: 'string', description: 'who owns the fix, so a reader never has to guess which skill a rule lives in: a skill-gap row is "<skill>:<rule-id>" (the rule that is missing or too weak, e.g. one-shot:finalize-gate) or "<skill>:new-rule" when none exists yet; an infra-fix row is the script or hook path; a ruling row is the rubric dimension or era row it would settle' },
           title: { type: 'string' },
           dims: { type: 'array', items: { type: 'string' } },
           gids: { type: 'array', items: { type: 'string' }, description: 'this cohort\'s runs the class appeared in' },
@@ -264,7 +265,7 @@ const cohort = await agent(
   `[field-correction] rows (exact set-tested.sh command + one-line evidence); ` +
   `[transcript-eval] rows (finding-driven only, per the demotion rule above); ` +
   `[ruling] rows the eval cannot settle; ` +
-  `[skill-gap]/[infra-fix] rows tagged with their ledger class id in backticks, in ledger order (full per-run evidence in Appendix C). ` +
+  `[skill-gap]/[infra-fix] rows tagged with their ledger class id in backticks, in ledger order (full per-run evidence in Appendix C), each naming its OWNER right after the class id: a skill-gap row names the owning skill and rule as \`<skill>:<rule-id>\` (\`<skill>:new-rule\` when the rule does not exist yet), an infra-fix row names the script or hook file. Never print a bare rule id: the reader does not know which skill a rule belongs to. ` +
   `After the tier subsections: [playbook-proposal] one-liners and [flow-proposal] one-liners (verbatim texts in Appendix D). ` +
   `\"## Open defect classes\" — the already-fixed inspection INVERTED: lead with NOT-FIXED and PARTIAL classes ` +
   `(named mechanism or its absence, confidence, which upfront row closes it); fully-fixed classes collapse to one ` +
@@ -280,7 +281,7 @@ const cohort = await agent(
   `D playbook + flow proposal texts verbatim; E coverage gaps in full. ` +
   `Derive every row ONLY from findings present in the results (no inventions); omit empty subsections. ` +
   `Return the markdown as \`report\` and, as \`actions\`, one entry per [skill-gap]/[infra-fix]/[ruling] row: its ledger ` +
-  `class_id, tier, type, title, the dimensions it grades under, and the gids (with window_end) of this cohort's runs it ` +
+  `class_id, tier, type, title, owner (the same owner string the row prints), the dimensions it grades under, and the gids (with window_end) of this cohort's runs it ` +
   `appeared in. Re-run, field-correction, transcript-eval and proposal rows are one-offs and are NOT ledger actions.`,
   { label: 'cohort-report', phase: 'Synthesize', schema: COHORT_SCHEMA, ...SYNTH_OPT }
 )

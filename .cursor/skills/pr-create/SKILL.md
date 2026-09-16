@@ -17,7 +17,7 @@ metadata:
 <rule id="base-must-match-branch-point">Pass `--base <ref>` whenever the branch was cut from anything other than the repo's default branch (a white-label branch such as edge-react-gui's `coinhub`, a release branch, a stacked PR's parent). Without it the PR targets the default branch and its diff carries every commit separating the two, which no reviewer can read. Resolve the ref with `git merge-base --is-ancestor origin/<ref> HEAD` or from the branch's upstream before creating the PR.</rule>
 <rule id="verification-required">Run verification before creating the PR.</rule>
 <rule id="no-reviewer-assignment">Do NOT auto-assign Asana reviewers, set review-needed status, or estimate review hours from this skill. Reviewer choice is a human step; callers that want those behaviors must invoke `asana-task-update` themselves.</rule>
-<rule id="flag-contract">`--asana-attach` only runs when a task GID is available from chat context or explicit `--asana-task <gid>`. If no task GID is available, fail fast and skip the attach.</rule>
+<rule id="flag-contract">To attach the PR to its Asana task, pass `--asana-task <gid>` AND `--asana-attach` to `pr-create.sh`; the script runs the attach itself, so never follow it with a separate `asana-task-update.sh --attach-pr` call unless the attach failed. Resolve the gid from chat context when the caller did not name one. Read the result from the JSON `asana_attached` field: `true` attached, `false` the attach failed (stderr WARN carries the manual command), `null` means `--asana-attach` was not passed.</rule>
 <rule id="script-timeouts">Asana updates can take up to 90s. Use `block_until_ms: 120000` for `asana-task-update.sh` calls.</rule>
 <rule id="repo-template-required">If the repo has `.github/PULL_REQUEST_TEMPLATE.md`, the PR body must preserve that template's section headings. Do NOT substitute generic sections like `Summary` or `Test plan`.</rule>
 <rule id="attach-test-evidence">When proof screenshots of the change exist (an orchestrated run's `/build-and-test` saves them as `/tmp/agent-proof-<task-gid>-NN-<slug>.png`, or the caller names files), attach them to the PR after creation via `~/.cursor/skills/pr-create/scripts/pr-attach-screenshots.sh --repo <owner/repo> --pr <num> <png...>` — it downscales copies for upload, uploads them to the public assets branch (`edge-dev-agents@agent-pr-assets`), and posts ONE comment embedding the images inline (filename slug → caption; argument order → display order; a `HACKED` token in a filename → 🪓 caption + a banner stating what was hacked, per build-and-test `hack-verify-visual-changes`). When ANY attached file carries the `HACKED` token, you MUST pass `--hack-note "<one short line: what was hacked>"` (e.g. "hard-coded the empty-state branch true in WalletList") — the script refuses to post without it, so the banner names the actual hack instead of a generic paragraph. Reuse the same hack description you wrote for the report's Testing section. GitHub has NO API for uploading images directly into comments — do NOT inline base64, commit images onto the PR branch, or link local paths. If no proof screenshots exist, skip silently (not every PR is app-testable).</rule>
@@ -66,7 +66,7 @@ Write body to `/tmp/pr-body-<task-gid>.md` (gid-scoped — a shared `/tmp/pr-bod
   --title "<title>" \
   --body-file /tmp/pr-body-<task-gid>.md \
   [--base <ref>] \
-  [--asana-task <task_gid>]
+  [--asana-task <task_gid> --asana-attach]
 ```
 
 `--base` defaults to the repo's default branch; pass it explicitly per
@@ -90,27 +90,10 @@ Per `attach-test-evidence`: if proof screenshots exist for this change (`ls /tmp
 Pass them in narrative order (NN prefix). If ANY file carries the `HACKED` token, add `--hack-note "<one short line: what was hacked>"` per `attach-test-evidence`. No screenshots → skip silently. Never rename a `HACKED`-marked file to hide the marker — the script keys the 🪓 caption and banner off that token (build-and-test `hack-verify-visual-changes`).
 </step>
 
-<step id="5" name="Optional Asana PR attach">
+<step id="5" name="Check the Asana PR attach">
 If `--asana-attach` was not requested, skip.
 
-If `--asana-attach` is requested, resolve `task_gid` from:
-
-1. explicit `--asana-task <gid>` argument
-2. chat context (previous task-review/im context)
-
-If no task GID is available, fail fast and report:
-
-> `--asana-attach` was requested but no task GID was found in flags or chat context.
-
-Then call:
-
-```bash
-~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
-  --task <task_gid> \
-  --attach-pr --pr-url <pr_url> --pr-title "<title>" --pr-number <number>
-```
-
-Do NOT pass `--assign`, `--set-status`, or `--auto-est-review-hrs` from this skill. Reviewer assignment and review-status updates are intentionally out of scope — see `no-reviewer-assignment` rule.
+Per `flag-contract`, read `asana_attached` from step 4's JSON. On `false`, run the manual attach the WARN line names, once, and report its result. Reviewer assignment and review status stay out of scope per `no-reviewer-assignment`.
 </step>
 
 <step id="6" name="Report result">

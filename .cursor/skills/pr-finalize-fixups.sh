@@ -8,7 +8,12 @@
 #   Operator rewrite approval: in an orchestrated session (AGENT_TASK_GID set), a
 #   non-empty /tmp/agent-history-rewrite-approved-<gid>.md (the agent's record of
 #   an operator task comment approving a history rewrite under review) turns a
-#   preserve verdict into autosquash for an OWNED PR. Same note git-history-gate.sh
+#   preserve verdict into autosquash for an OWNED PR — but only when the note
+#   says `Targets: all`. The autosquash below is WHOLE-BRANCH, so a note naming
+#   specific commits (or the legacy note with no `Targets:` line) approves only
+#   a one-fixup fold (lint-commit.sh --fixup, git-branch-ops.sh fold-one) and
+#   leaves this path in preserve: condense + push, reviewer's delta intact.
+#   Same note and same parse (git-branch-ops.sh note-scope) git-history-gate.sh
 #   honors; /eval-run audits it against the operator comment it cites.
 #
 #   Ownership guard (HARD override, checked first): if the authenticated gh user
@@ -148,8 +153,12 @@ IS_OWNER=$(echo "$MODE_JSON" | node -e "
 
 REWRITE_OK="/tmp/agent-history-rewrite-approved-${AGENT_TASK_GID:-none}.md"
 if [[ "$MODE" == "preserve" && "$IS_OWNER" == "true" && -n "${AGENT_TASK_GID:-}" && -s "$REWRITE_OK" ]]; then
-  echo ">> pr-finalize-fixups: preserve -> autosquash by operator rewrite approval ($REWRITE_OK)" >&2
-  MODE="autosquash"
+  if "$GIT_BRANCH_OPS_SH" note-scope --note "$REWRITE_OK" 2>/dev/null | grep -qx 'all'; then
+    echo ">> pr-finalize-fixups: preserve -> autosquash by operator rewrite approval ($REWRITE_OK says Targets: all)" >&2
+    MODE="autosquash"
+  else
+    echo ">> pr-finalize-fixups: $REWRITE_OK does not say 'Targets: all', so it does not approve a whole-branch autosquash; staying in preserve (condense + push). Fold an approved target with git-branch-ops.sh fold-one." >&2
+  fi
 fi
 
 # Find latest existing fixup commit's timestamp on this branch (if any).
