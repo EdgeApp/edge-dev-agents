@@ -11,11 +11,12 @@
 # Attachment BINARIES (asanausercontent.com) are not matched — downloading a
 # file the script already surfaced is fine.
 #
-# Scope: no-ops unless AGENT_TASK_GID is set. Companion scripts are exempt by
-# path. Exit 0 allow, exit 2 block.
+# Scope: EVERY session, orchestrated or chat. A chat session hand-rolling the
+# traversal reaches the same wrong answer as a run does, and silently: the
+# discovery scripts walk a task's attachments AND subtasks, which a hand-rolled
+# regex over subtask names alone misses. Companion scripts are exempt by path.
+# Exit 0 allow, exit 2 block.
 set -uo pipefail
-
-[ -n "${AGENT_TASK_GID:-}" ] || exit 0
 
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
@@ -33,16 +34,21 @@ printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])(curl|wget|http|xh)([[:space
 
 # Sanctioned scripts (their internal curls are invisible to this hook anyway;
 # this exempts mixed commands that both run a script and mention the API).
+# Matched by DIRECTORY, not by a name list: every Asana-touching script already
+# lives under one of these two roots, and a name list silently stops covering
+# the next script added there.
 case "$CMD" in
-  *asana-get-context.sh*|*asana-task-update.sh*|*check-followup-scope.sh*|\
-  *asana-field-value.sh*|*update-status.sh*|*set-tested.sh*|\
-  *asana-build-field.sh*|*asana-force-land.sh*|*agent-authored-text.sh*) exit 0 ;;
+  *".cursor/skills/"*|*".config/agent-watcher/"*) exit 0 ;;
 esac
 
-echo "BLOCKED: raw Asana API calls are forbidden in agent sessions — the sanctioned scripts carry contracts a raw curl drops (attachment download, followup-scope watermark arithmetic, authored-text marking, gated status writes). Use instead:
+echo "BLOCKED: raw Asana API calls are forbidden in every session, chat included — the sanctioned scripts carry contracts a raw curl drops (attachment download, followup-scope watermark arithmetic, authored-text marking, gated status writes). Use instead:
   task ingestion (task+comments+subtasks+ATTACHMENTS): ~/.cursor/skills/asana-get-context.sh <gid>
   single field read: ~/.cursor/skills/asana-field-value.sh <gid> \"<field>\"
-  writes (comments, attachments, subtasks): ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh
+  task COMMENT: ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh --task <gid> --comment-file <file>
+  WHICH PRs EXIST + approval state (walks attachments AND subtasks): ~/.cursor/skills/pr-land/scripts/pr-land-discover.sh
+  a run's full evidence surface incl. its PRs: ~/.cursor/skills/resolve-run/scripts/resolve-run.sh --gid <gid>
+  attachments: asana-task-update.sh --task <gid> --attach-file <path> --attach-name <name> (a same-name run report is replaced)
+  subtasks: asana-task-update.sh --task <gid> --create-subtask --subtask-name \"<name>\"
   task DESCRIPTION (agent-maintained tail only): asana-task-update.sh --task <gid> --set-current-state <file>
   followup-scope / watermark: ~/.config/agent-watcher/check-followup-scope.sh --task-gid <gid>
   status transitions: ~/.config/agent-watcher/update-status.sh

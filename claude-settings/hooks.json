@@ -28,6 +28,16 @@
         }
       ],
       "matcher": "Read"
+    },
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/record-own-asana-story.sh",
+          "timeout": 10,
+          "type": "command"
+        }
+      ],
+      "matcher": "mcp__claude_ai_Asana__add_comment"
     }
   ],
   "PreToolUse": [
@@ -103,7 +113,7 @@
           "type": "command"
         },
         {
-          "command": "~/.config/agent-watcher/hooks/block-piped-watcher-scripts.sh",
+          "command": "~/.config/agent-watcher/hooks/guard-piped-watcher-scripts.sh",
           "timeout": 10,
           "type": "command"
         },
@@ -114,7 +124,7 @@
         },
         {
           "command": "~/.config/agent-watcher/hooks/require-followup-scope-on-complete.sh",
-          "timeout": 30,
+          "timeout": 120,
           "type": "command"
         },
         {

@@ -58,8 +58,13 @@ case "$CMD" in
     _REPO=$(echo "$URL" | cut -d/ -f5)
 
     # --- Call 2: Changed files with patches (REST — GraphQL doesn't expose patches) ---
-    FILES=$(gh api "repos/$_OWNER/$_REPO/pulls/$NUMBER/files" --paginate 2>&1) || {
-      echo "Error: Failed to fetch PR files. Output: $FILES" >&2
+    # Payloads go through temp files, not argv: a large PR's patches exceed
+    # ARG_MAX as a --argjson value, and --paginate emits one array per page.
+    WORK=$(mktemp -d /tmp/pr-review-ctx.XXXXXX)
+    trap 'rm -rf "$WORK"' EXIT
+    printf '%s' "$META" > "$WORK/meta.json"
+    gh api "repos/$_OWNER/$_REPO/pulls/$NUMBER/files" --paginate > "$WORK/files.json" 2>"$WORK/files.err" || {
+      echo "Error: Failed to fetch PR files. Output: $(cat "$WORK/files.err")" >&2
       exit 1
     }
 
@@ -67,17 +72,17 @@ case "$CMD" in
     # no-duplicate-feedback can be checked against EVERYTHING already raised,
     # not just unresolved threads. Trimmed to the fields duplicate-checking
     # needs; body capped to keep context cost bounded.
-    INLINE=$(gh api "repos/$_OWNER/$_REPO/pulls/$NUMBER/comments" --paginate 2>&1) || {
-      echo "Error: Failed to fetch PR inline comments. Output: $INLINE" >&2
+    gh api "repos/$_OWNER/$_REPO/pulls/$NUMBER/comments" --paginate > "$WORK/inline.json" 2>"$WORK/inline.err" || {
+      echo "Error: Failed to fetch PR inline comments. Output: $(cat "$WORK/inline.err")" >&2
       exit 1
     }
 
     # Merge into single structured JSON output
     jq -n \
-      --argjson meta "$META" \
-      --argjson files "$FILES" \
-      --argjson inline "$INLINE" \
-      '{
+      --slurpfile metas "$WORK/meta.json" \
+      --slurpfile filePages "$WORK/files.json" \
+      --slurpfile inlinePages "$WORK/inline.json" \
+      '$metas[0] as $meta | ($filePages | add // []) as $files | ($inlinePages | add // []) as $inline | {
         number: $meta.number,
         title: $meta.title,
         url: $meta.url,

@@ -7,7 +7,10 @@
 # APFS-cloned node_modules keep the rest fast. Pass --force-rebuild to always rebuild.
 #
 # Usage:
-#   ios-rn-build.sh --udid <UDID> --bundle-id <co.example.app> [--port <n>] [--force-rebuild] [--skip-install]
+#   ios-rn-build.sh --udid <UDID> --bundle-id <co.example.app> [--port <n>] [--force-rebuild] [--skip-install] [--detach]
+#
+# --detach runs the build in the background (nohup, own process group) and
+# returns at once; block on it with ios-rn-build-wait.sh (see the detach block).
 #
 # Env fallbacks (used when the flag is NOT passed): watcher-spawned sessions get
 # these exported automatically, so the build targets the slot's sim + Metro port
@@ -46,6 +49,9 @@ BUNDLE_ID=""
 PORT=""
 FORCE=false
 SKIP_INSTALL=false
+DETACH=false
+ORIG_ARGS=("$@")
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -54,6 +60,7 @@ while [[ $# -gt 0 ]]; do
     --port)          PORT="$2";      shift 2 ;;
     --force-rebuild) FORCE=true;     shift ;;
     --skip-install)  SKIP_INSTALL=true; shift ;;
+    --detach)        DETACH=true;    shift ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -62,15 +69,43 @@ done
 UDID="${UDID:-${AGENT_SIM_UDID:-}}"
 PORT="${PORT:-${AGENT_METRO_PORT:-8081}}"
 
+# Detached child (spawned by the --detach block below): record pid + the exit
+# trap FIRST, so a gate that waits or exits before the build is still visible to
+# ios-rn-build-wait.sh. status_set is a no-op in a foreground run.
+status_set() { # <key> <value>: atomic rewrite of the detached status file
+  [[ -n "${IOS_RN_BUILD_STATUS:-}" ]] || return 0
+  local tmp="$IOS_RN_BUILD_STATUS.tmp.$$"
+  { grep -v "^$1=" "$IOS_RN_BUILD_STATUS" 2>/dev/null || true; printf '%s=%s\n' "$1" "$2"; } > "$tmp" && mv "$tmp" "$IOS_RN_BUILD_STATUS"
+}
+if [[ -n "${IOS_RN_BUILD_STATUS:-}" ]]; then
+  status_set pid "$$"
+  status_set phase running
+  # exit= is written LAST: its presence is the wait script's completion signal.
+  trap 'rc=$?; status_set finished "$(date +%s)"; status_set phase done; status_set exit "$rc"' EXIT
+  trap 'exit 143' TERM HUP INT
+fi
+
 # STALE-CLONE GATE: setup-task-workspace writes .stale-node-modules when the
 # worktree's APFS-cloned node_modules came from a main checkout whose lockfile
 # differs from this branch's — building on top bakes WRONG dep versions into
 # native-embedded assets (the 2026-07-30 fleet-wide "Horizon.Server undefined"
 # toast was an accb WebView bundle built against stellar-sdk 0.11.0 this way).
 # Hard-fail with the fix; a build on known-wrong deps is never worth having.
-if [[ -f .stale-node-modules ]]; then
-  echo "ios-rn-build: BLOCKED — this worktree's node_modules are a STALE clone (see .stale-node-modules)." >&2
-  echo "Fix: run 'sfw npm ci' here, then 'rm .stale-node-modules', then re-run the build." >&2
+# With the orch lib present: wait for a background reinstall setup started, then
+# drop the marker if the installed tree now matches the lockfile (normalized hash).
+NM_LIB="$HOME/.config/agent-watcher/lib/node-modules-freshness.sh"
+[[ -f "$NM_LIB" ]] && source "$NM_LIB"
+NM_DEFER=false
+if [[ -f .stale-node-modules ]] && declare -F nm_build_gate >/dev/null; then
+  if [[ "${DETACH:-false}" == true ]] && nm_installer_alive .; then
+    NM_DEFER=true   # the detached child re-runs this gate and does the waiting
+  else
+    nm_build_gate . "${IOS_RN_BUILD_REINSTALL_WAIT:-480}" || true
+  fi
+fi
+if [[ -f .stale-node-modules ]] && ! $NM_DEFER; then
+  echo "ios-rn-build: BLOCKED: node_modules does not match this branch's package-lock.json (see .stale-node-modules)." >&2
+  echo "Fix: ~/.config/agent-watcher/lib/node-modules-reinstall.sh \"\$PWD\" (moves the tree aside, runs npm ci, clears the marker), then re-run the build." >&2
   exit 1
 fi
 
@@ -79,6 +114,40 @@ fi
   echo "  (--udid may instead come from \$AGENT_SIM_UDID)" >&2
   exit 1
 }
+
+# ── Detached mode ───────────────────────────────────────────────────────────────
+# A cold build can outlive the Bash tool's 600s foreground cap, which kills it.
+# --detach re-execs this script under nohup in its own process group and exits 0
+# immediately; ios-rn-build-wait.sh then blocks in bounded chunks (exit 7 =
+# still running, re-invoke). Files are keyed by sim so any later call finds them:
+#   /tmp/ios-rn-build-<udid>.log     full output of the detached build
+#   /tmp/ios-rn-build-<udid>.status  key=value lines: pid, phase, started, cwd,
+#                                    and finished + exit once it ends
+# Releasing the slot's sim (release-pool-entry.sh) kills a still-running build.
+BUILD_LOG="/tmp/ios-rn-build-$UDID.log"
+BUILD_STATUS="/tmp/ios-rn-build-$UDID.status"
+if $DETACH; then
+  if [[ -f "$BUILD_STATUS" ]] && ! grep -q '^exit=' "$BUILD_STATUS"; then
+    OLD_PID="$(sed -n 's/^pid=//p' "$BUILD_STATUS" | tail -1)"
+    if [[ -n "$OLD_PID" ]] && kill -0 "$OLD_PID" 2>/dev/null; then
+      echo ">> ios-rn-build: a detached build is already running on $UDID (pid $OLD_PID); wait on it with ios-rn-build-wait.sh --udid $UDID" >&2
+      exit 1
+    fi
+  fi
+  CHILD_ARGS=()
+  for a in "${ORIG_ARGS[@]}"; do [[ "$a" == "--detach" ]] || CHILD_ARGS+=("$a"); done
+  printf 'pid=\nphase=spawning\nstarted=%s\ncwd=%s\n' "$(date +%s)" "$PWD" > "$BUILD_STATUS"
+  : > "$BUILD_LOG"
+  if command -v perl >/dev/null 2>&1; then
+    IOS_RN_BUILD_STATUS="$BUILD_STATUS" nohup perl -e 'setpgrp(0,0); exec @ARGV or die "exec: $!"' \
+      bash "$SELF" ${CHILD_ARGS[@]+"${CHILD_ARGS[@]}"} >"$BUILD_LOG" 2>&1 </dev/null &
+  else
+    IOS_RN_BUILD_STATUS="$BUILD_STATUS" nohup bash "$SELF" ${CHILD_ARGS[@]+"${CHILD_ARGS[@]}"} >"$BUILD_LOG" 2>&1 </dev/null &
+  fi
+  echo ">> ios-rn-build: DETACHED pid=$! log=$BUILD_LOG status=$BUILD_STATUS"
+  echo "NEXT: ~/.cursor/skills/build-and-test/scripts/ios-rn-build-wait.sh --udid $UDID"
+  exit 0
+fi
 
 # Suppress React Native's Xcode "Start Packager" build phase. That phase `open`s
 # node_modules/react-native/scripts/launchPackager.command whenever nothing is
@@ -211,9 +280,13 @@ fi
 PM="$("$PM_SH" detect)"
 if $SKIP_INSTALL && [[ -d node_modules ]]; then
   echo ">> ios-rn-build: --skip-install (node_modules present; pm=$PM)" >&2
+elif declare -F nm_install_skippable >/dev/null && nm_install_skippable .; then
+  # An install on a matching tree changes nothing except reverting updot-baked deps.
+  echo ">> ios-rn-build: node_modules already matches package-lock.json ($NM_WANT); skipping $PM install (updot-baked deps kept)" >&2
 else
   echo ">> ios-rn-build: $PM install (via pm.sh)" >&2
   "$PM_SH" install
+  if declare -F nm_clear_marker_if_fresh >/dev/null; then nm_clear_marker_if_fresh . || true; fi
 fi
 
 echo ">> ios-rn-build: $PM run prepare (via pm.sh)" >&2
@@ -239,6 +312,7 @@ if [[ -n "$RN_VER" && -z "${HERMES_ENGINE_TARBALL_PATH:-}" ]]; then
   fi
 fi
 
+status_set phase prepare.ios
 echo ">> ios-rn-build: $PM run prepare.ios (via pm.sh)" >&2
 "$PM_SH" run prepare.ios
 
@@ -256,7 +330,8 @@ if [[ "$PORT" != "8081" ]]; then
   echo ">> ios-rn-build: using non-default Metro port $PORT" >&2
 fi
 echo ">> ios-rn-build: npx react-native run-ios ${RUN_ARGS[*]}  (usually a few minutes)" >&2
-RUN_LOG="/tmp/ios-rn-build-runios-$$.log"
+status_set phase run-ios
+RUN_LOG="/tmp/ios-rn-build-runios-$UDID.log"
 RUN_EXIT=0
 npx react-native run-ios "${RUN_ARGS[@]}" 2>&1 | tee "$RUN_LOG" || RUN_EXIT=$?
 
@@ -269,6 +344,7 @@ if [[ $RUN_EXIT -ne 0 ]]; then
   WORKSPACE=$(ls -d ios/*.xcworkspace 2>/dev/null | head -1)
   SCHEME=$(basename "${WORKSPACE%.xcworkspace}")
   if [[ -n "$WORKSPACE" ]]; then
+    status_set phase xcodebuild
     echo ">> ios-rn-build: falling back to direct xcodebuild ($WORKSPACE, scheme $SCHEME)" >&2
     DD="/tmp/ios-rn-build-dd-$$"
     if xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Debug \

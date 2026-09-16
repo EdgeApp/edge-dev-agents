@@ -21,6 +21,7 @@
 set -uo pipefail
 
 DIR="$HOME/.config/agent-watcher"
+source "$DIR/lib/attach-names.sh"  # one attachment naming scheme
 ST="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"
 CRED="$DIR/credentials.json"
 
@@ -64,8 +65,8 @@ emit_run() {
     local atts
     atts=$(curl -s --max-time 6 -H "Authorization: Bearer $tok" \
       "https://app.asana.com/api/1.0/tasks/$gid/attachments?opt_fields=name,created_at" 2>/dev/null)
-    wm=$(jq -r '[.data[]? | select(.name | startswith("agent-run-report"))] | sort_by(.created_at) | last | .created_at // "1970-01-01T00:00:00.000Z"' <<<"$atts")
-    nreports=$(jq -r '[.data[]? | select(.name | startswith("agent-run-report"))] | length' <<<"$atts" 2>/dev/null || echo 0)
+    wm=$(jq -r --arg re "$REPORT_ATTACH_RE" '[.data[]? | select(.name | test($re))] | sort_by(.created_at) | last | .created_at // "1970-01-01T00:00:00.000Z"' <<<"$atts")
+    nreports=$(jq -r --arg re "$REPORT_ATTACH_RE" '[.data[]? | select(.name | test($re))] | length' <<<"$atts" 2>/dev/null || echo 0)
     # Description-staleness hint (one-shot description-current-state): with
     # prior completed runs, the operator prose in the description may predate
     # the delivered reality; the CURRENT STATE section, TDD, and comments

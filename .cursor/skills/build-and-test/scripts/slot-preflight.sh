@@ -106,9 +106,13 @@ fi
 
 echo "PLAN: $PLAN"
 # Exact invocation for the plan — run it verbatim, no flag-guessing.
+# A full rebuild can outlive the Bash tool's 600s cap, so it runs detached and
+# WAIT blocks on it in bounded chunks (exit 7 = re-run WAIT).
 IRB="$HOME/.cursor/skills/build-and-test/scripts/ios-rn-build.sh"
+IRB_WAIT="$HOME/.cursor/skills/build-and-test/scripts/ios-rn-build-wait.sh"
 case "$PLAN" in
   ready)        echo "INVOKE: (none — app is current; start Metro via ios-rn-build only if not already running, then drive)" ;;
-  full-rebuild) echo "INVOKE: $IRB --udid $UDID --bundle-id $BUNDLE_ID --port $PORT --force-rebuild" ;;
+  full-rebuild) echo "INVOKE: $IRB --udid $UDID --bundle-id $BUNDLE_ID --port $PORT --force-rebuild --detach"
+                echo "WAIT: $IRB_WAIT --udid $UDID" ;;
   *)            echo "INVOKE: $IRB --udid $UDID --bundle-id $BUNDLE_ID --port $PORT" ;;
 esac

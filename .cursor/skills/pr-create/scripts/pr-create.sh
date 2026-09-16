@@ -46,6 +46,14 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
+// --asana-attach needs the task gid. Checked before anything is created: the
+// check used to run after `gh pr create`, so a missing gid exited 2 with a
+// live PR and no JSON naming it.
+if (asanaAttach && !asanaTask) {
+  console.error("ERROR: --asana-attach requires --asana-task <gid> (or drop the flag)");
+  process.exit(2);
+}
+
 function git(cmd) {
   return execSync(`git ${cmd}`, { encoding: "utf8" }).trim();
 }
@@ -425,17 +433,14 @@ if (!prMatch) {
 // the flag every caller already passes does what it says.
 let asanaAttached = false;
 if (asanaAttach) {
-  if (!asanaTask) {
-    console.error("ERROR: --asana-attach requires --asana-task <gid> (or drop the flag)");
-    process.exit(2);
-  }
   const attach = spawnSync(
     `${process.env.HOME}/.cursor/skills/asana-task-update/scripts/asana-task-update.sh`,
     ["--task", asanaTask, "--attach-pr",
      "--pr-url", prUrl, "--pr-title", title, "--pr-number", prMatch[1]],
     { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], timeout: 120000 }
   );
-  asanaAttached = (attach.status || 0) === 0;
+  // status is null when the child timed out or was killed; that is not an attach.
+  asanaAttached = attach.status === 0;
   if (!asanaAttached) console.error(`WARN: PR created but Asana attach failed (exit ${attach.status}) — attach manually: asana-task-update.sh --task ${asanaTask} --attach-pr`);
 }
 

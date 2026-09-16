@@ -154,6 +154,28 @@ for d in "$HOME/.claude/projects/$ENC_GIT_PREFIX"*; do
 done
 shopt -u nullglob
 
+# Prompt-spawned sessions (spawn-chat-session.sh) carry no /one-shot signature;
+# lib/chat-spawns.js's registry is how they are found. SPAWN_REG rows:
+# uuid \t rc \t anchor(true|false) \t chrome(true|false), later lines win.
+SPAWN_REGISTRY="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/chat-spawns.jsonl"
+SPAWN_REG=$(jq -r 'select(.uuid) | [.uuid, (.rc // ""), ((.anchor // false) | tostring), ((.chrome // false) | tostring)] | @tsv' "$SPAWN_REGISTRY" 2>/dev/null || true)
+spawn_field() { # $1=uuid $2=column (2=rc 3=anchor 4=chrome) -> value ("" when unregistered)
+  [[ -n "$SPAWN_REG" ]] || return 0
+  printf '%s\n' "$SPAWN_REG" | awk -F'\t' -v u="$1" -v c="$2" '$1==u {v=$c} END {printf "%s", v}'
+}
+# --list shows them next to runs so a reaped chat stays resumable by name. Term
+# matching and the ambiguity guard stay run-only: a chat has no task identity.
+if $DO_LIST && [[ -n "$SPAWN_REG" ]]; then
+  shopt -s nullglob
+  while IFS=$'\t' read -r su _ _; do
+    [[ -n "$su" ]] || continue
+    for f in "$HOME/.claude/projects"/*/"$su.jsonl"; do
+      [[ " ${CANDIDATES[*]} " == *" $f "* ]] || CANDIDATES+=("$f")
+    done
+  done < <(printf '%s\n' "$SPAWN_REG" | awk -F'\t' '!seen[$1]++')
+  shopt -u nullglob
+fi
+
 # --uuid: exact selection replaces the candidate machinery entirely (any project
 # dir, any kind — chat forks and interactive transcripts carry no /one-shot
 # signature and are invisible to the matcher above; the /resume-session skill
@@ -164,6 +186,7 @@ if [[ -n "$UUID" ]]; then
   for f in "$HOME/.claude/projects"/*/"$UUID.jsonl"; do CANDIDATES+=("$f"); done
   shopt -u nullglob
   [[ ${#CANDIDATES[@]} -gt 0 ]] || { echo ">> resume-agent: no transcript found for uuid $UUID" >&2; exit 1; }
+  UUID_TERM="$TERM"   # a term given alongside --uuid still names the chat (e.g. resurrecting a reaped chat-<slug>)
   TERM=""   # bypass term filtering and the ambiguity guard
 fi
 
@@ -393,6 +416,9 @@ if $DO_LIST; then
       [[ "$gid" == "-" ]] && gid=""   # emit_candidates placeholder (see comment there)
       nm=$(name_of_gid "$gid")
       if [[ -n "$nm" ]]; then title="Asana: $nm"; else title="${preview:-}"; fi
+      # A spawn's head gid is incidental (brief or injected context), never its task.
+      spawn_rc=$(spawn_field "$uuid" 2)
+      if [[ -n "$spawn_rc" ]]; then gid=""; title="$spawn_rc"; fi
       state=""; rc=""
       if [[ -n "$gid" ]]; then
         row=$(printf '%s\n' "$TMUX_STATE" | awk -F'\t' -v g="$gid" '$1==g {print; exit}')
@@ -413,6 +439,8 @@ if $DO_LIST; then
     ts=$(date -r "$mtime" '+%Y-%m-%d %H:%M:%S')
     nm=$(name_of_gid "$gid")
     if [[ -n "$nm" ]]; then title="Asana: $nm"; else title="${preview:-(title unavailable)}"; fi
+    spawn_rc=$(spawn_field "$uuid" 2)
+    if [[ -n "$spawn_rc" ]]; then gid=""; title="spawned: $spawn_rc"; fi
 
     state=""; rc=""
     if [[ -n "$gid" ]]; then
@@ -514,7 +542,21 @@ if $CHAT; then
   # offline) and slug from that. Any resolution failure falls back to the uuid
   # — a spawn never blocks on Asana. Fork transcripts inherit the parent's
   # history head, so a fork-of-a-run still resolves its task gid.
-  SLUG_SRC="$TERM"
+  SLUG_SRC="${TERM:-${UUID_TERM:-}}"
+  # A registered spawn comes back under the name it was spawned with (anchor
+  # shape included) and continues its own transcript: its only writer is gone,
+  # and a fork would leave the name on a child the registry does not know.
+  SPAWN_RC=""
+  if [[ -n "$UUID" ]]; then SPAWN_RC=$(spawn_field "$UUID" 2); fi
+  if [[ -n "$SPAWN_RC" ]]; then
+    IN_PLACE=true
+    [[ "$(spawn_field "$UUID" 4)" == "true" ]] && CHROME=true
+    if [[ "$(spawn_field "$UUID" 3)" == "true" ]]; then
+      [[ -n "$ANCHOR_NAME" ]] || ANCHOR_NAME="$SPAWN_RC"
+    else
+      [[ -n "$SLUG_SRC" ]] || SLUG_SRC="${SPAWN_RC#chat-}"
+    fi
+  fi
   if [[ -z "$SLUG_SRC" && -n "$UUID" && -n "$LATEST_JSONL" ]]; then
     SLUG_SRC=$(name_of_gid "$(first_gid_of "$LATEST_JSONL")")
   fi
@@ -526,6 +568,10 @@ if $CHAT; then
   if [[ -n "$ANCHOR_NAME" ]]; then
     RC_NAME="$ANCHOR_NAME"
     TMUX_NAME="claude-asana-${ANCHOR_NAME}"
+  elif [[ -n "$SPAWN_RC" && -z "${TERM:-${UUID_TERM:-}}" ]]; then
+    # Verbatim, not re-slugged: the 24-char slug cut would rename a longer spawn.
+    RC_NAME="$SPAWN_RC"
+    TMUX_NAME="claude-asana-${SPAWN_RC}"
   fi
   # Name-slugged forks of the same task collide on the tmux name while being
   # genuinely different conversations. Disambiguate by the argv --resume uuid of
@@ -545,7 +591,10 @@ if $CHAT; then
     done
     return 0
   }
-  if [[ -z "$ANCHOR_NAME" ]] && tmux has-session -t "$TMUX_NAME" 2>/dev/null; then
+  # A registered spawn's pane has no --resume in argv, so the uuid comparison
+  # below cannot recognize it; a same-name session IS that spawn (never suffix
+  # it into a second claude on one transcript).
+  if [[ -z "$ANCHOR_NAME" && -z "$SPAWN_RC" ]] && tmux has-session -t "$TMUX_NAME" 2>/dev/null; then
     if [[ "$(pane_resume_uuid "$TMUX_NAME")" != "$LATEST_UUID" ]]; then
       SLUG="${SLUG}-$(printf '%s' "$LATEST_UUID" | cut -c1-4)"
       RC_NAME="chat-${SLUG}"

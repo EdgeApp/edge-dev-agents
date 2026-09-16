@@ -141,13 +141,14 @@
       "cursor"
     ],
     "persistent_anchors": [
-      "main",
-      "eval-run",
-      "pokemon",
+      "eddy-misc",
       "eddy-orch-mining",
-      "main2",
       "edge",
-      "fleet"
+      "eval-run",
+      "fleet",
+      "homepage",
+      "pokemon",
+      "wwe-app"
     ],
     "idle_reap_hours": 72,
     "operator_hold_ttl_min": 15

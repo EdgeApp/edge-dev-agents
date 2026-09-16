@@ -58,3 +58,14 @@ jq . > "$tmp" <<<"$NEW_JSON"
 mv "$tmp" "$POOL"
 
 echo ">> release-pool-entry: slot $SLOT marked dirty (was task $TASK_GID)" >&2
+
+# A detached ios-rn-build.sh (--detach) on this sim outlives the session that
+# started it; kill it with the sim's release so it cannot build onto a sim the
+# pool is about to refresh or hand to the next task. Lock released first: the
+# kill waits ~2s for its TERM to land. Best-effort, never fails the release.
+UDID_HELD=$(jq -r --arg s "$SLOT" '.pool[] | select(.slot == ($s | tonumber)) | .udid // empty' <<<"$POOL_JSON" | head -1)
+rm -f "$LOCK"; trap - EXIT
+BUILD_WAIT="$HOME/.cursor/skills/build-and-test/scripts/ios-rn-build-wait.sh"
+if [[ -n "$UDID_HELD" && -f "/tmp/ios-rn-build-$UDID_HELD.status" && -x "$BUILD_WAIT" ]]; then
+  "$BUILD_WAIT" --udid "$UDID_HELD" --kill >&2 || true
+fi

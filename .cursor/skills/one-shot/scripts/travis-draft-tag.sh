@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
-# travis-draft-tag.sh — keep Travis out of the draft phase (operator policy
+# travis-draft-tag.sh — RETIRED 2026-09-11 (operator policy): the one-shot flow no
+# longer opens draft PRs, so nothing calls this script. A draft PR posts no
+# reviewer-bot check-runs and, with the tag below, no Travis check either, which
+# left the step-6 watch with ZERO checks to gate on. Kept on disk for legacy
+# branches that still carry the token (watch-pr.sh warns when a ready PR's HEAD
+# does) and so `strip` stays available by hand.
+#
+# ORIGINAL PURPOSE — keep Travis out of the draft phase (operator policy
 # 2026-08-06: Travis queues are shared and expensive; a draft build blocks
 # other in-flight work for a HEAD nobody will land).
 #

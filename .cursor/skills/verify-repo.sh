@@ -102,6 +102,29 @@ function runCommandWithLog(command, label, repoDir, extraEnv = {}) {
   }
 }
 
+// Land-lease upkeep: verification is the longest step of a land train, so when
+// this session holds the repo's land lease (repo-land-lock.sh), renew it at the
+// start and before every step. Outside a land there is no lease and renew exits
+// 3 silently. Exit 1 (someone else holds it, or ours expired) only warns: the
+// verdict of this verification is unaffected, the push after it is not safe.
+const LAND_LOCK = path.join(os.homedir(), ".cursor", "skills", "pr-land", "scripts", "repo-land-lock.sh");
+const LAND_LOCK_OWNER = process.env.AGENT_SESSION_UUID || `op-${process.env.USER || "shell"}`;
+let landRepoName = null;
+function renewLandLease() {
+  if (!existsSync(LAND_LOCK)) return;
+  if (landRepoName == null) {
+    landRepoName = path.basename(repoDir);
+    try {
+      const url = execSync("git remote get-url origin", { cwd: repoDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+      if (url) landRepoName = path.basename(url).replace(/\.git$/, "");
+    } catch {}
+  }
+  const r = require("child_process").spawnSync(LAND_LOCK, ["renew", "--repo", landRepoName, "--owner", LAND_LOCK_OWNER], { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
+  if (r.status === 1) {
+    console.error(`⚠  land lease on ${landRepoName} is not held by this session (${(r.stderr || "").trim()}); re-acquire before pushing`);
+  }
+}
+
 // Detect repo type
 const isGui = repoDir.includes("edge-react-gui");
 
@@ -331,6 +354,7 @@ function verifyCode() {
   console.log(`Code verification (using ${PM}):`);
 
   if (!skipInstall) {
+    renewLandLease();
     console.log(`▶  ${installCmd}...`);
     const installResult = runCommandWithLog(installCmd, `${PM}-install`, repoDir, pmEnv);
     if (!installResult.success) {
@@ -347,6 +371,7 @@ function verifyCode() {
   }
 
   for (const cmd of commands) {
+    renewLandLease();
     if (scripts[cmd] == null) {
       console.log(`⏭  ${runCmd(cmd)} - skipped (not in package.json)`);
       continue;
@@ -456,6 +481,7 @@ function verifyCode() {
 // Main
 // ============================================
 
+renewLandLease();
 const changelogResult = verifyChangelog();
 if (!changelogResult.success) {
   console.error("\n=== Verification FAILED (CHANGELOG) ===");

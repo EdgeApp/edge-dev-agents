@@ -18,6 +18,13 @@
 # thread on 2026-07-29 because the old gate wording filtered to Bot authors).
 # Resolving them updates the marker via a re-run of the check, which is the
 # retry path the deny message prescribes.
+# Own comments: gids in /tmp/agent-own-stories-<gid> (written by
+# asana-task-update.sh --comment-file and hooks/record-own-asana-story.sh) are the
+# run's OWN comments. When every comment newer than the marker is one of them,
+# the hook re-runs the check itself (refreshing the marker) and continues to the
+# remaining gates instead of blocking: the agent and the operator post as the
+# same Asana user, and a run's own completion comment posted after its check was
+# the dominant stale-marker block. A missing file keeps the plain comparison.
 # Fail-open on API/network errors WHEN a marker exists (Asana being down should not
 # wedge the fleet; without network update-status.sh would fail anyway).
 #
@@ -44,9 +51,13 @@ esac
 GID="$AGENT_TASK_GID"
 MARKER="/tmp/agent-followup-scope-$GID.json"
 CHECK="\$HOME/.config/agent-watcher/check-followup-scope.sh --task-gid $GID"
+OWN="/tmp/agent-own-stories-$GID"
+# A check chained into the same command as Complete has not run when this gate
+# evaluates, so every retry path says to run it on its own.
+SOLO="Run the check as its OWN Bash command, never chained with the Complete call (this gate evaluates before anything chained ahead of Complete executes)."
 
 if [ ! -s "$MARKER" ]; then
-  echo "BLOCKED: no followup-scope check for task $GID. Your context may predate operator comments (a watcher resume compacts the session from a PRE-followup summary), so recalled history can never establish 'no new scope'. Run: $CHECK — then: if it lists operator asks newer than the run-report watermark, they are THIS run's deliverable (followup-scope-is-the-deliverable); deliver or explicitly surface them before Complete. If it lists none, retry Complete." >&2
+  echo "BLOCKED: no followup-scope check for task $GID. Your context may predate operator comments (a watcher resume compacts the session from a PRE-followup summary), so recalled history can never establish 'no new scope'. Run: $CHECK; then: if it lists operator asks newer than the run-report watermark, they are THIS run's deliverable (followup-scope-is-the-deliverable); deliver or explicitly surface them before Complete. If it lists none, retry Complete. $SOLO" >&2
   exit 2
 fi
 
@@ -54,12 +65,28 @@ fi
 # failure here fails OPEN (marker exists, Asana/API may be down).
 TOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null)}"
 if [ -n "$TOKEN" ]; then
-  LIVE_NEWEST="$(curl -sS --max-time 15 -H "Authorization: Bearer $TOKEN" \
-    "https://app.asana.com/api/1.0/tasks/$GID/stories?opt_fields=created_at,resource_subtype" 2>/dev/null \
+  LIVE_STORIES="$(curl -sS --max-time 15 -H "Authorization: Bearer $TOKEN" \
+    "https://app.asana.com/api/1.0/tasks/$GID/stories?opt_fields=gid,created_at,resource_subtype" 2>/dev/null || true)"
+  LIVE_NEWEST="$(printf '%s' "$LIVE_STORIES" \
     | jq -r '[.data[]? | select(.resource_subtype == "comment_added") | .created_at] | sort | last // empty' 2>/dev/null || true)"
   MARKER_NEWEST="$(jq -r '.newest_comment_at // empty' "$MARKER" 2>/dev/null || true)"
+  if [ -n "$LIVE_NEWEST" ] && [ "$LIVE_NEWEST" != "$MARKER_NEWEST" ] && [ -s "$OWN" ]; then
+    # Comments newer than the marker that are NOT the run's own. Zero foreign
+    # AND at least one newer comment means only self-posted stories moved the
+    # newest-comment clock: refresh the marker here and fall through.
+    FOREIGN_NEWER="$(printf '%s' "$LIVE_STORIES" | jq -r --arg m "$MARKER_NEWEST" --rawfile own "$OWN" '
+        ($own | split("\n") | map(select(length > 0))) as $mine
+        | [.data[]? | select(.resource_subtype == "comment_added") | select(($m == "") or (.created_at > $m))]
+        | "\(length) \([.[] | select(.gid as $g | $mine | index($g) | not)] | length)"' 2>/dev/null || true)"
+    if [ "${FOREIGN_NEWER%% *}" != "0" ] && [ "${FOREIGN_NEWER#* }" = "0" ] && [ -n "$FOREIGN_NEWER" ]; then
+      echo ">> require-followup-scope-on-complete: only this run's own comment(s) postdate the scope check; refreshing the marker" >&2
+      if "$HOME/.config/agent-watcher/check-followup-scope.sh" --task-gid "$GID" >/dev/null 2>&1 && [ -s "$MARKER" ]; then
+        MARKER_NEWEST="$(jq -r '.newest_comment_at // empty' "$MARKER" 2>/dev/null || true)"
+      fi
+    fi
+  fi
   if [ -n "$LIVE_NEWEST" ] && [ "$LIVE_NEWEST" != "$MARKER_NEWEST" ]; then
-    echo "BLOCKED: stale followup-scope check for task $GID — comment(s) landed after your last check (marker knows $MARKER_NEWEST, live newest is $LIVE_NEWEST). Re-run: $CHECK — address any new operator asks per followup-scope-is-the-deliverable, then retry Complete." >&2
+    echo "BLOCKED: stale followup-scope check for task $GID; comment(s) landed after your last check (marker knows $MARKER_NEWEST, live newest is $LIVE_NEWEST). Re-run: $CHECK; address any new operator asks per followup-scope-is-the-deliverable, then retry Complete. $SOLO" >&2
     exit 2
   fi
 fi
@@ -71,7 +98,7 @@ fi
 # 2026-08-19 report-eval cohort; enforcement approved 2026-07-29, built here.
 AGENT_AFTER="$(jq -r '.agent_comments_after_watermark // 0' "$MARKER" 2>/dev/null || echo 0)"
 if [ "$AGENT_AFTER" -gt 0 ] 2>/dev/null; then
-  echo "BLOCKED: $AGENT_AFTER agent-authored comment(s) postdate the run-report attachment, so the report is no longer the watermark — the next run's scope check cannot see anything below it. Re-attach the report (same file via asana-task-update.sh --attach-file; its iteration ordinal stays stable on re-attach), re-run: $CHECK — then retry Complete." >&2
+  echo "BLOCKED: $AGENT_AFTER agent-authored comment(s) postdate the run-report attachment, so the report is no longer the watermark; the next run's scope check cannot see anything below it. Re-attach the report (same file via asana-task-update.sh --attach-file; its iteration ordinal stays stable on re-attach), re-run: $CHECK; then retry Complete. $SOLO" >&2
   exit 2
 fi
 
@@ -79,7 +106,7 @@ fi
 # check script owns that; a re-run after resolving threads refreshes the count.
 GH_BLOCKING="$(jq -r '.github_blocking_threads // 0' "$MARKER" 2>/dev/null || echo 0)"
 if [ "$GH_BLOCKING" -gt 0 ] 2>/dev/null; then
-  echo "BLOCKED: your followup-scope check recorded $GH_BLOCKING unresolved review thread(s) on an OWNED open PR — that is THIS run's scope (human threads count: a reviewer's comments are the re-arm reason even with zero Asana activity). Address each per pr-address reply-then-resolve, re-run: $CHECK — then retry Complete once it records zero blocking threads." >&2
+  echo "BLOCKED: your followup-scope check recorded $GH_BLOCKING unresolved review thread(s) on an OWNED open PR; that is THIS run's scope (human threads count: a reviewer's comments are the re-arm reason even with zero Asana activity). Address each per pr-address reply-then-resolve, re-run: $CHECK; then retry Complete once it records zero blocking threads. $SOLO" >&2
   exit 2
 fi
 
@@ -91,7 +118,7 @@ fi
 # sticky until the reviewer re-reviews and must never gate Complete.
 GH_UNANSWERED="$(jq -r '.github_unanswered_bodies // 0' "$MARKER" 2>/dev/null || echo 0)"
 if [ "$GH_UNANSWERED" -gt 0 ] 2>/dev/null; then
-  echo "BLOCKED: your followup-scope check recorded $GH_UNANSWERED unanswered top-level review BODY(ies)/PR comment(s) on an OWNED PR — review feedback exactly like a thread, but it lives in .reviewBodies/.topLevel, NOT .threads. Address each per /pr-address (reply, then mark-addressed with the <!-- addressed:... --> marker), re-run: $CHECK — then retry Complete once it records zero." >&2
+  echo "BLOCKED: your followup-scope check recorded $GH_UNANSWERED unanswered top-level review BODY(ies)/PR comment(s) on an OWNED PR; review feedback exactly like a thread, but it lives in .reviewBodies/.topLevel, NOT .threads. Address each per /pr-address (reply, then mark-addressed with the <!-- addressed:... --> marker), re-run: $CHECK; then retry Complete once it records zero. $SOLO" >&2
   exit 2
 fi
 
@@ -100,7 +127,7 @@ fi
 # outage waiver when a reviewer is genuinely unavailable; its presence exempts.
 GH_BOTS="$(jq -r '.github_bots_incomplete // 0' "$MARKER" 2>/dev/null || echo 0)"
 if [ "$GH_BOTS" -gt 0 ] 2>/dev/null && [ ! -s "/tmp/agent-bot-unavailable-$GID" ]; then
-  echo "BLOCKED: $GH_BOTS reviewer-bot check(s) missing or not completed-clean on an OWNED ready PR HEAD. Complete requires the bots to have RUN AND CONCLUDED there (success/skipped): if the PR just flipped ready, run watch-pr.sh and let them finish; a red bot means findings to address first. A genuine bot outage is waived automatically when watch-pr records reviewer-unavailable. Re-run: $CHECK — then retry Complete." >&2
+  echo "BLOCKED: $GH_BOTS reviewer-bot check(s) missing or not completed-clean on an OWNED ready PR HEAD. Complete requires the bots to have RUN AND CONCLUDED there (success/skipped): if the PR just flipped ready, run watch-pr.sh and let them finish; a red bot means findings to address first. A genuine bot outage is waived automatically when watch-pr records reviewer-unavailable. Re-run: $CHECK; then retry Complete. $SOLO" >&2
   exit 2
 fi
 

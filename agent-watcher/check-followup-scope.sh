@@ -11,7 +11,7 @@
 # The require-followup-scope-on-complete.sh hook enforces that this ran.
 #
 # What it does:
-#   1. Fetch the task's attachments; watermark = newest agent-run-report*.md created_at
+#   1. Fetch the task's attachments; watermark = newest run-report attachment (lib/attach-names.sh) created_at
 #      (no report ever attached -> watermark is empty -> ALL comments are scope).
 #   2. Fetch the task's stories; enumerate comment_added stories NEWER than the watermark.
 #   3. Fetch the task's LIVE fields and diff them against the previous segment's
@@ -54,6 +54,7 @@
 set -euo pipefail
 
 DIR="$HOME/.config/agent-watcher"
+source "$HOME/.config/agent-watcher/lib/attach-names.sh"  # one attachment naming scheme
 TASK_GID=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -75,9 +76,9 @@ STORIES="$(curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" \
 echo "$ATT" | jq -e '.data' >/dev/null 2>&1 || { echo "check-followup-scope: attachments response invalid: $(echo "$ATT" | head -c 200)" >&2; exit 1; }
 echo "$STORIES" | jq -e '.data' >/dev/null 2>&1 || { echo "check-followup-scope: stories response invalid: $(echo "$STORIES" | head -c 200)" >&2; exit 1; }
 
-# Watermark: newest agent-run-report*.md attachment. ISO-8601 sorts lexically.
-WATERMARK="$(echo "$ATT" | jq -r '[.data[] | select(.name | test("^agent-run-report.*\\.md$")) | .created_at] | sort | last // empty')"
-WATERMARK_GID="$(echo "$ATT" | jq -r --arg w "$WATERMARK" 'first(.data[] | select(.name | test("^agent-run-report.*\\.md$")) | select(.created_at == $w) | .gid) // empty')"
+# Watermark: newest run-report attachment (new <N>-agent-run-report.md or legacy name). ISO-8601 sorts lexically.
+WATERMARK="$(echo "$ATT" | jq -r --arg re "$REPORT_ATTACH_RE" '[.data[] | select(.name | test($re)) | .created_at] | sort | last // empty')"
+WATERMARK_GID="$(echo "$ATT" | jq -r --arg re "$REPORT_ATTACH_RE" --arg w "$WATERMARK" 'first(.data[] | select(.name | test($re)) | select(.created_at == $w) | .gid) // empty')"
 
 # Comments newer than the watermark (all comments when no report was ever attached).
 NEWER="$(echo "$STORIES" | jq --arg w "$WATERMARK" \
@@ -224,7 +225,7 @@ GH_UNANSWERED="${GH_UNANSWERED:-0}"
 SEG_START=""
 [[ -f "$VERSIONS_FILE" ]] && SEG_START=$(jq -rs '[.[] | .ts // empty] | last // empty' "$VERSIONS_FILE" 2>/dev/null || true)
 if [[ -n "$SEG_START" ]]; then
-  SEG_WATERMARK="$(echo "$ATT" | jq -r --arg s "$SEG_START" '[.data[] | select(.name | test("^agent-run-report.*\\.md$")) | select(.created_at < $s) | .created_at] | sort | last // empty')"
+  SEG_WATERMARK="$(echo "$ATT" | jq -r --arg re "$REPORT_ATTACH_RE" --arg s "$SEG_START" '[.data[] | select(.name | test($re)) | select(.created_at < $s) | .created_at] | sort | last // empty')"
 else
   SEG_WATERMARK="$WATERMARK"
 fi
@@ -258,7 +259,7 @@ jq -n \
 
 echo ">> check-followup-scope: task $TASK_GID"
 if [[ -n "$WATERMARK" ]]; then
-  echo ">>   watermark (latest agent-run-report*.md): $WATERMARK"
+  echo ">>   watermark (latest *agent-run-report*.md): $WATERMARK"
 else
   echo ">>   watermark: NONE — no run-report ever attached; every comment is undischarged scope where it is addressed to the run"
 fi
@@ -338,7 +339,7 @@ if [[ -n "$WATERMARK_GID" ]]; then
           inSec && NF { print "     " $0 }
         ' | head -14
       done
-      echo ">>   (full report: the newest agent-run-report*.md attachment on the task)"
+      echo ">>   (full report: the newest *agent-run-report*.md attachment on the task)"
     fi
   fi
 fi

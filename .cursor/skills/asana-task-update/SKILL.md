@@ -42,10 +42,19 @@ metadata:
   --task <task_gid> \
   --set-board-state "QA Verification" --unassign
 
-# Attach a run-report markdown file to the task
+# Attach a run-report markdown file to the task. Orch doc names are numbered per
+# task: the run-report attach gate renames reports to <N>-agent-run-report.md, and
+# the script renames plan-<title>.md to <N>-plan-<title>.md (lib/attach-names.sh).
+# Re-attaching a corrected report under the same name REPLACES this segment's copy
+# (upload, then delete the older one); plans and other files dedupe instead.
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
   --task <task_gid> \
   --attach-file /tmp/agent-run-report.md --attach-name agent-run-report.md
+
+# Post a task comment from a file (marked as agent-authored; posts before any
+# --attach-file in the same call, so the report stays the newest story).
+~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
+  --task <task_gid> --comment-file /tmp/comment-<task_gid>.md
 
 # Refresh the agent-maintained CURRENT STATE tail of a task description.
 # Body file holds the bullets ONLY: the script adds the delimiter, preserves the
@@ -67,7 +76,8 @@ Determine which updates are needed by the caller and build one command with all 
 
 - `--attach-pr --pr-url --pr-title --pr-number`
 - `--attach-file <path> [--attach-name <name>]` (upload a local file, e.g. a run-report `.md`, as a native task attachment; distinct from `--attach-pr`)
-- `--assign` or `--assign <user_gid>`
+- `--comment-file <path>` (post the file's text as a task comment, marked as agent-authored)
+- `--assign` or `--assign <user_gid>` (sets the task assignee, e.g. a roster member below; it also fills the legacy Reviewer/Implementor fields only when one of the task's projects carries them, so `PROMPT_IMPLEMENTOR` appears only there)
 - `--skip-assign-if-missing`
 - `--unassign`
 - `--set-status "Review Needed|Publish Needed|Verification Needed"` (legacy Status field)

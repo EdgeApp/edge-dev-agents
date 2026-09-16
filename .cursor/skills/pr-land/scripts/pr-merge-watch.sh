@@ -76,8 +76,24 @@ call_deadline=$(( now + MAX_CALL ))
 # Consecutive-poll state tracking without associative arrays (macOS bash 3.2).
 PREV_STATES=""
 prev_state() { printf '%s\n' "$PREV_STATES" | grep -F "|$1=" | head -1 | cut -d= -f2; }
+# Land-lease upkeep: when this session holds a watched repo's land lease, each
+# poll renews it so a long CI wait cannot outlive the TTL (repo-land-lock.sh
+# renew: 0 renewed, 3 no lease held, 1 held by someone else or expired).
+LAND_LOCK="$HOME/.cursor/skills/pr-land/scripts/repo-land-lock.sh"
+LAND_LOCK_OWNER="${AGENT_SESSION_UUID:-op-${USER:-shell}}"
+renew_land_leases() {
+  [ -x "$LAND_LOCK" ] || return 0
+  local r rc
+  for r in $(for spec in "${PRS[@]}"; do p="${spec%%#*}"; echo "${p##*/}"; done | sort -u); do
+    rc=0
+    "$LAND_LOCK" renew --repo "$r" --owner "$LAND_LOCK_OWNER" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 1 ] && echo "$(date +%H:%M:%S) WARNING: land lease on $r is not ours or expired; re-acquire before any push" >&2
+  done
+  return 0
+}
 
 while :; do
+  renew_land_leases
   open=0
   red_pr=""
   rebase_prs=()
@@ -145,7 +161,8 @@ while :; do
   if [ ${#rebase_prs[@]} -gt 0 ]; then finish "NEEDS_REBASE ${rebase_prs[*]}" 3; fi
   if [ ${#review_prs[@]} -gt 0 ]; then finish "BLOCKED_ON_REVIEW ${review_prs[*]}" 6; fi
   if [ "$(date +%s)" -ge "$deadline" ]; then rm -f "$DEADLINE_FILE"; finish "TIMEOUT" 5; fi
-  if [ "$(date +%s)" -ge "$call_deadline" ]; then
+  # Bound the NEXT sleep too: a poll that would start past the cap exits now.
+  if [ $(( $(date +%s) + INTERVAL )) -ge "$call_deadline" ]; then
     finish "CONTINUE $(( deadline - $(date +%s) ))s of overall budget remain — re-invoke with the same args" 7
   fi
   sleep "$INTERVAL"

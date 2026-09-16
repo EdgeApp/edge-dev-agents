@@ -24,15 +24,19 @@
 # which finding or ask it answers. The kind is written as a `Fixup-for:` trailer;
 # git-branch-ops.sh condense-fixups keeps the two kinds as separate fixups per
 # target, so a reviewer sees the answer to their own comments apart from bot churn.
-#   --reorder      After a fixup commit, autosquash from merge-base with upstream.
+#   --reorder      After a fixup commit, fold THAT fixup into its target
+#                  (`git-branch-ops.sh fold-one`), never a whole-branch
+#                  autosquash: other pending fixups on the branch belong to
+#                  their own review rounds and are left alone.
 #                  DEFAULT, gated by the review-mode oracle (`git-branch-ops.sh
-#                  fold-mode`): when a human is mid-review on the branch's PR
-#                  (preserve) the fixup stays a fixup! commit at HEAD so the
-#                  reviewer sees the delta (slot it with slot-fixup.sh); no PR,
-#                  autosquash mode, or an operator rewrite approval note folds
+#                  fold-mode --target <target-sha>`): when a human is mid-review
+#                  on the branch's PR (preserve) the fixup stays a fixup! commit
+#                  at HEAD so the reviewer sees the delta (slot it with
+#                  slot-fixup.sh); no PR, autosquash mode, or an operator
+#                  rewrite approval whose scope covers this fixup's target folds
 #                  it. Outside an agent session (no AGENT_TASK_GID) an explicit
 #                  --reorder forces the fold.
-#   --no-reorder   Never autosquash, whatever the oracle says
+#   --no-reorder   Never fold, whatever the oracle says
 #
 # If files are given, they are the primary scope for linting/committing.
 # The script may also auto-include generated companion files like:
@@ -50,7 +54,8 @@
 #   4. git add -A && git commit --no-verify
 #   5. Run jest --findRelatedTests -u on committed .ts/.tsx files
 #   6. If snapshots changed, amend the commit to include them
-#   7. If commit is a fixup (--fixup or -m "fixup! ..."), autosquash via shared helper
+#   7. If commit is a fixup (--fixup or -m "fixup! ..."), fold that one fixup
+#      into its target via the shared helper
 set -euo pipefail
 
 # Bump node heap for large repos (default ~4GB OOMs on big codebases).
@@ -450,7 +455,7 @@ if [[ ${#LINT_FILES[@]} -gt 0 && -x ./node_modules/.bin/jest ]]; then
   fi
 fi
 
-# Step 7: Autosquash fixup commits when requested
+# Step 7: Fold this fixup into its target when the oracle allows
 # Detects fixup commits by --fixup flag or "fixup! " prefix in message
 IS_FIXUP="false"
 if [[ -n "$FIXUP" ]]; then
@@ -461,7 +466,25 @@ fi
 
 FOLD="false"
 if [[ "$IS_FIXUP" == "true" && "$REORDER" != "false" ]]; then
-  FOLD_JSON="$(~/.cursor/skills/git-branch-ops.sh fold-mode 2>/dev/null || echo '{"fold":true,"mode":"unknown","reason":"fold-mode unavailable"}')"
+  # The commit this fixup targets. fold-mode checks an operator rewrite
+  # approval's scope against it, so a fixup whose target the operator did not
+  # name stays a fixup! commit for the reviewer.
+  if [[ -n "$FIXUP" ]]; then
+    FIXUP_TARGET="$(git rev-parse --verify -q "${FIXUP}^{commit}" 2>/dev/null || true)"
+  else
+    FIXUP_HEADLINE="$(git log -1 --format=%s | sed -E 's/^(fixup! )+//')"
+    FOLD_UPSTREAM=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
+      || echo "origin/$(git remote show origin 2>/dev/null | sed -n '/HEAD branch/s/.*: //p')" \
+      || echo "origin/master")
+    FOLD_BASE="$(git merge-base "$FOLD_UPSTREAM" HEAD 2>/dev/null || true)"
+    # %H is 40 chars, so the subject starts at column 42; literal comparison,
+    # never a dynamic regex (subjects carry regex metacharacters).
+    FIXUP_TARGET="$(git log "${FOLD_BASE:+$FOLD_BASE..}HEAD~1" --format='%H %s' 2>/dev/null \
+      | HEADLINE="$FIXUP_HEADLINE" awk 'substr($0, 42) == ENVIRON["HEADLINE"] { print $1; exit }' || true)"
+  fi
+  FOLD_MODE_ARGS=(fold-mode)
+  [[ -n "$FIXUP_TARGET" ]] && FOLD_MODE_ARGS+=(--target "$FIXUP_TARGET")
+  FOLD_JSON="$(~/.cursor/skills/git-branch-ops.sh "${FOLD_MODE_ARGS[@]}" 2>/dev/null || echo '{"fold":true,"mode":"unknown","reason":"fold-mode unavailable"}')"
   FOLD_MODE="$(printf '%s' "$FOLD_JSON" | jq -r '.mode // "unknown"' 2>/dev/null || echo unknown)"
   FOLD_REASON="$(printf '%s' "$FOLD_JSON" | jq -r '.reason // ""' 2>/dev/null || true)"
   if [[ "$(printf '%s' "$FOLD_JSON" | jq -r '.fold' 2>/dev/null)" == "true" ]]; then
@@ -476,18 +499,16 @@ if [[ "$IS_FIXUP" == "true" && "$REORDER" != "false" ]]; then
 fi
 
 if [[ "$FOLD" == "true" ]]; then
-  echo ">> Autosquashing fixup commit ($FOLD_REASON)..."
+  echo ">> Folding this fixup into its target ($FOLD_REASON)..."
 
-  DEFAULT_UPSTREAM=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
-    || echo "origin/$(git remote show origin 2>/dev/null | sed -n '/HEAD branch/s/.*: //p')" \
-    || echo "origin/master")
-
-  if ~/.cursor/skills/git-branch-ops.sh autosquash --merge-base-with "$DEFAULT_UPSTREAM" 2>/dev/null; then
-    echo ">> Fixup autosquashed successfully"
+  # fold-one, never `autosquash`: the whole-branch autosquash would also squash
+  # every OTHER pending fixup on the branch, including ones a reviewer has not
+  # read yet. It aborts its own rebase on a conflict and leaves the fixup here.
+  if ~/.cursor/skills/git-branch-ops.sh fold-one --fixup "$(git rev-parse HEAD)"; then
+    echo ">> Fixup folded into its target"
   else
-    git rebase --abort 2>/dev/null || true
-    echo ">> Warning: Could not autosquash fixup (conflict). Fixup remains at HEAD." >&2
-    echo ">> Run '~/.cursor/skills/git-branch-ops.sh autosquash --merge-base-with $DEFAULT_UPSTREAM' manually." >&2
+    echo ">> Warning: Could not fold the fixup (see the error above). Fixup remains at HEAD." >&2
+    echo ">> Slot it next to its target with ~/.cursor/skills/slot-fixup.sh; pr-finalize-fixups.sh folds it at the next sanctioned rewrite." >&2
   fi
 fi
 

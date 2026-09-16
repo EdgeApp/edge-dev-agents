@@ -4,23 +4,50 @@
 #
 # Usage:
 #   git-branch-ops.sh autosquash [--base <ref> | --merge-base-with <ref>]
+#   git-branch-ops.sh fold-one --fixup <sha> [--base <ref> | --merge-base-with <ref>]
 #   git-branch-ops.sh condense-fixups [--base <ref> | --merge-base-with <ref>]
 #   git-branch-ops.sh push [--remote <name>] [--branch <name>] [--force-with-lease]
 #   git-branch-ops.sh self-rewrite [--upstream <ref>] [--min-lines N] [--min-ratio N] [--gate]
 #   git-branch-ops.sh self-rewrite --whole-branch [--min-lines N] [--min-ratio N]
-#   git-branch-ops.sh fold-mode
+#   git-branch-ops.sh fold-mode [--target <sha>]
+#   git-branch-ops.sh note-scope [--note <path>]
 #
-# fold-mode: may a fixup on this branch be squashed into its target RIGHT NOW?
+# autosquash vs fold-one: `autosquash` is a WHOLE-BRANCH
+# `rebase -i --autosquash` from the merge base — it squashes EVERY pending
+# fixup! on the branch, including ones a reviewer has not seen. It belongs to
+# the sanctioned push-time path (pr-finalize-fixups.sh) and to an operator
+# approval that says `Targets: all`. `fold-one --fixup <sha>` squashes exactly
+# ONE fixup into the commit its subject names and leaves every other pending
+# fixup where it is; that is the fold lint-commit.sh performs after creating a
+# fixup.
+#
+# fold-mode: may THIS fixup be squashed into its target RIGHT NOW?
 # One JSON line: {"fold":true|false,"mode":"autosquash"|"preserve"|"no-pr"|
-# "unknown","reason":"..."}. Asks pr-address.sh review-mode for the branch's
-# open PR; `preserve` (a human is mid-review) means the fixup must stay a
-# fixup! commit so the reviewer sees the delta, UNLESS the operator approved a
-# rewrite (/tmp/agent-history-rewrite-approved-<AGENT_TASK_GID>.md, the same
-# note git-history-gate.sh honors). No PR, or an oracle that cannot answer,
+# "unknown","approved_targets":[...],"whole_branch":true|false,"reason":"..."}.
+# Asks pr-address.sh review-mode for the branch's open PR; `preserve` (a human
+# is mid-review) means the fixup must stay a fixup! commit so the reviewer sees
+# the delta, UNLESS the operator approved a rewrite of the commit this fixup
+# targets (pass it as --target <sha>). No PR, or an oracle that cannot answer,
 # folds (fail open: a fresh /im branch has no reviewer to protect).
-# lint-commit.sh consults this before its post-fixup autosquash, so every
-# fixup path (im, pr-land, tdd, self-rewrite folds, pr-address, bugbot) makes
-# the same call without each caller remembering a flag.
+# lint-commit.sh consults this before its post-fixup fold, so every fixup path
+# (im, pr-land, tdd, self-rewrite folds, pr-address, bugbot) makes the same
+# call without each caller remembering a flag.
+#
+# OPERATOR REWRITE-APPROVAL NOTE — shape.
+# /tmp/agent-history-rewrite-approved-<AGENT_TASK_GID>.md, written by the agent
+# to record the operator task comment that approved a history rewrite under
+# review (git-history-gate.sh's block message tells the agent to write it;
+# /eval-run audits it against the comment it cites). It cites that comment and
+# names its SCOPE on a line, case-insensitive:
+#   Targets: <sha> [<sha> ...]   those commits may be rewritten
+#   Targets: all                 the whole branch may be rewritten
+# A note with NO Targets: line is the legacy shape: it approves folding ONE
+# fixup into its own target (fold-one) and never a whole-branch autosquash.
+# The approval is never blanket permission: an approval naming one commit does
+# not authorize squashing a fixup the reviewer is still waiting to read.
+# `note-scope` prints the tokens one per line (`all` for the whole branch) and
+# exits 1 when there is no note, so git-history-gate.sh and this script read
+# one parse.
 #
 # self-rewrite: find unpublished commits that REWRITE lines this branch already
 # published. A commit whose removed lines were introduced by commits already on
@@ -55,8 +82,11 @@
 #   cannot answer.
 #
 # Exit codes:
-#   0 - success (self-rewrite: nothing flagged, or flagged without --gate)
-#   1 - error
+#   0 - success (self-rewrite: nothing flagged, or flagged without --gate;
+#       note-scope: a note exists)
+#   1 - error (fold-one: target not on the branch, detached HEAD, or a rebase
+#       conflict — the rebase is aborted and the fixup stays where it was;
+#       note-scope: no note)
 #   2 - self-rewrite --gate: flagged commits, no concession note
 set -euo pipefail
 
@@ -73,9 +103,24 @@ MIN_LINES=5
 MIN_RATIO=80
 GATE="false"
 WHOLE_BRANCH="false"
+FIXUP=""
+TARGET=""
+NOTE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --fixup)
+      FIXUP="$2"
+      shift 2
+      ;;
+    --target)
+      TARGET="$2"
+      shift 2
+      ;;
+    --note)
+      NOTE="$2"
+      shift 2
+      ;;
     --base)
       BASE="$2"
       shift 2
@@ -137,23 +182,42 @@ resolve_default_upstream() {
   fi
 }
 
-run_autosquash() {
+# Fill BASE from --base, --merge-base-with, or the default upstream's merge base.
+resolve_base() {
   if [[ -n "$BASE" && -n "$MERGE_BASE_WITH" ]]; then
     echo "Error: Use either --base or --merge-base-with, not both" >&2
     exit 1
   fi
-
+  [[ -n "$BASE" ]] && return 0
+  [[ -n "$MERGE_BASE_WITH" ]] || MERGE_BASE_WITH="$(resolve_default_upstream)"
+  BASE="$(git merge-base "$MERGE_BASE_WITH" HEAD 2>/dev/null || true)"
   if [[ -z "$BASE" ]]; then
-    if [[ -z "$MERGE_BASE_WITH" ]]; then
-      MERGE_BASE_WITH="$(resolve_default_upstream)"
-    fi
-
-    BASE="$(git merge-base "$MERGE_BASE_WITH" HEAD 2>/dev/null || true)"
-    if [[ -z "$BASE" ]]; then
-      echo "Error: Could not determine merge-base with '$MERGE_BASE_WITH'" >&2
-      exit 1
-    fi
+    echo "Error: Could not determine merge-base with '$MERGE_BASE_WITH'" >&2
+    exit 1
   fi
+}
+
+# The operator rewrite-approval note for this run. Shape: see the header.
+rewrite_note_path() {
+  printf '/tmp/agent-history-rewrite-approved-%s.md\n' "${AGENT_TASK_GID:-none}"
+}
+
+# Print the note's scope tokens, one per line (`all` = the whole branch); no
+# output = the legacy unscoped shape. Exit 1 when the note is absent or empty,
+# so a caller can tell "no approval" from "approval with no scope line".
+# Lowercased before matching: `Targets:` / `targets:` / `Target:` all parse,
+# and shas are hex either way.
+run_note_scope() {
+  local note="${1:-${NOTE:-$(rewrite_note_path)}}"
+  [[ -s "$note" ]] || return 1
+  tr '[:upper:]' '[:lower:]' < "$note" \
+    | sed -nE 's/^[[:space:]]*targets?[[:space:]]*:[[:space:]]*(.*)$/\1/p' \
+    | tr ',' ' ' | tr -s '[:space:]' '\n' | grep -v '^$' || true
+  return 0
+}
+
+run_autosquash() {
+  resolve_base
 
   rm -f "$(git rev-parse --git-path index.lock)"
   GIT_EDITOR=true GIT_SEQUENCE_EDITOR=: git rebase -i "$BASE" --autosquash
@@ -320,18 +384,7 @@ run_self_rewrite() {
 # where condensed is the number of fixup commits removed. Exit 1 on a rebase
 # conflict (aborted, tree left clean).
 run_condense_fixups() {
-  if [[ -n "$BASE" && -n "$MERGE_BASE_WITH" ]]; then
-    echo "Error: Use either --base or --merge-base-with, not both" >&2
-    exit 1
-  fi
-  if [[ -z "$BASE" ]]; then
-    [[ -n "$MERGE_BASE_WITH" ]] || MERGE_BASE_WITH="$(resolve_default_upstream)"
-    BASE="$(git merge-base "$MERGE_BASE_WITH" HEAD 2>/dev/null || true)"
-    if [[ -z "$BASE" ]]; then
-      echo "Error: Could not determine merge-base with '$MERGE_BASE_WITH'" >&2
-      exit 1
-    fi
-  fi
+  resolve_base
   local tmp plan
   tmp="$(mktemp -d -t condense-fixups.XXXXXX)"
   # shellcheck disable=SC2064  # expand now: the local is gone when EXIT fires
@@ -422,11 +475,97 @@ NODEEOF
   printf '%s\n' "$plan"
 }
 
+# fold-one --fixup <sha>: squash exactly ONE fixup! commit into the commit its
+# subject names. Every other pending fixup on the branch keeps its own commit,
+# which is the whole point: `autosquash` rewrites the branch from the merge
+# base and sweeps up fixups a reviewer is still waiting to read.
+# The sequence editor drops the named fixup's `pick` line and re-inserts it as
+# `fixup` directly after its target's line; every other line stays `pick`.
+run_fold_one() {
+  local fixup_sha target_sha subject headline short_fix short_tgt tmp
+  if [[ -z "$FIXUP" ]]; then
+    echo "Error: fold-one needs --fixup <sha>" >&2
+    exit 1
+  fi
+  if ! git symbolic-ref --quiet HEAD >/dev/null 2>&1; then
+    echo "Error: HEAD is detached; check out the branch before folding a fixup" >&2
+    exit 1
+  fi
+  fixup_sha="$(git rev-parse --verify -q "${FIXUP}^{commit}" 2>/dev/null || true)"
+  if [[ -z "$fixup_sha" ]]; then
+    echo "Error: '$FIXUP' is not a commit in this repo" >&2
+    exit 1
+  fi
+  resolve_base
+  if ! git rev-list "$BASE..HEAD" 2>/dev/null | grep -qx "$fixup_sha"; then
+    echo "Error: fixup $(git rev-parse --short=10 "$fixup_sha") is not on this branch above $BASE" >&2
+    exit 1
+  fi
+  subject="$(git log -1 --format=%s "$fixup_sha")"
+  if [[ "$subject" != fixup!\ * ]]; then
+    echo "Error: $(git rev-parse --short=10 "$fixup_sha") is not a fixup! commit (subject: $subject)" >&2
+    exit 1
+  fi
+  headline="$subject"
+  while [[ "$headline" == fixup!\ * ]]; do headline="${headline#fixup! }"; done
+  # Literal subject comparison, never a dynamic regex: subjects carry regex
+  # metacharacters. %H is 40 chars, so the subject starts at column 42. Search
+  # below the fixup only, so the target is always an ancestor of it.
+  target_sha="$(git log "$BASE..$fixup_sha^" --format='%H %s' 2>/dev/null \
+    | HEADLINE="$headline" awk 'substr($0, 42) == ENVIRON["HEADLINE"] { print $1; exit }' || true)"
+  if [[ -z "$target_sha" ]]; then
+    echo "Error: fixup target \"$headline\" is not on this branch (searched $BASE..$(git rev-parse --short=10 "$fixup_sha")^)." >&2
+    echo "  The fixup stays where it is. Re-target it at a commit on the branch, or let pr-finalize-fixups.sh carry it." >&2
+    exit 1
+  fi
+  short_fix="$(git rev-parse --short=10 "$fixup_sha")"
+  short_tgt="$(git rev-parse --short=10 "$target_sha")"
+  tmp="$(mktemp -d -t fold-one.XXXXXX)"
+  # shellcheck disable=SC2064  # expand now: the local is gone when EXIT fires
+  trap "rm -rf '$tmp'" EXIT
+  cat > "$tmp/fold-one.js" <<'NODEEOF'
+const fs = require('fs')
+const todoPath = process.argv[2]
+const fixup = process.env.FOLD_FIXUP_SHA
+const target = process.env.FOLD_TARGET_SHA
+const shaOf = l => { const m = l.match(/^(?:pick|p)\s+([0-9a-f]+)/); return m ? m[1] : null }
+// git abbreviates todo shas; either side may be the prefix.
+const same = (a, b) => !!a && !!b && (a.startsWith(b) || b.startsWith(a))
+const lines = fs.readFileSync(todoPath, 'utf8').split('\n')
+const kept = []
+let fixupLine = null
+for (const line of lines) {
+  const sha = shaOf(line)
+  if (sha && same(fixup, sha) && fixupLine === null) { fixupLine = line; continue }
+  kept.push(line)
+}
+if (fixupLine === null) { console.error('ERROR: fixup ' + fixup + ' is not in the rebase todo'); process.exit(1) }
+const at = kept.findIndex(l => { const sha = shaOf(l); return sha && same(target, sha) })
+if (at < 0) { console.error('ERROR: target ' + target + ' is not in the rebase todo'); process.exit(1) }
+kept.splice(at + 1, 0, fixupLine.replace(/^(?:pick|p)\s+/, 'fixup '))
+fs.writeFileSync(todoPath, kept.join('\n'))
+NODEEOF
+  rm -f "$(git rev-parse --git-path index.lock)"
+  if ! FOLD_FIXUP_SHA="$fixup_sha" FOLD_TARGET_SHA="$target_sha" \
+      GIT_SEQUENCE_EDITOR="node $tmp/fold-one.js" GIT_EDITOR=true \
+      git rebase --autostash -i "$BASE" >"$tmp/rebase.log" 2>&1; then
+    echo "Error: rebase failed while folding $short_fix into $short_tgt" >&2
+    sed 's/^/  /' "$tmp/rebase.log" | tail -20 >&2
+    if [[ -d "$(git rev-parse --git-path rebase-merge)" ]] || [[ -d "$(git rev-parse --git-path rebase-apply)" ]]; then
+      echo "Aborting the rebase; the fixup stays where it was" >&2
+      git rebase --abort 2>&1 | sed 's/^/  /' >&2 || true
+    fi
+    exit 1
+  fi
+  echo ">> Folded fixup $short_fix into $short_tgt (\"$headline\"); other pending fixups untouched"
+}
+
 run_fold_mode() {
-  local prjson prnum owner rname mode="" note
+  local prjson prnum owner rname mode="" note tokens tokens_json="" tok tok_sha target_sha=""
+  local scoped="false" all="false" covers="false"
   prjson="$(gh pr view --json number,headRepositoryOwner,headRepository 2>/dev/null || true)"
   if [[ -z "$prjson" ]]; then
-    printf '{"fold":true,"mode":"no-pr","reason":"no open PR for this branch"}\n'; return 0
+    printf '{"fold":true,"mode":"no-pr","approved_targets":[],"whole_branch":false,"reason":"no open PR for this branch"}\n'; return 0
   fi
   prnum="$(printf '%s' "$prjson" | jq -r '.number // empty')"
   owner="$(printf '%s' "$prjson" | jq -r '.headRepositoryOwner.login // empty')"
@@ -437,14 +576,38 @@ run_fold_mode() {
   fi
   case "$mode" in
     preserve)
-      note="/tmp/agent-history-rewrite-approved-${AGENT_TASK_GID:-none}.md"
-      if [[ -n "${AGENT_TASK_GID:-}" && -s "$note" ]]; then
-        printf '{"fold":true,"mode":"preserve","reason":"operator rewrite approval %s"}\n' "$note"
+      note="${NOTE:-$(rewrite_note_path)}"
+      if [[ -z "${AGENT_TASK_GID:-}" && -z "$NOTE" ]] || [[ ! -s "$note" ]]; then
+        printf '{"fold":false,"mode":"preserve","approved_targets":[],"whole_branch":false,"reason":"a human reviewer is mid-review on PR #%s; keep the fixup! commit so they see the delta"}\n' "$prnum"
+        return 0
+      fi
+      tokens="$(run_note_scope "$note" || true)"
+      [[ -n "$tokens" ]] && scoped="true"
+      [[ -n "$TARGET" ]] && target_sha="$(git rev-parse --verify -q "${TARGET}^{commit}" 2>/dev/null || true)"
+      while read -r tok; do
+        [[ -n "$tok" ]] || continue
+        [[ -n "$tokens_json" ]] && tokens_json+=","
+        tokens_json+="\"$(printf '%s' "$tok" | sed 's/[\\"]/_/g')\""
+        if [[ "$tok" == "all" ]]; then all="true"; continue; fi
+        if [[ -n "$target_sha" ]]; then
+          tok_sha="$(git rev-parse --verify -q "${tok}^{commit}" 2>/dev/null || true)"
+          [[ -n "$tok_sha" && "$tok_sha" == "$target_sha" ]] && covers="true"
+        fi
+      done <<< "$tokens"
+      if [[ "$all" == "true" ]]; then
+        printf '{"fold":true,"mode":"preserve","approved_targets":[%s],"whole_branch":true,"reason":"operator rewrite approval %s says Targets: all, so the whole branch may be rewritten"}\n' "$tokens_json" "$note"
+      elif [[ "$covers" == "true" ]]; then
+        printf '{"fold":true,"mode":"preserve","approved_targets":[%s],"whole_branch":false,"reason":"operator rewrite approval %s names this fixup target (%s); fold only this fixup"}\n' \
+          "$tokens_json" "$note" "$(git rev-parse --short=10 "$target_sha")"
+      elif [[ "$scoped" == "true" ]]; then
+        printf '{"fold":false,"mode":"preserve","approved_targets":[%s],"whole_branch":false,"reason":"operator rewrite approval %s covers only the targets it names; it does not cover %s, so the fixup stays for the reviewer"}\n' \
+          "$tokens_json" "$note" "${target_sha:-the commit this fixup targets (no --target given)}"
       else
-        printf '{"fold":false,"mode":"preserve","reason":"a human reviewer is mid-review on PR #%s; keep the fixup! commit so they see the delta"}\n' "$prnum"
+        echo ">> fold-mode: $note names no targets. Add a scope line so the approval says what it covers: 'Targets: <sha> [<sha> ...]' or 'Targets: all'. Folding THIS fixup only." >&2
+        printf '{"fold":true,"mode":"preserve","approved_targets":[],"whole_branch":false,"reason":"operator rewrite approval %s is unscoped (no Targets: line); it folds this one fixup into its own target and never a whole-branch autosquash"}\n' "$note"
       fi ;;
-    autosquash) printf '{"fold":true,"mode":"autosquash","reason":"no active human review on PR #%s"}\n' "$prnum" ;;
-    *) printf '{"fold":true,"mode":"unknown","reason":"review-mode unavailable; fail open"}\n' ;;
+    autosquash) printf '{"fold":true,"mode":"autosquash","approved_targets":[],"whole_branch":false,"reason":"no active human review on PR #%s"}\n' "$prnum" ;;
+    *) printf '{"fold":true,"mode":"unknown","approved_targets":[],"whole_branch":false,"reason":"review-mode unavailable; fail open"}\n' ;;
   esac
 }
 
@@ -452,8 +615,14 @@ case "$CMD" in
   autosquash)
     run_autosquash
     ;;
+  fold-one)
+    run_fold_one
+    ;;
   fold-mode)
     run_fold_mode
+    ;;
+  note-scope)
+    run_note_scope
     ;;
   condense-fixups)
     run_condense_fixups
@@ -465,7 +634,7 @@ case "$CMD" in
     run_self_rewrite
     ;;
   *)
-    echo "Usage: git-branch-ops.sh {autosquash|condense-fixups|push|self-rewrite|fold-mode} [args]" >&2
+    echo "Usage: git-branch-ops.sh {autosquash|fold-one|condense-fixups|push|self-rewrite|fold-mode|note-scope} [args]" >&2
     exit 1
     ;;
 esac

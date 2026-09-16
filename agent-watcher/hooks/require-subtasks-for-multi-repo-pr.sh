@@ -4,9 +4,10 @@
 # subtask-per-PR (one-shot `multi-repo-subtasks`), never flat-attached onto the main
 # task. A run is multi-repo when its worktree root holds >1 repo on a feature branch
 # WITH commits ahead of the origin base (a provisioned branch with zero commits is
-# not PR work). Block a pr-create.sh EXECUTION that flat-attaches in that case;
-# `--no-asana-attach` or a `--create-subtask ... --attach-pr` call passes, and
-# read-only commands that merely name the script path never fire it.
+# not PR work). Block a pr-create.sh EXECUTION that flat-attaches in that case.
+# pr-create.sh attaches ONLY when passed --asana-attach (its default is no attach),
+# so a call without that flag never flat-attaches and passes; read-only commands
+# that merely name the script path never fire it.
 # Enforcement-over-prose: the 2026-06-20 eval cohort had a run flat-attach a 2-repo PR set.
 set -euo pipefail
 
@@ -28,9 +29,10 @@ CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentio
 # *pr-create* also matched sibling helpers under skills/pr-create/scripts/
 # (pr-attach-screenshots.sh) with no compliant way through.
 printf '%s' "$CMD_M" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" pr-create.sh || exit 0
-# The compliant multi-repo paths are explicitly allowed.
-printf '%s' "$CMD_M" | grep -q -- '--no-asana-attach' && exit 0
-printf '%s' "$CMD_M" | grep -q -- '--create-subtask' && exit 0
+# Only a flat-attaching call can violate the rule: pr-create.sh defaults to no
+# Asana attach, so without --asana-attach (exact flag; --no-asana-attach does not
+# count) there is nothing to gate.
+printf '%s' "$CMD_M" | grep -qE -- '(^|[[:space:]])--asana-attach([[:space:]=]|$)' || exit 0
 
 WT="$HOME/git/.agent-worktrees/$AGENT_TASK_GID"
 [ -d "$WT" ] || exit 0
@@ -61,7 +63,7 @@ for d in "$WT"/*/; do
 done
 
 if [ "$feature_repos" -gt 1 ]; then
-  echo "BLOCKED: this run has feature branches in $feature_repos repos ($names ) — a multi-repo run must NOT flat-attach PRs onto the main task. Run /pr-create with --no-asana-attach, then create a subtask per PR and attach each via 'asana-task-update.sh --create-subtask --subtask-name ... --attach-pr ...' (one-shot rule multi-repo-subtasks). Single-repo runs attach their one PR directly." >&2
+  echo "BLOCKED: this run has feature branches in $feature_repos repos ($names ): a multi-repo run must NOT flat-attach PRs onto the main task. Run /pr-create without --asana-attach, then create a subtask per PR and attach each via 'asana-task-update.sh --create-subtask --subtask-name ... --attach-pr ...' (one-shot rule multi-repo-subtasks). Single-repo runs attach their one PR directly." >&2
   exit 2
 fi
 exit 0

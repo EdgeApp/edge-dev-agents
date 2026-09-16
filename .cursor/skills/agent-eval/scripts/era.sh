@@ -6,6 +6,10 @@
 #                 "not_yet":[{shipped,dims,name,mechanism,before}]}
 # An empty or unparsable date puts every row in in_effect (grade the current
 # expectation) and sets as_of to null. Exit 2 when the table is missing.
+# Cells split on unescaped pipes; a literal pipe inside a cell is written `\|`
+# (the GFM table escape). A dated row that does not split into exactly six
+# cells exits 1 naming the line, since a shifted column would hand graders the
+# Before text as After with nothing downstream able to notice.
 set -euo pipefail
 SK="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TABLE="$SK/references/era.md"; ASOF="${1:-}"
@@ -14,10 +18,12 @@ TABLE="$SK/references/era.md"; ASOF="${1:-}"
 node -e '
   const fs=require("fs"); const [table,asofRaw]=process.argv.slice(1);
   const d=(asofRaw||"").match(/^\d{4}-\d{2}-\d{2}/); const asof=d?d[0]:null;
-  const rows=[];
+  const rows=[]; let ln=0;
   for(const line of fs.readFileSync(table,"utf8").split("\n")){
-    const c=line.split("|").map(s=>s.trim());
-    if(c.length<7||!/^\d{4}-\d{2}-\d{2}$/.test(c[1]))continue;
+    ln++;
+    const c=line.split(/(?<!\\)\|/).map(s=>s.trim().replace(/\\\|/g,"|"));
+    if(c.length<3||!/^\d{4}-\d{2}-\d{2}$/.test(c[1]))continue;
+    if(c.length!==8){console.error("era.sh: "+table+":"+ln+" splits into "+(c.length-2)+" cells, want 6 (escape a literal pipe as \\|)");process.exit(1)}
     rows.push({shipped:c[1],dims:c[2].split(",").map(s=>s.trim()).filter(Boolean),name:c[3],mechanism:c[4],before:c[5],after:c[6]});
   }
   const inEffect=[],notYet=[];

@@ -36,6 +36,8 @@ SUBTASK_NAME=""
 
 SET_CURRENT_STATE_FILE=""
 
+COMMENT_FILE=""
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --task) TASK_GID="$2"; shift 2 ;;
@@ -47,6 +49,7 @@ while [[ $# -gt 0 ]]; do
     --pr-number) PR_NUMBER="$2"; shift 2 ;;
     --attach-file) DO_ATTACH_FILE=true; ATTACH_FILE_PATH="$2"; shift 2 ;;
     --set-current-state) SET_CURRENT_STATE_FILE="$2"; shift 2 ;;
+    --comment-file) COMMENT_FILE="$2"; shift 2 ;;
     --attach-name) ATTACH_FILE_NAME="$2"; shift 2 ;;
     --assign)
       DO_ASSIGN=true
@@ -75,7 +78,7 @@ if [[ -z "$TASK_GID" ]]; then
   exit 1
 fi
 
-if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_STATUS" ]] && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_REVIEWER_GID" ]] && [[ -z "$SET_IMPLEMENTOR_GID" ]] && [[ -z "$SET_PRIORITY_GID" ]] && [[ -z "$SET_PLANNED_GID" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && ! $AUTO_EST_REVIEW; then
+if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_STATUS" ]] && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_REVIEWER_GID" ]] && [[ -z "$SET_IMPLEMENTOR_GID" ]] && [[ -z "$SET_PRIORITY_GID" ]] && [[ -z "$SET_PLANNED_GID" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$COMMENT_FILE" ]] && ! $AUTO_EST_REVIEW; then
   echo "Error: No operations specified" >&2
   exit 1
 fi
@@ -91,6 +94,9 @@ if [[ -z "${ASANA_TOKEN:-}" ]]; then
   echo "Error: ASANA_TOKEN not set and not found in credentials.json (.asana_token)" >&2
   exit 1
 fi
+# Exported so child helpers (asana-whoami.sh for implementor resolution) see a
+# token that came from credentials.json rather than the environment.
+export ASANA_TOKEN
 
 # Widget secret: prefer $ASANA_GITHUB_SECRET, else fall back to credentials.json
 # (mirrors the token fallback — spawned shells may not have it exported).
@@ -109,6 +115,36 @@ fi
 
 ASANA_API="https://app.asana.com/api/1.0"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# asana_request <label> <curl args...>
+# Runs one Asana API call and leaves the response body in ASANA_RESPONSE.
+# Returns 0 on a 2xx. Otherwise prints ">> <label>: FAILED (HTTP <code>): <why>"
+# to stderr, where <why> is Asana's errors[].message (else the raw body, else
+# curl's own error), and returns 1; callers exit 1.
+# Use it instead of a bare `curl -sf`: on an HTTP/2 connection the system curl
+# reports an HTTP 4xx under -f as exit 56 (not 22) and discards the body, so an
+# unguarded `curl -sf` under `set -e` ended the script with a bare 56 and no hint
+# of what Asana refused.
+ASANA_RESPONSE=""
+asana_request() {
+  local label="$1"; shift
+  local out err code rc=0 why
+  out="$(mktemp)"; err="$(mktemp)"
+  code="$(curl -sS -o "$out" -w '%{http_code}' "$@" 2>"$err")" || rc=$?
+  ASANA_RESPONSE="$(cat "$out" 2>/dev/null || true)"
+  if [[ $rc -eq 0 && "$code" =~ ^2[0-9][0-9]$ ]]; then
+    rm -f "$out" "$err"
+    return 0
+  fi
+  why="$(printf '%s' "$ASANA_RESPONSE" | jq -r '[.errors[]?.message // empty] | join("; ")' 2>/dev/null || true)"
+  [[ -n "$why" ]] || why="$(printf '%s' "$ASANA_RESPONSE" | tr '\n' ' ')"
+  [[ -n "$why" ]] || why="$(tr '\n' ' ' < "$err")"
+  local curl_note=""
+  [[ $rc -ne 0 ]] && curl_note=", curl exit $rc"
+  echo ">> $label: FAILED (HTTP ${code:-000}${curl_note}): ${why:0:800}" >&2
+  rm -f "$out" "$err"
+  return 1
+}
 
 # The one line separating operator prose from the agent-maintained tail of a
 # task description. Owned here so every writer agrees on the byte-exact literal;
@@ -170,8 +206,34 @@ load_task_fields() {
   if [[ -n "$TASK_FIELDS" ]]; then
     return 0
   fi
-  TASK_FIELDS=$(curl -sf "$ASANA_API/tasks/$TASK_GID?opt_fields=name,assignee.name,custom_fields.gid,custom_fields.name,custom_fields.people_value.gid,custom_fields.people_value.name,custom_fields.number_value,custom_fields.enum_value.gid,custom_fields.enum_value.name" \
-    -H "Authorization: Bearer $ASANA_TOKEN")
+  asana_request "Task read" "$ASANA_API/tasks/$TASK_GID?opt_fields=name,assignee.name,memberships.project.gid,custom_fields.gid,custom_fields.name,custom_fields.people_value.gid,custom_fields.people_value.name,custom_fields.number_value,custom_fields.enum_value.gid,custom_fields.enum_value.name" \
+    -H "Authorization: Bearer $ASANA_TOKEN" || exit 1
+  TASK_FIELDS="$ASANA_RESPONSE"
+}
+
+# Custom field gids attached to the task's projects. A task's GET lists
+# workspace-global fields (the legacy Reviewer/Implementor/Status set) even when
+# none of its projects carries them, so "the field shows on the task" does not
+# mean a write to it is accepted. Only the projects' custom_field_settings say
+# which fields belong to the task.
+PROJECT_FIELD_GIDS=""
+PROJECT_FIELDS_LOADED=false
+load_project_fields() {
+  $PROJECT_FIELDS_LOADED && return 0
+  load_task_fields
+  local proj
+  for proj in $(printf '%s' "$TASK_FIELDS" | jq -r '.data.memberships[]?.project.gid // empty'); do
+    asana_request "Project fields read ($proj)" "$ASANA_API/projects/$proj/custom_field_settings?limit=100&opt_fields=custom_field.gid" \
+      -H "Authorization: Bearer $ASANA_TOKEN" || exit 1
+    PROJECT_FIELD_GIDS="$PROJECT_FIELD_GIDS $(printf '%s' "$ASANA_RESPONSE" | jq -r '[.data[]?.custom_field.gid] | join(" ")')"
+  done
+  PROJECT_FIELDS_LOADED=true
+}
+
+# field_on_task_projects <field_gid>: call load_project_fields first (it exits
+# on a failed read, which a function used as an `if` condition cannot do).
+field_on_task_projects() {
+  [[ " $PROJECT_FIELD_GIDS " == *" $1 "* ]]
 }
 
 read_people_field() {
@@ -217,32 +279,143 @@ if $DO_ATTACH; then
   rm -f "$ATTACH_BODY_FILE"
 fi
 
+# --comment-file <path>: post the file's text as a task comment. Runs BEFORE
+# --attach-file so a single call that does both keeps the watermark order the
+# one-shot report-as-attachment rule requires (comment first, report last).
+# The text is marked via agent-authored-text.sh (orch runs only), rejected when
+# it narrates a reviewer-bot outage (same boundary mark-agent-authored-asana.sh
+# enforces on the MCP path), and the created story gid is appended to
+# /tmp/agent-own-stories-<gid> for in-flight orch runs commenting on their own
+# task, so require-followup-scope-on-complete.sh can tell the run's own
+# comments from operator scope that arrived after its check.
+if [[ -n "$COMMENT_FILE" ]]; then
+  [[ -f "$COMMENT_FILE" ]] || { echo "Error: --comment-file not found: $COMMENT_FILE" >&2; exit 1; }
+  CM_BODY="$(cat "$COMMENT_FILE")"
+  [[ -n "${CM_BODY//[[:space:]]/}" ]] || { echo "Error: --comment-file is empty: $COMMENT_FILE" >&2; exit 1; }
+  CM_ORCH=false
+  "$HOME/.config/agent-watcher/orch-run-context.sh" 2>/dev/null && CM_ORCH=true
+  CM_NOISE_LIB="$HOME/.config/agent-watcher/hooks/lib/reviewer-outage-noise.sh"
+  if $CM_ORCH && [[ -f "$CM_NOISE_LIB" ]]; then
+    . "$CM_NOISE_LIB"
+    CM_NOISE="$(reviewer_noise_hits "$COMMENT_FILE" | head -4 || true)"
+    if [[ -n "$CM_NOISE" ]]; then
+      echo ">> Comment: REJECTED (reviewer-bot outage narration; that state is one unchecked box in the run report's Finalize Gate and appears nowhere else). Remove these lines and retry:" >&2
+      printf '%s\n' "$CM_NOISE" | sed 's/^/    /' >&2
+      exit 1
+    fi
+  fi
+  CM_MARKER="$HOME/.config/agent-watcher/agent-authored-text.sh"
+  if [[ -x "$CM_MARKER" ]]; then
+    CM_BODY="$(printf '%s' "$CM_BODY" | "$CM_MARKER")"
+  fi
+  CM_PAYLOAD="$(jq -n --arg t "$CM_BODY" '{data:{text:$t}}')"
+  if CM_OUT=$(curl -sf -X POST "$ASANA_API/tasks/$TASK_GID/stories" \
+      -H "Authorization: Bearer $ASANA_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "$CM_PAYLOAD" 2>/dev/null); then
+    CM_GID="$(printf '%s' "$CM_OUT" | jq -r '.data.gid // empty' 2>/dev/null || true)"
+    if $CM_ORCH && [[ -n "$CM_GID" && "$TASK_GID" == "${AGENT_TASK_GID:-}" ]]; then
+      printf '%s\n' "$CM_GID" >> "/tmp/agent-own-stories-$TASK_GID"
+    fi
+    echo ">> Comment: posted to task $TASK_GID (story ${CM_GID:-unknown})"
+  else
+    echo ">> Comment: FAILED (POST rejected for task $TASK_GID)" >&2
+    exit 1
+  fi
+fi
+
 # Upload a local file (e.g. a run report markdown) as a native Asana attachment.
 # This is a real file upload to the task, distinct from --attach-pr (the GitHub widget).
+#
+# Same-name handling, by kind (names from lib/attach-names.sh):
+#   run report  REPLACE: a corrected report re-attached under the same
+#               <N>-agent-run-report.md name must land (it moves the followup
+#               watermark), so upload first, and only after the upload succeeds
+#               DELETE every older same-name attachment. Upload failure exits 1
+#               with the old report still attached; a failed delete only warns
+#               (a duplicate is acceptable, zero reports never is). Guard: only
+#               attachments created at or after THIS segment's start (newest
+#               versions/<gid>.jsonl stamp, the same source check-followup-scope.sh
+#               uses) are replaced; an older segment's report is never deleted,
+#               so that case keeps the skip below and says why.
+#   plan        dedupe by <anything> suffix (a retry never mints a second ordinal).
+#   other       dedupe by exact name (a double-invoke creates no duplicate).
 if $DO_ATTACH_FILE; then
   if [[ ! -f "$ATTACH_FILE_PATH" ]]; then
     echo "Error: --attach-file path not found: $ATTACH_FILE_PATH" >&2
     exit 1
   fi
-  # Dedupe: a double-invoke (or a retry) must not create a duplicate attachment.
-  # If an attachment with the same name already exists on the task, skip the upload.
   DEDUPE_NAME="${ATTACH_FILE_NAME:-$(basename "$ATTACH_FILE_PATH")}"
-  EXISTING_ATTACH=$(curl -sf "$ASANA_API/tasks/$TASK_GID/attachments?opt_fields=name" \
-      -H "Authorization: Bearer $ASANA_TOKEN" 2>/dev/null \
-      | jq -r --arg n "$DEDUPE_NAME" '.data[]? | select(.name == $n) | .name' 2>/dev/null | head -1)
-  if [[ -n "$EXISTING_ATTACH" ]]; then
-    echo ">> File attach: skipped — '$DEDUPE_NAME' already attached to task $TASK_GID (dedupe)"
-  else
-  FORM_SPEC="file=@${ATTACH_FILE_PATH};type=text/markdown"
-  [[ -n "$ATTACH_FILE_NAME" ]] && FORM_SPEC="${FORM_SPEC};filename=${ATTACH_FILE_NAME}"
-  if FILE_ATTACH_OUT=$(curl -sf -X POST "$ASANA_API/tasks/$TASK_GID/attachments" \
-      -H "Authorization: Bearer $ASANA_TOKEN" \
-      -F "$FORM_SPEC" 2>/dev/null); then
-    echo ">> File attach: $(echo "$FILE_ATTACH_OUT" | jq -r '.data.name // "attachment"')"
-  else
-    echo ">> File attach: FAILED ($ATTACH_FILE_PATH)" >&2
-    exit 1
+  ATTACH_LIST=$(curl -sf "$ASANA_API/tasks/$TASK_GID/attachments?opt_fields=name,created_at" \
+      -H "Authorization: Bearer $ASANA_TOKEN" 2>/dev/null || true)
+  ATTACH_NAMES=$(printf '%s' "$ATTACH_LIST" | jq -r '.data[]? | .name' 2>/dev/null || true)
+  EXISTING_ATTACH=$(printf '%s\n' "$ATTACH_NAMES" | grep -Fx -- "$DEDUPE_NAME" | head -1 || true)
+  # Off-orch machines (skills synced without the orch lib) keep plain names.
+  source "$HOME/.config/agent-watcher/lib/attach-names.sh" 2>/dev/null || true
+  if [[ -n "${PLAN_ATTACH_RE:-}" && "$DEDUPE_NAME" =~ $PLAN_ATTACH_RE ]]; then
+    PLAN_SUFFIX=$(plan_attach_suffix "$DEDUPE_NAME")
+    EXISTING_ATTACH=$(printf '%s\n' "$ATTACH_NAMES" | grep -E "$PLAN_ATTACH_RE" | while read -r n; do
+        [[ "$(plan_attach_suffix "$n")" == "$PLAN_SUFFIX" ]] && echo "$n"; done | head -1 || true)
+    if [[ -z "$EXISTING_ATTACH" ]]; then
+      ATTACH_FILE_NAME=$(plan_attach_name "$(printf '%s\n' "$ATTACH_NAMES" | next_attach_ordinal plan)" "$DEDUPE_NAME")
+      DEDUPE_NAME="$ATTACH_FILE_NAME"
+    fi
   fi
+
+  REPLACE_GIDS=""
+  if [[ -n "$EXISTING_ATTACH" && -n "${REPORT_ATTACH_RE:-}" && "$DEDUPE_NAME" =~ $REPORT_ATTACH_RE ]]; then
+    SEG_START=""
+    VERSIONS_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/versions/$TASK_GID.jsonl"
+    [[ -f "$VERSIONS_FILE" ]] && SEG_START=$(jq -rs '[.[] | .ts // empty] | last // empty' "$VERSIONS_FILE" 2>/dev/null || true)
+    # Fractional seconds stripped on both sides so the ISO strings compare lexically.
+    SAME_NAME=$(printf '%s' "$ATTACH_LIST" | jq -c --arg n "$DEDUPE_NAME" --arg s "${SEG_START%%.*}" '
+        def norm: (. // "") | sub("\\.[0-9]+Z$"; "Z");
+        [.data[]? | select(.name == $n) | {gid, created_at, in_seg: (($s | sub("Z$"; "")) as $ss | ($ss != "") and ((.created_at | norm) >= ($ss + "Z")))}]' 2>/dev/null || echo "[]")
+    OLDER_SEG=$(printf '%s' "$SAME_NAME" | jq -r '[.[] | select(.in_seg | not)] | length' 2>/dev/null || echo 1)
+    if [[ -z "$SEG_START" ]]; then
+      echo ">> File attach: skipped, '$DEDUPE_NAME' already attached to task $TASK_GID and no segment start is recorded (versions/$TASK_GID.jsonl), so it cannot be proven this segment's report; not replacing"
+    elif [[ "$OLDER_SEG" != "0" ]]; then
+      echo ">> File attach: skipped, '$DEDUPE_NAME' on task $TASK_GID was attached before this segment started ($SEG_START); an older segment's report is never replaced. Fix the report's iteration so it attaches under a new ordinal"
+    else
+      REPLACE_GIDS=$(printf '%s' "$SAME_NAME" | jq -r '.[].gid' 2>/dev/null || true)
+      [[ -n "$REPLACE_GIDS" ]] || echo ">> File attach: skipped, '$DEDUPE_NAME' already attached to task $TASK_GID but its gid could not be read; not replacing"
+    fi
+  elif [[ -n "$EXISTING_ATTACH" ]]; then
+    echo ">> File attach: skipped, '$DEDUPE_NAME' already attached to task $TASK_GID (dedupe)"
+  fi
+
+  if [[ -z "$EXISTING_ATTACH" || -n "$REPLACE_GIDS" ]]; then
+    FORM_SPEC="file=@${ATTACH_FILE_PATH};type=text/markdown"
+    [[ -n "$ATTACH_FILE_NAME" ]] && FORM_SPEC="${FORM_SPEC};filename=${ATTACH_FILE_NAME}"
+    if FILE_ATTACH_OUT=$(curl -sf -X POST "$ASANA_API/tasks/$TASK_GID/attachments" \
+        -H "Authorization: Bearer $ASANA_TOKEN" \
+        -F "$FORM_SPEC" 2>/dev/null); then
+      NEW_ATTACH_GID=$(printf '%s' "$FILE_ATTACH_OUT" | jq -r '.data.gid // empty' 2>/dev/null || true)
+    else
+      NEW_ATTACH_GID=""
+      FILE_ATTACH_OUT=""
+    fi
+    if [[ -n "$REPLACE_GIDS" ]]; then
+      if [[ -z "$NEW_ATTACH_GID" ]]; then
+        echo ">> File attach: FAILED ($ATTACH_FILE_PATH); the existing '$DEDUPE_NAME' is still attached" >&2
+        exit 1
+      fi
+      DELETED=""
+      for OLD_GID in $REPLACE_GIDS; do
+        if curl -sf -X DELETE "$ASANA_API/attachments/$OLD_GID" \
+            -H "Authorization: Bearer $ASANA_TOKEN" > /dev/null 2>&1; then
+          DELETED="${DELETED:+$DELETED,}$OLD_GID"
+        else
+          echo ">> WARN: uploaded $NEW_ATTACH_GID but could not delete older '$DEDUPE_NAME' ($OLD_GID); the task now carries a duplicate" >&2
+        fi
+      done
+      echo ">> File attach: replaced ${DELETED:-none}->$NEW_ATTACH_GID ($DEDUPE_NAME)"
+    elif [[ -n "$FILE_ATTACH_OUT" ]]; then
+      echo ">> File attach: $(echo "$FILE_ATTACH_OUT" | jq -r '.data.name // "attachment"')"
+    else
+      echo ">> File attach: FAILED ($ATTACH_FILE_PATH)" >&2
+      exit 1
+    fi
   fi
 fi
 
@@ -264,23 +437,36 @@ if $DO_ASSIGN; then
     fi
   fi
 
+  # The assignee is the operation --assign asks for. Mirroring it into the legacy
+  # Reviewer/Implementor people fields is a side effect, done only for a field
+  # one of the task's projects carries: Asana refuses the whole PUT, assignee
+  # included, when it names a field outside the task's projects (the current
+  # boards carry neither field). An explicit --set-reviewer/--set-implementor is
+  # still sent as asked, and a refusal is reported by the PUT below.
   if $DO_ASSIGN; then
-    if [[ -z "$SET_REVIEWER_GID" ]]; then
+    load_project_fields
+    MIRRORED=""
+    if [[ -z "$SET_REVIEWER_GID" ]] && field_on_task_projects "$REVIEWER_FIELD"; then
       SET_REVIEWER_GID="$ASSIGN_GID"
+      MIRRORED="Reviewer"
     fi
 
-    if [[ -z "$SET_IMPLEMENTOR_GID" ]]; then
+    if [[ -z "$SET_IMPLEMENTOR_GID" ]] && field_on_task_projects "$IMPLEMENTOR_FIELD"; then
       SET_IMPLEMENTOR_GID="$(read_people_field "$IMPLEMENTOR_FIELD")"
-    fi
-    if [[ -z "$SET_IMPLEMENTOR_GID" ]]; then
-      SET_IMPLEMENTOR_GID="$("$SCRIPT_DIR/../../asana-whoami.sh" 2>/dev/null || true)"
-      if [[ -n "$SET_IMPLEMENTOR_GID" ]]; then
-        echo ">> Implementor: auto-resolved to current user ($SET_IMPLEMENTOR_GID)"
+      if [[ -z "$SET_IMPLEMENTOR_GID" ]]; then
+        SET_IMPLEMENTOR_GID="$("$SCRIPT_DIR/../../asana-whoami.sh" 2>/dev/null || true)"
+        if [[ -n "$SET_IMPLEMENTOR_GID" ]]; then
+          echo ">> Implementor: auto-resolved to current user ($SET_IMPLEMENTOR_GID)"
+        fi
       fi
+      if [[ -z "$SET_IMPLEMENTOR_GID" ]]; then
+        echo ">> PROMPT_IMPLEMENTOR"
+        exit 2
+      fi
+      MIRRORED="${MIRRORED:+$MIRRORED, }Implementor"
     fi
-    if [[ -z "$SET_IMPLEMENTOR_GID" ]]; then
-      echo ">> PROMPT_IMPLEMENTOR"
-      exit 2
+    if [[ -z "$MIRRORED" ]]; then
+      echo ">> Reviewer/Implementor fields: not on this task's projects; setting the assignee only"
     fi
   fi
 fi
@@ -331,10 +517,11 @@ elif $DO_ASSIGN; then
 fi
 
 if $HAS_UPDATE; then
-  curl -sf -X PUT "$ASANA_API/tasks/$TASK_GID" \
+  UPDATE_KEYS="$(printf '%s' "$UPDATE_BODY" | jq -r '[.data | to_entries[] | if .key == "custom_fields" then "custom_fields " + (.value | keys | join(",")) else .key end] | join("; ")')"
+  asana_request "Task update (PUT $TASK_GID: $UPDATE_KEYS)" -X PUT "$ASANA_API/tasks/$TASK_GID" \
     -H "Authorization: Bearer $ASANA_TOKEN" \
     -H "Content-Type: application/json" \
-    -d "$UPDATE_BODY" > /dev/null
+    -d "$UPDATE_BODY" || exit 1
   echo ">> Task fields: updated"
 fi
 
@@ -375,10 +562,10 @@ if $AUTO_EST_REVIEW; then
     else
       EST_VAL=$(python3 -c "v=float('$SPENT_DEV'); x=round(v*0.1,1); print(x if x >= 0.1 else 0.1)")
       REVIEW_PATCH=$(jq -n --arg f "$EST_REVIEW_HRS_FIELD" --argjson v "$EST_VAL" '{data:{custom_fields:{($f):$v}}}')
-      curl -sf -X PUT "$ASANA_API/tasks/$TASK_GID" \
+      asana_request "Est. Review Hrs update" -X PUT "$ASANA_API/tasks/$TASK_GID" \
         -H "Authorization: Bearer $ASANA_TOKEN" \
         -H "Content-Type: application/json" \
-        -d "$REVIEW_PATCH" > /dev/null
+        -d "$REVIEW_PATCH" || exit 1
       echo ">> Est. Review Hrs: set to $EST_VAL (10% of Spent Dev Hrs)"
     fi
   fi

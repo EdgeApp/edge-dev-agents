@@ -5,6 +5,18 @@ appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
 ---
+# "Verify your password" (PasswordReminderModal) covers the scene when the
+# account is due a password check, and can also open when a tap meant for
+# something else lands on the password notification card. Its close button
+# postpones the check without touching the password.
+- runFlow:
+    when:
+      visible: "Verify your password"
+    commands:
+      - tapOn:
+          id: "modal-close-button"
+      - waitForAnimationToEnd:
+          timeout: 2500
 - runFlow:
     when:
       visible: "Security is Our Priority"

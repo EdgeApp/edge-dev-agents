@@ -20,6 +20,17 @@
 # The clone is copy-on-write: ~26s for a 2.6 GB / 164k-file tree, single-process,
 # ~500 MB transient memory, near-zero new disk blocks. Each worktree's tree diverges
 # only on files it changes; the session's own `npm install` reconciles just the diff.
+# FRESHNESS (fresh AND reuse paths): lib/node-modules-freshness.sh compares the
+# branch lockfile with what node_modules actually has installed (normalized, so a
+# version-bump commit is not a mismatch). On a mismatch this writes .stale-node-modules
+# and starts lib/node-modules-reinstall.sh DETACHED (own session: a caller's timeout
+# kill cannot interrupt npm ci halfway), then waits up to $SETUP_REINSTALL_WAIT
+# seconds (default 60). The worker serializes on a machine-wide install lock and
+# restores the previous tree on failure, so setup never ends worse than a stale clone
+# plus marker. ios-rn-build.sh and install-deps.sh wait for a still-running worker.
+# The clone registers itself (lib clone handshake) so refresh-main-checkouts.sh never
+# rewrites the source tree mid-clone; a refresh already in progress makes the clone
+# wait up to $SETUP_CLONE_WAIT seconds (default 30), then skip (the worker installs).
 #
 # Usage:
 #   setup-task-workspace.sh --task-gid <gid> --repo <name> [--base <ref>]
@@ -46,6 +57,9 @@ set -euo pipefail
 CONFIG="$HOME/.config/agent-watcher/asana-config.json"
 WORKTREES_ROOT="$HOME/git/.agent-worktrees"
 REPOS_ROOT="$HOME/git"
+
+source "$HOME/.config/agent-watcher/lib/node-modules-freshness.sh"
+REINSTALL="$HOME/.config/agent-watcher/lib/node-modules-reinstall.sh"
 
 TASK_GID=""
 REPO=""
@@ -118,42 +132,73 @@ clone_node_modules() {
   local src="$MAIN_REPO/node_modules"
   local dst="$WT/node_modules"
   if [[ ! -d "$src" ]]; then
-    echo ">> setup-task-workspace: WARN — $src not present; skipping node_modules clone" >&2
+    echo ">> setup-task-workspace: WARN: $src not present; skipping node_modules clone" >&2
     return 0
   fi
   if [[ -e "$dst" ]]; then
     echo ">> setup-task-workspace: node_modules already present in worktree; skipping clone" >&2
     return 0
   fi
+  if ! nm_clone_begin "$REPO" "${SETUP_CLONE_WAIT:-30}"; then
+    echo ">> setup-task-workspace: WARN: refresh-main-checkouts is rewriting $src; skipping the clone (the freshness check installs instead)" >&2
+    return 0
+  fi
   local t0 t1
   t0=$(date +%s)
   if cp -cR "$src" "$dst" 2>/tmp/setup-clone.log; then
     t1=$(date +%s)
-    echo ">> setup-task-workspace: APFS-cloned node_modules in $((t1 - t0))s ($src → $dst)" >&2
+    echo ">> setup-task-workspace: APFS-cloned node_modules in $((t1 - t0))s ($src -> $dst)" >&2
   else
-    echo ">> setup-task-workspace: WARN — node_modules clone failed; session will need a full npm install" >&2
+    echo ">> setup-task-workspace: WARN: node_modules clone failed; the freshness check installs instead" >&2
     cat /tmp/setup-clone.log >&2
     rm -rf "$dst" 2>/dev/null || true
+  fi
+  nm_clone_end "$REPO"
+  return 0
+}
+
+# ── STALE-TREE GUARD (fresh and reuse paths) ──────────────────────────────────
+# A clone matches the MAIN checkout's installed deps, not necessarily this branch's
+# lockfile; a reused worktree can also have drifted. Building on a stale tree bakes
+# wrong dep versions into native-embedded bundles. See the header FRESHNESS note.
+ensure_node_modules_fresh() {
+  [[ -f "$WT/package-lock.json" ]] || return 0
+  local rc=0 log
+  nm_hashes "$WT" "$MAIN_REPO/package-lock.json" || rc=$?
+  if [[ "$rc" -eq 2 ]]; then
+    echo ">> setup-task-workspace: WARN: could not compare node_modules with package-lock.json (${NM_HAVE:-?}); no marker written" >&2
     return 0
   fi
-  # STALE-CLONE GUARD: the cloned modules match the MAIN checkout's lockfile,
-  # not necessarily the WORKTREE branch's. When the main checkout lags origin
-  # (accb once sat 64 commits behind, node_modules on stellar-sdk 0.11.0), a
-  # bundle built from the clone bakes months-old deps — the 2026-07-30 fleet
-  # wide "Horizon.Server undefined" toast shipped exactly this way. Detection
-  # only (an unconditional npm ci here would re-introduce the process storms
-  # the clone exists to avoid): write a marker build-and-test checks before
-  # building/baking a dep bundle, and log the skipped path to stderr.
-  if [[ -f "$MAIN_REPO/package-lock.json" && -f "$WT/package-lock.json" ]] \
-     && ! cmp -s "$MAIN_REPO/package-lock.json" "$WT/package-lock.json"; then
-    {
-      echo "cloned node_modules came from $MAIN_REPO whose package-lock.json"
-      echo "differs from this branch's. Run 'sfw npm ci' here BEFORE building,"
-      echo "bundling, or baking this repo — the clone carries the WRONG dep"
-      echo "versions for this branch."
-    } > "$WT/.stale-node-modules"
-    echo ">> setup-task-workspace: WARN — STALE node_modules clone (lockfile mismatch vs main checkout); marker written to $WT/.stale-node-modules — npm ci required before any build" >&2
+  if [[ "$rc" -eq 0 ]]; then
+    nm_clear_marker_if_fresh "$WT" || true
+    echo ">> setup-task-workspace: node_modules matches package-lock.json ($NM_WANT)" >&2
+    return 0
   fi
+  if nm_installer_alive "$WT"; then
+    echo ">> setup-task-workspace: node_modules reinstall already running for $WT" >&2
+  else
+    nm_marker_write "$WT" "setup-task-workspace (clone source $MAIN_REPO)"
+    log="/tmp/setup-reinstall-$(basename "$(dirname "$WT")")-$(basename "$WT")-$$.log"
+    echo ">> setup-task-workspace: WARN: STALE node_modules (want $NM_WANT, have $NM_HAVE); marker $WT/.stale-node-modules; starting mv-aside + clean install (log $log)" >&2
+    perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' "$REINSTALL" "$WT" </dev/null >"$log" 2>&1 &
+    # The worker records installer_pid in the marker itself (a second writer here
+    # could resurrect a marker the worker just removed); wait until it has.
+    local i
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+      nm_installer_alive "$WT" && break
+      [[ -f "$WT/.stale-node-modules" && "$(nm_marker_field "$WT" status)" == "stale" ]] || break
+      sleep 1
+    done
+  fi
+  nm_wait_installer "$WT" "${SETUP_REINSTALL_WAIT:-60}" || true
+  if [[ ! -f "$WT/.stale-node-modules" ]]; then
+    echo ">> setup-task-workspace: node_modules reinstalled; matches package-lock.json" >&2
+  elif nm_installer_alive "$WT"; then
+    echo ">> setup-task-workspace: node_modules reinstall still running (pid $(nm_marker_field "$WT" installer_pid)); the marker clears when it finishes. ios-rn-build.sh and install-deps.sh wait for it; do not run installs in this worktree meanwhile" >&2
+  else
+    echo ">> setup-task-workspace: WARN: node_modules reinstall did not finish clean (status $(nm_marker_field "$WT" status); log $(nm_marker_field "$WT" installer_log)); marker kept; fix with $REINSTALL $WT before any build" >&2
+  fi
+  return 0
 }
 
 # Backfill GITIGNORED generated outputs that a fresh git worktree lacks but the first
@@ -296,6 +341,7 @@ if [[ -d "$WT" ]] && git -C "$MAIN_REPO" worktree list --porcelain | grep -qxF "
   ensure_env_json
   ensure_testconfig_json
   clone_node_modules
+  ensure_node_modules_fresh
   ensure_husky_runtime
   link_shared_memory
   echo "$WT"
@@ -345,6 +391,9 @@ ensure_testconfig_json
 
 # ── Clone node_modules from the main checkout ───────────────────────────────────
 clone_node_modules
+
+# ── Stale-tree guard: compare with the branch lockfile; reinstall on mismatch ───
+ensure_node_modules_fresh
 
 # ── Backfill gitignored generated outputs the first Metro bundle needs (gui only) ─
 backfill_gui_generated
