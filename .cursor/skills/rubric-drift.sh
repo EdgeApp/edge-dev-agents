@@ -99,6 +99,14 @@ function indexRules(file, skillName) {
 for (const d of fs.existsSync(SKILLS_DIR) ? fs.readdirSync(SKILLS_DIR) : []) {
   const f = path.join(SKILLS_DIR, d, 'SKILL.md')
   if (fs.existsSync(f)) indexRules(f, d)
+  // Reference slices too: a skill whose body outgrew the re-attach budget
+  // keeps its rules verbatim in <skill>/references/*.md. The anchor stays
+  // <skill>:<rule-id> wherever the body lives, so a moved rule keeps its lock
+  // entry and only a real content change reports CHANGED.
+  const refs = path.join(SKILLS_DIR, d, 'references')
+  let slices = []
+  try { slices = fs.readdirSync(refs) } catch { slices = [] }
+  for (const s of slices) if (s.endsWith('.md')) indexRules(path.join(refs, s), d)
 }
 for (const f of fs.existsSync(RULES_DIR) ? fs.readdirSync(RULES_DIR) : []) {
   if (f.endsWith('.mdc')) indexRules(path.join(RULES_DIR, f), f.replace(/\.mdc$/, ''))

@@ -80,8 +80,10 @@ Determine which updates are needed by the caller and build one command with all 
 - `--assign` or `--assign <user_gid>` (sets the task assignee, e.g. a roster member below; it also fills the legacy Reviewer/Implementor fields only when one of the task's projects carries them, so `PROMPT_IMPLEMENTOR` appears only there)
 - `--skip-assign-if-missing`
 - `--unassign`
-- `--set-status "Review Needed|Publish Needed|Verification Needed"` (legacy Status field)
-- `--set-board-state "Incoming Requests|Refinement|Ready to Pull|In Progress|PR Review|QA Verification|Blocked|Done|Icebox"` (new Board State 🤖 field)
+- `--set-status "<option name>"` (legacy Status field), `--set-board-state "<option name>"` (Board State 🤖 field). Both resolve the name against the FIELD'S OWN options on the task at call time, so this file never lists them: the operator adds and renames options in Asana and any list here would go stale. Matching ignores case, surrounding whitespace, and a leading emoji. An option gid is accepted too (for callers copying a field between tasks) and is validated the same way. An unrecognized value exits 1 naming every real option, so ask the script rather than guessing:
+  ```bash
+  ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh --task <gid> --set-board-state "?"
+  ```
 - `--set-reviewer <user_gid>`
 - `--set-implementor <user_gid>`
 - `--set-priority <enum_gid>`

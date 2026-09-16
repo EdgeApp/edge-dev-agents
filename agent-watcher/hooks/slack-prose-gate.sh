@@ -34,14 +34,22 @@ TEXT=$(printf '%s' "$INPUT" | jq -r '[.tool_input // {} | .. | strings] | join("
 # the full skill body (lib/skill-read-gate.sh); the retry passes this check and
 # is then linted. Same mechanism as lint-md-on-write.sh's Write path,
 # including the transcript-evidence credit tried before denying.
+#
+# one-shot:comms rides along (2026-09-16): the Slack send path IS the outbound
+# comms phase of an orchestrated run, and that phase's rules moved out of the
+# core SKILL.md into references/comms.md when /one-shot was split, so the
+# slice is delivered here the same way, by the same gate.
 if [ -n "${AGENT_TASK_GID:-}" ] && [ -f "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh" ]; then
   . "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh"
-  if [ -n "$(skill_read_missing no-slop)" ]; then
-    skill_read_credit_from_transcript "$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null || true)" no-slop
+  UNITS="no-slop one-shot:comms"
+  MISSING=$(skill_read_missing $UNITS)
+  if [ -n "$MISSING" ]; then
+    skill_read_credit_from_transcript "$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null || true)" $MISSING
+    MISSING=$(skill_read_missing $MISSING)
   fi
-  if [ -n "$(skill_read_missing no-slop)" ]; then
-    BODY=$(skill_read_deliver no-slop)
-    REASON="Slack text is outward prose and the no-slop contract has not entered this session yet. The full skill is below; it now counts as read. Rewrite the message against it, then retry (the retry is linted)."
+  if [ -n "$MISSING" ]; then
+    BODY=$(skill_read_deliver $MISSING)
+    REASON="Slack text is outward prose from an orchestrated run, and the contract(s) below have not entered this session yet. They now count as read. Rewrite the message against them, then retry (the retry is linted)."
     jq -nc --arg reason "$REASON" --arg body "$BODY" '{
       hookSpecificOutput: {
         hookEventName: "PreToolUse",

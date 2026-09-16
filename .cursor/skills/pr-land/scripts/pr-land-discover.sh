@@ -33,10 +33,16 @@ const edgeAppRepos = [
   "edge-currency-plugins",
 ];
 
-// "🔍 Review/Publish" section in the EdgeApp PR Pipeline project — the no-args queue.
+// The no-args queue: the Engineering Board stage holding tasks whose review is
+// done and whose PRs are ready to land. Matched BY NAME at call time, never by a
+// pinned gid — a board rename or a newly inserted stage leaves an old gid
+// resolving to a real but wrong section, which queues the wrong PRs with nothing
+// failing. Name matching turns that into an error naming the sections that exist.
+// Matching ignores case and leading/trailing whitespace, and tolerates a missing
+// or changed leading emoji, so only the words have to hold.
 // Project: https://app.asana.com/1/9976422036640/project/1213880789473005
-// Resolved via: GET /projects/1213880789473005/sections
-const ASANA_PR_LAND_SECTION_GID = "1214062531915722";
+const ASANA_BOARD_PROJECT_GID = "1213880789473005";
+const ASANA_PR_LAND_SECTION_NAME = "Merge/Finalize";
 
 const BRANCH_PREFIX = process.env.GIT_BRANCH_PREFIX || "jon";
 
@@ -143,6 +149,33 @@ function asanaGet(path) {
   });
 }
 
+// Strip a leading emoji/symbol run and surrounding space, lowercase the rest, so
+// "🚀 Merge/Finalize" and "merge/finalize" both match.
+function normalizeSectionName(name) {
+  return String(name || "")
+    .replace(/^[^\p{L}\p{N}]+/u, "")
+    .trim()
+    .toLowerCase();
+}
+
+// Resolve a project section by NAME. Throws naming every section that exists
+// when there is no match, so a board rename surfaces as an error the operator
+// can act on instead of a silently wrong queue.
+async function resolveSectionGid(projectGid, sectionName) {
+  const sections = await asanaGet(
+    `/projects/${projectGid}/sections?opt_fields=name&limit=100`
+  );
+  const want = normalizeSectionName(sectionName);
+  const hit = sections.find((s) => normalizeSectionName(s.name) === want);
+  if (!hit) {
+    throw new Error(
+      `no section named "${sectionName}" in project ${projectGid}; ` +
+        `sections are: ${sections.map((s) => s.name).join(", ")}`
+    );
+  }
+  return hit.gid;
+}
+
 function extractReviewers(reviews) {
   // Per GitHub semantics, only APPROVED / CHANGES_REQUESTED / DISMISSED change
   // a reviewer's effective state. COMMENTED (and PENDING) are informational and
@@ -206,8 +239,13 @@ async function main() {
         }
         const userGid = whoami.stdout.trim();
 
+        const sectionGid = await resolveSectionGid(
+          ASANA_BOARD_PROJECT_GID,
+          ASANA_PR_LAND_SECTION_NAME
+        );
+
         const sectionTasks = await asanaGet(
-          `/sections/${ASANA_PR_LAND_SECTION_GID}/tasks` +
+          `/sections/${sectionGid}/tasks` +
             `?opt_fields=name,assignee.gid,completed&completed_since=now&limit=100`
         );
         for (const t of sectionTasks) {

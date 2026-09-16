@@ -19,6 +19,13 @@ Covers:
      stores the report path, prints the exact re-attach command, and re-numbers
      an iteration stamp whose report was attached in a prior segment.
   F. mark-agent-authored-asana.sh reads stdin before its outage check.
+  G. Report REPLACE matches the name FAMILY (ordinal-insensitive, same slug), so
+     a gate-re-numbered re-attach replaces this segment's copy instead of
+     leaving the task with two report docs.
+  H. require-completion-judgment.sh splices a recorded verdict into this
+     segment's report and re-attaches it once, and never loops.
+  I. require-clean-run-report.sh resolves --attach-file "$F" and blocks a
+     write-and-attach in ONE command with the split named.
 
 Everything runs offline under a throwaway HOME: curl, gh and tmux are PATH
 stubs (curl logs every call and answers from canned JSON), unchanged helpers
@@ -30,7 +37,10 @@ import json, os, shutil, subprocess, sys, tempfile
 REAL = os.path.expanduser('~')
 AW = os.path.join(REAL, '.config/agent-watcher')
 SRC = os.environ.get('REATTACH_SRC')
-GID = '9990000000001'
+# Per-process GID: every marker this suite touches is a /tmp path keyed by it
+# (report doc, followup scope, own stories, judge re-attach), so a fixed one
+# makes two concurrent runs of this file delete each other's state.
+GID = '999' + str(os.getpid()).zfill(10)
 OWN = f'/tmp/agent-own-stories-{GID}'
 MARKER = f'/tmp/agent-followup-scope-{GID}.json'
 DOCMARK = f'/tmp/agent-report-doc-{GID}'
@@ -43,8 +53,10 @@ def check(name, cond, detail=''):
 
 
 def src(installed_rel):
-    """Path of a script under test: staged flat copy, or the installed file."""
-    return os.path.join(SRC, os.path.basename(installed_rel)) if SRC else os.path.join(REAL, installed_rel)
+    """Path of a script under test: the staged flat copy when REATTACH_SRC holds
+    one, else the installed file (so a staging dir may carry only what changed)."""
+    staged = os.path.join(SRC, os.path.basename(installed_rel)) if SRC else ''
+    return staged if staged and os.path.exists(staged) else os.path.join(REAL, installed_rel)
 
 
 TMP = tempfile.mkdtemp(prefix='reattach-test-')
@@ -62,6 +74,8 @@ UNDER_TEST = [
     '.config/agent-watcher/hooks/mark-agent-authored-asana.sh',
     '.config/agent-watcher/hooks/block-raw-asana-api.sh',
     '.config/agent-watcher/hooks/record-own-asana-story.sh',
+    '.config/agent-watcher/hooks/require-completion-judgment.sh',
+    '.config/agent-watcher/hooks/lib/splice-judge-section.sh',
 ]
 LINKED = [
     '.config/agent-watcher/lib/attach-names.sh',
@@ -69,6 +83,9 @@ LINKED = [
     '.config/agent-watcher/agent-authored-text.sh',
     '.config/agent-watcher/hooks/strip-cmd-mentions.sh',
     '.config/agent-watcher/hooks/lib/reviewer-outage-noise.sh',
+    '.config/agent-watcher/hooks/lib/shell-word-resolve.sh',
+    '.config/agent-watcher/hooks/cmd-executes.sh',
+    '.config/agent-watcher/judge-report-section.sh',
 ]
 for rel in UNDER_TEST:
     dst = os.path.join(HOME, rel); os.makedirs(os.path.dirname(dst), exist_ok=True)
@@ -82,6 +99,21 @@ for rel in LINKED:
 with open(os.path.join(HOME, '.config/agent-watcher/check-followup-scope.sh'), 'w') as fh:
     fh.write('#!/bin/bash\necho ran >> "$FAKE_CHECK_LOG"\ncp "$FAKE_REFRESH_MARKER" /tmp/agent-followup-scope-$2.json\n')
 os.chmod(os.path.join(HOME, '.config/agent-watcher/check-followup-scope.sh'), 0o755)
+
+# completion-judge.sh stub: records one provenance row (the shape
+# judge-report-section.sh renders) and exits FAKE_JUDGE_RC. operator-hold.sh
+# stub: never on hold.
+with open(os.path.join(HOME, '.config/agent-watcher/completion-judge.sh'), 'w') as fh:
+    fh.write('#!/bin/bash\n'
+             'mkdir -p "$XDG_STATE_HOME/agent-watcher/judge"\n'
+             'echo "{\\"ts\\":\\"2026-09-16T10:00:00Z\\",\\"gid\\":\\"$2\\",\\"event\\":\\"$4\\",'
+             '\\"verdict\\":\\"allow\\",\\"fails\\":0,\\"fail_ids\\":[],\\"summary\\":\\"evidence matches the ask\\"}" '
+             '>> "$XDG_STATE_HOME/agent-watcher/judge/$2.jsonl"\n'
+             'echo judged\nexit ${FAKE_JUDGE_RC:-0}\n')
+os.chmod(os.path.join(HOME, '.config/agent-watcher/completion-judge.sh'), 0o755)
+with open(os.path.join(HOME, '.config/agent-watcher/operator-hold.sh'), 'w') as fh:
+    fh.write('#!/bin/bash\nexit 1\n')
+os.chmod(os.path.join(HOME, '.config/agent-watcher/operator-hold.sh'), 0o755)
 
 CURL = r'''#!/usr/bin/env python3
 import json, os, sys
@@ -138,8 +170,12 @@ def calls():
     return [json.loads(l) for l in open(LOG)]
 
 
+JMARK = f'/tmp/agent-judge-reattach-{GID}'
+JUDGE_LOG = os.path.join(STATE, f'agent-watcher/judge/{GID}.jsonl')
+
+
 def reset():
-    for p in (LOG, OWN, MARKER, DOCMARK, os.path.join(TMP, 'check.log')):
+    for p in (LOG, OWN, MARKER, DOCMARK, JMARK, JUDGE_LOG, os.path.join(TMP, 'check.log')):
         if os.path.exists(p):
             os.remove(p)
 
@@ -420,6 +456,133 @@ ui = json.loads(p.stdout).get('hookSpecificOutput', {}).get('updatedInput', {}) 
 check('F2 clean comment is marked', ui.get('text', '').startswith('🥋'), p.stdout + p.stderr)
 p = mark_hook('mcp__claude_ai_Asana__search_tasks', {'text': 'bugbot out of quota'})
 check('F3 read tools pass untouched', p.returncode == 0 and not p.stdout.strip(), p.stdout + p.stderr)
+
+# ---------------- G. report name FAMILY replace (ordinal-insensitive) ----------------
+# 2026-09-16: the attach gate re-numbered --attach-name agent-run-report.md to
+# 2-agent-run-report.md, the exact-name compare found nothing, and the task kept
+# both docs.
+reset()
+p = update(['--attach-file', REPORT_FILE, '--attach-name', '2-agent-run-report.md'],
+           FAKE_ATTACH_JSON=att(('BARE1', 'agent-run-report.md', '2026-09-15T11:00:00.000Z')))
+check('G1 a re-numbered name replaces this segment bare report', p.returncode == 0 and 'replaced BARE1->NEW1' in p.stdout, p.stdout + p.stderr)
+
+reset()
+p = update(['--attach-file', REPORT_FILE, '--attach-name', 'agent-run-report.md'],
+           FAKE_ATTACH_JSON=att(('NUM1', '2-agent-run-report.md', '2026-09-15T11:00:00.000Z')))
+check('G2 a bare name replaces this segment numbered report', p.returncode == 0 and 'replaced NUM1->NEW1' in p.stdout, p.stdout + p.stderr)
+
+reset()
+p = update(['--attach-file', REPORT_FILE, '--attach-name', '2-agent-run-report.md'],
+           FAKE_ATTACH_JSON=att(('SLUG1', 'agent-run-report-alpha.md', '2026-09-15T11:00:00.000Z')))
+check('G3 a different slug stays a different doc',
+      p.returncode == 0 and any(x['method'] == 'POST' for x in calls()) and not any(x['method'] == 'DELETE' for x in calls()), p.stdout + p.stderr)
+
+reset()
+p = update(['--attach-file', REPORT_FILE, '--attach-name', '2-agent-run-report.md'],
+           FAKE_ATTACH_JSON=att(('BARE1', 'agent-run-report.md', '2026-09-15T09:00:00.000Z')))
+check('G4 a prior segment report is still never replaced',
+      p.returncode == 0 and not any(x['method'] in ('POST', 'DELETE') for x in calls()) and 'before this segment started' in p.stdout, p.stdout + p.stderr)
+
+reset()
+p = update(['--attach-file', REPORT_FILE, '--attach-name', '3-agent-run-report-alpha.md'],
+           FAKE_ATTACH_JSON=att(('LEG1', 'agent-run-report-3-alpha.md', '2026-09-15T11:00:00.000Z')))
+check('G5 the legacy ordinal form is the same doc', p.returncode == 0 and 'replaced LEG1->NEW1' in p.stdout, p.stdout + p.stderr)
+
+# End to end, the 2026-09-16 shape: the gate re-numbers, then the re-attach replaces.
+RFAM = os.path.join(TMP, f'agent-run-report-{GID}-wc.md')
+reset(); report(RFAM)
+bare = att(('BARE1', 'agent-run-report.md', '2026-09-15T11:00:00.000Z'))
+p = rgate_att(f'{UPD} --task {GID} --attach-file {RFAM} --attach-name agent-run-report.md', bare, 'sess-fam')
+renamed = new_name(p)
+reset()
+p2 = update(['--attach-file', RFAM, '--attach-name', renamed], FAKE_ATTACH_JSON=bare)
+check('G6 gate re-number then re-attach leaves ONE report doc',
+      renamed == '2-agent-run-report.md' and 'replaced BARE1->NEW1' in p2.stdout, renamed + ' | ' + p2.stdout + p2.stderr)
+
+# ---------------- H. judge verdict lands in the attached report ----------------
+JGATE = os.path.join(HOME, '.config/agent-watcher/hooks/require-completion-judgment.sh')
+COMPLETE_CMD = json.dumps({'tool_input': {'command': f'~/.config/agent-watcher/update-status.sh {GID} Complete'}})
+RJ = os.path.join(TMP, 'agent-run-report-judge.md')
+
+
+def judge_report():
+    open(RJ, 'w').write('---\niteration: "2"\n---\n\n# Run report 2: judge\n\n## Completion Judge\n'
+                        '<!-- cat: completion-judge -->\n_No judge call yet._\n\n## Testing\n\nDriven on the sim.\n')
+
+
+def jgate(**kw):
+    return subprocess.run([JGATE], input=COMPLETE_CMD, capture_output=True, text=True,
+                          env=env(FAKE_ATTACH_JSON=att(('R2', '2-agent-run-report.md', '2026-09-15T11:00:00.000Z')), **kw),
+                          timeout=120)
+
+
+reset(); judge_report(); open(DOCMARK, 'w').write(f'sess-j|judge|{RJ}\n')
+p = jgate()
+body = open(RJ).read()
+posts = [x for x in calls() if x['method'] == 'POST' and x['url'].endswith('/attachments')]
+check('H1 an allowed verdict is spliced into the report',
+      p.returncode == 0 and '| # | Time (UTC) | Event | Verdict' in body and 'allow' in body and '_No judge call yet._' not in body,
+      p.stdout + p.stderr + body[-300:])
+check('H1 the report is re-attached in place', len(posts) == 1 and any(x['method'] == 'DELETE' and x['url'].endswith('R2') for x in calls()), p.stdout + p.stderr)
+
+reset()
+p = jgate()
+check('H2 a second completion event does not re-attach (no loop)',
+      p.returncode == 0 and not any(x['method'] == 'POST' and x['url'].endswith('/attachments') for x in calls()), p.stdout + p.stderr)
+
+reset(); judge_report(); open(DOCMARK, 'w').write(f'sess-j2|judge|{RJ}\n')
+p = jgate(FAKE_JUDGE_RC=1)
+check('H3 a denied verdict is spliced and re-attached too',
+      p.returncode == 2 and 'allow' in open(RJ).read() and any(x['method'] == 'POST' and x['url'].endswith('/attachments') for x in calls()),
+      p.stdout + p.stderr)
+
+reset(); judge_report()
+p = jgate()
+check('H4 no attached report doc: verdict path untouched',
+      p.returncode == 0 and '_No judge call yet._' in open(RJ).read() and not calls(), p.stdout + p.stderr)
+
+reset(); open(DOCMARK, 'w').write(f'sess-j3|judge|{RJ}\n')
+open(RJ, 'w').write('---\niteration: "2"\n---\n\n## Completion Judge\n\n| # | Time (UTC) | Event | Verdict | Failed | Summary |\n')
+p = jgate()
+check('H5 a report that already carries a verdict is left alone',
+      p.returncode == 0 and not any(x['method'] == 'POST' for x in calls()), p.stdout + p.stderr)
+
+# ---------------- I. attach-file word resolution + write-and-attach split ----------------
+RV = os.path.join(TMP, f'agent-run-report-{GID}-varpath.md')
+reset(); report(RV, iteration=3)
+p = rgate(f'F={RV}\n{UPD} --task {GID} --attach-file "$F" --attach-name agent-run-report.md')
+check('I1 --attach-file "$F" resolves to the file it names', p.returncode == 0, p.stderr)
+
+reset(); report(RV, iteration=3)
+p = rgate(f"sed -i '' 's/Done/Redone/' {RV} && {UPD} --task {GID} --attach-file {RV} --attach-name agent-run-report.md")
+check('I2 edit-and-attach in one command blocks with the split named',
+      p.returncode == 2 and 'same command' in p.stderr and 'Split it in two' in p.stderr, p.stderr)
+
+reset(); report(RV, iteration=3)
+p = rgate(f"cat > {RV} <<'EOF'\n# Run report 3: x\nEOF\n{UPD} --task {GID} --attach-file {RV} --attach-name agent-run-report.md")
+check('I3 write-then-attach in one command blocks', p.returncode == 2 and 'Split it in two' in p.stderr, p.stderr)
+
+reset(); report(RV, iteration=3)
+p = rgate(f'F={RV}\nprintf x > "$F"\n{UPD} --task {GID} --attach-file "$F" --attach-name agent-run-report.md')
+check('I4 the write is caught through the variable too', p.returncode == 2 and 'Split it in two' in p.stderr, p.stderr)
+
+reset(); report(RV, iteration=3)
+p = rgate(f'echo hi > /tmp/other-{GID}.txt && {UPD} --task {GID} --attach-file {RV} --attach-name agent-run-report.md')
+check('I5 a write to another file attaches normally', p.returncode == 0, p.stderr)
+
+reset(); report(RV, iteration=3)
+p = rgate(f"cat > /tmp/note-{GID}.md <<'EOF'\nre-attach with: cat > {RV}\nEOF\n{UPD} --task {GID} --attach-file {RV} --attach-name agent-run-report.md")
+check('I6 a heredoc body quoting a write is not a write', p.returncode == 0, p.stderr)
+os.path.exists(f'/tmp/note-{GID}.md') and os.remove(f'/tmp/note-{GID}.md')
+
+reset()
+p = rgate(f'{UPD} --task {GID} --attach-file "$(cat /tmp/p-{GID})" --attach-name agent-run-report.md')
+check('I7 an unresolvable path keeps the not-readable block', p.returncode == 2 and 'not readable' in p.stderr, p.stderr)
+
+reset()
+p = rgate(f'{UPD} --task {GID} --attach-file $MISSING_VAR --attach-name agent-run-report.md')
+check('I8 an unset variable keeps the not-readable block', p.returncode == 2 and 'not readable' in p.stderr, p.stderr)
+
 
 reset()
 shutil.rmtree(TMP, ignore_errors=True)

@@ -18,7 +18,15 @@
 #     last commit touching src/docs vs last commit touching code.
 # No judgment, no agent goodwill. Fails OPEN on anything it cannot determine
 # (no worktree, no doc, no field, git/API error) — a gate that guesses would
-# block clean runs.
+# block clean runs. INCONCLUSIVE IS NOT A VIOLATION: the unstamped branch blocks
+# only while it can name the code commits that outran the doc, because a gate
+# that prints an empty list and blocks anyway is indistinguishable from a bug
+# and gets cleared with a waiver instead of a fix.
+#
+# NO PIPES INTO AN EARLY-EXITING READER. `git show <big doc> | grep -q` makes git
+# die of SIGPIPE, and pipefail turns that 141 into a failed test: the stamped
+# branch silently became "unstamped" on any doc large enough for grep to hit its
+# match before git finished writing. Read into a variable and match in bash.
 #
 # Escape hatch: /tmp/agent-tdd-current-waiver-<gid>.md explaining why the doc is
 # legitimately unchanged (audited by /eval-run; an unjustified note is a finding).
@@ -63,8 +71,9 @@ STAMP_SH="$HOME/.cursor/skills/tdd/scripts/tdd-stamp.sh"
 DOC_REL="${DOC#$REPO_DIR}"; DOC_REL="${DOC_REL#/}"
 # Stamped doc: compare against the COMMITTED doc at HEAD (the gate is about what
 # ships, not what sits unstaged in the worktree).
-if [ -x "$STAMP_SH" ] && git -C "$REPO_DIR" show "HEAD:$DOC_REL" 2>/dev/null | grep -q 'tdd-code-fingerprint:'; then
-  STAMPED=$(git -C "$REPO_DIR" show "HEAD:$DOC_REL" | grep -oE 'tdd-code-fingerprint: [0-9a-f]{40}' | head -1 | awk '{print $2}')
+DOC_AT_HEAD=$(git -C "$REPO_DIR" show "HEAD:$DOC_REL" 2>/dev/null || true)
+if [ -x "$STAMP_SH" ] && [[ $DOC_AT_HEAD =~ tdd-code-fingerprint:[[:space:]]([0-9a-f]{40}) ]]; then
+  STAMPED="${BASH_REMATCH[1]}"
   HEAD_FP=$("$STAMP_SH" "$REPO_DIR" --fingerprint 2>/dev/null || echo "")
   [ -n "$HEAD_FP" ] || exit 0
   [ "$STAMPED" = "$HEAD_FP" ] && exit 0
@@ -92,7 +101,12 @@ CODE_TS=$(git -C "$REPO_DIR" log -1 --format=%ct -- . ':(exclude)src/docs' 2>/de
 [ -n "$DOC_TS" ] && [ -n "$CODE_TS" ] || exit 0
 [ "$CODE_TS" -le "$DOC_TS" ] 2>/dev/null && exit 0
 
-NEWER=$(git -C "$REPO_DIR" log --oneline "$BASE..HEAD" --since="@$DOC_TS" -- . ':(exclude)src/docs' 2>/dev/null | head -5 || true)
+NEWER=$(git -C "$REPO_DIR" log -5 --oneline "$BASE..HEAD" --since="@$DOC_TS" -- . ':(exclude)src/docs' 2>/dev/null || true)
+# Inconclusive, not a violation: two timestamps said the code moved but no commit
+# can be named for it. Whatever went wrong (a ref git cannot resolve, a pipeline
+# killed mid-read), a deny that shows the agent an empty list teaches nothing and
+# gets waived rather than fixed.
+[ -n "$NEWER" ] || exit 0
 cat >&2 <<MSG
 BLOCKED: the committed TDD is older than the code it documents.
   doc:  $(basename "$DOC") (last touched $(date -r "$DOC_TS" '+%Y-%m-%d %H:%M'))

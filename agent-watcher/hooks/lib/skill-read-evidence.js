@@ -11,9 +11,18 @@
 // with its YAML frontmatter removed, trimmed; Claude Code strips frontmatter
 // when it injects a skill and substitutes placeholders (see containsBody).
 //
+// UNITS: every mode takes units, not only skill names. `pr-land` is a whole
+// SKILL.md; `one-shot:watch` is one reference slice
+// (~/.cursor/skills/one-shot/references/watch.md) of a skill split into a core
+// plus per-phase files. Proof rules are identical for both; the only
+// difference is which file on disk the delivered text is compared against.
+// Slices have no frontmatter and are never injected as skills, so their only
+// evidence shapes are Reads covering every line, an unaltered `cat`, and the
+// gate's own deny-with-body (which writes the marker directly).
+//
 // Modes:
-//   scan <transcript.jsonl> <skill>...
-//     Prints the subset of <skill> whose complete current body is in context,
+//   scan <transcript.jsonl> <unit>...
+//     Prints the subset of <unit> whose complete current body is in context,
 //     space-separated. Context = the transcript from the LAST top-level
 //     compact_boundary line to EOF (whole file when none). Evidence, any of:
 //       - a meta user message "Base directory for this skill: .../skills/<name>"
@@ -43,9 +52,32 @@ const os = require("os");
 const crypto = require("crypto");
 
 const SKILL_PATH_RE = /(?:^|\/)skills\/([a-z0-9-]+)\/SKILL\.md$/;
+const REF_PATH_RE = /(?:^|\/)skills\/([a-z0-9-]+)\/references\/([A-Za-z0-9._-]+)\.md$/;
+// Both shapes, unanchored, for scanning a Bash command string.
+const ANY_PATH_RE_G = /skills\/([a-z0-9-]+)\/(?:SKILL\.md|references\/([A-Za-z0-9._-]+)\.md)/g;
 
-function canonicalPath(name) {
-  return `${os.homedir()}/.cursor/skills/${name}/SKILL.md`;
+// unitOfPath: the unit a file path names, or null when it names neither a
+// SKILL.md nor a reference slice.
+function unitOfPath(fp) {
+  if (typeof fp !== "string") return null;
+  const s = fp.match(SKILL_PATH_RE);
+  if (s) return s[1];
+  const r = fp.match(REF_PATH_RE);
+  if (r) return `${r[1]}:${r[2]}`;
+  return null;
+}
+
+function canonicalPath(unit) {
+  const home = os.homedir();
+  const i = unit.indexOf(":");
+  if (i < 0) return `${home}/.cursor/skills/${unit}/SKILL.md`;
+  return `${home}/.cursor/skills/${unit.slice(0, i)}/references/${unit.slice(i + 1)}.md`;
+}
+
+// The skill a unit belongs to (its own name for a bare skill).
+function skillOfUnit(unit) {
+  const i = unit.indexOf(":");
+  return i < 0 ? unit : unit.slice(0, i);
 }
 
 const diskCache = new Map();
@@ -148,11 +180,14 @@ function scan(transcript, names) {
   }
   if (!wanted.size) return [];
 
-  // Only lines mentioning skills/<name> (delivery headers, file paths) or an
-  // invoked_skills attachment (entries keyed by name) can carry evidence.
-  // Collect their offsets, then parse just those lines.
+  // Only lines mentioning skills/<name> (delivery headers, file paths — the
+  // slice path contains it too) or an invoked_skills attachment (entries keyed
+  // by name) can carry evidence. Collect their offsets, then parse just those
+  // lines.
   const starts = new Set();
-  for (const needleText of [...[...wanted.keys()].map((n) => `skills/${n}`), '"invoked_skills"']) {
+  const needles = new Set([...wanted.keys()].map((u) => `skills/${skillOfUnit(u)}`));
+  needles.add('"invoked_skills"');
+  for (const needleText of needles) {
     const nb = Buffer.from(needleText);
     let i = buf.indexOf(nb, from);
     while (i >= 0) {
@@ -194,16 +229,16 @@ function scan(transcript, names) {
       } else if (att.type === "file") {
         const f = att.content && att.content.file;
         const fp = (f && f.filePath) || att.filename || "";
-        const m = fp.match(SKILL_PATH_RE);
-        const w = m && wanted.get(m[1]);
+        const u = unitOfPath(fp);
+        const w = u && wanted.get(u);
         if (w && f && typeof f.content === "string" && containsBody(f.content, w.d)) w.ok = true;
       }
     }
 
     const r = o.toolUseResult;
     if (o.type === "user" && r && typeof r === "object" && r.file && typeof r.file.filePath === "string") {
-      const m = r.file.filePath.match(SKILL_PATH_RE);
-      const w = m && wanted.get(m[1]);
+      const u = unitOfPath(r.file.filePath);
+      const w = u && wanted.get(u);
       if (w) for (const ln of provenLines(w.d, r.file)) w.covered.add(ln);
     }
   }
@@ -224,9 +259,8 @@ function post(key) {
 
   if (tool === "Read") {
     const fp = String(ti.file_path || "");
-    const m = fp.match(SKILL_PATH_RE);
-    if (!m || !tr || typeof tr !== "object" || !tr.file) return out;
-    const name = m[1];
+    const name = unitOfPath(fp);
+    if (!name || !tr || typeof tr !== "object" || !tr.file) return out;
     const d = disk(name, fp);
     if (!d) return out;
     const proven = provenLines(d, tr.file);
@@ -253,16 +287,18 @@ function post(key) {
     const cmd = String(ti.command || "");
     if (!tr || typeof tr !== "object" || typeof tr.stdout !== "string" || tr.persistedOutputPath) return out;
     // Each command segment (split on ; && || newline) that is a cat of a
-    // SKILL.md must leave stdout alone: no pipe, no stdout redirect, no
-    // $( ) capture around it.
+    // SKILL.md or a reference slice must leave stdout alone: no pipe, no
+    // stdout redirect, no $( ) capture around it.
     for (const seg of cmd.split(/;|&&|\|\||\n/)) {
       const cm = seg.match(/(^|\$\(|\()\s*cat\s[^|]*/);
       if (!cm) continue;
-      const names = [...seg.matchAll(/skills\/([a-z0-9-]+)\/SKILL\.md/g)].map((x) => x[1]);
-      if (!names.length) continue;
+      const hits = [...seg.matchAll(ANY_PATH_RE_G)];
+      if (!hits.length) continue;
       if (cm[1] === "$(" || /\|/.test(seg) || /(^|[^0-9&<>])>|\b1>|&>/.test(seg.replace(/\b2>(&1|\s*\/dev\/null)/g, ""))) continue;
-      for (const name of new Set(names)) {
-        const d = disk(name, (seg.match(new RegExp(`\\S*skills/${name}/SKILL\\.md`)) || [])[0]);
+      const seen = new Map();
+      for (const h of hits) seen.set(h[2] ? `${h[1]}:${h[2]}` : h[1], h[0]);
+      for (const [name, rel] of seen) {
+        const d = disk(name, (seg.match(new RegExp(`\\S*${rel.replace(/[.]/g, "\\.")}`)) || [])[0]);
         if (d && tr.stdout.includes(d.body)) out.push(name); // cat output is verbatim: no placeholder tolerance
       }
     }

@@ -448,8 +448,12 @@ CLNODE
   # Publish is the auth-gated, RESUMABLE tail (pr-land npm-publish-auth): a
   # pushed version commit npm lacks is benign — a re-run's resume path
   # completes it whenever the operator taps the link.
+  # Exit 5 (accepted-not-served) also lands here: re-running is right for it,
+  # but it must never become a version bump — npm already took the version.
+  # The code goes in the message so the operator can read its meaning off
+  # pr-land's exit table instead of guessing from "did not complete".
   "$NPM_PUBLISH" "$repo_dir" \
-    || { step "$phase" failed "npm publish did not complete (auth pending or registry error); master+tag are pushed, re-run resumes the publish"; die "dep: $pkg publish pending"; }
+    || { rc=$?; step "$phase" failed "npm publish did not complete (npm-publish-web.sh exit $rc; see pr-land npm-publish-auth); master+tag are pushed, re-run resumes the publish and never bump to a new version"; die "dep: $pkg publish pending (exit $rc)"; }
   ( cd "$WT" && "$UPGRADE_DEP" "$pkg" "$new_version" ) \
     || { step "$phase" failed "upgrade-dep.sh failed in the gui worktree"; die "dep: gui upgrade of $pkg failed"; }
   step "$phase" ok "published $new_version, gui upgraded from $pin"

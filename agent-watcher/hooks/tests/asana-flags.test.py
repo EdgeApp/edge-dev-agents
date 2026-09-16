@@ -18,7 +18,7 @@ Covers:
         with PROMPT_REVIEWER.
      A7 an explicit --set-reviewer is still sent even off-project.
   B. pr-create.sh --asana-attach
-     B1 `--asana-task <gid> --asana-attach` (one-shot step 5) attaches and
+     B1 `--asana-task <gid> --asana-attach` (one-shot references/pr.md, step 5) attaches and
         reports asana_attached true; B2 the reverse flag order does too.
      B3 --asana-attach without --asana-task exits 2 before `gh pr create`.
      B4 no --asana-attach: asana_attached null and no attach call.

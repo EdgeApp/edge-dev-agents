@@ -22,7 +22,7 @@ metadata:
 </rules>
 
 <step id="0" name="Planning handoff via /asana-plan">
-Delegate planning to `~/.cursor/skills/asana-plan/SKILL.md` first — UNLESS planning already happened in this session (e.g. one-shot step 2 already produced the plan doc); in that case proceed from the existing plan, do not re-run `/asana-plan`.
+Delegate planning to `~/.cursor/skills/asana-plan/SKILL.md` first — UNLESS planning already happened in this session (e.g. one-shot references/implementation.md step 2 already produced the plan doc); in that case proceed from the existing plan, do not re-run `/asana-plan`.
 
 - If user provided an Asana URL, run `/asana-plan` in Asana mode.
 - If user provided ad-hoc text or file references, run `/asana-plan` in text/file mode.

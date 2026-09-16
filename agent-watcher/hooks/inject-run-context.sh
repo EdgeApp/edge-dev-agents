@@ -10,7 +10,8 @@
 #   ORCH RUN (AGENT_TASK_GID set): live Asana task state, operator comments
 #     newer than the last run-report attachment (the followup watermark),
 #     attempt-log tail, attached-PR state, slot/worktree env, the mid-run
-#     state file (/tmp/agent-state-<gid>.md) if the run keeps one, and
+#     state file (/tmp/agent-state-<gid>.md) if the run keeps one, the
+#     one-shot followup slice when the task already carries a run report, and
 #     re-read pointers for contract files.
 #   ANCHOR (tmux claude-asana-<name> with <name> in persistent_anchors):
 #     identity line + the anchor's open-threads ledger.
@@ -163,6 +164,22 @@ EOF
         touch "/tmp/agent-skill-read-$gid-$sk" 2>/dev/null || true
       fi
     done
+  fi
+
+  # Followup-slice injection (2026-09-16): a task that already carries a
+  # run-report attachment is a followup by the same watermark signal used
+  # above, and one-shot's followup rules moved into references/followup.md when
+  # the skill was split, so they are no longer in context by default. Inject
+  # the slice at every context boundary of such a task (markers expire at each
+  # one, and the re-anchoring rules are needed from the first tool call, before
+  # any script the gate would deliver them at). Pre-write its read marker, the
+  # same as the planning injection above.
+  local fup="$HOME/.cursor/skills/one-shot/references/followup.md"
+  if [[ "${nreports:-0}" -gt 0 && -f "$fup" ]]; then
+    echo "--- INJECTED CONTRACT (this task already has $nreports run report(s), so this segment is a FOLLOWUP; follow this, do not re-fetch): ~/.cursor/skills/one-shot/references/followup.md ---"
+    cat "$fup"
+    echo
+    touch "/tmp/agent-skill-read-$gid-one-shot:followup" 2>/dev/null || true
   fi
 }
 

@@ -15,9 +15,21 @@
 #      command/exec, or bash/sh). A reader that merely names the path (cat, sed,
 #      grep, ls) is argument position and never fires.
 #   3. In a gated segment with a pipe, drop the trailing pipe stages when EVERY
-#      downstream stage is head or tail with plain args (watcher stdout is small;
-#      the truncation was pointless). Any other downstream stage keeps the block.
-#   4. Cuts are made on the RAW command at the stripped view's offsets, so quoted
+#      downstream stage is PURE TRUNCATION of small watcher stdout: head, tail,
+#      or `sed -n <n>[,<m>]p`, each with plain args and optional redirections.
+#      Any other downstream stage (grep, jq, a second filter) keeps the block --
+#      dropping it would change what the agent asked to see, which a rewrite may
+#      never do.
+#   4. Redirections on a dropped stage move onto the kept call, ahead of a
+#      trailing `2>&1` so both streams still land in the file
+#      (`h 2>&1 | tail -2 > f` -> `h > f 2>&1`).
+#   5. Stages are matched against the RAW segment, not the stripped view: a
+#      stage's arguments are often quoted (`sed -n '1,14p'`), and a blanked span
+#      would read as a bare `sed -n` and pass a check it should fail.
+#   6. Segments are independent. A segment the rewrite cannot make safe blocks
+#      the call, and the block message QUOTES that segment, so the retry fixes
+#      the one stage at fault instead of re-deriving the whole command.
+#   7. Cuts are made on the RAW command at the stripped view's offsets, so quoted
 #      args and heredoc bodies survive byte for byte; the operator that ended the
 #      segment is rejoined behind one space (`2>&1 | tail -2 && x` -> `2>&1 && x`).
 # The rewrite is idempotent: its output has no piped watcher segment.
@@ -52,7 +64,7 @@ CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 case "$CMD" in *.config/agent-watcher/*) ;; *) exit 0 ;; esac
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
-BLOCK_MSG="BLOCKED: do not pipe an agent-watcher helper script through '| tail' or '| head'. The pipe runs it in a subshell that fails setgid ('failed to change group ID: operation not permitted') and exit-1s, so the write does not happen. Call the script BARE and read its stdout/exit code directly (one-shot rule agent-status-on-pending-task)."
+BLOCK_MSG="BLOCKED: do not pipe an agent-watcher helper script into another command. The pipe runs it in a subshell that fails setgid ('failed to change group ID: operation not permitted') and exit-1s, so the write does not happen. Call the script BARE and read its stdout/exit code directly (one-shot rule agent-status-on-pending-task)."
 
 SUBST_MSG="BLOCKED: an agent-watcher helper script is piped inside a command substitution (\$(...), backticks, or <(...)). The pipe runs it in a subshell that fails setgid ('failed to change group ID: operation not permitted') and exit-1s, so the write does not happen. Run the helper bare as its own command (not inside a substitution, no pipe) and read its stdout/exit code directly (one-shot rule agent-status-on-pending-task)."
 
@@ -64,7 +76,13 @@ REWRITTEN=$(node -e '
 const [raw, strippedArg] = process.argv.slice(1);
 const m = strippedArg.length === raw.length ? strippedArg : raw;
 const HEAD = /^\s*[({]?\s*(?:(?:[A-Za-z_][A-Za-z0-9_]*=\S*|timeout(?:\s+-\S+)*\s+[0-9.]+[smhd]?|env|nice|time|command|exec|bash|sh)\s+)*["\x27]?\S*\.config\/agent-watcher\/(?:hooks\/)?[A-Za-z0-9_.-]+\.sh(?=["\x27\s|;&)]|$)/;
-const DOWN = /^\s*(?:head|tail)(?:\s+(?:-[A-Za-z0-9]+|--[a-z-]+(?:=\S+)?|[0-9]+))*\s*\)*\s*$/;
+// A downstream stage that only truncates small watcher stdout, with optional
+// redirections. Matched against the RAW stage text (quoted args are real here).
+const REDIR = String.raw`(?:[0-9]?>>?|&>|[0-9]?<)\s*[^\s|;&)]+`;
+const TRUNC = String.raw`(?:head|tail)(?:\s+(?:-[A-Za-z0-9]+|--[a-z-]+(?:=\S+)?|[0-9]+))*` +
+  String.raw`|sed\s+-n\s+(?:"[0-9]+(?:,[0-9]+)?p"|\x27[0-9]+(?:,[0-9]+)?p\x27|[0-9]+(?:,[0-9]+)?p)`;
+const DOWN = new RegExp(String.raw`^\s*(?:` + TRUNC + String.raw`)(?:\s+` + REDIR + String.raw`)*\s*\)*\s*$`);
+const REDIR_G = new RegExp(REDIR, "g");
 function topLevel(str, re) {
   // Separators inside $(...) / $((...)) belong to the substitution; a bare
   // ( ... ) subshell group is transparent, so its inner commands still split.
@@ -147,26 +165,41 @@ let s = 0;
 for (const x of seps) { bounds.push([s, x.index]); s = x.index + x.len; }
 bounds.push([s, m.length]);
 let out = raw, changed = false;
+const blocked = [];
 for (let k = bounds.length - 1; k >= 0; k--) {
   const [a, b] = bounds[k];
   if (!HEAD.test(raw.slice(a, b))) continue;
-  const seg = m.slice(a, b);
+  const seg = m.slice(a, b), rawSeg = raw.slice(a, b);
   const pipes = topLevel(seg, /(?<![>|])\|&?/y).map((x) => ({ index: x.index, 0: seg.substr(x.index, x.len) }));
   if (!pipes.length) continue;
   const stages = [];
   for (let i = 0; i < pipes.length; i++) {
     const from = pipes[i].index + pipes[i][0].length;
-    stages.push(seg.slice(from, i + 1 < pipes.length ? pipes[i + 1].index : seg.length));
+    stages.push([from, i + 1 < pipes.length ? pipes[i + 1].index : seg.length]);
   }
-  if (!stages.every((st) => DOWN.test(st))) process.exit(3);
+  // One unrewritable segment blocks the call, but never cancels the rewrite of
+  // the others: it is reported by text so the retry edits only that stage.
+  if (!stages.every(([f, t]) => DOWN.test(rawSeg.slice(f, t)))) { blocked.push(rawSeg.trim()); continue; }
+  // Redirections on the dropped stages move onto the kept call.
+  const redirs = [];
+  for (const [f, t] of stages) for (const r of rawSeg.slice(f, t).matchAll(REDIR_G)) redirs.push(r[0]);
   const cut = a + pipes[0].index;
   const rest = out.slice(b);
   const glue = rest.length && rest[0] !== "\n" ? " " : "";
   // Keep the closing parens of a ( ... | tail ) subshell group.
-  const closers = (stages[stages.length - 1].match(/\)[\s)]*$/) || [""])[0].replace(/\s/g, "");
-  out = out.slice(0, cut).replace(/[ \t]+$/, "") + closers + glue + rest;
+  const last = rawSeg.slice(stages[stages.length - 1][0], stages[stages.length - 1][1]);
+  const closers = (last.match(/\)[\s)]*$/) || [""])[0].replace(/\s/g, "");
+  let kept = out.slice(0, cut).replace(/[ \t]+$/, ""), dup = "";
+  if (redirs.length) {
+    // `h 2>&1 | tail > f` means both streams reach f: the dup must follow it.
+    const md = /\s+[0-9]?>&[0-9-]+$/.exec(kept);
+    if (md) { dup = kept.slice(md.index).trim(); kept = kept.slice(0, md.index); }
+  }
+  const add = redirs.concat(dup ? [dup] : []);
+  out = kept + (add.length ? " " + add.join(" ") : "") + closers + glue + rest;
   changed = true;
 }
+if (blocked.length) { process.stdout.write(blocked.reverse().join("\n")); process.exit(3); }
 if (!changed) process.exit(1);
 process.stdout.write(out);
 ' "$CMD" "$CMD_M")
@@ -197,7 +230,12 @@ case "$RC" in
     exit 0
     ;;
   3)
-    echo "$BLOCK_MSG" >&2
+    {
+      echo "$BLOCK_MSG"
+      echo "Only these segments are at fault; the rest of the command is fine as written:"
+      printf '%s\n' "$REWRITTEN" | sed 's/^/    /'
+      echo "A head/tail/'sed -n <n>,<m>p' stage would have been dropped for you. This downstream stage is a filter, so dropping it would change what you asked to see: run the helper BARE as its own segment, then filter a file or variable in a separate command."
+    } >&2
     exit 2
     ;;
   4)

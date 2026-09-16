@@ -19,3 +19,6 @@ skills/build-and-test/maestro/swap-*.yaml
 
 # Third-party skill, local-only by request (banana-claude image gen)
 skills/banana/*
+
+# Claude synced-skills bucket: third-party skills plus their API keys, never distribute
+skills/synced/**

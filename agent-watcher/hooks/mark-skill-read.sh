@@ -6,7 +6,11 @@
 # deliveries count, because a partial read that earns the marker also
 # suppresses the gate's deny-with-body delivery, recreating the under-read
 # hole (the Cacao run credited pr-address from a 150-235 line slice).
-#   Read tool: each Read of a skills/<name>/SKILL.md adds the lines it showed
+# UNITS (2026-09-16): a marker names either a whole skill (`im`) or one
+# reference slice of a split skill (`one-shot:watch` ->
+# skills/one-shot/references/watch.md). Both are credited by the same evidence
+# rules; lib/skill-read-evidence.js owns the path-to-unit mapping.
+#   Read tool: each Read of a skills/<name>/SKILL.md (or reference slice) adds the lines it showed
 #                (checked line by line against the current file) to
 #                /tmp/agent-skill-read-<key>-<name>.ranges; the marker is
 #                written once every line is covered. One uncapped full Read
@@ -58,7 +62,7 @@ post_evidence() {
 case "$TOOL" in
   Read)
     FP=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
-    if printf '%s' "$FP" | grep -qE 'skills/[a-z0-9-]+/SKILL\.md$'; then
+    if printf '%s' "$FP" | grep -qE 'skills/[a-z0-9-]+/(SKILL\.md|references/[A-Za-z0-9._-]+\.md)$'; then
       post_evidence
     fi
     ;;
@@ -66,7 +70,7 @@ case "$TOOL" in
     CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
     # Coarse shape filter first (cheap); the content check decides. Under-
     # marking is cheap (the gate backfills), over-marking is the failure mode.
-    if printf '%s' "$CMD" | grep -qE '(^|[;&|(]|\$\()[[:space:]]*cat[[:space:]][^|;&]*skills/[a-z0-9-]+/SKILL\.md' \
+    if printf '%s' "$CMD" | grep -qE '(^|[;&|(]|\$\()[[:space:]]*cat[[:space:]][^|;&]*skills/[a-z0-9-]+/(SKILL\.md|references/[A-Za-z0-9._-]+\.md)' \
        && ! printf '%s' "$CMD" | grep -qE '\b(sed|head|tail|awk)\b'; then
       post_evidence
     fi

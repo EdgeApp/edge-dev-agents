@@ -28,17 +28,19 @@
 #
 # Usage: watch-pr.sh --pr <num> [--repo <owner/name>] [--task-gid <gid>]
 #                    [--budget-seconds 1800] [--interval 30]
+# The repo is never guessed: see REPO RESOLUTION below. Pass --repo whenever the
+# PR is not in the cwd repo and the task does not yet attach it.
 # Exit: 0   green — final stdout line distinguishes:
 #             RESULT: green                   (everything passed, Travis included)
 #             RESULT: green-travis-pending    (all but Travis passed; Travis
 #                                              queued/running — report its state
 #                                              in the Finalize Gate checklist)
-#             Any RESULT may carry a ` reviewer-unavailable:<name>` suffix,
-#             meaning that reviewer posted NO check-run on a HEAD whose other
-#             checks all completed. Proceed; record it as an unchecked box in
-#             the report's Finalize Gate and NOWHERE else (no comment, no
-#             follow-up item; require-clean-run-report.sh and the Asana comment
-#             hook enforce this).
+#             Any RESULT may carry a ` reviewer-unavailable:<name>(<why>)[, ...]`
+#             suffix, one entry per reviewer bot that posted no usable check-run
+#             on a HEAD whose other checks all completed. Proceed; record each as
+#             an unchecked box in the report's Finalize Gate and NOWHERE else
+#             (no comment, no follow-up item; require-clean-run-report.sh and
+#             the Asana comment hook enforce this).
 #             RESULT: green-wip-preserve      (all passed except the wip-guard
 #                                              check, red only because preserved
 #                                              fixup commits are on the branch
@@ -76,20 +78,61 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$PR" ] || { echo "usage: watch-pr.sh --pr <num> ..." >&2; exit 2; }
 command -v gh >/dev/null || { echo "ERROR: gh not found" >&2; exit 2; }
-# Without --repo, gh resolves the repo from cwd; from ~/git (not a repo) it prints
-# "fatal: not a git repository" and the watch silently no-ops. Fail loudly instead.
-if [ -z "$REPO" ] && ! git -C "$PWD" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "ERROR: not in a git repo and no --repo given — pass --repo <owner/name> or run from the PR's worktree" >&2
-  exit 2
-fi
-# Make the target repo EXPLICIT — never rely on gh's silent cwd inference. Run from
-# the WRONG worktree and gh would resolve a same-numbered PR in a different repo (or
-# "no checks") and the watch could read as green. If --repo was not passed, resolve
-# it from the cwd repo and LOG it, so a wrong-worktree cwd surfaces in the output
-# instead of silently watching the wrong PR.
-if [ -z "$REPO" ]; then
-  REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)
-  [ -n "$REPO" ] && echo ">> watch-pr: no --repo given; resolved '$REPO' from cwd ($(basename "$PWD"))" >&2
+
+# REPO RESOLUTION: the target repo is EXPLICIT before anything is watched.
+# PR numbers collide across repos and gh infers the repo from cwd, so a watch
+# launched from another repo's worktree reads a DIFFERENT repo's PR of the same
+# number and reports its state as this PR's (a run burned 5m26s and returned
+# `RESULT: no-checks` off an unrelated PR that way). Precedence:
+#   1. --repo      explicit wins, always.
+#   2. --task-gid  the repo of the PR NUMBERED --pr attached to that task (parent
+#                  or per-repo subtask). The task is the authority on which repo
+#                  the run's PR lives in; cwd is not.
+#   3. cwd         only when the cwd repo really HAS PR #--pr and the task
+#                  attaches nothing that contradicts it.
+# Anything else exits 2 naming --repo rather than watching a guess.
+asana_task_pr_urls() { # $1=gid → github PR URLs attached to the task or its subtasks
+  local gid="$1" token g api="https://app.asana.com/api/1.0"
+  command -v curl >/dev/null && command -v jq >/dev/null || return 0
+  token="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null || true)}"
+  [ -n "$token" ] || return 0
+  for g in "$gid" $(curl -sf --max-time 15 "$api/tasks/$gid/subtasks?opt_fields=gid" \
+      -H "Authorization: Bearer $token" 2>/dev/null | jq -r '.data[]?.gid // empty' 2>/dev/null || true); do
+    curl -sf --max-time 15 "$api/tasks/$g/attachments?opt_fields=view_url" \
+      -H "Authorization: Bearer $token" 2>/dev/null | jq -r '.data[]? | .view_url // empty' 2>/dev/null || true
+  done | { grep -oE 'https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/pull/[0-9]+' || true; } | sort -u
+}
+if [ -n "$REPO" ]; then
+  echo ">> watch-pr: repo $REPO (source: --repo)" >&2
+else
+  CWD_REPO=""
+  if git -C "$PWD" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    CWD_REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)
+  fi
+  TASK_PR_URLS=""
+  [ -n "$TASK_GID" ] && TASK_PR_URLS=$(asana_task_pr_urls "$TASK_GID")
+  TASK_REPO=$(printf '%s\n' "$TASK_PR_URLS" | awk -F/ -v n="$PR" 'NF >= 7 && $NF == n {print $4 "/" $5}' | head -1)
+  if [ -n "$TASK_REPO" ]; then
+    REPO="$TASK_REPO"
+    if [ -n "$CWD_REPO" ] && [ "$CWD_REPO" != "$REPO" ]; then
+      echo ">> watch-pr: cwd is $CWD_REPO, but task $TASK_GID attaches PR #$PR in $REPO; watching $REPO" >&2
+    fi
+    echo ">> watch-pr: repo $REPO (source: PR #$PR attached to task $TASK_GID)" >&2
+  elif [ -n "$TASK_PR_URLS" ]; then
+    echo "ERROR: task $TASK_GID attaches $(printf '%s' "$TASK_PR_URLS" | tr '\n' ' ')but none is PR #$PR, and PR numbers collide across repos. Pass --repo <owner/name> for PR #$PR" >&2
+    exit 2
+  elif [ -n "$CWD_REPO" ]; then
+    if gh pr view "$PR" --repo "$CWD_REPO" --json number >/dev/null 2>&1; then
+      REPO="$CWD_REPO"
+      echo ">> watch-pr: repo $REPO (source: cwd $(basename "$PWD"); it has PR #$PR)" >&2
+    else
+      echo "ERROR: $CWD_REPO (resolved from cwd $(basename "$PWD")) has no PR #$PR. Pass --repo <owner/name> for the repo that does" >&2
+      exit 2
+    fi
+  else
+    echo "ERROR: no --repo, cwd is not a git repo, and no task attachment names PR #$PR. Pass --repo <owner/name>" >&2
+    exit 2
+  fi
 fi
 command -v timeout >/dev/null || { echo "ERROR: timeout not on PATH (shim: ~/.cursor/skills/timeout.sh)" >&2; exit 2; }
 
@@ -107,9 +150,15 @@ command -v timeout >/dev/null || { echo "ERROR: timeout not on PATH (shim: ~/.cu
 #   - Keyed by task + repo + PR, so a task alternating two PRs keeps a budget
 #     per PR instead of each watch resetting the other's (the HEAD check below
 #     would otherwise see a foreign HEAD every call).
-BUDGET_FILE="/tmp/agent-watch-budget-${TASK_GID:-notask}-$(printf '%s' "${REPO:-norepo}" | tr -c 'A-Za-z0-9' '-')-pr$PR"
+BUDGET_FILE="/tmp/agent-watch-budget-${TASK_GID:-notask}-$(printf '%s' "$REPO" | tr -c 'A-Za-z0-9' '-')-pr$PR"
 NOW=$(date +%s)
-CUR_HEAD=$(gh pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefOid -q .headRefOid 2>/dev/null || echo "unknown")
+# One retry: a transient gh failure must not read as "PR #$PR is not in $REPO".
+CUR_HEAD=$(gh pr view "$PR" --repo "$REPO" --json headRefOid -q .headRefOid 2>/dev/null || true)
+if [ -z "$CUR_HEAD" ]; then
+  sleep 5
+  CUR_HEAD=$(gh pr view "$PR" --repo "$REPO" --json headRefOid -q .headRefOid 2>/dev/null || true)
+fi
+[ -n "$CUR_HEAD" ] || { echo "ERROR: $REPO has no PR #$PR (or gh cannot read it); watching it would report another repo's checks" >&2; exit 2; }
 REMAINING="$BUDGET"
 if [ -r "$BUDGET_FILE" ]; then
   FILE_MTIME=$(stat -f %m "$BUDGET_FILE" 2>/dev/null || echo 0)
@@ -147,25 +196,30 @@ CALL_DEADLINE=$((WATCH_START + MAX_CALL))
 LAND_LOCK="$HOME/.cursor/skills/pr-land/scripts/repo-land-lock.sh"
 LAND_LOCK_OWNER="${AGENT_SESSION_UUID:-op-${USER:-shell}}"
 renew_land_lease() {
-  [ -n "$REPO" ] && [ -x "$LAND_LOCK" ] || return 0
+  [ -x "$LAND_LOCK" ] || return 0
   local rc=0
   "$LAND_LOCK" renew --repo "$REPO" --owner "$LAND_LOCK_OWNER" >/dev/null 2>&1 || rc=$?
   [ "$rc" -eq 1 ] && echo ">> watch-pr: WARNING: land lease on ${REPO##*/} is not ours or expired; re-acquire before any push" >&2
   return 0
 }
-echo ">> watch-pr: ${REMAINING}s of round budget remain (HEAD ${CUR_HEAD:0:8}); watching ${REPO:+$REPO }PR #$PR" >&2
+echo ">> watch-pr: ${REMAINING}s of round budget remain (HEAD ${CUR_HEAD:0:8}); watching $REPO PR #$PR" >&2
 
 # Poll loop instead of `gh pr checks --watch`: --watch blocks on ALL checks with
 # no way to exempt the slow-CI check. Same budget contract as before.
 SLOW_CI_PATTERN="Travis CI"
-# The reviewer bot's check-run NAME (not its login). A reviewer that never posts
-# a check-run on a HEAD whose other checks all completed is UNAVAILABLE, not
-# pending: it is out of quota, disabled for the repo, or down. That is a
-# different verdict from "found nothing", and only this script can tell them
-# apart, so it reports which one rather than leaving the caller to guess.
-REVIEWER_CHECK_PATTERN="${REVIEWER_CHECK_PATTERN:-Cursor Bugbot}"
-# The same reviewer's GitHub LOGIN, for the review query below. GraphQL strips
-# the `[bot]` suffix, so Cursor's bots appear as plain `cursor`.
+# The reviewer bots' check-run NAME prefixes (not their logins), `|`-separated
+# and matched with startswith. They are the SAME two prefixes the Complete gate
+# counts (check-followup-scope.sh), so this watch can never report coverage the
+# gate then refuses. A reviewer that never posts a check-run on a HEAD whose
+# other checks all completed is UNAVAILABLE, not pending: it is out of quota,
+# disabled for the repo, or down. That is a different verdict from "found
+# nothing", and only this script can tell them apart, so it reports which one
+# rather than leaving the caller to guess. Each reviewer is judged SEPARATELY:
+# one bot's clean check-run says nothing about the other's absence.
+REVIEWER_CHECK_PATTERN="${REVIEWER_CHECK_PATTERN:-Cursor Bugbot|Cursor Security}"
+# The reviewers' shared GitHub LOGIN, for the review query below. GraphQL strips
+# the `[bot]` suffix, so BOTH Cursor bots appear as plain `cursor`, which is why
+# a review on HEAD can only answer "one of them reviewed", never which one.
 REVIEWER_BOT_LOGIN="${REVIEWER_BOT_LOGIN:-cursor}"
 WIP_GUARD_PATTERN="block-wip-pr"
 WIP_MODE=""  # cached review-mode verdict; fetched at most once per invocation
@@ -173,7 +227,7 @@ WIP_MODE=""  # cached review-mode verdict; fetched at most once per invocation
 # Backstop for the travis-draft-tag flow: a READY PR whose HEAD still carries
 # [skip travis] can never go Travis-green — the strip was skipped at the flip.
 # Print the warning to stderr (do not fail; the watch itself still gates everything else).
-TAGCHK=$(gh pr view "$PR" ${REPO:+--repo "$REPO"} --json isDraft,commits \
+TAGCHK=$(gh pr view "$PR" --repo "$REPO" --json isDraft,commits \
   -q '{d: .isDraft, m: .commits[-1].messageHeadline}' 2>/dev/null || true)
 if [ -n "$TAGCHK" ] && [ "$(jq -r '.d' <<<"$TAGCHK")" = "false" ] \
    && jq -r '.m' <<<"$TAGCHK" | grep -q '\[skip travis\]'; then
@@ -184,7 +238,7 @@ fi
 # carries fixup! commits AND the squash oracle says preserve. Same oracle as
 # pr-finalize-fixups — no second derivation of "is a reviewer active".
 wip_guard_expected() {
-  [ -n "$REPO" ] || return 1
+
   case "$WIP_MODE" in
     preserve) return 0 ;;
     autosquash|none) return 1 ;;
@@ -205,7 +259,7 @@ wip_guard_expected() {
 # "reviewer unavailable" and walked past it. A review pinned to the head commit
 # is the only proof of coverage.
 reviewer_reviewed_head() {
-  [ -n "$REPO" ] || return 1
+
   local count
   count=$(gh api graphql -f query="{repository(owner:\"${REPO%%/*}\",name:\"${REPO##*/}\"){pullRequest(number:$PR){headRefOid reviews(last:50){nodes{author{login} commit{oid}}}}}}" \
     --jq ".data.repository.pullRequest | .headRefOid as \$h | [.reviews.nodes[] | select(.author.login == \"$REVIEWER_BOT_LOGIN\") | select(.commit.oid == \$h)] | length" \
@@ -217,7 +271,7 @@ while :; do
   NOW=$(date +%s)
   [ "$NOW" -ge "$DEADLINE" ] && { echo ">> watch-pr: remaining-budget timeout" >&2; exit 124; }
   renew_land_lease
-  JSON=$(gh pr checks "$PR" ${REPO:+--repo "$REPO"} --json name,bucket 2>/dev/null || true)
+  JSON=$(gh pr checks "$PR" --repo "$REPO" --json name,bucket 2>/dev/null || true)
   [ -n "$JSON" ] || JSON="[]"
   TOTAL=$(jq 'length' <<<"$JSON" 2>/dev/null || echo 0)
   # ZERO checks: nothing has posted at all (draft PR, [skip travis] HEAD, or a
@@ -251,30 +305,42 @@ while :; do
     # all, or one whose bucket is "skipping". Neither is reviewed-and-clean, so
     # neither may be reported as reviewer coverage — but neither PROVES absence
     # either, so the check-run only raises the question. A review pinned to the
-    # head commit answers it, and that answer wins.
-    REVIEWER_REVIEWED=$(jq -r --arg p "$REVIEWER_CHECK_PATTERN" '[.[] | select(.name | startswith($p)) | select(.bucket != "skipping")] | length' <<<"$JSON" 2>/dev/null || echo 0)
+    # head commit answers it, and that answer wins. That answer is per-LOGIN and
+    # both Cursor reviewers post as `cursor`, so it can only say "one of them
+    # reviewed": it clears the note when EVERY reviewer is missing (the outage it
+    # was written for), and when one reviewer DID post a usable check-run the
+    # other's absence stands on its own.
+    REVIEWER_MISS=$(jq -r --arg p "$REVIEWER_CHECK_PATTERN" '
+      . as $c
+      | [ ($p | split("|"))[]
+          | . as $n
+          | { n: $n,
+              seen:   ([ $c[] | select(.name | startswith($n)) ] | length),
+              usable: ([ $c[] | select((.name | startswith($n)) and (.bucket != "skipping")) ] | length) }
+          | select(.usable == 0)
+          | .n + (if .seen == 0 then "(no check-run)" else "(check-run skipped)" end) ] as $m
+      | [ ($m | length), (($p | split("|")) | length), ($m | join(", ")) ] | @tsv' <<<"$JSON" 2>/dev/null || true)
+    IFS=$'\t' read -r MISS_N REVIEWER_N MISS_TEXT <<<"${REVIEWER_MISS:-0	0	}"
     REVIEWER_NOTE=""
-    if [ "${REVIEWER_REVIEWED:-0}" -eq 0 ] && ! reviewer_reviewed_head; then
+    if [ "${MISS_N:-0}" -gt 0 ] && ! { [ "$MISS_N" -eq "${REVIEWER_N:-0}" ] && reviewer_reviewed_head; }; then
       # DRAFT PRs (the 2026-07-31 bugbot-credit gate): reviewer bots skip drafts
       # BY DESIGN — absence is the gate working, not an outage. Distinct suffix
       # so the caller knows the finalize path is `gh pr ready` + re-watch, and
       # the Finalize Gate box is "pending ready-flip", not reviewer-unavailable.
-      IS_DRAFT=$(gh pr view "$PR" ${REPO:+--repo "$REPO"} --json isDraft -q .isDraft 2>/dev/null || echo false)
+      IS_DRAFT=$(gh pr view "$PR" --repo "$REPO" --json isDraft -q .isDraft 2>/dev/null || echo false)
       if [ "$IS_DRAFT" = "true" ]; then
-        REVIEWER_NOTE=" draft-reviewer-skipped($REVIEWER_CHECK_PATTERN: bots skip drafts by design; run gh pr ready at finalize, then re-watch)"
-        echo ">> watch-pr: PR is DRAFT — '$REVIEWER_CHECK_PATTERN' skipping it is the credit gate working. CI is gated now; bots gate after 'gh pr ready' at finalize." >&2
+        REVIEWER_NOTE=" draft-reviewer-skipped($MISS_TEXT: bots skip drafts by design; run gh pr ready at finalize, then re-watch)"
+        echo ">> watch-pr: PR is DRAFT, so '$MISS_TEXT' skipping it is the credit gate working. CI is gated now; bots gate after 'gh pr ready' at finalize." >&2
       else
         # Genuinely unavailable reviewer on a READY PR: write the waiver the
         # Complete gate's bot check honors, so an outage blocks nothing while
         # staying on the audit trail (the eval reads this file's reason).
         if [ -n "$TASK_GID" ]; then
           printf 'reviewer-unavailable: %s posted no check-run/review on ready HEAD %s at %s (other checks complete)\n' \
-            "$REVIEWER_CHECK_PATTERN" "${CUR_HEAD:0:12}" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "/tmp/agent-bot-unavailable-${TASK_GID}" 2>/dev/null || true
+            "$MISS_TEXT" "${CUR_HEAD:0:12}" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "/tmp/agent-bot-unavailable-${TASK_GID}" 2>/dev/null || true
         fi
-        REVIEWER_SEEN=$(jq -r --arg p "$REVIEWER_CHECK_PATTERN" '[.[] | .name | select(startswith($p))] | length' <<<"$JSON" 2>/dev/null || echo 0)
-        if [ "${REVIEWER_SEEN:-0}" -eq 0 ]; then WHY="no check-run"; else WHY="check-run skipped"; fi
-        REVIEWER_NOTE=" reviewer-unavailable:$REVIEWER_CHECK_PATTERN($WHY, no review on HEAD)"
-        echo ">> watch-pr: '$REVIEWER_CHECK_PATTERN' did not review HEAD ($WHY). Proceed. Record it ONLY as the unchecked reviewer box in the run report's Finalize Gate; mention it nowhere else (operator ruling 2026-09-02)." >&2
+        REVIEWER_NOTE=" reviewer-unavailable:$MISS_TEXT(no review on HEAD)"
+        echo ">> watch-pr: $MISS_TEXT did not review HEAD. Proceed. Record it ONLY as the unchecked reviewer box in the run report's Finalize Gate; mention it nowhere else (operator ruling 2026-09-02)." >&2
       fi
     fi
     if [ -n "$FAILS_WIP" ]; then

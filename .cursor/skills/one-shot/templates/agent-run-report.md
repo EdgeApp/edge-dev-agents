@@ -58,7 +58,8 @@ _None observed._
 ## Completion Judge
 <!-- cat: completion-judge -->
 <!-- Auto-filled at attach from the judge provenance log (one row per judge call:
-     event, verdict, failed dimensions, summary; operator overrides named). Leave as is. -->
+     event, verdict, failed dimensions, summary; operator overrides named), and
+     refreshed by a re-attach once the completion judge has ruled. Leave as is. -->
 _No judge call yet._
 
 ## Testing
