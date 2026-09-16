@@ -45,6 +45,24 @@
       "subject": "Add Arc swaps via LI.FI",
       "hackNote": null,
       "addedAt": "2026-09-16T22:59:38.773Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20260916-165049-agent-proof-1218563157181138-13-lifi-quote-arc-out-after-fix.png",
+      "caption": "lifi quote arc out after fix",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc swaps via LI.FI",
+      "hackNote": null,
+      "addedAt": "2026-09-16T23:50:58.416Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20260916-165049-agent-proof-1218563157181138-14-lifi-swap-arc-out-after-fix-success.png",
+      "caption": "lifi swap arc out after fix success",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc swaps via LI.FI",
+      "hackNote": null,
+      "addedAt": "2026-09-16T23:50:58.421Z"
     }
   ]
 }
