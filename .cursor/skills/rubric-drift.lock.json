@@ -162,7 +162,7 @@
       ]
     },
     "pr-address:never-sets-completion": {
-      "hash": "34c67ff9f721",
+      "hash": "cb1a750dfcc2",
       "dims": [
         "A14"
       ]
@@ -417,7 +417,7 @@
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "a1c3f0a649f9",
+      "hash": "bc1fd1022b8c",
       "dims": [
         "A9"
       ]
@@ -642,7 +642,7 @@
       ]
     },
     "one-shot:operator-hold": {
-      "hash": "806fe07ff710",
+      "hash": "54a3a4e9d500",
       "dims": [
         "A7"
       ]
@@ -675,6 +675,12 @@
       "hash": "6a4315b85330",
       "dims": [
         "O9"
+      ]
+    },
+    "one-shot:set-tested-field": {
+      "hash": "3ac88a279063",
+      "dims": [
+        "A22"
       ]
     }
   },
@@ -950,10 +956,6 @@
     "one-shot:ignore-watchdog-revive-ping": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "c7a0784aa196"
-    },
-    "one-shot:set-tested-field": {
-      "reason": "2026-08-06: Android Device enum added 2026-08-06; graded via A22's dated physical-vs-emulator anchor",
-      "hash": "3ac88a279063"
     },
     "one-shot:yolo-no-silent-downgrade": {
       "reason": "2026-09-10: rewired 2026-09-10 to the completion judge; the downgrade case is graded by A32/O9 and the judge J2/J5",

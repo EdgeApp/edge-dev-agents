@@ -1,21 +1,27 @@
 #!/usr/bin/env bash
 # operator-hold-prompt.sh -- UserPromptSubmit hook. In an orchestrated session a
-# prompt a HUMAN types sets an operator hold (operator-hold.sh) and prints one
-# context line telling the agent to answer and wait; a release clears it and
-# says so; a stop order keeps it and tells the agent to take the operator-
-# directed block now. Machine prompts and headless children touch nothing.
+# prompt a HUMAN types is read for what it orders: a question or an interrupt
+# sets an operator hold (operator-hold.sh) and prints one context line telling
+# the agent to answer and wait; a release clears it and says so; a stop order
+# keeps it and tells the agent to take the operator-directed block now; any
+# other human text is a STEER, printed as such, and sets nothing (the run stays
+# autonomous). Machine prompts and headless children touch nothing.
 #
-# Grammar (hooks/lib/operator-directives.sh owns the sentence rules):
+# Grammar (hooks/lib/operator-directives.sh owns the sentence rules), checked in
+# this order:
+#   stop     a STOP directive opens or closes the message ("stop the task",
+#            "set it to blocked"); the hold stays, the agent is told to block
 #   release  the first word (after ok/yes/sure/please) is go|resume|continue|
 #            proceed, or the last bare clause (after the final , ; . ! ? and/then)
 #            is go|go ahead|resume|continue|proceed|complete|finish up|wrap it up,
 #            or a COMPLETION directive opens or closes the message
 #            ("finish up", "set it to complete", "ship it")
-#   stop     a STOP directive opens or closes the message ("stop the task",
-#            "set it to blocked"); the hold stays, the agent is told to block
-#   hold     anything else a human typed, including negated or conditional
-#            directives ("don't finish yet", "finish once QA signs off") and a
-#            bare "stop" (an interrupt, not an order)
+#   hold     a question (a sentence ending in "?", except a request phrased as
+#            "can/could/would/will you ..."), an interrupt (wait|hold on|hang on|
+#            hold up|pause opening the message, or one of those or a bare "stop"
+#            as a whole clause), or a negated go ("don't continue", "not yet")
+#   steer    anything else a human typed ("the fee row is wrong, fix it"):
+#            carried out, no hold
 # A completion or stop directive, or an explicit "bypass the judge", also writes
 # /tmp/agent-judge-waiver-<gid>: the completion judge is not consulted for the
 # rest of the segment (require-completion-judgment.sh; spawn clears it).
@@ -81,6 +87,10 @@ if $RELEASE; then
   exit 0
 fi
 
+if [ "$(printf '%s' "$NORM" | hold_trigger)" != hold ]; then
+  echo "[operator steer, no hold] A human wrote this mid-run. Carry it out (where it conflicts with the plan, the operator wins), answer briefly if it asks nothing, and keep going: the run stays autonomous and no phase, push or PR action is blocked."
+  exit 0
+fi
 "$H/operator-hold.sh" set "$GID"
 echo "[operator hold] A human is steering this session. Answer this prompt, then END YOUR TURN and wait: do not advance agent_status, push, open or land a PR, or start the next phase until a message from the operator starts with go, resume, continue or proceed, or ends with one of those (or "complete") as its own clause (e.g. "... and resume", "..., complete."). Reading, investigating and local edits are fine. If the operator asks you to STOP or BLOCK the task, a `--blocked yes --reason "operator-directed: <their words>"` write passes the gates while held. A Stop hook block will NOT fire while the hold is active; do not read its absence as license to continue."
 exit 0

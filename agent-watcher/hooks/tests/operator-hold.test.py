@@ -44,23 +44,32 @@ GRAMMAR = [
     # bypass grants
     ('You have approval to bypass the completion judge after this point', 'bypass'),
     ('Skip the judge and complete the task', 'bypass'),
-    # holds: negations, conditions, non-bare verbs, interrupts, questions
-    ('yes do it', 'hold'), ('approved', 'hold'), ('no, hold on', 'hold'), ('what does the fee row show?', 'hold'),
-    ("don't complete yet", 'hold'), ('not ready to complete, QA found another case', 'hold'),
-    ('wait before you finish', 'hold'), ('mark it complete when QA signs off', 'hold'),
-    ('the task is complete once QA signs off', 'hold'), ('complete garbage, the fee is wrong', 'hold'),
-    ('Stop, I am going to let QA finish testing', 'hold'), ('stop', 'hold'), ('that continue button is wrong', 'hold'),
-    ('do not continue', 'hold'), ("fix X and don't continue", 'hold'), ('never go ahead without asking', 'hold'),
-    ("don't stop the task yet", 'hold'), ('stop the sim, not the task', 'hold'), ('please do not skip the judge', 'hold'),
+    # holds (2026-09-16 narrowing): questions, interrupts, negated go
+    ('no, hold on', 'hold'), ('what does the fee row show?', 'hold'), ('why did the build fail?', 'hold'),
+    ('is that the right wallet? fix the fee too', 'hold'), ('wait before you finish', 'hold'),
+    ('Stop, I am going to let QA finish testing', 'hold'), ('stop', 'hold'), ('hang on a sec', 'hold'), ('pause', 'hold'),
+    ('do not continue', 'hold'), ("fix X and don't continue", 'hold'), ('not yet', 'hold'),
+    # steers: anything else a human typed, including negated or conditional directives,
+    # requests phrased as questions, and "stop <thing>" that is not a stop order
+    ('yes do it', 'steer'), ('approved', 'steer'), ("don't complete yet", 'steer'),
+    ('not ready to complete, QA found another case', 'steer'), ('mark it complete when QA signs off', 'steer'),
+    ('the task is complete once QA signs off', 'steer'), ('complete garbage, the fee is wrong', 'steer'),
+    ('that continue button is wrong', 'steer'), ('never go ahead without asking', 'hold'),
+    ("don't stop the task yet", 'steer'), ('stop the sim, not the task', 'steer'), ('please do not skip the judge', 'steer'),
+    ('can you also handle the android side?', 'steer'), ('Could you check the fee row first?', 'steer'),
+    ("don't wait for QA", 'steer'), ('the fee row is wrong, fix it', 'steer'), ('use the second wallet instead', 'steer'),
+    # trigger plus a release anchor: the release wins
+    ('wait, the fee is wrong, fix it and continue', 'release'), ('what about android? fix it and go', 'release'),
 ]
 table = '\n'.join(f'{p}\t{e}' for p, e in GRAMMAR)
 script = r'''
 . "$1/hooks/lib/operator-directives.sh"
 while IFS=$'\t' read -r phrase expect; do
   anchor=$(printf '%s' "$phrase" | release_anchor); kinds=$(printf '%s' "$phrase" | directive_kinds)
-  got=hold
+  got=steer
   case " $kinds " in *" bypass "*) got=bypass ;; *" stop "*) got=stop ;; *" complete "*) got="release complete" ;;
-    *) case "$anchor" in "release complete") got="release complete" ;; release) got=release ;; esac ;; esac
+    *) case "$anchor" in "release complete") got="release complete" ;; release) got=release ;;
+         *) [ "$(printf '%s' "$phrase" | hold_trigger)" = hold ] && got=hold ;; esac ;; esac
   printf '%s\t%s\t%s\n' "$phrase" "$expect" "$got"
 done
 '''
@@ -102,8 +111,10 @@ def clear():
 
 try:
     clear()
+    out = prompt('the fee row is wrong, fix it')
+    check('plain steer stamps nothing, prints the no-hold context', (not held()) and 'no hold' in out, out[:60])
     out = prompt('what does the fee row show?')
-    check('human prompt sets the hold + steering context', held() and 'steering' in out, out[:60])
+    check('question sets the hold + steering context', held() and 'steering' in out, out[:60])
     out = prompt('looks good, go ahead')
     check('release prompt clears the hold + released context, no waiver', (not held()) and 'released' in out and not os.path.exists(WAIVER), out[:60])
     out = prompt('Complete the task')

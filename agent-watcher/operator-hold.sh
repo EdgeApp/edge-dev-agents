@@ -18,8 +18,11 @@
 # sim and Metro and needs no justification.
 #
 # Consumers (all read `status`; none re-implement the file check):
-#   hooks/operator-hold-prompt.sh      UserPromptSubmit: sets on a human prompt,
-#                                      releases on a leading or trailing release word
+#   hooks/operator-hold-prompt.sh      UserPromptSubmit: sets on a human question
+#                                      or interrupt (wait / hold on / bare stop),
+#                                      releases on a leading or trailing release
+#                                      word; any other human text is a steer and
+#                                      sets nothing
 #   hooks/require-continuation-or-block.sh  Stop: allows the stop while held
 #   hooks/operator-hold-gate.sh        PreToolUse(Bash): blocks phase advances,
 #                                      pushes and PR/landing actions while held
