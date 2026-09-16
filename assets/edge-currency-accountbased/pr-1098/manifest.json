@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-currency-accountbased/pr-1098/20260916-041309-agent-proof-1218333177692561-09-HACKED-lagging-node-null-history.png",
+      "caption": "lagging node null history",
+      "hacked": true,
+      "phase": null,
+      "subject": "Fix flaky builtinTokens and FTM fee tests",
+      "hackNote": "local uncommitted accb harness pointed Solana at Helius devnet with a v1-only address and wrapped the archive connections: a node answering null ahead of the real one (09), then -32015 on one node and an outage on the next for the newest row (10); reverted, git status clean",
+      "addedAt": "2026-09-16T11:13:13.734Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1098/20260916-041309-agent-proof-1218333177692561-10-HACKED-unsupported-then-outage-history.png",
+      "caption": "unsupported then outage history",
+      "hacked": true,
+      "phase": null,
+      "subject": "Fix flaky builtinTokens and FTM fee tests",
+      "hackNote": "local uncommitted accb harness pointed Solana at Helius devnet with a v1-only address and wrapped the archive connections: a node answering null ahead of the real one (09), then -32015 on one node and an outage on the next for the newest row (10); reverted, git status clean",
+      "addedAt": "2026-09-16T11:13:13.757Z"
+    }
+  ]
+}
