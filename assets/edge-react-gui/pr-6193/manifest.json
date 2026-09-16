@@ -108,6 +108,33 @@
       "subject": "test: add testIDs to WcSignMessageModal buttons",
       "hackNote": null,
       "migratedFrom": 5533814341
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260916-010120-agent-proof-1216274035296616-01-existing-btc-wallets.png",
+      "caption": "existing btc wallets",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add testIDs to WcSignMessageModal buttons",
+      "hackNote": null,
+      "addedAt": "2026-09-16T08:01:28.089Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260916-010120-agent-proof-1216274035296616-02-signature-request.png",
+      "caption": "signature request",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add testIDs to WcSignMessageModal buttons",
+      "hackNote": null,
+      "addedAt": "2026-09-16T08:01:28.101Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6193/20260916-010120-agent-proof-1216274035296616-03-signature-sent.png",
+      "caption": "signature sent",
+      "hacked": false,
+      "phase": null,
+      "subject": "test: add testIDs to WcSignMessageModal buttons",
+      "hackNote": null,
+      "addedAt": "2026-09-16T08:01:28.101Z"
     }
   ]
 }
