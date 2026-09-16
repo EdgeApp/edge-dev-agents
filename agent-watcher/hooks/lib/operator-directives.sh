@@ -34,6 +34,36 @@ release_anchor() {
   return 0
 }
 
+# hold_trigger: prints "hold" when the human text asks the run to pause, else
+# nothing. Triggers (operator policy 2026-09-16: a hold is the exception, a plain
+# steer keeps the run autonomous):
+#   question   a sentence ending in "?", unless it opens with can/could/would/will
+#              you (a request phrased as a question: "can you also do X?")
+#   interrupt  wait | hold on | hang on | hold up | pause as the first word of the
+#              message, or any of those plus bare "stop" as a whole clause
+#              ("no, hold on"; "Stop, I'll let QA test"); "stop the sim" is a steer
+#   negated go don't/do not/never continue|proceed|go ahead|go on, or "not yet"
+# A release anchor in the same message wins (the caller checks release first).
+hold_trigger() {
+  local norm sent clause q first
+  norm=$(tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ' | sed -E 's/^ +//; s/ +$//')
+  [ -n "$norm" ] || return 0
+  # questions: every sentence closed by "?"
+  while IFS= read -r q; do
+    q=$(printf '%s' "$q" | awk -F'[.!;]' '{print $NF}' | sed -E 's/^[[:punct:] ]+//; s/^(ok|okay|k|yes|yep|yeah|sure|please|and|so|also|but)[[:punct:] ]+//')
+    [ -n "$q" ] || continue
+    printf '%s' "$q" | grep -qE '^(can|could|would|will|can you|could you)( you| u)?( please)? [a-z]' && continue
+    printf 'hold'; return 0
+  done < <(printf '%s' "$norm" | grep -oE '[^?]+\?' || true)
+  first=$(printf '%s' "$norm" | sed -E 's/^(ok|okay|k|yes|yep|yeah|sure|please|no|hmm|hm|uh)[[:punct:] ]+//')
+  printf '%s' "$first" | grep -qE '^(wait|hold on|hang on|hold up|pause)([[:punct:] ]|$)' && { printf 'hold'; return 0; }
+  while IFS= read -r clause; do
+    clause=$(printf '%s' "$clause" | sed -E 's/^[[:punct:] ]+//; s/[[:punct:] ]+$//; s/^(ok|okay|please|no|and|then) +//; s/ (please|a sec|a second|a moment|a minute|there|here|now)$//')
+    case "$clause" in wait|"hold on"|"hang on"|"hold up"|pause|stop) printf 'hold'; return 0 ;; esac
+  done < <(printf '%s\n' "$norm" | tr ',;.!?' '\n\n\n\n\n' | sed -E 's/ (and|then) /\n/g')
+  printf '%s' "$norm" | grep -qE "(^|[^a-z])(don'?t|do not|never|not) (continue|proceed|go ahead|go on|move on)([^a-z]|$)|(^|[^a-z])not yet([^a-z]|$)" && { printf 'hold'; return 0; }
+  return 0
+}
 directive_kinds() {
   local norm first_sent last_sent last_clause sent kinds="" lead obj tail complete_re stop_re neg_re bypass_re
   norm=$(tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ' | sed -E 's/^ +//; s/ +$//')
