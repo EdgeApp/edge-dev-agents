@@ -18,6 +18,15 @@
       "subject": "Treat Phaze quoteExpiry as optional",
       "hackNote": "createOrder response had quoteExpiry deleted locally (and the Phaze remote disable forced off) so the fallback path runs on live Phaze orders; frame 01 also restored the pre-change cleaner; all reverted, never committed",
       "addedAt": "2026-09-16T22:39:47.847Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6197/20260916-154608-agent-proof-1218192628740167-03-HACKED-order-status-list-without-expiry.png",
+      "caption": "order status list without expiry",
+      "hacked": true,
+      "phase": null,
+      "subject": "Treat Phaze quoteExpiry as optional",
+      "hackNote": "quoteExpiry deleted locally from createOrder and orders/status responses, Phaze remote disable forced off, and (frame 03) the list filter widened to show unpaid orders; frame 01 also restored the pre-change cleaner; all reverted, never committed",
+      "addedAt": "2026-09-16T22:46:14.273Z"
     }
   ]
 }
