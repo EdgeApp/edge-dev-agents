@@ -54,6 +54,15 @@
       "subject": "Add Arc support",
       "hackNote": null,
       "addedAt": "2026-09-16T22:59:24.629Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20260916-165038-agent-proof-1218563157181138-12-arc-history-after-keyless-resync.png",
+      "caption": "arc history after keyless resync",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc support",
+      "hackNote": null,
+      "addedAt": "2026-09-16T23:50:42.089Z"
     }
   ]
 }
