@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20260916-155913-agent-proof-1218563157181138-01-arc-in-create-wallet.png",
+      "caption": "arc in create wallet",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc support",
+      "hackNote": null,
+      "addedAt": "2026-09-16T22:59:24.628Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20260916-155913-agent-proof-1218563157181138-04-arc-balance-after-funding.png",
+      "caption": "arc balance after funding",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc support",
+      "hackNote": null,
+      "addedAt": "2026-09-16T22:59:24.629Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20260916-155913-agent-proof-1218563157181138-08-arc-history-send-swap-approval-receive.png",
+      "caption": "arc history send swap approval receive",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc support",
+      "hackNote": null,
+      "addedAt": "2026-09-16T22:59:24.629Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20260916-155913-agent-proof-1218563157181138-09-arc-wallet-usdc-symbol.png",
+      "caption": "arc wallet usdc symbol",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc support",
+      "hackNote": null,
+      "addedAt": "2026-09-16T22:59:24.629Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20260916-155913-agent-proof-1218563157181138-10-arc-send-confirm.png",
+      "caption": "arc send confirm",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc support",
+      "hackNote": null,
+      "addedAt": "2026-09-16T22:59:24.629Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20260916-155913-agent-proof-1218563157181138-11-arc-send-result.png",
+      "caption": "arc send result",
+      "hacked": false,
+      "phase": null,
+      "subject": "Add Arc support",
+      "hackNote": null,
+      "addedAt": "2026-09-16T22:59:24.629Z"
+    }
+  ]
+}
