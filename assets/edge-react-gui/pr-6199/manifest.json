@@ -90,6 +90,24 @@
       "subject": "fixup! Add exchange deep links with promo attribution",
       "hackNote": null,
       "addedAt": "2026-09-16T09:13:55.493Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6199/20260916-031934-agent-proof-1210180856778864-07-swap-link-quote-eth-to-btc.png",
+      "caption": "swap link quote eth to btc",
+      "hacked": false,
+      "phase": null,
+      "subject": "fixup! Add exchange deep links with promo attribution",
+      "hackNote": null,
+      "addedAt": "2026-09-16T10:19:39.275Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6199/20260916-031934-agent-proof-1210180856778864-08-promo-swap-executed-success.png",
+      "caption": "promo swap executed success",
+      "hacked": false,
+      "phase": null,
+      "subject": "fixup! Add exchange deep links with promo attribution",
+      "hackNote": null,
+      "addedAt": "2026-09-16T10:19:39.277Z"
     }
   ]
 }
