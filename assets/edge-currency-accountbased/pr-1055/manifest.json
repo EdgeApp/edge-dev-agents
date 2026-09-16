@@ -324,6 +324,24 @@
       "subject": "Gate ARRR sends on SDK spendability",
       "hackNote": null,
       "addedAt": "2026-09-16T07:54:46.800Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1055/20260916-005453-agent-proof-1216926437132721-21-synced-max-fee-slider-armed.png",
+      "caption": "synced max fee slider armed",
+      "hacked": false,
+      "phase": null,
+      "subject": "Rebuild Pirate Chain on react-native-pirate-wallet",
+      "hackNote": null,
+      "addedAt": "2026-09-16T07:54:58.474Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1055/20260916-005453-agent-proof-1216926437132721-22-transaction-history.png",
+      "caption": "transaction history",
+      "hacked": false,
+      "phase": null,
+      "subject": "Rebuild Pirate Chain on react-native-pirate-wallet",
+      "hackNote": null,
+      "addedAt": "2026-09-16T07:54:58.475Z"
     }
   ]
 }
