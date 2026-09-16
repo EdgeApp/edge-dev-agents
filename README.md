@@ -415,7 +415,7 @@ flowchart TB
     CALL -->|yes| RUN
     CALL -->|"no, body ≤ 50KB"| GATE
     GATE -->|retry| CALL
-    CALL -->|"no, body > 50KB (one-shot, pr-land)"| PTR
+    CALL -->|"no, body > 50KB (pr-land)"| PTR
     EXP -.expires.-> M
 ```
 
@@ -457,7 +457,7 @@ done.
 | | `record-own-asana-story.sh` (PostToolUse) | Records the story gid of each in-flight run's own MCP comment so the Complete gate can tell it from operator scope (`asana-task-update.sh --comment-file` records the script path) |
 | | `require-skill-for-file.sh` | A file whose NAME has an owning skill (AGENTS.md: agents-md, every session; CHANGELOG.md: changelog, orch runs) is written only after that skill entered context; deny-with-body via the shared gate library, one table for all such files |
 | | `lint-md-on-write.sh` | Markdown written outside the internal allowlist passes the mechanical no-slop tier on every vector (Write, Edit, redirect, tee, sed -i, perl -pi); CHANGELOG.md targets also pass the changelog entry-shape lint (length cap, mechanism tails, second sentences) |
-| | `require-skill-read-for-scripts.sh` + `mark-skill-read.sh` | A skill's companion script runs only after its SKILL.md FULLY entered context; the deny message delivers the complete body itself (deny-with-body) and writes the marker, so the retry passes educated, and states that the whole Bash command was cancelled. Marking is strict and content-checked against the current file: Read pages covering every line (a token-capped Read counts only the lines it returned), a `cat` whose unaltered stdout holds the body, Skill tool, or gate/session-start injection; partial reads (sed slices, cat piped to head or redirected) earn nothing. Before denying, the gate credits a body the transcript proves is in context since the last compaction (slash-command delivery, uncut `invoked_skills` re-injection, covering Read pages). `--help`/`-h`-only invocations are exempt. Bodies over 50KB (one-shot, pr-land) fall back to a read-in-pages pointer without a marker |
+| | `require-skill-read-for-scripts.sh` + `mark-skill-read.sh` | A skill's companion script runs only after its SKILL.md FULLY entered context; the deny message delivers the complete body itself (deny-with-body) and writes the marker, so the retry passes educated, and states that the whole Bash command was cancelled. Marking is strict and content-checked against the current file: Read pages covering every line (a token-capped Read counts only the lines it returned), a `cat` whose unaltered stdout holds the body, Skill tool, or gate/session-start injection; partial reads (sed slices, cat piped to head or redirected) earn nothing. Before denying, the gate credits a body the transcript proves is in context since the last compaction (slash-command delivery, uncut `invoked_skills` re-injection, covering Read pages). `--help`/`-h`-only invocations are exempt. Bodies over 50KB (pr-land) fall back to a read-in-pages pointer without a marker. The same gate also delivers a /one-shot PHASE SLICE (`one-shot:<phase>`, `references/<phase>.md`) at the first companion-script call of that phase, since the split left only the core in context by default |
 | | `mark-playbook-read.sh` | Records the playbook read the drive gate requires |
 | | `nudge-asana-mcp.sh` | Steers bulk Asana reads to the cheaper script path |
 | | `block-raw-asana-api.sh` | Raw Asana API calls go through the sanctioned scripts (ingestion with attachment download, field reads, writes, scope checks) |

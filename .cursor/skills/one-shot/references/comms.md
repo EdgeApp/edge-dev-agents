@@ -1,0 +1,5 @@
+Governs a deliverable that includes an outbound message to a human, in any phase; the core step map cross-cutting row `Outbound comms` points here.
+
+<rules description="Non-negotiable constraints, binding exactly as if written in the core SKILL.md.">
+<rule id="comms-drafts-never-sends">When a deliverable includes outbound communication (a reply to a partner or reviewer, a status message, an announcement), produce a DRAFT and never send; sending is the operator's action. Route by destination: the task names a Slack thread or channel link → a Slack draft via `/slack` (`slack_send_message_draft`; the Slack gate lints it and the channel link is relayed in the report). Any other destination (Telegram, Signal, email, an unnamed channel) → write the draft as its own `.md` at `/tmp/comms-<gid>-<slug>.md`, then embed it in the run report. The path matters: `/tmp/agent-*` and `/tmp/plan-*` are allowlisted out of the write-time lint, so a draft written there is never gated; a draft pasted only into the report's fenced block is never gated either. Copy-paste ergonomics are not a goal; the file write is what runs the no-slop gate.</rule>
+</rules>

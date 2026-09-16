@@ -5,6 +5,8 @@
 #   --since <ISO-date>   discover runs spawned at/after date (watcher log + worktrees), resolve each
 #   --gid <task-gid>     resolve a single run
 #   --list               with --since: print gid + name + spawned_at only (no deep resolution)
+#   --transcript-only    with --gid: print just the resolved transcript path (one
+#                        line, empty when none) and exit; no Asana/GitHub calls
 #
 # Output: JSON array of manifests on stdout (the ONLY stdout). Diagnostics on stderr.
 # Exit: 0 = ok (possibly empty array), 1 = error, 2 = usage.
@@ -21,7 +23,7 @@ WATCHER_LOG="/tmp/asana-watcher.out"
 WATCHDOG_LOG="/tmp/session-watchdog.out"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"
 WORKTREES_ROOT="$HOME/git/.agent-worktrees"
-PROJECTS_DIR="$HOME/.claude/projects"
+PROJECTS_DIR="${PROJECTS_DIR:-$HOME/.claude/projects}"
 
 # Shared run-signature predicate (also used by resume-task.sh). resolve-run
 # already requires the agent-watcher deployment (pool/slots/worktree state), so
@@ -33,17 +35,19 @@ RUN_SIG_LIB="$HOME/.config/agent-watcher/lib/run-signature.sh"
 CONFIG="$HOME/.config/agent-watcher/asana-config.json"
 CRED="$HOME/.config/agent-watcher/credentials.json"
 
-GID="" SINCE="" LIST=0
+GID="" SINCE="" LIST=0 TRANSCRIPT_ONLY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --gid) GID="$2"; shift 2 ;;
     --since) SINCE="$2"; shift 2 ;;
     --list) LIST=1; shift ;;
+    --transcript-only) TRANSCRIPT_ONLY=1; shift ;;
     -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//' >&2; exit 0 ;;
-    *) echo "usage: resolve-run.sh (--gid <gid> | --since <ISO-date>) [--list]" >&2; exit 2 ;;
+    *) echo "usage: resolve-run.sh (--gid <gid> | --since <ISO-date>) [--list] [--transcript-only]" >&2; exit 2 ;;
   esac
 done
-[ -n "$GID" ] || [ -n "$SINCE" ] || { echo "usage: resolve-run.sh (--gid <gid> | --since <ISO-date>) [--list]" >&2; exit 2; }
+[ -n "$GID" ] || [ -n "$SINCE" ] || { echo "usage: resolve-run.sh (--gid <gid> | --since <ISO-date>) [--list] [--transcript-only]" >&2; exit 2; }
+[ "$TRANSCRIPT_ONLY" -eq 0 ] || [ -n "$GID" ] || { echo "usage: --transcript-only needs --gid <gid>" >&2; exit 2; }
 
 command -v jq >/dev/null || { echo "ERROR: jq not found" >&2; exit 1; }
 
@@ -130,28 +134,81 @@ asana_pr_attachments() { # $1=gid $2=followup JSON (for subtask gids) → JSON a
   done | { grep -oE '^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/pull/[0-9]+$' || true; } | sort -u | head -5 | jq -R . | jq -cs . 2>/dev/null || echo "[]"
 }
 
-find_transcript() { # $1=gid → newest RUN jsonl whose FIRST asana URL gid equals the target
-  # (mirrors resume-task.sh's first-URL semantics: a later MENTION of the gid in
-  #  another session must not match — six runs once resolved to one shared
-  #  interactive transcript)
-  #
-  # RUN SIGNATURE required, via the shared lib (also used by resume-task.sh):
-  # without it an active chat fork (newest mtime) would be graded as the run —
-  # friction/probe counts from the discussion, chat messages counted as operator
-  # nudges, eval window misaligned. Rationale and implementation scars (line-based
-  # head, var capture under pipefail, grep -a) are documented in the lib.
-  local gid="$1" best="" best_m=0 f m first_url
-  for f in "$PROJECTS_DIR"/*"$gid"*/*.jsonl "$PROJECTS_DIR"/*git*/*.jsonl; do
-    [ -r "$f" ] || continue
-    first_url=$(head -c 16384 "$f" | grep -oE 'app\.asana\.com[A-Za-z0-9/._-]*' | head -1 || true)
-    [ -n "$first_url" ] || continue
-    # the task gid is the LAST long numeric segment of the URL (handles /0/<proj>/<task> and /f suffix)
-    echo "$first_url" | grep -oE '[0-9]{12,}' | tail -1 | grep -qx "$gid" || continue
-    has_run_signature "$f" || continue
-    m=$(stat -f %m "$f" 2>/dev/null || echo 0)
-    if [ "$m" -gt "$best_m" ]; then best="$f"; best_m=$m; fi
-  done
-  echo "$best"
+# ---- transcript discovery ----
+# A run's transcript is the session whose OPENING records name the task gid on a
+# RUN-IDENTITY record (the `/one-shot` command args, a resumed `lastPrompt`, or
+# the run-context refresh's `Task gid:` line) and whose head carries the run
+# signature. Three earlier shapes of this lookup each resolved the WRONG file:
+#   - parsing the first asana URL in the first 16KB: a run whose opening hook
+#     output exceeds 16KB has no URL in that window at all, and the newer
+#     ellipsis-rendered URL (`app.asana.com/1/.../task/`) carries no gid to match,
+#     so both shapes returned NO transcript and the eval lost the run.
+#   - matching the gid ANYWHERE in the head: one tool output listing many gids
+#     made that session a candidate for every gid in the list.
+#   - ordering candidates by MTIME: a file rewritten later is not the later
+#     SEGMENT, so a month-old segment outranked the current one and an eval would
+#     have graded month-old work as this run's.
+# Ordering is therefore by the timestamp of the LAST record (the segment that ran
+# most recently wins); identity is the anchored gid; and the run signature (shared
+# lib, also used by resume-task.sh) still decides run vs chat fork; without it an
+# active `--chat` fork is graded as the run, with the discussion's friction counts
+# and a misaligned eval window.
+TRANSCRIPT_INDEX=""
+TRANSCRIPT_HEAD_RECORDS="${TRANSCRIPT_HEAD_RECORDS:-50}"
+cleanup_transcript_index() { [ -n "$TRANSCRIPT_INDEX" ] && rm -f "$TRANSCRIPT_INDEX"; return 0; }
+trap cleanup_transcript_index EXIT
+# One node pass over every session file (bash would fork ~5 processes per file and
+# spend a minute on it): path <TAB> " gid gid " <TAB> last-record timestamp.
+build_transcript_index() {
+  TRANSCRIPT_INDEX=$(mktemp -t resolve-run-transcripts) || { TRANSCRIPT_INDEX=""; return 1; }
+  node -e '
+    const fs = require("fs"); const path = require("path"); const rl = require("readline");
+    const root = process.argv[1], HEAD = Number(process.argv[2]) || 50;
+    const ANCHOR = /<command-args>|"lastPrompt"|Task gid:/;
+    const TAIL_BYTES = 262144;
+    function lastTs(f, size) {
+      const len = Math.min(TAIL_BYTES, size); const buf = Buffer.alloc(len);
+      const fd = fs.openSync(f, "r");
+      try { fs.readSync(fd, buf, 0, len, size - len); } finally { fs.closeSync(fd); }
+      const m = buf.toString("utf8").match(/"timestamp":"([^"]+)"/g);
+      return m ? m[m.length - 1].slice(13, -1) : "";
+    }
+    (async () => {
+      let dirs = []; try { dirs = fs.readdirSync(root); } catch { return; }
+      for (const d of dirs) {
+        let files = []; try { files = fs.readdirSync(path.join(root, d)); } catch { continue; }
+        for (const fn of files) {
+          if (!fn.endsWith(".jsonl")) continue;
+          const f = path.join(root, d, fn);
+          let st; try { st = fs.statSync(f); } catch { continue; }
+          if (!st.isFile() || st.size === 0) continue;
+          const gids = new Set(); let n = 0;
+          try {
+            const stream = fs.createReadStream(f);
+            const r = rl.createInterface({ input: stream, crlfDelay: Infinity });
+            for await (const line of r) {
+              if (ANCHOR.test(line)) { const m = line.match(/[0-9]{12,}/g); if (m) m.forEach(g => gids.add(g)); }
+              if (++n >= HEAD) break;
+            }
+            r.close(); stream.destroy();
+          } catch { continue; }
+          if (!gids.size) continue;
+          let ts = ""; try { ts = lastTs(f, st.size); } catch { ts = ""; }
+          console.log([f, " " + [...gids].join(" ") + " ", ts].join("\t"));
+        }
+      }
+    })().catch(() => {});
+  ' "$PROJECTS_DIR" "$TRANSCRIPT_HEAD_RECORDS" > "$TRANSCRIPT_INDEX" 2>/dev/null || true
+}
+find_transcript() { # $1=gid → the gid's newest RUN transcript segment, or ""
+  local gid="$1" f
+  [ -n "$TRANSCRIPT_INDEX" ] || build_transcript_index
+  [ -r "${TRANSCRIPT_INDEX:-/nonexistent}" ] || { echo ""; return 0; }
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    has_run_signature "$f" && { echo "$f"; return 0; }
+  done < <(awk -F'\t' -v g=" $gid " 'index($2, g) > 0 { print $3 "\t" $1 }' "$TRANSCRIPT_INDEX" | sort -r | cut -f2)
+  echo ""
 }
 
 resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on stdout
@@ -451,6 +508,10 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
 }
 
 # ---- main ----
+if [ "$TRANSCRIPT_ONLY" -eq 1 ]; then
+  find_transcript "$GID"
+  exit 0
+fi
 if [ -n "$GID" ]; then
   resolve_one "$GID" "" "" | jq -cs .
   exit 0

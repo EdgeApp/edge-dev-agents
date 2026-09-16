@@ -35,6 +35,11 @@
 #      ruling 2026-09-02): a bot that did not run is ONE unchecked Finalize Gate
 #      box with its reason, nowhere else. Pattern lives in
 #      lib/reviewer-outage-noise.sh, shared with the Asana comment hook.
+#   8. Write-and-attach in ONE command: the hook runs BEFORE the command, so it
+#      would lint the pre-edit file (or none at all) while the edit ships
+#      unlinted. Blocked with the two-command split named. The path itself is a
+#      shell WORD, expanded via lib/shell-word-resolve.sh, so --attach-file "$F"
+#      is the file it names rather than the literal string.
 #
 # ALSO auto-fills traceability fields before linting, since every one is fully
 # determined by state the hook can read and none by agent recollection:
@@ -102,9 +107,60 @@ case "$CMD" in
 esac
 
 # Extract the attached file path: --attach-file form, else curl's file=@ form.
-REPORT="$(printf '%s' "$CMD" | sed -nE 's/.*--attach-file[= ]+"?([^" ]+)"?.*/\1/p')"
-[ -n "$REPORT" ] || REPORT="$(printf '%s' "$CMD" | sed -nE 's/.*file=@"?([^";]+)"?.*/\1/p' | head -1)"
+# The WORD is taken with its quotes and expanded by the shared resolver, because
+# agents write the path as a variable (F=/tmp/report.md ... --attach-file "$F")
+# and a literal '$F' reads as an unreadable path (two runs blocked that way on
+# 2026-09-16). Unresolvable words (command substitution, an unset variable) keep
+# the literal, which blocks below exactly as before.
+. "$HOME/.config/agent-watcher/hooks/lib/shell-word-resolve.sh"
+Q="'"
+WORD_RE="(\"[^\"]*\"|$Q[^$Q]*$Q|[^ ]+)"
+REPORT_WORD="$(printf '%s' "$CMD" | sed -nE "s/.*--attach-file[= ]+$WORD_RE.*/\\1/p" | head -1)"
+[ -n "$REPORT_WORD" ] || REPORT_WORD="$(printf '%s' "$CMD" | sed -nE "s/.*file=@$WORD_RE.*/\\1/p" | head -1)"
+REPORT_BARE="$(printf '%s' "$REPORT_WORD" | sed -E "s/^[\"$Q]//; s/[\"$Q;]\$//")"
+if REPORT="$(resolve_shell_word "$REPORT_WORD" "$CMD" "$CMD_M")"; then :; else REPORT="$REPORT_BARE"; fi
 REPORT="${REPORT/#\~/$HOME}"
+
+# Edit-and-attach in ONE command can never pass: this hook runs BEFORE the
+# command, so it lints (and auto-fills) the PRE-edit file while the edit itself
+# ships unlinted, and on a first write there is no file to read at all. Name the
+# split; a readability error here reads as a missing report (run 1218333177692561).
+ATTACH_AT="$CMD"
+case "$CMD" in *--attach-file*) ATTACH_AT="${CMD%%--attach-file*}" ;; esac
+case "$CMD" in *file=@*) T="${CMD%%file=@*}"; if [ ${#T} -lt ${#ATTACH_AT} ]; then ATTACH_AT="$T"; fi ;; esac
+# Heredoc bodies blanked (a report that QUOTES an attach command is not a write);
+# quoted spans are kept, since the redirect target itself is usually quoted.
+PRE="$(printf '%s' "$ATTACH_AT" | python3 -c '
+import re, sys
+cmd = sys.stdin.read()
+for m in list(re.finditer(r"<<-?\s*[\x27\"]?(\w+)[\x27\"]?", cmd)):
+    tag = m.group(1)
+    end = re.search(r"^\s*" + re.escape(tag) + r"\s*$", cmd[m.end():], re.M)
+    stop = m.end() + (end.end() if end else len(cmd))
+    cmd = cmd[:m.end()] + " " * (stop - m.end()) + cmd[stop:]
+sys.stdout.write(cmd)' 2>/dev/null || printf '%s' "$ATTACH_AT")"
+WRITE_HIT=""
+for tok in "$REPORT_WORD" "$REPORT_BARE" "$REPORT"; do
+  [ -n "$tok" ] || continue
+  TOK_RE="$(printf '%s' "$tok" | sed -E 's/[][(){}.^$*+?|\\\/]/\\&/g')"
+  WRITE_HIT="$(printf '%s' "$PRE" | grep -oE "(>>?[[:space:]]*|tee([[:space:]]+-a)?[[:space:]]+|(sed|perl)[[:space:]]+-i[^;&|]*[[:space:]]|(mv|cp)[[:space:]]+[^;&|]*[[:space:]])$TOK_RE" | head -1 || true)"
+  if [ -z "$WRITE_HIT" ]; then
+    # An in-line python/node writer names the path with no shell redirect.
+    case "$PRE" in
+      *python*|*node*)
+        case "$PRE" in
+          *write_text*|*".write("*|*writeFileSync*|*"open("*)
+            WRITE_HIT="$(printf '%s' "$PRE" | grep -oE "$TOK_RE" | head -1 || true)" ;;
+        esac ;;
+    esac
+  fi
+  if [ -n "$WRITE_HIT" ]; then break; fi
+done
+if [ -n "$WRITE_HIT" ]; then
+  echo "BLOCKED: this command WRITES $REPORT and attaches it in the same command ('$WRITE_HIT'). The attach gate runs before the command, so it would lint the pre-edit file and your edit would ship unlinted. Split it in two: run the write/edit as its own command, then attach with exactly:
+  ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh --task $AGENT_TASK_GID --attach-file $REPORT --attach-name agent-run-report.md" >&2
+  exit 2
+fi
 [ -s "$REPORT" ] || { echo "BLOCKED: --attach-file path '$REPORT' not readable — attach the actual report file." >&2; exit 2; }
 
 # Doc identity: slug from --attach-name, else the file basename. Computed early
@@ -316,19 +372,10 @@ $(echo "$SLOP" | sed 's/^/    /')
 fi
 
 # Completion Judge section: generated from the judge provenance log (one row per
-# judge call), replaced on every attach so re-attached reports stay current.
-if [ -x "$HOME/.config/agent-watcher/judge-report-section.sh" ]; then
-  SECTION="$("$HOME/.config/agent-watcher/judge-report-section.sh" --gid "$AGENT_TASK_GID" 2>/dev/null || true)"
-  if [ -n "$SECTION" ]; then
-    SECTION="$SECTION" node -e '
-const fs=require("fs"); const f=process.argv[1]; let s=fs.readFileSync(f,"utf8"); const sec=process.env.SECTION.trimEnd()+"\n";
-const re=/^## Completion Judge[^\n]*\n[\s\S]*?(?=^## |(?![\s\S]))/m;
-if(re.test(s)) s=s.replace(re, sec+"\n");
-else if(/^## Testing/m.test(s)) s=s.replace(/^## Testing/m, sec+"\n## Testing");
-else s=s.trimEnd()+"\n\n"+sec;
-fs.writeFileSync(f,s);' "$REPORT" 2>/dev/null || true
-  fi
-fi
+# judge call), replaced on every attach so re-attached reports stay current. The
+# post-verdict refresh shares this helper (lib/splice-judge-section.sh).
+. "$HOME/.config/agent-watcher/hooks/lib/splice-judge-section.sh"
+splice_judge_section "$AGENT_TASK_GID" "$REPORT"
 
 # 3. Missing template sections (headings read live from the template).
 if [ -f "$TEMPLATE" ]; then
@@ -346,7 +393,7 @@ HACKED_SHOTS="$(ls /tmp/agent-proof-"$AGENT_TASK_GID"-*HACKED*.png 2>/dev/null |
 if [ -n "$HACKED_SHOTS" ] && ! grep -qE '🪓|🩹|HACK-FORCED' "$REPORT"; then
   FAIL+="- Hack-forced screenshots are not declared in the report. This run captured:
 $(echo "$HACKED_SHOTS" | head -5 | sed 's/^/    /')
-    Add a 🪓 line in the Testing section per one-shot step 7: the file, the exact hack, that it was reverted (clean git status), and what the frame does NOT prove (the trigger).
+    Add a 🪓 line in the Testing section per one-shot references/report.md: the file, the exact hack, that it was reverted (clean git status), and what the frame does NOT prove (the trigger).
 "
 fi
 

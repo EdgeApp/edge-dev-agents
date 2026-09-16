@@ -7,12 +7,19 @@ Every vector below is the shape of a real block from an eval cohort, with
 synthetic ids. Each gate must keep blocking its true positives and stop
 blocking the false positives:
 
-  guard-piped-watcher-scripts.sh  per-segment rewrite of `watcher.sh | tail`;
-                                  unrelated pipes later in the command pass
-                                  untouched; non head/tail stages and
-                                  --attach-name commands still block; a helper
-                                  piped inside $(...), backticks, or <(...)
-                                  blocks.
+  guard-piped-watcher-scripts.sh  per-segment rewrite of `watcher.sh | tail`,
+                                  `| sed -n <n>,<m>p`, and redirects on the
+                                  dropped stage; unrelated pipes later in the
+                                  command pass untouched; filter stages and
+                                  --attach-name commands still block, quoting
+                                  the segment at fault; a helper piped inside
+                                  $(...), backticks, or <(...) blocks.
+  strip-cmd-mentions.sh           output length always equals input length, so
+                                  offset-mapping callers keep the stripped view.
+  require-skill-read-for-scripts.sh the deny quotes the gated segment and says
+                                  a preceding heredoc write was cancelled too.
+  require-tdd-current.sh          a doc too large for a pipe buffer is still
+                                  read as stamped; a stale stamp still blocks.
   require-maestro-device.sh       --device "$VAR" resolves (same-command
                                   assignment, then env) before the iOS/Android
                                   split; $(...) blocks; list_devices skips the
@@ -36,7 +43,7 @@ blocking the false positives:
 Side effects are confined to temp dirs and /tmp files named with TEST_GID.
 xcrun and adb are PATH stubs, so no simulator or device is needed.
 """
-import json, os, shutil, subprocess, sys, tempfile
+import json, os, shutil, subprocess, sys, tempfile, time
 
 HOOKS = os.path.expanduser('~/.config/agent-watcher/hooks')
 AW = '~/.config/agent-watcher'
@@ -112,8 +119,24 @@ def piped():
             f'timeout 30 "$HOME/.config/agent-watcher/update-status.sh" {TEST_GID} Testing\necho next')
     rewrite('subshell group keeps its closing paren', f'({us} Reviewing | tail -2) && echo ok', f'({us} Reviewing) && echo ok')
 
+    # Truncation stages beyond head/tail, and redirections on the dropped stage.
+    rewrite('sed -n range, quoted, later segments kept',
+            f"{AW}/check-followup-scope.sh --task-gid {TEST_GID} 2>&1 | sed -n '1,14p'; cd ~/git/x && gh api graphql -f query='{{ a }}' --jq '.b | .c'",
+            f"{AW}/check-followup-scope.sh --task-gid {TEST_GID} 2>&1 ; cd ~/git/x && gh api graphql -f query='{{ a }}' --jq '.b | .c'")
+    rewrite('two piped watchers, tail then unquoted sed -n range',
+            f'{AW}/set-tested.sh {TEST_GID} "Unit Tests" 2>&1 | tail -1; {AW}/check-followup-scope.sh --task-gid {TEST_GID} 2>&1 | sed -n 1,8p',
+            f'{AW}/set-tested.sh {TEST_GID} "Unit Tests" 2>&1 ; {AW}/check-followup-scope.sh --task-gid {TEST_GID} 2>&1')
+    rewrite('sed -n range then unrelated gh segments',
+            f"{AW}/check-followup-scope.sh --task-gid {TEST_GID} 2>&1 | sed -n '1,12p'; gh pr view 1088 --json state; echo \"$AGENT_ORCH_VERSION\"",
+            f"{AW}/check-followup-scope.sh --task-gid {TEST_GID} 2>&1 ; gh pr view 1088 --json state; echo \"$AGENT_ORCH_VERSION\"")
+    rewrite('redirect on the dropped stage moves ahead of the 2>&1 dup',
+            f'{us} Complete 2>&1 | tail -2 > /tmp/out.txt', f'{us} Complete > /tmp/out.txt 2>&1')
+    rewrite('redirect on the dropped stage, no dup to reorder',
+            f'{us} Complete | tail -2 > /tmp/out.txt && echo ok', f'{us} Complete > /tmp/out.txt && echo ok')
+
     blocks('non head/tail downstream stage', f'{us} Complete 2>&1 | grep -i error')
-    blocks('head then redirect', f'{us} Complete 2>&1 | tail -2 > /tmp/out.txt')
+    # Stages are matched raw: a blanked quoted span must not read as a bare tail.
+    blocks('quoted argument on a truncation stage', f'{us} Complete | tail -2 "$(echo x)"')
     blocks('--attach-name command is never rewritten',
            f'~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh --task {TEST_GID} --attach-file /tmp/r.md --attach-name agent-run-report.md; {us} Complete | tail -2')
     # Substitutions: never rewritten, always blocked with the run-it-bare message.
@@ -137,8 +160,172 @@ def piped():
     passes('quoted pipe inside $(watcher ...)', f'X=$({us} Testing --reason "a | b")')
     passes('pipe only in a nested substitution arg', f'X=$({us} Testing $(echo a | tr a b))')
 
+    # A segment the rewrite cannot make safe blocks the call and is quoted back,
+    # so the retry edits that stage instead of re-deriving the whole command.
+    def blocks_naming(label, cmd, seg):
+        rc, out, err = hook('guard-piped-watcher-scripts.sh', cmd, env=env)
+        check(f'piped block quotes the offending segment: {label}',
+              rc == 2 and 'BLOCKED' in err and seg in err, f'rc={rc} err={err[:400]}')
+
+    blocks_naming('rewritable tail segment, grep segment at fault',
+                  f'{AW}/set-tested.sh {TEST_GID} "iOS Sim" 2>&1 | tail -2; {AW}/check-followup-scope.sh --task-gid {TEST_GID} 2>&1 | grep -E "marker" | head -6',
+                  f'{AW}/check-followup-scope.sh --task-gid {TEST_GID} 2>&1 | grep -E "marker" | head -6')
+    blocks_naming('grep segment after an ungated substitution',
+                  f'echo "TDD: $(~/.cursor/skills/asana-field-value.sh {TEST_GID} \'TDD?\' 2>&1 | tail -1)"; {AW}/check-followup-scope.sh --task-gid {TEST_GID} 2>&1 | grep -E "marker"',
+                  f'{AW}/check-followup-scope.sh --task-gid {TEST_GID} 2>&1 | grep -E "marker"')
+
     rc, _, _ = hook('guard-piped-watcher-scripts.sh', f'{us} Complete | tail -2', env={})
     check('piped no-op outside orch sessions', rc == 0)
+
+
+# ---------------------------------------------------------------- strip-cmd-mentions
+def stripmentions():
+    """Output length IS the contract: a caller that sees a mismatch drops the
+    stripped view and pattern-matches the raw command instead."""
+    def same_length(label, cmd):
+        p = subprocess.run([os.path.join(HOOKS, 'strip-cmd-mentions.sh')], input=cmd,
+                           capture_output=True, text=True, timeout=30)
+        check(f'strip-cmd-mentions length preserved: {label}', len(p.stdout) == len(cmd),
+              f'in={len(cmd)} out={len(p.stdout)}')
+
+    same_length('unterminated heredoc', "cat > /tmp/a.md <<'EOF'\nline one\nline two\n")
+    same_length('second heredoc unterminated', 'cat <<A\nx\nA\ncat <<B\ny\n')
+    same_length('terminated heredoc', "cat > /tmp/a.md <<'EOF'\nbody\nEOF\necho ok")
+    same_length('quotes and backticks', 'echo "hi" && ls | head -2 && echo `date`')
+    # A conflict marker inside a heredoc body opens no heredoc of its own.
+    conflict = ("python3 - <<'PY'\nimport re\ns = re.sub(r'<<<<<<< HEAD\\n.*?>>>>>>> x', '', s)\nPY\n"
+                f'{AW}/update-status.sh {TEST_GID} Complete | tail -2')
+    same_length('conflict marker inside a heredoc body', conflict)
+    rc, out, err = hook('guard-piped-watcher-scripts.sh', conflict, env={'AGENT_TASK_GID': TEST_GID})
+    got = json.loads(out)['hookSpecificOutput']['updatedInput']['command'] if rc == 0 and out.strip() else None
+    check('conflict marker does not hide the call after the heredoc',
+          got is not None and got.endswith(f'{AW}/update-status.sh {TEST_GID} Complete'), f'rc={rc} got={got!r}')
+    # The consumer proof: an unterminated heredoc must not disable the gate that
+    # rides on the stripped view's offsets.
+    rc, out, err = hook('guard-piped-watcher-scripts.sh',
+                        f"cat > /tmp/agent-state-{TEST_GID}.md <<'EOF'\nran {AW}/update-status.sh 1 Complete | tail -2\n",
+                        env={'AGENT_TASK_GID': TEST_GID})
+    check('unterminated heredoc still hides a quoted watcher pipe', rc == 0 and not out.strip(),
+          f'rc={rc} out={out[:160]} err={err[:160]}')
+
+
+# ---------------------------------------------------------------- skill-read blame
+def skillread():
+    """The gate requires the same units as before; only the deny's blast-radius
+    reporting changed. Markers are cleared before each call because a delivered
+    body writes one."""
+    import glob
+    env = {'AGENT_TASK_GID': TEST_GID}
+
+    def clear():
+        for p in glob.glob(f'/tmp/agent-skill-read-{TEST_GID}-*'):
+            os.remove(p)
+
+    def deny(label, cmd, seg, heredoc_note):
+        clear()
+        rc, out, err = hook('require-skill-read-for-scripts.sh', cmd, env=env)
+        head = err.split('=====')[0]
+        check(f'skill-read deny names the gated segment: {label}',
+              rc == 2 and 'NOTHING in it ran' in err and 'ENTIRE command' in err and seg in head,
+              f'rc={rc} head={head[:400]}')
+        check(f'skill-read heredoc note {"present" if heredoc_note else "absent"}: {label}',
+              ('That write did NOT happen either' in head) == heredoc_note, head[:400])
+
+    def allows(label, cmd):
+        clear()
+        rc, out, err = hook('require-skill-read-for-scripts.sh', cmd, env=env)
+        check(f'skill-read allows: {label}', rc == 0, f'rc={rc} err={err[:200]}')
+
+    gated = f'~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh --task {TEST_GID} --comment-file /tmp/agent-comment-{TEST_GID}.txt 2>&1 | tail -3'
+    deny('heredoc write then gated attach',
+         f"cat > /tmp/agent-comment-{TEST_GID}.txt <<'EOF'\nbody line\nEOF\n{gated}", gated, True)
+    deny('cd, gated call, echo',
+         f'cd ~/git/x && {AW}/check-followup-scope.sh --task-gid {TEST_GID} 2>&1; echo done',
+         f'{AW}/check-followup-scope.sh --task-gid {TEST_GID} 2>&1', False)
+    allows('compound with no gated script', 'cd ~/git/x && git status --short; echo done')
+    allows('gated path only quoted in a heredoc body',
+           f"cat > /tmp/agent-note-{TEST_GID}.md <<'EOF'\nran {AW}/check-followup-scope.sh --task-gid 1\nEOF")
+    clear()
+    for p in (f'/tmp/agent-comment-{TEST_GID}.txt', f'/tmp/agent-note-{TEST_GID}.md'):
+        os.path.exists(p) and os.remove(p)
+
+
+# ---------------------------------------------------------------- tdd doc SIGPIPE
+def tddsigpipe(tmp):
+    """A 108KB+ doc used to make `git show ... | grep -q` die of SIGPIPE; pipefail
+    turned that 141 into "unstamped", and the legacy branch then blocked a doc the
+    stamp calls current. The gate must still block a genuinely stale stamp."""
+    stamp = os.path.expanduser('~/.cursor/skills/tdd/scripts/tdd-stamp.sh')
+    if not os.access(stamp, os.X_OK):
+        check('tdd sigpipe: tdd-stamp.sh is executable', False, stamp)
+        return
+    genv = dict(os.environ, GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@t',
+                GIT_COMMITTER_NAME='t', GIT_COMMITTER_EMAIL='t@t')
+
+    def git(cmd, cwd):
+        p = subprocess.run(cmd, shell=True, cwd=cwd, capture_output=True, text=True, env=genv)
+        if p.returncode:
+            raise RuntimeError(f'{cmd}\n{p.stdout}{p.stderr}')
+        return p.stdout
+
+    home = os.path.join(tmp, 'tddhome')
+    os.makedirs(os.path.join(home, '.cursor/skills/tdd/scripts'))
+    os.symlink(os.path.expanduser('~/.config'), os.path.join(home, '.config'))
+    os.symlink(stamp, os.path.join(home, '.cursor/skills/tdd/scripts/tdd-stamp.sh'))
+    fv = os.path.join(home, '.cursor/skills/asana-field-value.sh')
+    with open(fv, 'w') as fh:
+        fh.write('#!/bin/bash\necho tdd\n')
+    os.chmod(fv, 0o755)
+    repo = os.path.join(home, 'git/.agent-worktrees', TEST_GID, 'repo')
+    os.makedirs(os.path.join(repo, 'src/docs'))
+    git('git init -q -b master', repo)
+    open(os.path.join(repo, 'src/a.ts'), 'w').write('export const a = 1\n')
+    git('git add -A && git commit -q -m Base', repo)
+    git('git checkout -q -b feature', repo)
+    open(os.path.join(repo, 'src/feat.ts'), 'w').write('export const feat = 1\n')
+    git('git add -A && git commit -q -m Feature', repo)
+    first = git('git rev-parse HEAD', repo).strip()
+    open(os.path.join(repo, 'src/more.ts'), 'w').write('export const more = 2\n')
+    git('git add -A && git commit -q -m More', repo)
+
+    doc = 'src/docs/big.md'
+    # Far past the pipe buffer, so `git show | grep -q` reaches SIGPIPE every run
+    # rather than racing the reader.
+    filler = ''.join(f'Line {i} of the design body, long enough to outrun a pipe buffer.\n'
+                     for i in range(8000))
+    with open(os.path.join(repo, doc), 'w') as fh:
+        fh.write('# Big design\n\n| | |\n|---|---|\n| Status | Implemented |\n\n## Contents\n\n' + filler)
+    size = os.path.getsize(os.path.join(repo, doc))
+    check('tdd sigpipe fixture doc is far larger than a pipe buffer', size > 400 * 1024, f'{size} bytes')
+    subprocess.run([stamp, repo, doc], capture_output=True, text=True, env=genv)
+    git(f'git add -A && git commit -q --fixup {first}', repo)
+    git('GIT_SEQUENCE_EDITOR=: git rebase -q -i --autosquash master', repo)
+    # Code commits AFTER the doc commit that leave the tree (and so the stamp)
+    # unchanged: the stamped branch must pass, the legacy timestamp branch would
+    # block. Only a hook that reads the stamp can tell them apart.
+    genv['GIT_COMMITTER_DATE'] = f'{int(time.time()) + 90} +0000'
+    open(os.path.join(repo, 'src/a.ts'), 'w').write('export const a = 99\n')
+    git('git add -A && git commit -q -m Churn', repo)
+    open(os.path.join(repo, 'src/a.ts'), 'w').write('export const a = 1\n')
+    git('git add -A && git commit -q -m Revert', repo)
+
+    def gate():
+        e = dict(genv, HOME=home, AGENT_TASK_GID=TEST_GID)
+        e.pop('AGENT_SIM_UDID', None)
+        p = subprocess.run([os.path.join(HOOKS, 'require-tdd-current.sh')],
+                           input=json.dumps({'tool_name': 'Bash', 'tool_input': {
+                               'command': f'{AW}/update-status.sh {TEST_GID} Complete'}}),
+                           capture_output=True, text=True, env=e, timeout=60)
+        return p.returncode, p.stderr
+
+    rc, err = gate()
+    check('current stamp on a large doc passes Complete', rc == 0, f'rc={rc} {err[:300]}')
+    check('large doc is not misreported as unstamped', 'older than the code' not in err, err[:300])
+    open(os.path.join(repo, 'src/later.ts'), 'w').write('export const later = 3\n')
+    git('git add -A && git commit -q -m Later', repo)
+    rc, err = gate()
+    check('stale stamp on a large doc still blocks', rc == 2 and 'different code tree' in err,
+          f'rc={rc} {err[:300]}')
 
 
 # ---------------------------------------------------------------- maestro device
@@ -409,6 +596,9 @@ def main():
         for f in ('xcrun', 'adb'):
             os.chmod(os.path.join(stub, f), 0o755)
         piped()
+        stripmentions()
+        skillread()
+        tddsigpipe(tmp)
         maestro(stub)
         playbook()
         plan(tmp)

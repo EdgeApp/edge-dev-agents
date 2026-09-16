@@ -19,6 +19,7 @@ One of (with a 60000ms+ timeout):
 ~/.cursor/skills/resolve-run/scripts/resolve-run.sh --gid <task-gid>
 ~/.cursor/skills/resolve-run/scripts/resolve-run.sh --since <ISO-date>
 ~/.cursor/skills/resolve-run/scripts/resolve-run.sh --since <ISO-date> --list   # discovery only, no deep resolution
+~/.cursor/skills/resolve-run/scripts/resolve-run.sh --gid <task-gid> --transcript-only   # just the transcript path
 ```
 
 Output is a JSON array of manifests (stdout only; diagnostics on stderr). Exit 0 = ok, 1 = error, 2 = usage.
@@ -27,6 +28,7 @@ Output is a JSON array of manifests (stdout only; diagnostics on stderr). Exit 0
 <step id="2" name="Interpret">
 Key manifest fields:
 - `in_flight: true` — run is still executing; evaluators must SKIP it (incomplete evidence).
+- `transcript` is the run's NEWEST SEGMENT: the session whose opening records name the gid on a run-identity record (the `/one-shot` args, a resumed `lastPrompt`, the run-context `Task gid:` line) and whose head carries the run signature, ordered by the timestamp of its LAST record. A gid merely mentioned elsewhere in a session, and a `--chat` fork of the run, are both excluded by construction.
 - `transcript: null` — transcript not found; a transcript-eval cannot run for this gid (report it). A report-eval still can: `prs` and `era` fall back to Asana data.
 - `evidence_sources` — where `prs` (`transcript`, `asana-attachments`, both, or `none`) and the `era.as_of` date (`window_end`, `release_receipt`, `report_attached`, `version_stamp`, `spawned_at`, or `none`) came from. `era_as_of: none` means every era row is in effect regardless of the run's age; say so when grading a dated dimension.
 - `asana.status: "__MISSING__"` — task deleted/404; `"__NO_AUTH__"` — no token available.
@@ -37,5 +39,5 @@ Key manifest fields:
 
 <edge-cases>
 <case name="Watcher log rotated/empty">Discovery falls back to worktree-dir mtimes; runs whose worktree was already GC'd AND missing from the log are unenumerable — note this as a coverage gap rather than silently reporting completeness.</case>
-<case name="Multiple transcripts match a gid">The script picks the newest by mtime (followups resume into newer sessions). If an eval needs the full history, list all matches manually and say so.</case>
+<case name="Multiple transcripts match a gid">A run that was resumed has one session per segment; the script returns the one whose LAST RECORD is newest, which is the segment the run finished in. A file's mtime is NOT that ordering (a rewritten old segment carries a newer mtime). If an eval needs the earlier segments too, list them manually and say so.</case>
 </edge-cases>

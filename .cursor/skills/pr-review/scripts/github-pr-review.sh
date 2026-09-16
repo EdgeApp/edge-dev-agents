@@ -3,7 +3,9 @@
 #
 # Subcommands:
 #   context  [--pr <number>] [--owner <o>] [--repo <r>]   Fetch PR metadata + files + existing reviews
-#   submit   --pr <n> --owner <o> --repo <r> --sha <sha>  Post review (JSON on stdin)
+#   submit   --pr <n> --owner <o> --repo <r> --sha <sha>  Post review (JSON on stdin; exits 1
+#            without calling GitHub if stdin is empty, not one JSON object, has an event
+#            other than COMMENT/REQUEST_CHANGES, or has malformed comments)
 #
 # The `context` subcommand auto-detects the PR from the current branch if --pr is omitted.
 # Total API calls: 2 (gh pr view + gh api for file patches).
@@ -106,6 +108,28 @@ case "$CMD" in
     # Read review JSON from stdin: { event, body, comments: [{path, line, body, start_line?, side?}] }
     # Inject commit_id from --sha and POST to reviews endpoint.
     REVIEW_JSON=$(cat)
+
+    # Validate the payload before any GitHub call. GitHub accepts an empty or
+    # event-less body and creates an empty PENDING review, which then blocks
+    # the account's next review on that PR, so a missing draft file piped in
+    # as `cat missing.json | ...` must exit 1 here instead of posting. APPROVE
+    # is refused outright (pr-review never-approve).
+    VALIDATION=$(printf '%s' "$REVIEW_JSON" | jq -rs '
+      if length == 0 then "stdin is empty (was the draft file missing?)"
+      elif length > 1 then "stdin holds \(length) JSON values; expected exactly one review object"
+      else .[0] |
+        if type != "object" then "review must be a JSON object, got \(type)"
+        elif (has("event") | not) then "review is missing \"event\""
+        elif (.event != "COMMENT" and .event != "REQUEST_CHANGES") then "event must be COMMENT or REQUEST_CHANGES, got \(.event | tojson)"
+        elif has("comments") and (.comments | type) != "array" then "\"comments\" must be an array"
+        elif any((.comments // [])[]; type != "object" or ((.path // "") == "") or ((.line | type) != "number") or ((.body // "") == "")) then "every comment needs a non-empty path, a numeric line, and a non-empty body"
+        elif ((.body // "") == "") and ((.comments // []) | length) == 0 then "review has neither a body nor comments"
+        else "OK" end
+      end' 2>/dev/null) || VALIDATION="stdin is not valid JSON"
+    if [[ "$VALIDATION" != "OK" ]]; then
+      echo "Error: refusing to submit: $VALIDATION" >&2
+      exit 1
+    fi
 
     # Prose lint on the outbound review (top-level body + every inline comment
     # body), the shared no-slop lint WITH the --semantic haiku judge — a PR

@@ -168,37 +168,65 @@ fi
 
 # Airbitz.co workspace field GIDs
 STATUS_FIELD="1190660107346181"
-REVIEW_NEEDED_OPTION="1190660107348334"
-PUBLISH_NEEDED_OPTION="1191304757575656"
-VERIFICATION_NEEDED_OPTION="1190660107348340"
 BOARD_STATE_FIELD="1213992584300456"
 REVIEWER_FIELD="1203334388004673"
 IMPLEMENTOR_FIELD="1203334386796983"
 SPENT_DEV_HRS_FIELD="1202996660964169"
 EST_REVIEW_HRS_FIELD="1203002792997295"
 
-status_to_gid() {
-  case "$1" in
-    "Review Needed") echo "$REVIEW_NEEDED_OPTION" ;;
-    "Publish Needed") echo "$PUBLISH_NEEDED_OPTION" ;;
-    "Verification Needed") echo "$VERIFICATION_NEEDED_OPTION" ;;
-    *) echo "$1" ;;
-  esac
+# Resolve an enum option to its gid by NAME, from the field's OWN enum_options
+# on this task. Never from a hand-maintained table: the operator adds and renames
+# options in Asana, a table goes stale silently, and the old fallback passed an
+# unknown name through AS a gid, so a new or misspelled option became a malformed
+# API write instead of an error. Matching ignores case, surrounding whitespace,
+# and a leading emoji run, so only the words have to hold.
+#
+# Accepts either an option NAME or an option GID (an all-digits value, which no
+# option name ever is) — callers that copy a field between tasks already hold the
+# gid. Either way the value is VALIDATED against the field's live options, so a
+# gid from a deleted or foreign option is an error rather than a malformed write.
+#
+# Usage: enum_option_gid <field_gid> <field_label> <option-name-or-gid>
+# stdout: the option gid. Exit 1 with the field's real options on no match.
+normalize_option_name() {
+  printf '%s' "$1" | sed -E 's/^[^[:alnum:]]+//; s/^[[:space:]]+//; s/[[:space:]]+$//' | tr '[:upper:]' '[:lower:]'
 }
 
-board_state_to_gid() {
-  case "$1" in
-    "Incoming Requests") echo "1214109511460876" ;;
-    "Refinement") echo "1214109511571763" ;;
-    "Ready to Pull") echo "1213992584300457" ;;
-    "In Progress") echo "1213992584300458" ;;
-    "PR Review") echo "1214074445437890" ;;
-    "QA Verification") echo "1213992584300459" ;;
-    "Blocked") echo "1213992584300460" ;;
-    "Done") echo "1213992584300461" ;;
-    "Icebox") echo "1214109610541444" ;;
-    *) echo "$1" ;;
-  esac
+enum_option_gid() {
+  local field_gid="$1" field_label="$2" want_raw="$3" want gid options
+  load_task_fields
+
+  if [[ "$want_raw" =~ ^[0-9]+$ ]]; then
+    gid="$(printf '%s' "$TASK_FIELDS" | jq -r --arg f "$field_gid" --arg w "$want_raw" '
+      .data.custom_fields[]? | select(.gid == $f) | .enum_options[]?
+      | select(.gid == $w) | .gid' | head -n 1)"
+    if [[ -n "$gid" ]]; then
+      printf '%s' "$gid"
+      return 0
+    fi
+  fi
+
+  want="$(normalize_option_name "$want_raw")"
+
+  gid="$(printf '%s' "$TASK_FIELDS" | jq -r --arg f "$field_gid" --arg w "$want" '
+    .data.custom_fields[]? | select(.gid == $f) | .enum_options[]?
+    | select((.name // "")
+        | sub("^[^\\p{L}\\p{N}]+"; "") | sub("^\\s+"; "") | sub("\\s+$"; "") | ascii_downcase
+        == $w)
+    | .gid' | head -n 1)"
+  if [[ -n "$gid" ]]; then
+    printf '%s' "$gid"
+    return 0
+  fi
+
+  options="$(printf '%s' "$TASK_FIELDS" | jq -r --arg f "$field_gid" '
+    [.data.custom_fields[]? | select(.gid == $f) | .enum_options[]?.name] | join(", ")')"
+  if [[ -z "$options" ]]; then
+    echo "Error: field \"$field_label\" ($field_gid) is not on task $TASK_GID, or carries no enum options" >&2
+  else
+    echo "Error: \"$want_raw\" is not an option (by name or gid) of \"$field_label\" on task $TASK_GID; options are: $options" >&2
+  fi
+  return 1
 }
 
 TASK_FIELDS=""
@@ -206,7 +234,7 @@ load_task_fields() {
   if [[ -n "$TASK_FIELDS" ]]; then
     return 0
   fi
-  asana_request "Task read" "$ASANA_API/tasks/$TASK_GID?opt_fields=name,assignee.name,memberships.project.gid,custom_fields.gid,custom_fields.name,custom_fields.people_value.gid,custom_fields.people_value.name,custom_fields.number_value,custom_fields.enum_value.gid,custom_fields.enum_value.name" \
+  asana_request "Task read" "$ASANA_API/tasks/$TASK_GID?opt_fields=name,assignee.name,memberships.project.gid,custom_fields.gid,custom_fields.name,custom_fields.people_value.gid,custom_fields.people_value.name,custom_fields.number_value,custom_fields.enum_value.gid,custom_fields.enum_value.name,custom_fields.enum_options.gid,custom_fields.enum_options.name" \
     -H "Authorization: Bearer $ASANA_TOKEN" || exit 1
   TASK_FIELDS="$ASANA_RESPONSE"
 }
@@ -328,9 +356,9 @@ fi
 # This is a real file upload to the task, distinct from --attach-pr (the GitHub widget).
 #
 # Same-name handling, by kind (names from lib/attach-names.sh):
-#   run report  REPLACE: a corrected report re-attached under the same
-#               <N>-agent-run-report.md name must land (it moves the followup
-#               watermark), so upload first, and only after the upload succeeds
+#   run report  REPLACE: a corrected report re-attached under the report NAME
+#               FAMILY (same slug, ordinal-insensitive) must land (it moves the
+#               followup watermark), so upload first, and only after the upload succeeds
 #               DELETE every older same-name attachment. Upload failure exits 1
 #               with the old report still attached; a failed delete only warns
 #               (a duplicate is acceptable, zero reports never is). Guard: only
@@ -338,6 +366,13 @@ fi
 #               versions/<gid>.jsonl stamp, the same source check-followup-scope.sh
 #               uses) are replaced; an older segment's report is never deleted,
 #               so that case keeps the skip below and says why.
+#               NAME FAMILY: the attach gate re-numbers --attach-name after the
+#               caller wrote it (agent-run-report.md -> <N>-agent-run-report.md),
+#               so an exact-string compare finds nothing and the task keeps BOTH
+#               docs. Match the ordinal-stripped name instead. Two DIFFERENT
+#               explicit ordinals stay different docs (a re-number always goes
+#               bare -> numbered), so a fresh ordinal still uploads beside the
+#               segment's earlier report rather than deleting it.
 #   plan        dedupe by <anything> suffix (a retry never mints a second ordinal).
 #   other       dedupe by exact name (a double-invoke creates no duplicate).
 if $DO_ATTACH_FILE; then
@@ -362,23 +397,40 @@ if $DO_ATTACH_FILE; then
     fi
   fi
 
+  # Report name family: same slug, ordinal-insensitive (see header). The two
+  # readers below stay local until attach-names.sh grows a report_attach_suffix.
+  report_name_suffix() { printf '%s\n' "$1" | sed -E 's/^[0-9]+-//; s/^agent-run-report-?//; s/^[0-9]+-//'; }
+  report_name_ordinal() { printf '%s\n' "$1" | sed -nE 's/^([0-9]+)-agent-run-report.*/\1/p; s/^agent-run-report-([0-9]+)-.*/\1/p' | head -1 | sed -E 's/^0+//'; }
+  REPORT_FAMILY=""
+  if [[ -n "${REPORT_ATTACH_RE:-}" && "$DEDUPE_NAME" =~ $REPORT_ATTACH_RE ]]; then
+    WANT_SUFFIX=$(report_name_suffix "$DEDUPE_NAME")
+    WANT_ORD=$(report_name_ordinal "$DEDUPE_NAME")
+    REPORT_FAMILY=$(printf '%s\n' "$ATTACH_NAMES" | grep -E "$REPORT_ATTACH_RE" | while read -r n; do
+        [[ "$(report_name_suffix "$n")" == "$WANT_SUFFIX" ]] || continue
+        HAVE_ORD=$(report_name_ordinal "$n")
+        [[ -z "$HAVE_ORD" || -z "$WANT_ORD" || "$HAVE_ORD" == "$WANT_ORD" ]] && echo "$n"
+      done | grep -v '^$' || true)
+    [[ -n "$REPORT_FAMILY" ]] && EXISTING_ATTACH=$(printf '%s\n' "$REPORT_FAMILY" | head -1)
+  fi
+
   REPLACE_GIDS=""
-  if [[ -n "$EXISTING_ATTACH" && -n "${REPORT_ATTACH_RE:-}" && "$DEDUPE_NAME" =~ $REPORT_ATTACH_RE ]]; then
+  if [[ -n "$EXISTING_ATTACH" && -n "$REPORT_FAMILY" ]]; then
     SEG_START=""
     VERSIONS_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/versions/$TASK_GID.jsonl"
     [[ -f "$VERSIONS_FILE" ]] && SEG_START=$(jq -rs '[.[] | .ts // empty] | last // empty' "$VERSIONS_FILE" 2>/dev/null || true)
     # Fractional seconds stripped on both sides so the ISO strings compare lexically.
-    SAME_NAME=$(printf '%s' "$ATTACH_LIST" | jq -c --arg n "$DEDUPE_NAME" --arg s "${SEG_START%%.*}" '
+    FAMILY_JSON=$(printf '%s\n' "$REPORT_FAMILY" | grep -v '^$' | jq -Rsc 'split("\n") | map(select(. != ""))' 2>/dev/null || echo '[]')
+    SAME_NAME=$(printf '%s' "$ATTACH_LIST" | jq -c --argjson f "$FAMILY_JSON" --arg s "${SEG_START%%.*}" '
         def norm: (. // "") | sub("\\.[0-9]+Z$"; "Z");
-        [.data[]? | select(.name == $n) | {gid, created_at, in_seg: (($s | sub("Z$"; "")) as $ss | ($ss != "") and ((.created_at | norm) >= ($ss + "Z")))}]' 2>/dev/null || echo "[]")
+        [.data[]? | select(.name as $n | $f | index($n)) | {gid, name, created_at, in_seg: (($s | sub("Z$"; "")) as $ss | ($ss != "") and ((.created_at | norm) >= ($ss + "Z")))}]' 2>/dev/null || echo "[]")
     OLDER_SEG=$(printf '%s' "$SAME_NAME" | jq -r '[.[] | select(.in_seg | not)] | length' 2>/dev/null || echo 1)
     if [[ -z "$SEG_START" ]]; then
-      echo ">> File attach: skipped, '$DEDUPE_NAME' already attached to task $TASK_GID and no segment start is recorded (versions/$TASK_GID.jsonl), so it cannot be proven this segment's report; not replacing"
+      echo ">> File attach: skipped, '$EXISTING_ATTACH' already attached to task $TASK_GID and no segment start is recorded (versions/$TASK_GID.jsonl), so it cannot be proven this segment's report; not replacing"
     elif [[ "$OLDER_SEG" != "0" ]]; then
-      echo ">> File attach: skipped, '$DEDUPE_NAME' on task $TASK_GID was attached before this segment started ($SEG_START); an older segment's report is never replaced. Fix the report's iteration so it attaches under a new ordinal"
+      echo ">> File attach: skipped, '$EXISTING_ATTACH' on task $TASK_GID was attached before this segment started ($SEG_START); an older segment's report is never replaced. Fix the report's iteration so it attaches under a new ordinal"
     else
       REPLACE_GIDS=$(printf '%s' "$SAME_NAME" | jq -r '.[].gid' 2>/dev/null || true)
-      [[ -n "$REPLACE_GIDS" ]] || echo ">> File attach: skipped, '$DEDUPE_NAME' already attached to task $TASK_GID but its gid could not be read; not replacing"
+      [[ -n "$REPLACE_GIDS" ]] || echo ">> File attach: skipped, '$EXISTING_ATTACH' already attached to task $TASK_GID but its gid could not be read; not replacing"
     fi
   elif [[ -n "$EXISTING_ATTACH" ]]; then
     echo ">> File attach: skipped, '$DEDUPE_NAME' already attached to task $TASK_GID (dedupe)"
@@ -474,11 +526,11 @@ fi
 CUSTOM_FIELDS_PATCH='{}'
 
 if [[ -n "$SET_STATUS" ]]; then
-  STATUS_GID="$(status_to_gid "$SET_STATUS")"
+  STATUS_GID="$(enum_option_gid "$STATUS_FIELD" "Status" "$SET_STATUS")" || exit 1
   CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$STATUS_FIELD" --arg v "$STATUS_GID" '. + {($k): $v}')
 fi
 if [[ -n "$SET_BOARD_STATE" ]]; then
-  BOARD_STATE_GID="$(board_state_to_gid "$SET_BOARD_STATE")"
+  BOARD_STATE_GID="$(enum_option_gid "$BOARD_STATE_FIELD" "Board State 🤖" "$SET_BOARD_STATE")" || exit 1
   CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$BOARD_STATE_FIELD" --arg v "$BOARD_STATE_GID" '. + {($k): $v}')
 fi
 if [[ -n "$SET_REVIEWER_GID" ]]; then
