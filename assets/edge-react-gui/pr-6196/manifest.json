@@ -45,6 +45,24 @@
       "subject": "Fix lint warnings in WcConnectScene",
       "hackNote": null,
       "migratedFrom": 5594846996
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6196/20260916-023315-agent-proof-1217260776555871-01-seg4-confirm-connection-plain-allowances.png",
+      "caption": "seg4 confirm connection plain allowances",
+      "hacked": false,
+      "phase": null,
+      "subject": "Clarify WalletConnect connection and request risks",
+      "hackNote": null,
+      "addedAt": "2026-09-16T09:33:21.269Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6196/20260916-023315-agent-proof-1217260776555871-02-seg4-active-connections.png",
+      "caption": "seg4 active connections",
+      "hacked": false,
+      "phase": null,
+      "subject": "Clarify WalletConnect connection and request risks",
+      "hackNote": null,
+      "addedAt": "2026-09-16T09:33:21.270Z"
     }
   ]
 }
