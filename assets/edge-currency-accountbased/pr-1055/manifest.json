@@ -306,6 +306,24 @@
       "subject": "Log the ARRR endpoint pool diagnostics",
       "hackNote": null,
       "migratedFrom": 5673802899
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1055/20260916-005440-agent-proof-1216926437132721-20-arrr-sync-in-progress.png",
+      "caption": "arrr sync in progress",
+      "hacked": false,
+      "phase": null,
+      "subject": "Gate ARRR sends on SDK spendability",
+      "hackNote": null,
+      "addedAt": "2026-09-16T07:54:46.796Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1055/20260916-005440-agent-proof-1216926437132721-23-presync-refusal-error-card.png",
+      "caption": "presync refusal error card",
+      "hacked": false,
+      "phase": null,
+      "subject": "Gate ARRR sends on SDK spendability",
+      "hackNote": null,
+      "addedAt": "2026-09-16T07:54:46.800Z"
     }
   ]
 }
