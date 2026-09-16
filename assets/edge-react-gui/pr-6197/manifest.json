@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6197/20260916-152300-agent-proof-1218192628740167-01-HACKED-before-missing-expiry-fails-order.png",
+      "caption": "before missing expiry fails order",
+      "hacked": true,
+      "phase": null,
+      "subject": "Treat Phaze quoteExpiry as optional",
+      "hackNote": "createOrder response had quoteExpiry deleted and the pre-change cleaner restored locally, to show the failure this commit fixes; both reverted, never committed",
+      "addedAt": "2026-09-16T22:23:06.367Z"
+    }
+  ]
+}
