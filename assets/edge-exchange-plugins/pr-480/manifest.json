@@ -270,6 +270,24 @@
       "subject": "Split Solana same-chain swaps.xyz routes as a DEX",
       "hackNote": null,
       "addedAt": "2026-09-15T23:38:57.732Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260916-175854-agent-proof-1217036054017879-40-mptradedefi-quote-after-rename.png",
+      "caption": "mptradedefi quote after rename",
+      "hacked": false,
+      "phase": null,
+      "subject": "Split MoonPay Trade DEX routes into a second plugin",
+      "hackNote": null,
+      "addedAt": "2026-09-17T00:59:00.678Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260916-175854-agent-proof-1217036054017879-41-mptradedefi-swap-success-after-rename.png",
+      "caption": "mptradedefi swap success after rename",
+      "hacked": false,
+      "phase": null,
+      "subject": "Split MoonPay Trade DEX routes into a second plugin",
+      "hackNote": null,
+      "addedAt": "2026-09-17T00:59:00.697Z"
     }
   ]
 }
