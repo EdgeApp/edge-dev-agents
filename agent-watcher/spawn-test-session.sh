@@ -131,6 +131,19 @@ MODEL_FLAG=""
 [[ -n "$AGENT_MODEL" ]] && MODEL_FLAG="--model \"$AGENT_MODEL\" "
 EFFORT_FLAG=""
 [[ -n "$AGENT_EFFORT" ]] && EFFORT_FLAG="--effort $AGENT_EFFORT "
+# Auto-compact window. Every model we spawn (opus-5, fable-5-1, sonnet-5) is
+# NATIVE 1M, so the [1m] in the model strings is redundant and dropping it does
+# NOT cap anything: the window is a separate flag. Left at `auto`, a run holds its
+# whole history and re-sends it on every call, so cost is average context times
+# call count and a long run pays its early turns hundreds of times over (measured:
+# 12 sessions, ZERO compactions, one at 967k over 735 calls).
+# Capping here trades that for periodic compaction, which the SessionStart:compact
+# ground-truth injection + the mid-run state file exist to survive.
+# Config: .watcher.autocompact_window ("auto", or 100k-1M). Spawn-time only, so a
+# change reaches the next segment of every task with no per-task override to chase.
+AUTOCOMPACT="$(jq -r '.watcher.autocompact_window // "200k"' "$_CONFIG" 2>/dev/null)"
+AUTOCOMPACT_FLAG=""
+[[ -n "$AUTOCOMPACT" && "$AUTOCOMPACT" != "auto" ]] && AUTOCOMPACT_FLAG="--autocompact $AUTOCOMPACT "
 if [[ -n "$RESUME_ID" ]]; then
   # RESUME MODE: re-attach an existing claude session instead of starting fresh.
   # No initial prompt — the restored conversation IS the state. Composes with slot
@@ -138,9 +151,9 @@ if [[ -n "$RESUME_ID" ]]; then
   # bare `claude --resume` would lack). CWD must match the session's original launch
   # dir for --resume to resolve it; slot mode already sets CWD from --worktree-path
   # (the watcher passes ~/git), which is where orch sessions launch.
-  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}${MCP_FLAG}${MODEL_FLAG}${EFFORT_FLAG}--rc --resume $RESUME_ID"
+  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}${MCP_FLAG}${MODEL_FLAG}${EFFORT_FLAG}${AUTOCOMPACT_FLAG}--rc --resume $RESUME_ID"
 else
-  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}${MCP_FLAG}${MODEL_FLAG}${EFFORT_FLAG}--rc \"$ESC_PROMPT\""
+  CLAUDE_INVOKE="claude ${YOLO_FLAG}${CHROME_FLAG}${MCP_FLAG}${MODEL_FLAG}${EFFORT_FLAG}${AUTOCOMPACT_FLAG}--rc \"$ESC_PROMPT\""
 fi
 
 # Build the per-slot env exports (empty in legacy mode).

@@ -994,8 +994,8 @@
       "hash": "14718b3cf86d"
     },
     "pr-address:script-timeouts": {
-      "reason": "2026-09-03: caller ergonomics (block_until_ms budget), not a gradeable run behavior",
-      "hash": "d59c34def8fa"
+      "reason": "2026-09-17: only added edit-comment to the list of body-carrying verbs that need the 600000 timeout; eval expectation unchanged",
+      "hash": "88692089b02f"
     },
     "pr-address:operate-in-worktree": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1452,6 +1452,10 @@
     "one-shot:watchdog-dialog-declined": {
       "reason": "2026-09-11: machine-prompt handling driven by session-watchdog.js; the agent's rewrite is ordinary command craft graded under A16/A19, no separate dimension",
       "hash": "844bc093a159"
+    },
+    "pr-address:edit-your-own-comment": {
+      "reason": "2026-09-17: author scoping and the replies refusal are mechanically enforced by pr-address.sh edit-comment; remaining edit-vs-reply judgment is rare and low eval value",
+      "hash": "a8cc7fabc0c2"
     }
   },
   "excluded_skills": {
