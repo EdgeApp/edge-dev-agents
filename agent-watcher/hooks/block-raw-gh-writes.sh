@@ -20,6 +20,9 @@
 #      matched too: the sanctioned retraction is pr-address.sh delete-comment,
 #      which is author-scoped to currentUser, so an agent can clean up its own
 #      accidental post without gaining the ability to erase a human's review.
+#      PATCH is matched for the same reason: the sanctioned in-place correction
+#      is pr-address.sh edit-comment (author-scoped, body linted, refuses a
+#      review comment that already has replies).
 #
 # Known residual: graphql addComment/submitPullRequestReview mutations.
 # block-raw-thread-resolve.sh owns resolveReviewThread; extend here if a
@@ -100,7 +103,7 @@ fi
 if echo "$CMD" | grep -qE '(issues|pulls)/[0-9]+/(comments|reviews)|issues/comments/[0-9]+|pulls/comments/[0-9]+'; then
   if printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])gh[[:space:]]+api([[:space:]]|$)' && \
      printf '%s' "$CMD_M" | grep -qE '(^|[[:space:]])(-f|-F|--field|--raw-field|--input)([[:space:]]|$|=)|--method[[:space:]=]+(POST|PATCH|DELETE)|-X[[:space:]]+(POST|PATCH|DELETE)'; then
-    block "raw \`gh api\` writes to comment/review endpoints are forbidden in agent sessions — posting goes through pr-address.sh (reply, comment, mark-addressed) or github-pr-review.sh (review submit), which lint the body per /no-slop and keep the addressed-marker arithmetic the Complete gate reads. RETRACTING a comment you posted by mistake also has a sanctioned path: \`pr-address.sh delete-comment --owner <o> --repo <r> --comment-id <id>\`, which refuses any author but you. Reads (bare GET listings) are fine. Read the owning SKILL.md and use its script."
+    block "raw \`gh api\` writes to comment/review endpoints are forbidden in agent sessions — posting goes through pr-address.sh (reply, comment, mark-addressed) or github-pr-review.sh (review submit), which lint the body per /no-slop and keep the addressed-marker arithmetic the Complete gate reads. RETRACTING a comment you posted by mistake also has a sanctioned path: \`pr-address.sh delete-comment --owner <o> --repo <r> --comment-id <id>\`, which refuses any author but you, and EDITING your own comment in place goes through \`pr-address.sh edit-comment --owner <o> --repo <r> --comment-id <id> --body-file <path>\`, which is author-scoped and lints the new body. Reads (bare GET listings) are fine. Read the owning SKILL.md and use its script."
   fi
 fi
 
