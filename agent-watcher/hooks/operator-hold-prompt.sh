@@ -23,8 +23,11 @@
 #   steer    anything else a human typed ("the fee row is wrong, fix it"):
 #            carried out, no hold
 # A completion or stop directive, or an explicit "bypass the judge", also writes
-# /tmp/agent-judge-waiver-<gid>: the completion judge is not consulted for the
-# rest of the segment (require-completion-judgment.sh; spawn clears it).
+# /tmp/agent-judge-waiver-<gid>: the completion judge is skipped for ONE completion
+# event, which consumes the file and logs the skip as an operator override
+# (require-completion-judgment.sh; spawn clears a leftover). Every later event is
+# judged again, so the release text says the judge is waived for this completion
+# rather than claiming the normal gates all still apply.
 #
 # Not steering: harness envelopes and notices (background-task completions,
 # file-changed notes, command echoes) are stripped before the text is read, and
@@ -73,17 +76,27 @@ case " $KINDS " in *" complete "*) RELEASE=true; COMPLETE_DIRECTIVE=true ;; esac
 case " $KINDS " in *" stop "*) STOP=true ;; esac
 case " $KINDS " in *" bypass "*) BYPASS=true ;; esac
 write_waiver() { printf 'operator-directed %s (%s): %s\n' "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(printf '%s' "$PROMPT" | head -c 300 | tr '\n' ' ')" > "/tmp/agent-judge-waiver-$GID" 2>/dev/null || true; }
-if $BYPASS; then write_waiver bypass; fi
+if $BYPASS; then
+  write_waiver bypass
+  # A stop or completion directive in the same message prints its own waiver line below.
+  if ! $STOP && ! $RELEASE; then
+    echo "[completion judge waived] The operator waived the completion judge for your NEXT completion event only: that event consumes the waiver and is logged as an operator override, and every completion event after it is judged again. No other gate is waived."
+  fi
+fi
 if $STOP; then
   write_waiver stop
   "$H/operator-hold.sh" set "$GID"
-  echo "[operator hold: stop directive] The operator asked you to STOP this run. Do it now, in this turn: update-status.sh $GID <current status> --blocked yes --reason \"operator-directed: <their words>\" (this passes every gate while the hold is active), write and attach the run report describing where things stand, then end your turn. Do not resume the phase, push, or open a PR."
+  echo "[operator hold: stop directive] The operator asked you to STOP this run. Do it now, in this turn: update-status.sh $GID <current status> --blocked yes --reason \"operator-directed: <their words>\" (this passes every gate while the hold is active, and the completion judge is waived for that one write; it applies again to any later completion event), write and attach the run report describing where things stand, then end your turn. Do not resume the phase, push, or open a PR."
   exit 0
 fi
 if $RELEASE; then
-  $COMPLETE_DIRECTIVE && write_waiver complete
   "$H/operator-hold.sh" release "$GID"
-  echo "[operator hold released] The run is autonomous again: resume the phase you were in. The rest of this message is steering to carry out; a completion directive (complete / finish / ship) means finalize through the normal gates now."
+  if $COMPLETE_DIRECTIVE; then
+    write_waiver complete
+    echo "[operator hold released, completion directive] The run is autonomous again and the operator ordered you to finalize now: carry out the rest of this message as steering, then finalize. The COMPLETION JUDGE IS WAIVED for the next completion event only (that event consumes the waiver and is logged as an operator override); every other gate still applies, and the judge applies again to every completion event after it."
+  else
+    echo "[operator hold released] The run is autonomous again: resume the phase you were in. The rest of this message is steering to carry out; finalize through the normal gates when the work is done."
+  fi
   exit 0
 fi
 

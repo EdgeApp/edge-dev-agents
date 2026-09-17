@@ -122,8 +122,14 @@ try:
           and json.loads(open(LOGF).read().strip().splitlines()[-1])['verdict'] == 'unavailable', f'rc={rc} {err[:120]}')
     marker([ASK, {'created_at': '2026-09-10T23:37:00Z', 'by': 'op', 'authored': 'operator', 'text': 'You have approval to bypass the completion judge after this point'}])
     n = calls(); rc, out, err = judge('--event', 'complete', '--force', verdict='deny')
-    check('launcher: operator override comment -> allow, no judge call, waiver written', rc == 0 and calls() == n and 'OPERATOR OVERRIDE' in out and os.path.exists(WAIVER), f'rc={rc} {out[:100]}')
-    os.remove(WAIVER)
+    last = json.loads(open(LOGF).read().strip().splitlines()[-1])
+    check('launcher: operator override comment -> allow, no judge call, override line carrying the directive, no standing waiver file',
+          rc == 0 and calls() == n and 'OPERATOR OVERRIDE' in out and not os.path.exists(WAIVER)
+          and last['verdict'] == 'override' and last['event'] == 'complete' and 'bypass the completion judge' in last['directive'],
+          f'rc={rc} {out[:100]} {last}')
+    n = calls(); rc, out, err = judge('--event', 'pr-create', '--force', verdict='deny')
+    check('launcher: the standing comment overrides each event on its own line', rc == 0 and calls() == n
+          and json.loads(open(LOGF).read().strip().splitlines()[-1])['event'] == 'pr-create', f'rc={rc}')
     marker([ASK, {'created_at': '2026-09-10T23:37:00Z', 'by': 'bot', 'authored': 'agent', 'text': 'bypass the completion judge'}])
     n = calls(); rc, out, err = judge('--event', 'complete', '--force', verdict='deny')
     check('launcher: agent-authored comment never overrides', rc == 1 and calls() == n + 1, f'rc={rc} calls={calls()} n={n} {err[:120]}')
@@ -149,10 +155,23 @@ try:
     rc, out, err = gate(f'~/.config/agent-watcher/update-status.sh {GID} Testing --blocked yes --reason "operator-directed: stop"', verdict='deny')
     check('gate: block under an operator hold passes without a judge call', rc == 0 and calls() == n and 'operator-directed' in out)
     os.remove(f'/tmp/agent-operator-hold-{GID}')
-    open(WAIVER, 'w').write('operator: waived')
+    open(WAIVER, 'w').write('operator-directed complete (2026-09-17T08:17:50Z): Complete the run, I will publish tomorrow\n')
     n = calls(); rc, out, err = gate(f'~/.config/agent-watcher/update-status.sh {GID} Complete', verdict='deny')
-    check('gate: operator waiver passes, is echoed, and STANDS for the segment', rc == 0 and 'WAIVED' in out and calls() == n and os.path.exists(WAIVER))
-    os.remove(WAIVER)
+    check('gate: operator waiver passes, is echoed, and is CONSUMED by the event it authorized',
+          rc == 0 and 'WAIVED' in out and 'consumed' in out and calls() == n and not os.path.exists(WAIVER), f'rc={rc} {out[:160]}')
+    rows = [json.loads(l) for l in open(LOGF).read().strip().splitlines()]
+    w = rows[-1]
+    check('gate: the skip is logged in the judge provenance log in the override shape a grader reads',
+          w['verdict'] == 'override' and w['event'] == 'complete' and w['gid'] == GID and w['override'] == 'complete'
+          and 'I will publish tomorrow' in w['directive'] and w['ts'].endswith('Z'), str(w)[:200])
+    check('gate: resolve-run reads the whole log as blocking.judge_log (every line parses)',
+          json.loads(subprocess.run(['jq', '-cs', '.', LOGF], capture_output=True, text=True).stdout)[-1]['verdict'] == 'override')
+    open(ALOG, 'a').write(json.dumps({'ts': 't5', 'gid': GID, 'category': 'send', 'action': 'z', 'result': 'success'}) + '\n')
+    n = calls(); rc, out, err = gate(f'~/.config/agent-watcher/update-status.sh {GID} Complete', verdict='deny')
+    check('gate: the NEXT completion event in the same segment is judged again', rc == 2 and 'DENIED' in err and calls() == n + 1, f'rc={rc} calls={calls()} n={n}')
+    sec = subprocess.run([f'{AW}/judge-report-section.sh', '--gid', GID], capture_output=True, text=True, env=ENV).stdout
+    check('report section: a waiver override row names the directive, not an Asana comment',
+          'operator override (complete) via operator waiver' in sec and 'I will publish tomorrow' in sec, sec[-400:])
     open(ALOG, 'a').write(json.dumps({'ts': 't4', 'gid': GID, 'category': 'send', 'action': 'y', 'result': 'success'}) + '\n')
     rc, out, err = gate(f'~/.config/agent-watcher/update-status.sh {GID} Complete', verdict='garbage')
     check('gate: judge unavailable -> exit 2 with retry text, never a silent allow', rc == 2 and 'could not rule' in err and 'retry' in err, f'rc={rc} {err[:120]}')

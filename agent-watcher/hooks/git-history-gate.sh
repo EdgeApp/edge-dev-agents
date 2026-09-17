@@ -73,9 +73,10 @@ CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 # raw command if the helper is unavailable.
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
-case "$CMD" in
-  *".cursor/skills/"*|*".config/agent-watcher/"*) exit 0 ;;
-esac
+# Companion scripts are exempt by DIRECTORY, but only when one is actually
+# INVOKED: lib/companion-invoked.sh owns the command-position test and the
+# reason a substring match is not good enough.
+printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/lib/companion-invoked.sh" && exit 0
 
 # ---- commit discipline ------------------------------------------------------
 if echo "$CMD_M" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+(-[^[:space:]]+[[:space:]]+)*commit([[:space:]]|$)'; then

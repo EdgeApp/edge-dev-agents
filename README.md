@@ -632,9 +632,11 @@ reproducible from a single clone + `./bootstrap.sh`:
   NOT synced. The only officially global Claude file is `~/.claude/CLAUDE.md`,
   generated here from always-apply rules.
 - **`.cursor/.syncignore`**: permanent sync exclusions, read from the REPO
-  copy so every machine honors the same list. Currently: WIP commands,
-  task-specific maestro flows (dev artifacts, not conventions), and the
-  third-party `banana` image-generation skill (local-only by request).
+  copy so every machine honors the same list. Currently: WIP commands and
+  task-specific maestro flows (dev artifacts, not conventions). Third-party
+  skills need no entry: the sync ships only skills this repo already tracks or
+  whose frontmatter names an author it distributes, and reports every other
+  entry under `excludedSkills` with its reason.
 
 `/convention-sync` keeps all of the above in sync (home to repo) and hard-blocks
 staging when the remote is ahead, the branch is wrong, or the sync would delete
@@ -772,8 +774,10 @@ scripts, not be re-described independently across skills.
 | [`/obsidian`](.cursor/skills/obsidian/SKILL.md) | Manage notes in the local Obsidian vault |
 | [`/drunk-claude`](.cursor/skills/drunk-claude/SKILL.md) | Novelty persona skill |
 
-The `banana` image-generation skill exists locally but is excluded from sync
-(third-party, local-only by request).
+Third-party skills (the `banana` image generator, and whatever Claude Code
+syncs into `skills/synced/<bucket>/`) stay local: the sync ships only skills
+this repo already tracks or whose frontmatter names an author it distributes,
+and lists everything it skipped under `excludedSkills`.
 
 ## Companion scripts
 

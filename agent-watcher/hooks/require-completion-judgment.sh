@@ -14,11 +14,13 @@
 # Pass-throughs (no judgment):
 #   - a block while an OPERATOR HOLD is active: the human who would judge it is the
 #     one asking for it (operator-directed)
-#   - /tmp/agent-judge-waiver-<gid> written by an OPERATOR (never the run), by
-#     hand or by hooks/operator-hold-prompt.sh on an ordered override ("complete
-#     the task", "stop the task", "bypass the judge"), or by completion-judge.sh when
-#     such an order sits in an OPERATOR COMMENT in the segment's scope: stands for
-#     the segment (spawn/resume clears it); the text is echoed for the eval
+#   - /tmp/agent-judge-waiver-<gid> written by an OPERATOR (never the run), by hand
+#     or by hooks/operator-hold-prompt.sh on an ordered override ("complete the
+#     task", "stop the task", "bypass the judge"): covers ONE completion event and
+#     is consumed (removed) by it, so the next event is judged again; the text is
+#     echoed and written to the provenance log as `"verdict":"override"`. The same
+#     order sitting in an OPERATOR COMMENT in the segment's scope overrides per
+#     event inside completion-judge.sh, each with its own log line.
 # Judge unavailable (no binary, timeout under the launcher's own deadline, garbage
 # output) DENIES with a retry recipe: a timed-out hook would fail OPEN, so the
 # launcher deadline (480s) stays under this hook's timeout (600s).
@@ -109,9 +111,26 @@ refresh_report_judge_section() {
   return 0
 }
 
+# OPERATOR WAIVER: one event, then gone. The file is CONSUMED here (removed) and
+# the skip is written to the judge provenance log as a `"verdict":"override"` line,
+# the same log resolve-run surfaces as blocking.judge_log: an authorized bypass is
+# readable as such, and a completion event with neither a verdict nor an override
+# line is a gate evasion. The next completion event, in this segment or a later one,
+# is judged again; the operator waives again by saying so again.
 WAIVER="/tmp/agent-judge-waiver-$GID"
 if [ -s "$WAIVER" ]; then
-  echo "completion judge WAIVED by operator for task $GID: $(head -c 200 "$WAIVER" | tr '\n' ' ')"
+  TEXT=$(head -c 300 "$WAIVER" | tr '\n' ' ')
+  KIND=$(printf '%s' "$TEXT" | sed -nE 's/^operator-directed ([a-z]+) .*/\1/p; s/^operator override \(([a-z]+)\).*/\1/p' | head -1)
+  [ -n "$KIND" ] || KIND=waiver
+  LOG_DIR="${COMPLETION_JUDGE_LOG_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/judge}"
+  mkdir -p "$LOG_DIR" 2>/dev/null
+  printf '{"ts":"%s","gid":"%s","event":"%s","nonce":"override","verdict":"override","override":%s,"source":"operator waiver","directive":%s}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GID" "$EVENT" "$(printf '%s' "$KIND" | jq -Rs .)" "$(printf '%s' "$TEXT" | jq -Rs .)" \
+    >> "$LOG_DIR/$GID.jsonl" 2>/dev/null
+  rm -f "$WAIVER" 2>/dev/null
+  echo "completion judge WAIVED by operator for this $EVENT event on task $GID: $TEXT"
+  echo "The waiver is consumed: it covered this one event and is now gone, so the next completion event is judged again (the operator waives again by saying so again). Logged to the judge provenance log as an operator override."
+  refresh_report_judge_section
   exit 0
 fi
 

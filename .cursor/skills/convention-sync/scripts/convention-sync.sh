@@ -10,6 +10,11 @@
 # Sync model: ~/.cursor/ is canonical. Default direction (user-to-repo) copies local
 # files into the repo. --repo-to-user is for onboarding or pulling others' changes.
 # No bidirectional conflict detection — the chosen direction overwrites the other side.
+#
+# skills/ is AUTHORED-ONLY (see authored_skill_gate): anything under ~/.cursor/skills
+# that the repo does not already carry and whose SKILL.md does not claim an author the
+# repo already distributes is excluded from the push and reported in `excludedSkills`.
+# Every file the push would copy also passes scan_file_for_secrets; a hit aborts the stage.
 
 set -euo pipefail
 
@@ -234,7 +239,7 @@ fi
 # Override with --force-branch.
 if [[ "$DO_STAGE" == "true" && "$DIRECTION" == "user-to-repo" && "$FORCE_BRANCH" != "true" ]]; then
   cur_branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-  def_branch="$(git -C "$REPO_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')"
+  def_branch="$(git -C "$REPO_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || true)"
   [[ -z "$def_branch" ]] && def_branch="main"
   if [[ "$cur_branch" != "$def_branch" ]]; then
     echo "ERROR: on branch '$cur_branch' but the sync commits directly to '$def_branch'." >&2
@@ -264,6 +269,166 @@ is_ignored() {
     fi
   done
   return 1
+}
+
+# --- Authored-only gate for skills/ -------------------------------------------
+# The sync used to be allowlist-by-exception: everything under ~/.cursor/skills
+# shipped unless .syncignore named it, so any third-party skill dropped into the
+# tree (Claude Code's account-level skill sync writes a UUID-named bucket, and
+# ~/.claude/skills is a symlink to ~/.cursor/skills) rode into the repo by
+# default, including an API key inside one. Name-based excludes cannot keep up
+# with a parent directory whose name is a fresh UUID, so the default is now
+# EXCLUDE: a skill ships only when it is recognizably the operator's.
+#
+# Checked in this order; the deny checks win:
+#   1. DENY  any path with a third-party bucket ancestor: a directory whose
+#            name contains a UUID, or one holding a `.bucket-*` marker file.
+#   2. ALLOW the repo already carries the top-level entry. Repo tracking IS the
+#            authorship record: a file got there through a reviewed sync.
+#   3. ALLOW a plain file directly under skills/ (a shared script). Third-party
+#            drops arrive as directories; a loose file here is hand-authored.
+#   4. ALLOW SKILL.md frontmatter claims an author the repo already distributes
+#            (operator_authors, harvested from the repo's tracked SKILL.md
+#            files). This is how a BRAND-NEW skill of the operator's ships
+#            without a chicken-and-egg first commit.
+#   5. Otherwise EXCLUDE and report {entry, reason, files} in `excludedSkills`,
+#            so a mistaken exclusion is visible in the dry run instead of silent.
+# .syncignore still applies on top of this, for everything the gate allows.
+UUID_RE='[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+excluded_raw=""            # accumulated "<entry>\t<reason>" lines, collapsed at report time
+excluded_skills_json="[]"
+operator_authors=""        # ":id:" list harvested from the repo's tracked skills
+
+FRONTMATTER_AUTHOR_AWK='/^---[[:space:]]*$/{n++; next} n==1 && /^[[:space:]]*author:[[:space:]]*/ { sub(/^[[:space:]]*author:[[:space:]]*/, ""); gsub(/["'"'"']/, ""); print; exit }'
+
+skill_author_of() {   # $1 = abs path to a SKILL.md; echoes the frontmatter author, if any
+  awk "$FRONTMATTER_AUTHOR_AWK" "$1" 2>/dev/null || true
+}
+
+load_operator_authors() {
+  local f a
+  for f in "$REPO_CURSOR"/skills/*/SKILL.md; do
+    [[ -f "$f" ]] || continue
+    a="$(skill_author_of "$f")"
+    if [[ -n "$a" && "$operator_authors" != *":$a:"* ]]; then
+      operator_authors="$operator_authors:$a:"
+    fi
+  done
+  return 0
+}
+
+# $1 = path relative to ~/.cursor/skills (e.g. "foo/SKILL.md").
+# Returns 0 when the path may sync. Returns 1 and echoes "<entry>\t<reason>"
+# when it may not, where <entry> is the directory a reader should look at.
+authored_skill_gate() {
+  local rel="$1" entry dirpart acc seg marker author
+  local segs
+  dirpart="${rel%/*}"
+  [[ "$dirpart" == "$rel" ]] && dirpart=""
+  acc=""
+  if [[ -n "$dirpart" ]]; then
+    IFS='/' read -ra segs <<< "$dirpart"
+    for seg in "${segs[@]}"; do
+      acc="${acc:+$acc/}$seg"
+      if [[ "$seg" =~ $UUID_RE ]]; then
+        printf 'skills/%s\tthird-party skill bucket: UUID-named directory\n' "$acc"
+        return 1
+      fi
+      for marker in "$USER_DIR/skills/$acc"/.bucket-*; do
+        [[ -e "$marker" ]] || continue
+        printf 'skills/%s\tthird-party skill bucket: %s marker file\n' "$acc" "$(basename "$marker")"
+        return 1
+      done
+    done
+  fi
+
+  entry="${rel%%/*}"
+  [[ -e "$REPO_CURSOR/skills/$entry" ]] && return 0        # already distributed by the repo
+  [[ -z "$dirpart" ]] && return 0                          # shared script at the skills/ top level
+
+  if [[ -f "$USER_DIR/skills/$entry/SKILL.md" ]]; then
+    author="$(skill_author_of "$USER_DIR/skills/$entry/SKILL.md")"
+    if [[ -n "$author" ]]; then
+      if [[ "$operator_authors" == *":$author:"* ]]; then
+        return 0
+      fi
+      printf 'skills/%s\tunrecognized skill: SKILL.md author "%s" is not an author the repo distributes\n' "$entry" "$author"
+      return 1
+    fi
+    printf 'skills/%s\tunrecognized skill: not in the repo and SKILL.md carries no metadata.author\n' "$entry"
+    return 1
+  fi
+
+  printf 'skills/%s\tunrecognized skill: not in the repo and has no SKILL.md to claim an author\n' "$entry"
+  return 1
+}
+
+record_exclusion() {
+  excluded_raw="$excluded_raw$1
+"
+}
+
+# --- Secret scan (stage gate) -------------------------------------------------
+# Belt and braces behind the authored gate: an operator-authored skill can still
+# hold a key file. Every file this sync would copy is scanned for common key
+# shapes and for a high-entropy blob inside a key-named file (the leaked banana
+# key had no recognizable vendor prefix, only the filename). A hit aborts the
+# stage and names the path; there is no --force for it. The escape hatch for a
+# false positive is .syncignore, which is applied before the scan.
+SECRET_PEM_RE='-----BEGIN [A-Z ]*PRIVATE KEY-----'
+SECRET_TOKEN_RE='sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}'
+SECRET_KEYNAME_RE='(^|[._-])(key|keys|secret|secrets|token|tokens|credential|credentials|password|passwd|apikey|api_key)([._-]|$)|\.(pem|p12|pfx|key)$|^\.env|\.env$'
+SECRET_BLOB_RE='[A-Za-z0-9+/=_-]{24,}'
+secret_raw=""
+secret_findings_json="[]"
+
+# $1 = abs path. Echoes the finding kind and returns 0 when the file looks like
+# it carries a credential. Token shapes are filtered for a digit, so prose
+# placeholders (`sk-gid-for-pr-body-link`) are not findings. The finding never
+# quotes the matched text; the path and the kind are what a reader needs.
+scan_file_for_secrets() {
+  local f="$1" base hit
+  [[ -f "$f" ]] || return 1
+  if grep -qaE "$SECRET_PEM_RE" "$f" 2>/dev/null; then
+    printf 'private-key block\n'; return 0
+  fi
+  hit="$(grep -oaE "$SECRET_TOKEN_RE" "$f" 2>/dev/null | grep -E '[0-9]' | head -1 || true)"
+  if [[ -n "$hit" ]]; then
+    printf 'API key token shape\n'; return 0
+  fi
+  base="$(basename "$f")"
+  if [[ "$base" =~ $SECRET_KEYNAME_RE ]]; then
+    hit="$(grep -oaE "$SECRET_BLOB_RE" "$f" 2>/dev/null | grep -E '[0-9]' | grep -E '[A-Za-z]' | head -1 || true)"
+    if [[ -n "$hit" ]]; then
+      printf 'key-shaped blob in a key-named file\n'; return 0
+    fi
+  fi
+  return 1
+}
+
+# Scans everything a user-to-repo sync would copy: the changed ~/.cursor files
+# plus the changed extra-tree files. Populates secret_findings_json.
+scan_outgoing_for_secrets() {
+  local entry kind home_p
+  secret_raw=""
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    if kind="$(scan_file_for_secrets "$(local_path_for "$entry")")"; then
+      secret_raw="$secret_raw$entry	$kind
+"
+    fi
+  done < <(echo "$new_json $mod_json" | jq -sr '.[0] + .[1] | .[]')
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    home_p="$(home_path_for_extra "$entry")" || continue
+    if kind="$(scan_file_for_secrets "$home_p")"; then
+      secret_raw="$secret_raw$entry	$kind
+"
+    fi
+  done < <(echo "$extra_json" | jq -r '.[]')
+  secret_findings_json="$(printf '%s' "$secret_raw" | jq -R -s '
+    split("\n") | map(select(length > 0) | split("\t") | {file: .[0], kind: .[1]})')"
+  return 0
 }
 
 new_json="[]"
@@ -366,7 +531,7 @@ compare_readme() {
 compare_dirs() {
   local source_base="$1"
   local target_base="$2"
-  local source_path target_path rel entry
+  local source_path target_path rel entry gate_out
 
   for dir in $DIRS; do
     source_path="$source_base/$dir"
@@ -379,6 +544,15 @@ compare_dirs() {
         if is_ignored "$entry"; then
           ignored_json=$(echo "$ignored_json" | jq --arg f "$entry" '. + [$f]')
           continue
+        fi
+        # Authored-only gate, source side, push direction only. The repo side
+        # keeps reporting deletions normally, so a bucket that ever landed
+        # upstream can still be cleaned out by a later sync.
+        if [[ "$DIRECTION" == "user-to-repo" && "$dir" == "skills" ]]; then
+          if ! gate_out="$(authored_skill_gate "$rel")"; then
+            record_exclusion "$gate_out"
+            continue
+          fi
         fi
         if [[ ! -f "$target_path/$rel" ]]; then
           new_json=$(echo "$new_json" | jq --arg f "$entry" '. + [$f]')
@@ -611,6 +785,7 @@ extra_deletion_warnings() {
 
 extra_total=0
 if [[ "$DIRECTION" == "user-to-repo" ]]; then
+  load_operator_authors
   compare_readme "$USER_README" "$REPO_ROOT_README"
   compare_dirs "$USER_DIR" "$REPO_CURSOR"
 
@@ -620,6 +795,16 @@ if [[ "$DIRECTION" == "user-to-repo" ]]; then
 
   process_extra "dryrun"
   extra_total=$(echo "$extra_json" | jq 'length')
+
+  # Collapse the per-file exclusions into one row per excluded directory, so a
+  # 245-file bucket reads as one line naming the reason and the file count.
+  excluded_skills_json=$(printf '%s' "$excluded_raw" | jq -R -s '
+    split("\n") | map(select(length > 0) | split("\t") | {entry: .[0], reason: .[1]})
+    | group_by(.entry)
+    | map({entry: .[0].entry, reason: .[0].reason, files: length})
+    | sort_by(.entry)')
+
+  scan_outgoing_for_secrets
 
   # Extra-tree staleness warnings (#5): give the portable trees the same
   # protection as ~/.cursor. For each differing extra file, if the repo's last
@@ -709,6 +894,21 @@ fi
 # Regenerate ~/.claude/CLAUDE.md from alwaysApply rules
 if [[ -x "$SCRIPT_DIR/generate-claude-md.sh" ]]; then
   "$SCRIPT_DIR/generate-claude-md.sh" >/dev/null
+fi
+
+# Secret gate (#7): refuse to copy a file that looks like it carries a
+# credential, before anything is written into the repo. No --force override:
+# a key only has to reach a pushed branch once. Use .syncignore for a false
+# positive (it is applied before the scan).
+if [[ "$DO_STAGE" == "true" && "$DIRECTION" == "user-to-repo" ]]; then
+  secret_n=$(echo "$secret_findings_json" | jq 'length')
+  if [[ "$secret_n" -gt 0 ]]; then
+    echo "ERROR: refusing to stage $secret_n file(s) that look like credentials:" >&2
+    echo "$secret_findings_json" | jq -r '.[] | "  \(.file)  (\(.kind))"' >&2
+    echo "Nothing was copied into the repo." >&2
+    echo "Remove the credential from the file, or add its path to <repo>/.cursor/.syncignore if it is a false positive." >&2
+    exit 1
+  fi
 fi
 
 # Safety gate (#2/#3/#6): refuse a staging run that would DELETE or overwrite
@@ -843,7 +1043,9 @@ jq -n \
   --arg originBranch "$ORIGIN_BRANCH" \
   --argjson skippedNewer "$skipped_newer_json" \
   --argjson droppedHooks "$dropped_hooks_json" \
+  --argjson excludedSkills "$excluded_skills_json" \
+  --argjson secretFindings "$secret_findings_json" \
   --arg settingsBackup "$settings_backup" \
   --arg staged "$DO_STAGE" \
   --arg committed "$DO_COMMIT" \
-  '{repoDir: $repoDir, originBranch: $originBranch, originAhead: $originAhead, total: $total, new: $new, modified: $modified, deleted: $deleted, ignored: $ignored, warnings: $warnings, extra: $extra, extraTotal: $extraTotal, skippedNewer: $skippedNewer, droppedHooks: $droppedHooks, settingsBackup: $settingsBackup, staged: ($staged == "true"), committed: ($committed == "true")}'
+  '{repoDir: $repoDir, originBranch: $originBranch, originAhead: $originAhead, total: $total, new: $new, modified: $modified, deleted: $deleted, ignored: $ignored, warnings: $warnings, extra: $extra, extraTotal: $extraTotal, skippedNewer: $skippedNewer, droppedHooks: $droppedHooks, excludedSkills: $excludedSkills, secretFindings: $secretFindings, settingsBackup: $settingsBackup, staged: ($staged == "true"), committed: ($committed == "true")}'
