@@ -273,6 +273,15 @@
         }
       ],
       "matcher": "mcp__.*__slack_(send_message|send_message_draft|schedule_message|create_canvas|update_canvas)"
+    },
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/downscale-phone-screenshots.sh",
+          "type": "command"
+        }
+      ],
+      "matcher": "Read"
     }
   ],
   "SessionStart": [
@@ -293,6 +302,16 @@
           "type": "command"
         }
       ]
+    },
+    {
+      "hooks": [
+        {
+          "command": "/Users/eddy/git/site-orch/hooks/compact-ground-truth.sh",
+          "timeout": 20,
+          "type": "command"
+        }
+      ],
+      "matcher": "compact"
     }
   ],
   "Stop": [

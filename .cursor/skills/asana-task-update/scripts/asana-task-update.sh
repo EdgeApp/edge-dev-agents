@@ -408,7 +408,7 @@ if $DO_ATTACH_FILE; then
     REPORT_FAMILY=$(printf '%s\n' "$ATTACH_NAMES" | grep -E "$REPORT_ATTACH_RE" | while read -r n; do
         [[ "$(report_name_suffix "$n")" == "$WANT_SUFFIX" ]] || continue
         HAVE_ORD=$(report_name_ordinal "$n")
-        [[ -z "$HAVE_ORD" || -z "$WANT_ORD" || "$HAVE_ORD" == "$WANT_ORD" ]] && echo "$n"
+        [[ ( -z "$HAVE_ORD" && -z "$WANT_ORD" ) || "$HAVE_ORD" == "$WANT_ORD" ]] && echo "$n"
       done | grep -v '^$' || true)
     [[ -n "$REPORT_FAMILY" ]] && EXISTING_ATTACH=$(printf '%s\n' "$REPORT_FAMILY" | head -1)
   fi

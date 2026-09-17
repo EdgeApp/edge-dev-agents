@@ -151,6 +151,7 @@
       "wwe-app"
     ],
     "idle_reap_hours": 72,
-    "operator_hold_ttl_min": 15
+    "operator_hold_ttl_min": 15,
+    "autocompact_window": "200k"
   }
 }
