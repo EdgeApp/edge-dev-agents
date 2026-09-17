@@ -138,6 +138,9 @@ for wt in "$WT_ROOT"/*/; do
     [ -n "$prinfo" ] && base=$(printf '%s' "$prinfo" | jq -r '.baseRefName // empty')
   fi
   [ -n "$prinfo" ] && line "pr: $prinfo" || line "pr: none found"
+  # The repo's default branch (origin/HEAD) is what a new PR targets; a stale
+  # origin/develop in a master-default repo would otherwise inflate the diff.
+  [ -z "$base" ] && base=$(git -C "$wt" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
   if [ -z "$base" ]; then
     for b in develop master main; do git -C "$wt" rev-parse --verify -q "origin/$b" >/dev/null 2>&1 && { base="$b"; break; }; done
   fi
