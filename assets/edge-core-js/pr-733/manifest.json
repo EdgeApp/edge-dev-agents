@@ -198,6 +198,42 @@
       "subject": "Document the wallet cache v2 design",
       "hackNote": null,
       "migratedFrom": 5669564152
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260916-190008-agent-proof-1216673467164267-13-HACKED-warm-login-list.png",
+      "caption": "warm login list",
+      "hacked": true,
+      "phase": null,
+      "subject": "fixup! Emit currency wallets before their engines exist",
+      "hackNote": "Uncommitted 240 s snooze before loadFiatFile in the wallet pixie startup block, so a logout could land inside the window; reverted",
+      "addedAt": "2026-09-17T02:00:16.811Z"
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260916-190008-agent-proof-1216673467164267-14-HACKED-logout-during-startup.png",
+      "caption": "logout during startup",
+      "hacked": true,
+      "phase": null,
+      "subject": "fixup! Emit currency wallets before their engines exist",
+      "hackNote": "Uncommitted 240 s snooze before loadFiatFile in the wallet pixie startup block, so a logout could land inside the window; reverted",
+      "addedAt": "2026-09-17T02:00:16.812Z"
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260916-190008-agent-proof-1216673467164267-15-HACKED-relogin-list.png",
+      "caption": "relogin list",
+      "hacked": true,
+      "phase": null,
+      "subject": "fixup! Emit currency wallets before their engines exist",
+      "hackNote": "Uncommitted 240 s snooze before loadFiatFile in the wallet pixie startup block, so a logout could land inside the window; reverted",
+      "addedAt": "2026-09-17T02:00:16.812Z"
+    },
+    {
+      "path": "assets/edge-core-js/pr-733/20260916-190008-agent-proof-1216673467164267-16-HACKED-relogin-list-after-stale-loads.png",
+      "caption": "relogin list after stale loads",
+      "hacked": true,
+      "phase": null,
+      "subject": "fixup! Emit currency wallets before their engines exist",
+      "hackNote": "Uncommitted 240 s snooze before loadFiatFile in the wallet pixie startup block, so a logout could land inside the window; reverted",
+      "addedAt": "2026-09-17T02:00:16.812Z"
     }
   ]
 }
