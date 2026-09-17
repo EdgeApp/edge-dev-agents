@@ -90,8 +90,12 @@ function isChangelogOnly(files) {
 
 // Block until machine load is quiet before any verification run. Test suites
 // carry fixed per-test timeouts, and unrelated load (concurrent iOS builds)
-// fails them with timeouts that look like code failures. Advisory: the helper
-// always returns after its own budget, so verification still runs.
+// fails them with timeouts that look like code failures. UNRELATED is the
+// operative word: the helper subtracts this session's own process tree from
+// the load figure, so a land never waits out load it is generating itself (its
+// own npm install, webpack, or a prepare running against a second repo).
+// Advisory: the helper always returns after its own budget, so verification
+// still runs.
 function waitForQuietLoad() {
   const helper = path.join(__dirname, "wait-for-quiet-load.sh");
   try {

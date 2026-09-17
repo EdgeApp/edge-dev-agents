@@ -636,7 +636,7 @@
       ]
     },
     "pr-land:verification": {
-      "hash": "2e0008ae2f6c",
+      "hash": "35d97d6aa3fb",
       "dims": [
         "A16"
       ]
@@ -666,13 +666,13 @@
       ]
     },
     "file:require-completion-judgment.sh": {
-      "hash": "05cbcd09daee",
+      "hash": "df67ed224edb",
       "dims": [
         "O9"
       ]
     },
     "file:completion-judge.sh": {
-      "hash": "6a4315b85330",
+      "hash": "16670672eb38",
       "dims": [
         "O9"
       ]

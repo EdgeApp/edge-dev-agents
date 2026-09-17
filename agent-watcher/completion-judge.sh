@@ -14,7 +14,11 @@
 #   /tmp/agent-completion-verdict-<gid>.json  the verdict, bound to evidence_hash
 #   $XDG_STATE_HOME/agent-watcher/judge/<gid>.jsonl  provenance: one line per judge
 #       call (ts, event, hash, verdict, cost, duration, nonce). A verdict whose nonce
-#       has no provenance line was not written by this script.
+#       has no provenance line was not written by this script. An operator-ordered
+#       skip is a `"verdict":"override"` line carrying the directive text and its
+#       event, written here for an ordered Asana comment and by the gate hook when
+#       an operator waiver file is consumed: a completion event with neither a
+#       verdict nor an override line for it went around the gate.
 # Env: COMPLETION_JUDGE_MODEL (opus), COMPLETION_JUDGE_EFFORT (high),
 #      COMPLETION_JUDGE_DEADLINE seconds (480; keep under the gate hook timeout, a
 #      timed-out hook fails OPEN), COMPLETION_JUDGE_OFFLINE=1, COMPLETION_JUDGE_LOG_DIR.
@@ -52,8 +56,9 @@ BUNDLE=${EV#path=}; BUNDLE=${BUNDLE%% hash=*}; HASH=${EV##*hash=}
 
 # ORDERED OVERRIDE IN A COMMENT. Operator comments in the segment's scope are read with the same grammar
 # as session prompts (hooks/lib/operator-directives.sh): bypass covers every event,
-# complete covers complete/pr-create, stop covers block. The waiver file is written
-# so the gate's own pass-through carries it for the rest of the segment.
+# complete covers complete/pr-create, stop covers block. The override is per EVENT
+# and each one writes its own provenance line: no waiver file is dropped, so nothing
+# skips an event the comment was never read against.
 MARKER="/tmp/agent-followup-scope-$GID.json"
 if [ -s "$MARKER" ] && . "$H/hooks/lib/operator-directives.sh" 2>/dev/null; then
   while IFS=$'\t' read -r c_ts c_text; do
@@ -63,9 +68,9 @@ if [ -s "$MARKER" ] && . "$H/hooks/lib/operator-directives.sh" 2>/dev/null; then
     case " $kinds " in *" bypass "*) hit=bypass ;; esac
     [ -z "$hit" ] && case "$EVENT" in complete|pr-create) case " $kinds " in *" complete "*) hit=complete ;; esac ;; block) case " $kinds " in *" stop "*) hit=stop ;; esac ;; esac
     [ -n "$hit" ] || continue
-    printf 'operator override (%s) from Asana comment %s: %s\n' "$hit" "$c_ts" "$(printf '%s' "$c_text" | head -c 300 | tr '\n' ' ')" > "/tmp/agent-judge-waiver-$GID" 2>/dev/null || true
-    printf '{"ts":"%s","gid":"%s","event":"%s","evidence_hash":"%s","nonce":"override","verdict":"override","override":%s,"comment_at":"%s"}\n' \
-      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GID" "$EVENT" "$HASH" "$(printf '%s' "$hit" | jq -Rs .)" "$c_ts" >> "$LOG_DIR/$GID.jsonl"
+    printf '{"ts":"%s","gid":"%s","event":"%s","evidence_hash":"%s","nonce":"override","verdict":"override","override":%s,"comment_at":"%s","directive":%s}\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GID" "$EVENT" "$HASH" "$(printf '%s' "$hit" | jq -Rs .)" "$c_ts" \
+      "$(printf '%s' "$c_text" | head -c 300 | tr '\n' ' ' | jq -Rs .)" >> "$LOG_DIR/$GID.jsonl"
     echo "verdict: allow ($EVENT) by OPERATOR OVERRIDE: Asana comment $c_ts orders '$hit' ($(printf '%s' "$c_text" | head -c 160 | tr '\n' ' '))"
     exit 0
   done < <(jq -r '(.segment_comments // .comments // [])[] | select(.authored == "operator") | [.created_at, (.text | gsub("[\t\n]"; " "))] | @tsv' "$MARKER" 2>/dev/null)

@@ -203,7 +203,9 @@ ENV_EXPORTS+="export NODE_OPTIONS=\"\${NODE_OPTIONS:---max-old-space-size=8192}\
 # plan + run-report docs for traceability. Logged here so the watcher records the
 # task→session-uuid mapping.
 # A fresh session never inherits an operator hold (operator-hold.sh): the hold
-# belonged to the conversation that just ended.
+# belonged to the conversation that just ended. Same for a judge waiver: it covers
+# ONE completion event and the gate consumes it there, so anything left here was
+# never spent and does not carry into the new segment.
 [[ -n "${TASK_GID:-}" ]] && rm -f "/tmp/agent-operator-hold-$TASK_GID" "/tmp/agent-judge-waiver-$TASK_GID" 2>/dev/null
 AGENT_SESSION_UUID="$(uuidgen 2>/dev/null || true)"
 if [[ -n "$AGENT_SESSION_UUID" ]]; then

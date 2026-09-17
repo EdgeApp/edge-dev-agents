@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # judge-report-section.sh -- print the run report's "## Completion Judge" section
 # from the judge provenance log (one row per judge call: event, verdict, failed
-# dimensions, summary; override rows name the operator comment). Spliced into the
+# dimensions, summary; an override row names the operator's directive and where it
+# came from, an Asana comment or a consumed waiver file). Spliced into the
 # report at attach time by hooks/require-clean-run-report.sh, so the agent never
 # writes it. Usage: judge-report-section.sh --gid <gid>
 # Env: COMPLETION_JUDGE_LOG_DIR overrides the log directory (tests).
@@ -24,7 +25,7 @@ console.log("|---|---|---|---|---|---|");
 rows.forEach((r,i)=>{
   const t=(r.ts||"").replace(/^\d{4}-/,"").replace("T"," ").replace(/Z$/,"Z");
   let failed="", summary="";
-  if(r.verdict==="override"){failed="";summary=`operator override (${r.override||"?"}) via Asana comment ${(r.comment_at||"").replace(/^\d{4}-/,"")}`}
+  if(r.verdict==="override"){failed="";const via=r.comment_at?`via Asana comment ${r.comment_at.replace(/^\d{4}-/,"")}`:`via ${esc(r.source)||"operator waiver"}`;summary=`operator override (${r.override||"?"}) ${via}: ${esc(r.directive).slice(0,120)}`}
   else if(r.verdict==="unavailable"){summary=`judge unavailable: ${esc(r.error)}`}
   else {failed=(r.fail_ids||[]).join(", ")||(r.fails?`${r.fails} item(s)`:"");summary=esc(r.summary).slice(0,160)}
   console.log(`| ${i+1} | ${t} | ${r.event||""} | ${r.verdict||""} | ${failed} | ${summary} |`);

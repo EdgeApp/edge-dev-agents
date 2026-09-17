@@ -70,9 +70,10 @@ CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentio
 
 # Sanctioned scripts first — they invoke gh internally (invisible here), so
 # this exempts mixed commands that both run a script and match a trigger.
-case "$CMD" in
-  *".cursor/skills/"*|*".config/agent-watcher/"*) exit 0 ;;
-esac
+# Companion scripts are exempt by DIRECTORY, but only when one is actually
+# INVOKED: lib/companion-invoked.sh owns the command-position test and the
+# reason a substring match is not good enough.
+printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/lib/companion-invoked.sh" && exit 0
 
 block() {
   echo "BLOCKED: $1" >&2
