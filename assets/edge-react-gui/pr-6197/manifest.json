@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "entries": [
     {
       "path": "assets/edge-react-gui/pr-6197/20260916-171351-agent-proof-1218192628740167-01-HACKED-before-missing-expiry-fails-order.png",
@@ -81,6 +81,66 @@
       "subject": "Fall back to Bitrefill when Phaze is disabled",
       "hackNote": "Phaze disable forced in updateGiftCardInfo (the live info server serves no giftCardInfo); 03/05 widen the list filter to show unpaid orders, 04/05 make getOrderStatus throw (05 only after the first fetch), 06 also disables Bitrefill; all reverted, never committed",
       "addedAt": "2026-09-17T00:14:04.924Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6197/20260917-132456-agent-proof-1218192628740167-01-HACKED-phaze-disabled-no-orders-bitrefill.png",
+      "caption": "phaze disabled no orders bitrefill",
+      "index": "1",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Phaze disable (and, for the both-disabled frames, Bitrefill too) forced in updateGiftCardInfo because the live info server serves no giftCardInfo; reverted, never committed",
+      "batchAt": "2026-09-17T20:24:56Z",
+      "headSha": "0520670691deb5a460dad488188c005a249ea8a9",
+      "addedAt": "2026-09-17T20:24:56Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6197/20260917-132456-agent-proof-1218192628740167-02-HACKED-both-disabled-home-toast.png",
+      "caption": "both disabled home toast",
+      "index": "2",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Phaze disable (and, for the both-disabled frames, Bitrefill too) forced in updateGiftCardInfo because the live info server serves no giftCardInfo; reverted, never committed",
+      "batchAt": "2026-09-17T20:24:56Z",
+      "headSha": "0520670691deb5a460dad488188c005a249ea8a9",
+      "addedAt": "2026-09-17T20:24:56Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6197/20260917-132456-agent-proof-1218192628740167-03-HACKED-phaze-disabled-readonly-list.png",
+      "caption": "phaze disabled readonly list",
+      "index": "3",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Phaze disable (and, for the both-disabled frames, Bitrefill too) forced in updateGiftCardInfo because the live info server serves no giftCardInfo; reverted, never committed",
+      "batchAt": "2026-09-17T20:24:56Z",
+      "headSha": "0520670691deb5a460dad488188c005a249ea8a9",
+      "addedAt": "2026-09-17T20:24:56Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6197/20260917-132456-agent-proof-1218192628740167-04-HACKED-phaze-disabled-purchase-new-bitrefill.png",
+      "caption": "phaze disabled purchase new bitrefill",
+      "index": "4",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Phaze disable (and, for the both-disabled frames, Bitrefill too) forced in updateGiftCardInfo because the live info server serves no giftCardInfo; reverted, never committed",
+      "batchAt": "2026-09-17T20:24:56Z",
+      "headSha": "0520670691deb5a460dad488188c005a249ea8a9",
+      "addedAt": "2026-09-17T20:24:56Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6197/20260917-132456-agent-proof-1218192628740167-05-HACKED-both-disabled-purchase-new-toast.png",
+      "caption": "both disabled purchase new toast",
+      "index": "5",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Phaze disable (and, for the both-disabled frames, Bitrefill too) forced in updateGiftCardInfo because the live info server serves no giftCardInfo; reverted, never committed",
+      "batchAt": "2026-09-17T20:24:56Z",
+      "headSha": "0520670691deb5a460dad488188c005a249ea8a9",
+      "addedAt": "2026-09-17T20:24:56Z"
     }
   ]
 }
