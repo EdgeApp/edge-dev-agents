@@ -12,6 +12,12 @@
 #                                                          Retract a comment YOU authored (review-thread
 #                                                          reply or top-level). Refuses any other author.
 #                                                          No body lint: a delete carries no prose.
+#   edit-comment   --owner <o> --repo <r> --comment-id <id> --body <text>|--body-file <path>
+#                                                          Replace the body of a comment YOU authored, in
+#                                                          place. Refuses any other author, and refuses a
+#                                                          review comment that already has replies. Body is
+#                                                          linted like every outbound verb. Prints
+#                                                          `edited: <url>` or `unchanged: <id>`.
 #   mark-addressed --owner <o> --repo <r> --pr <n> --type <review|comment> --target-id <id> --body <text>
 #   comment        --owner <o> --repo <r> --pr <n> --body <text>|--body-file <path>
 #                                                          Post a standalone top-level PR comment (no
@@ -391,6 +397,61 @@ case "$CMD" in
     echo "deleted: $COMMENT_ID"
     ;;
 
+  edit-comment)
+    # In-place correction of a comment this user posted. block-raw-gh-writes.sh
+    # blocks raw PATCH on comment endpoints, so this is the only sanctioned
+    # edit path. Same author scoping and endpoint probe as delete-comment; the
+    # new body goes through lint_outbound_body like reply/comment. A review
+    # comment that already has replies is refused, because a reply means
+    # someone read the original: the correction belongs in a follow-up reply
+    # (SKILL.md edit-your-own-comment). Issue comments have no reply structure,
+    # so they are not checked.
+    require_gh
+    if [[ -n "$BODY_FILE" ]]; then
+      [[ -f "$BODY_FILE" ]] || { echo "Error: --body-file not found: $BODY_FILE" >&2; exit 1; }
+      BODY="$(cat "$BODY_FILE")"
+    fi
+    if [[ -z "$OWNER" || -z "$REPO" || -z "$COMMENT_ID" || -z "$BODY" ]]; then
+      echo "Error: --owner, --repo, --comment-id, and --body or --body-file required" >&2; exit 1
+    fi
+    ME=$(gh api user --jq '.login')
+    KIND="" GOT=""
+    for ep in "pulls/comments" "issues/comments"; do
+      GOT=$(gh api "repos/$OWNER/$REPO/$ep/$COMMENT_ID" 2>/dev/null) || { GOT=""; continue; }
+      KIND="$ep"
+      break
+    done
+    if [[ -z "$KIND" ]]; then
+      echo "Error: comment $COMMENT_ID not found in $OWNER/$REPO (neither a review comment nor an issue comment)" >&2; exit 1
+    fi
+    AUTHOR=$(echo "$GOT" | jq -r '.user.login // empty')
+    if [[ "$AUTHOR" != "$ME" ]]; then
+      echo "Error: comment $COMMENT_ID was authored by '$AUTHOR', not '$ME'. edit-comment only edits your own comments." >&2; exit 1
+    fi
+    if [[ "$KIND" == "pulls/comments" ]]; then
+      PR_NUM=$(echo "$GOT" | jq -r '.pull_request_url // "" | split("/") | last')
+      REPLIES=$(gh api "repos/$OWNER/$REPO/pulls/$PR_NUM/comments" --paginate \
+        --jq "[.[] | select(.in_reply_to_id == $COMMENT_ID)] | length" | awk '{s+=$1} END {print s+0}')
+      if [[ "$REPLIES" -gt 0 ]]; then
+        echo "Error: review comment $COMMENT_ID already has $REPLIES repl$([[ "$REPLIES" -eq 1 ]] && echo y || echo ies). Post the correction as a follow-up reply instead: pr-address.sh reply --owner $OWNER --repo $REPO --pr $PR_NUM --comment-id $COMMENT_ID --body <text>" >&2
+        exit 1
+      fi
+    fi
+    if [[ "$(echo "$GOT" | jq -r '.body // ""')" == "$BODY" ]]; then
+      echo "unchanged: $COMMENT_ID"
+      exit 0
+    fi
+    lint_outbound_body "$BODY"
+    RESULT=$(jq -n --arg body "$BODY" '{body: $body}' | \
+      gh api "repos/$OWNER/$REPO/$KIND/$COMMENT_ID" -X PATCH --input -)
+    URL=$(echo "$RESULT" | jq -r '.html_url // empty')
+    if [[ -n "$URL" ]]; then
+      echo "edited: $URL"
+    else
+      echo "Edit failed: $RESULT" >&2; exit 1
+    fi
+    ;;
+
   resolve-thread)
     require_gh
     if [[ -z "$THREAD_ID" ]]; then
@@ -657,7 +718,7 @@ case "$CMD" in
     ;;
 
   *)
-    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|delete-comment|resolve-thread|mark-addressed|comment|resolve-id|headline|fetch-pr-body|ensure-branch|review-mode|autosquash} [args]" >&2
+    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|delete-comment|edit-comment|resolve-thread|mark-addressed|comment|resolve-id|headline|fetch-pr-body|ensure-branch|review-mode|autosquash} [args]" >&2
     exit 1
     ;;
 esac
