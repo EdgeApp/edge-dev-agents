@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "entries": [
     {
       "path": "assets/edge-react-gui/pr-6206/20260908-163233-agent-proof-1216111164285203-01-under-threshold-no-card.png",
@@ -8,16 +8,10 @@
       "phase": null,
       "subject": "Add slow-sync card for large UTXO wallets",
       "hackNote": null,
-      "migratedFrom": 5593356350
-    },
-    {
-      "path": "assets/edge-react-gui/pr-6206/20260908-163233-agent-proof-1216111164285203-02-HACKED-card-on-utxo-wallet.png",
-      "caption": "card on utxo wallet",
-      "hacked": true,
-      "phase": null,
-      "subject": "Add slow-sync card for large UTXO wallets",
-      "hackNote": "lowered LARGE_UTXO_WALLET_TX_COUNT from 100 to 20 locally so a real 28-transaction DASH wallet crosses the real threshold comparison; reverted before commit.",
-      "migratedFrom": 5593356350
+      "migratedFrom": 5593356350,
+      "batchAt": "2026-09-17T20:16:35Z",
+      "headSha": "acd02f9405f23e5e1ff306d78e6f787f184cb78c",
+      "carriedFrom": "(earlier)"
     },
     {
       "path": "assets/edge-react-gui/pr-6206/20260908-163233-agent-proof-1216111164285203-03-HACKED-no-card-on-non-utxo-wallet.png",
@@ -25,8 +19,11 @@
       "hacked": true,
       "phase": null,
       "subject": "Add slow-sync card for large UTXO wallets",
-      "hackNote": "lowered LARGE_UTXO_WALLET_TX_COUNT from 100 to 20 locally so a real 28-transaction DASH wallet crosses the real threshold comparison; reverted before commit.",
-      "migratedFrom": 5593356350
+      "hackNote": "LARGE_UTXO_WALLET_TX_COUNT lowered from 100 to 20 locally so a real large-history wallet crosses the threshold; reverted before commit.",
+      "migratedFrom": 5593356350,
+      "batchAt": "2026-09-17T20:16:35Z",
+      "headSha": "acd02f9405f23e5e1ff306d78e6f787f184cb78c",
+      "carriedFrom": "(earlier)"
     },
     {
       "path": "assets/edge-react-gui/pr-6206/20260908-163233-agent-proof-1216111164285203-04-HACKED-learn-more-opens-article.png",
@@ -34,8 +31,11 @@
       "hacked": true,
       "phase": null,
       "subject": "Add slow-sync card for large UTXO wallets",
-      "hackNote": "lowered LARGE_UTXO_WALLET_TX_COUNT from 100 to 20 locally so a real 28-transaction DASH wallet crosses the real threshold comparison; reverted before commit.",
-      "migratedFrom": 5593356350
+      "hackNote": "LARGE_UTXO_WALLET_TX_COUNT lowered from 100 to 20 locally so a real large-history wallet crosses the threshold; reverted before commit.",
+      "migratedFrom": 5593356350,
+      "batchAt": "2026-09-17T20:16:35Z",
+      "headSha": "acd02f9405f23e5e1ff306d78e6f787f184cb78c",
+      "carriedFrom": "(earlier)"
     },
     {
       "path": "assets/edge-react-gui/pr-6206/20260908-165059-agent-proof-1216111164285203-05-HACKED-no-stale-card-after-wallet-switch.png",
@@ -43,8 +43,11 @@
       "hacked": true,
       "phase": null,
       "subject": "Add slow-sync card for large UTXO wallets",
-      "hackNote": "lowered LARGE_UTXO_WALLET_TX_COUNT from 100 to 20 locally so a real 28-transaction DASH wallet crosses the real threshold comparison; reverted before commit.",
-      "migratedFrom": 5593551316
+      "hackNote": "LARGE_UTXO_WALLET_TX_COUNT lowered from 100 to 20 locally so a real large-history wallet crosses the threshold; reverted before commit.",
+      "migratedFrom": 5593551316,
+      "batchAt": "2026-09-17T20:16:35Z",
+      "headSha": "acd02f9405f23e5e1ff306d78e6f787f184cb78c",
+      "carriedFrom": "(earlier)"
     },
     {
       "path": "assets/edge-react-gui/pr-6206/20260915-161801-agent-proof-1216111164285203-06-HACKED-warning-card-restyle.png",
@@ -53,7 +56,10 @@
       "phase": null,
       "subject": "Add slow-sync card for large UTXO wallets",
       "hackNote": "LARGE_UTXO_WALLET_TX_COUNT lowered from 100 to 20 locally so a real large-history wallet crosses the threshold; reverted before commit.",
-      "addedAt": "2026-09-15T23:18:05.921Z"
+      "addedAt": "2026-09-15T23:18:05.921Z",
+      "batchAt": "2026-09-17T20:16:35Z",
+      "headSha": "acd02f9405f23e5e1ff306d78e6f787f184cb78c",
+      "carriedFrom": "(earlier)"
     }
   ]
 }
