@@ -17,8 +17,8 @@ commands/github-pr-hudl.sh
 # families here so the leak can't recur.
 skills/build-and-test/maestro/swap-*.yaml
 
-# Third-party skill, local-only by request (banana-claude image gen)
-skills/banana/*
-
-# Claude synced-skills bucket: third-party skills plus their API keys, never distribute
-skills/synced/**
+# Third-party skills need no entry here: skills/ is authored-only (the sync
+# excludes and REPORTS anything the repo does not carry and whose SKILL.md
+# claims no author the repo distributes). Listing one here only hides it from
+# that report. Use this file for paths that ARE the operator's but should stay
+# local, and for a secret-scan false positive.
