@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "entries": [
     {
       "path": "assets/edge-exchange-plugins/pr-480/20260730-185043-agent-proof-1217036054017879-01-swapsxyz-quote.png",
@@ -288,6 +288,18 @@
       "subject": "Split MoonPay Trade DEX routes into a second plugin",
       "hackNote": null,
       "addedAt": "2026-09-17T00:59:00.697Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260918-120634-agent-proof-1217036054017879-42-mptradedefi-powered-by-icon.png",
+      "caption": "mptradedefi powered by icon",
+      "index": "42",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-18T19:06:34Z",
+      "headSha": "cc052f8629191f4e6885bfbea626300a466dde0d",
+      "addedAt": "2026-09-18T19:06:34Z"
     }
   ]
 }
