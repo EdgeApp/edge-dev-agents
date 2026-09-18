@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "entries": [
     {
       "path": "assets/edge-react-gui/pr-6128/20260803-163726-agent-proof-1217036054017879-02-swap-success.png",
@@ -124,6 +124,18 @@
       "subject": "Wire the MoonPay Trade DEX registration",
       "hackNote": null,
       "addedAt": "2026-09-17T00:59:10.765Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6128/20260918-120645-agent-proof-1217036054017879-42-mptradedefi-powered-by-icon.png",
+      "caption": "mptradedefi powered by icon",
+      "index": "42",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-18T19:06:45Z",
+      "headSha": "792a1894765674a40865c94f9fe5deac53158103",
+      "addedAt": "2026-09-18T19:06:45Z"
     }
   ]
 }
