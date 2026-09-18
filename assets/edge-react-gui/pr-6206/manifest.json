@@ -60,6 +60,30 @@
       "batchAt": "2026-09-17T20:16:35Z",
       "headSha": "acd02f9405f23e5e1ff306d78e6f787f184cb78c",
       "carriedFrom": "(earlier)"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6206/20260917-170908-agent-proof-1216111164285203-07-HACKED-review-fixes.png",
+      "caption": "review fixes",
+      "index": "7",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "LARGE_UTXO_WALLET_TX_COUNT temporarily set to 0 to force the Large Wallet card to render on-demand",
+      "batchAt": "2026-09-18T00:09:08Z",
+      "headSha": "b646315f54ab3e9964cdd74b3329f0411a3eb5c8",
+      "addedAt": "2026-09-18T00:09:08Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6206/20260917-170908-agent-proof-1216111164285203-08-HACKED-ecash-utxo-grouping.png",
+      "caption": "ecash utxo grouping",
+      "index": "8",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "LARGE_UTXO_WALLET_TX_COUNT temporarily set to 0 to force the Large Wallet card to render on-demand",
+      "batchAt": "2026-09-18T00:09:08Z",
+      "headSha": "b646315f54ab3e9964cdd74b3329f0411a3eb5c8",
+      "addedAt": "2026-09-18T00:09:08Z"
     }
   ]
 }
