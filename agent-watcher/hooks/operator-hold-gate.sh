@@ -6,7 +6,8 @@
 # operator may have asked for), git push, PR creation, and landing/publishing.
 # Everything else passes: reads, local edits, commits, builds, drives.
 #
-# Trigger precision: execution-position match (cmd-executes.sh) on the
+# Trigger precision: execution-position match (cmd-executes.sh, fed the raw
+# command so a quoted invocation still counts) on the
 # mention-stripped command (strip-cmd-mentions.sh), so a read of a script or a
 # quoted mention never fires.
 #
@@ -21,7 +22,7 @@ STATE=$("$H/operator-hold.sh" status "$GID" 2>/dev/null) || exit 0   # clear (or
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
 CMD_M=$(printf '%s' "$CMD" | "$H/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
-executes() { printf '%s' "$CMD_M" | "$H/hooks/cmd-executes.sh" "$1" 2>/dev/null; }
+executes() { printf '%s' "$CMD" | "$H/hooks/cmd-executes.sh" "$1" 2>/dev/null; }
 
 WHAT=""
 if executes update-status.sh; then

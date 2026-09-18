@@ -13,7 +13,12 @@ Run: python3 ~/.config/agent-watcher/hooks/tests/fixup-discipline.test.py
      left alone, idempotent.
   3. tdd-stamp.sh --fold stamps a fresh doc and folds it into the branch's first
      commit; a second --fold with nothing changed is a no-op.
-pr-finalize-fixups.sh wires 2 and 3 into every push but needs a live PR for its
+  4. git-branch-ops.sh fold-before folds only fixups AUTHORED before the cutoff,
+     compared as instants (an offset timestamp that sorts earlier as a string
+     but is later in time stays), leaving newer fixups and the tree intact.
+  5. condense-fixups falls back to one group per target in original order when
+     the per-kind regroup conflicts (interleaved human/auto edits of one line).
+pr-finalize-fixups.sh wires 2, 3 and 4 into every push but needs a live PR for its
 review-mode oracle, so it is exercised by real runs, not here.
 """
 import os, shutil, subprocess, sys, tempfile
@@ -106,6 +111,43 @@ try:
     check('stamp is current after the fold', sh(f'{STAMP} . src/docs/design.md --check', repo).returncode == 0)
     p = sh(f'{STAMP} . src/docs/design.md --fold', repo)
     check('--fold with nothing to do is a no-op', p.returncode == 0 and 'nothing to fold' in p.stdout, p.stdout)
+
+    # ---- 4. fold-before: author-date cutoff, compared as instants ----
+    r4 = os.path.join(tmp, 'r4'); os.makedirs(r4)
+    sh(f'git init -q -b master && git commit -q --allow-empty -m Base && git remote add origin {remote} && git checkout -q -b f4', r4)
+    sh('echo t > t.txt && git add t.txt && git commit -q -m "Add T"', r4)
+    sh('echo u > u.txt && git add u.txt && git commit -q -m "Add U"', r4)
+    def fx(cwd, f, line, subj, date):
+        sh(f'echo {line} >> {f} && git add {f} && GIT_AUTHOR_DATE={date} git commit -q -m "fixup! {subj}" -m "{line}"', cwd)
+    fx(r4, 't.txt', 't1', 'Add T', '2026-01-01T00:00:00Z')
+    fx(r4, 'u.txt', 'u1', 'Add U', '2026-01-02T00:00:00Z')
+    fx(r4, 't.txt', 't2', 'Add T', '2026-01-03T00:00:00-07:00')
+    fx(r4, 't.txt', 't3', 'Add T', '2026-01-04T00:00:00Z')
+    base4 = git('rev-parse HEAD~6', r4); tree4 = git('rev-parse HEAD^{tree}', r4)
+    p = sh(f'{OPS} fold-before --before 2026-01-03T05:00:00Z --base {base4}', r4)
+    check('fold-before exits 0 and folds 2', p.returncode == 0 and '"folded":2' in p.stdout, p.stdout + p.stderr[-300:])
+    s4 = git(f'log --reverse --format=%s {base4}..HEAD', r4).split('\n')
+    check('offset-dated and newer fixups stay, in order', s4 == ['Add T', 'Add U', 'fixup! Add T', 'fixup! Add T'], s4)
+    check('older fixups landed in their targets', git('show HEAD~3:t.txt', r4) == 't\nt1' and git('show HEAD~2:u.txt', r4) == 'u\nu1')
+    check('fold-before keeps the tree', git('rev-parse HEAD^{tree}', r4) == tree4)
+    p = sh(f'{OPS} fold-before --before 2026-01-03T05:00:00Z --base {base4}', r4)
+    check('fold-before idempotent', p.returncode == 0 and '"folded":0' in p.stdout, p.stdout)
+    p = sh(f'{OPS} fold-before --before not-a-date --base {base4}', r4)
+    check('fold-before rejects an unparseable cutoff', p.returncode != 0)
+
+    # ---- 5. condense fallback on a per-kind regroup conflict ----
+    r5 = os.path.join(tmp, 'r5'); os.makedirs(r5)
+    sh(f'git init -q -b master && git commit -q --allow-empty -m Base && git remote add origin {remote} && git checkout -q -b f5', r5)
+    sh('echo x=1 > x.txt && git add x.txt && git commit -q -m "Add X"', r5)
+    for val, kind in (('2', 'human'), ('3', 'auto'), ('4', 'human')):
+        sh(f'echo x={val} > x.txt && git add x.txt && git commit -q -m "fixup! Add X" -m "set {val}" -m "Fixup-for: {kind}"', r5)
+    base5 = git('rev-parse HEAD~4', r5); tree5 = git('rev-parse HEAD^{tree}', r5)
+    p = sh(f'{OPS} condense-fixups --base {base5}', r5)
+    check('condense falls back instead of failing', p.returncode == 0 and '"fallback":"one-per-target"' in p.stdout, p.stdout + p.stderr[-300:])
+    s5 = git(f'log --format=%s {base5}..HEAD', r5).split('\n')
+    check('one fixup left for X, kind human', s5 == ['fixup! Add X', 'Add X'] and git('log -1 --format=%b', r5).strip().endswith('Fixup-for: human'), s5)
+    check('fallback keeps the tree', git('rev-parse HEAD^{tree}', r5) == tree5)
+    check('no rebase left in progress', not os.path.isdir(os.path.join(r5, '.git/rebase-merge')))
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 print(f'\n{len(fails)} failure(s)' if fails else '\nall passed')

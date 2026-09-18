@@ -10,7 +10,7 @@ metadata:
 
 <usage>
 ```
-/pr-land                                          # Asana "PR Pipeline" section, incomplete tasks assigned to me
+/pr-land                                          # Asana "Merge/Finalize" section, incomplete tasks assigned to me
 /pr-land --branch-scan                            # All EdgeApp repos with $GIT_BRANCH_PREFIX/* PRs (legacy)
 /pr-land edge-react-gui                           # Specific repo (branch-prefix scan)
 /pr-land edge-react-gui edge-core-js              # Multiple repos
@@ -22,7 +22,7 @@ metadata:
 ```
 
 Arguments are classified automatically:
-- **No args** → queries the configured Asana "PR Pipeline" section (GID hardcoded in `pr-land-discover.sh`), filters to incomplete tasks assigned to the current Asana user (resolved from `ASANA_TOKEN` via `~/.cursor/skills/asana-whoami.sh`), and walks each task's attachments + subtasks for GitHub PR links. Tasks with no PR link are reported in `errors` but do not block.
+- **No args** → queries the Engineering Board's "Merge/Finalize" section (matched by name at call time in `pr-land-discover.sh`; a missing section errors with the names that exist), filters to incomplete tasks assigned to the current Asana user (resolved from `ASANA_TOKEN` via `~/.cursor/skills/asana-whoami.sh`), and walks each task's attachments + subtasks for GitHub PR links. Tasks with no PR link are reported in `errors` but do not block.
 - **`--branch-scan`** → legacy behavior: scans all EdgeApp repos for `$GIT_BRANCH_PREFIX/*` PRs.
 - **Repo names** → branch-prefix scan, limited to the named repos.
 - **PR URLs / shorthand** (`repo#N`) → fetched directly, no branch-prefix filter.
@@ -117,7 +117,7 @@ ONE tool call:
 ```
 
 Args can be repo names, PR URLs, PR shorthand (`repo#N`), Asana task URLs (mixed freely), or `--branch-scan`.
-No args = pull incomplete tasks assigned to me from the Asana "PR Pipeline" section and walk each for PR attachments + subtask PR attachments. Use `--branch-scan` for the legacy "scan all EdgeApp repos for `$GIT_BRANCH_PREFIX/*` PRs" behavior.
+No args = pull incomplete tasks assigned to me from the Engineering Board's "Merge/Finalize" section and walk each for PR attachments + subtask PR attachments. Use `--branch-scan` for the legacy "scan all EdgeApp repos for `$GIT_BRANCH_PREFIX/*` PRs" behavior.
 
 Returns JSON: `{ "prs": [...], "errors": [...] }`. Each PR has `repo`, `prNumber`, `branch`, `title`, `approved`, `changesRequested`, `reviewers`. Errors include Asana resolution failures or PR fetch failures.
 
@@ -147,7 +147,7 @@ Items previously marked with `<!-- addressed:review:ID -->` or `<!-- addressed:c
 2. Human reviewer comments are **blocking until the user decides how to handle them**. Use the `approved` and `changesRequested` fields from discovery to determine the path:
    1. **`changesRequested: true`**:
       - Treat the feedback as re-review-blocking
-      - If the user wants it addressed now, make the fix as a visible fixup commit, push it, reply/resolve the feedback, and **remove the PR from the merge set** so it can go back for review
+      - If the user wants it addressed now, make the fix as a visible fixup commit, push it with `~/.cursor/skills/pr-finalize-fixups.sh --owner <o> --repo <r> --pr <n>` (the review is active, so the plumbing push is gate-blocked while fixups are on the branch), reply/resolve the feedback, and **remove the PR from the merge set** so it can go back for review
       - If the user does not want to address it now, leave the PR out of the merge set and report it as blocked by requested changes
    2. **`approved: true` and `changesRequested: false`**:
       - DEFAULT: **address** the comments via the /pr-address flow below, without asking — the reviewer already approved, so follow-up comments are nits to fix, not re-review gates. Ask the user ONLY when a comment is ambiguous, expands scope beyond the PR, or you cannot determine the concrete change it wants.

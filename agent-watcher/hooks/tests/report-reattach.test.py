@@ -499,6 +499,19 @@ p2 = update(['--attach-file', RFAM, '--attach-name', renamed], FAKE_ATTACH_JSON=
 check('G6 gate re-number then re-attach leaves ONE report doc',
       renamed == '2-agent-run-report.md' and 'replaced BARE1->NEW1' in p2.stdout, renamed + ' | ' + p2.stdout + p2.stderr)
 
+# ---------------- J. bare legacy report alongside the numbered scheme ----------------
+# 2026-09-17: task 1218192628740167 carried a bare pre-scheme agent-run-report.md
+# AND numbered reports. The ordinal-insensitive family match pinned every later
+# report to that bare doc, which is prior-segment, so no report could ever attach
+# again and the refusal's remedy ("attach under a new ordinal") was unreachable.
+reset()
+p = update(['--attach-file', REPORT_FILE, '--attach-name', '4-agent-run-report.md'],
+           FAKE_ATTACH_JSON=att(('BARE0', 'agent-run-report.md', '2026-09-15T09:00:00.000Z'),
+                                ('NUM3', '3-agent-run-report.md', '2026-09-15T09:30:00.000Z')))
+check('J1 bare prior report does not block a new ordinal once numbering is in use',
+      p.returncode == 0 and any(x['method'] == 'POST' for x in calls()) and not any(x['method'] == 'DELETE' for x in calls()),
+      p.stdout + p.stderr)
+
 # ---------------- H. judge verdict lands in the attached report ----------------
 JGATE = os.path.join(HOME, '.config/agent-watcher/hooks/require-completion-judgment.sh')
 COMPLETE_CMD = json.dumps({'tool_input': {'command': f'~/.config/agent-watcher/update-status.sh {GID} Complete'}})

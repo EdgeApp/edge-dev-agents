@@ -18,8 +18,8 @@ REPORT_ATTACH_RE='^([0-9]+-)?agent-run-report.*\.md$'
 PLAN_ATTACH_RE='^([0-9]+-)?plan-.*\.md$'
 
 # next_attach_ordinal <report|plan>  (attachment names on stdin, one per line)
-# Prints max existing ordinal + 1; when no name carries an ordinal (legacy era),
-# falls back to count of matching names + 1.
+# Prints max(highest existing ordinal, count of matching names) + 1, so a bare
+# pre-scheme name still takes a slot.
 next_attach_ordinal() {
   local kind="$1" names re max count
   names=$(cat)
@@ -34,11 +34,14 @@ next_attach_ordinal() {
   else
     max=$(printf '%s\n' "$names" | sed -nE 's/^([0-9]+)-plan-.*/\1/p' | sort -n | tail -1)
   fi
-  if [ -n "$max" ]; then
+  # A bare pre-scheme name carries no ordinal but still occupies one, so the
+  # next ordinal is past both the highest number and the total count.
+  count=$(printf '%s\n' "$names" | grep -c . || true)
+  count=${count:-0}
+  if [ -n "$max" ] && [ $((10#$max)) -gt "$count" ]; then
     echo $((10#$max + 1))
   else
-    count=$(printf '%s\n' "$names" | grep -c . || true)
-    echo $((${count:-0} + 1))
+    echo $((count + 1))
   fi
 }
 

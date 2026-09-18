@@ -36,18 +36,28 @@
 # before the target, then the hook environment. An unresolvable target keeps
 # its literal text (joined to cwd), so gates keep treating it as a write.
 #
-# bash_write_target <cmd> [cwd] [ext] [raw-cmd]
+# bash_write_target <cmd> [cwd] [ext] [raw-cmd] [mode]
 #   Prints the absolute target path (empty when the command writes no matching
 #   file). <ext> defaults to 'md'; pass a full basename such as 'CHANGELOG.md'
 #   to match one file name only. <raw-cmd>: the unstripped command when <cmd>
 #   is the mention-stripped view, so quoted assignment values stay readable
-#   for variable expansion (defaults to <cmd>).
+#   for variable expansion (defaults to <cmd>). <mode>: 'first' (default) or
+#   'all', which prints EVERY matching target, one per line. A caller deciding
+#   whether a command writes a gated path needs 'all', because one command can
+#   write an ungated file and a gated one, and stopping at the first match
+#   would clear the whole command on the strength of the ungated write.
 
 _MD_WRITE_TARGET_LIB="$(dirname "${BASH_SOURCE[0]}")"
 [ -f "$_MD_WRITE_TARGET_LIB/shell-word-resolve.sh" ] && . "$_MD_WRITE_TARGET_LIB/shell-word-resolve.sh"
 
 bash_write_target() {
-  local cmd="$1" cwd="${2:-}" ext="${3:-md}" raw="${4:-$1}" target="" resolved="" word_pos=""
+  local cmd="$1" cwd="${2:-}" ext="${3:-md}" raw="${4:-$1}" mode="${5:-first}"
+  local target="" resolved="" word_pos="" targets=""
+  # In 'all' mode every branch keeps its whole match list; 'first' keeps the one
+  # each branch has always taken (the earliest, or the last for in-place edits,
+  # where sed and perl put the file after the expression).
+  _pick() { if [ "$mode" = all ]; then cat; else head -1; fi; }
+  _pick_last() { if [ "$mode" = all ]; then cat; else tail -1; fi; }
   case "$ext" in
     *.*) local tail="$ext" ;;      # exact basename
     *)   local tail="[^\"'[:space:];|&]+\\.$ext" ;;
@@ -58,7 +68,8 @@ bash_write_target() {
     # Prints "<raw-offset><TAB><raw word>" for the first matching target.
     local hit
     hit=$(node -e '
-const [stripped, raw, ext] = process.argv.slice(1);
+const [stripped, raw, ext, mode] = process.argv.slice(1);
+const hits = [];
 const S = Array.from(stripped), R = Array.from(raw);
 if (S.length !== R.length) process.exit(0);
 const s = S.join("");
@@ -82,32 +93,38 @@ for (const m of s.matchAll(/(^|\s)(>>?|tee(?:\s+-a)?)/g)) {
     word += c; plain += c; i++;
   }
   if (/["\x27]/.test(word) && want(plain)) {
-    process.stdout.write(R.slice(0, cp).join("").length + "\t" + word);
-    break;
+    hits.push(R.slice(0, cp).join("").length + "\t" + word);
+    if (mode !== "all") break;
   }
 }
-' "$cmd" "$raw" "$ext" 2>/dev/null || true)
-    if [ -n "$hit" ]; then
-      word_pos="${hit%%$'\t'*}"
-      target="${hit#*$'\t'}"
-    fi
+if (hits.length) process.stdout.write(hits.join("\n"));
+' "$cmd" "$raw" "$ext" "$mode" 2>/dev/null || true)
+    [ -n "$hit" ] && targets="$hit"
   fi
-  [ -n "$target" ] || target=$(printf '%s' "$cmd" \
+  [ -n "$targets" ] || targets=$(printf '%s' "$cmd" \
     | grep -oE "(^|[[:space:]])(>>?|tee([[:space:]]+-a)?)[[:space:]]*\"?'?[^\"'[:space:];|&]*${tail}" \
-    | sed -E "s/^[[:space:]]*(>>?|tee([[:space:]]+-a)?)[[:space:]]*[\"']?//" | head -1 || true)
-  if [ -z "$target" ] && printf '%s' "$cmd" | grep -qE "(^|[[:space:]|;&(])(sed[[:space:]]+(-[a-zA-Z]*)?-i|perl[[:space:]]+(-[a-zA-Z]*)?-[a-zA-Z]*i)"; then
-    target=$(printf '%s' "$cmd" \
+    | sed -E "s/^[[:space:]]*(>>?|tee([[:space:]]+-a)?)[[:space:]]*[\"']?//" | _pick || true)
+  if [ -z "$targets" ] && printf '%s' "$cmd" | grep -qE "(^|[[:space:]|;&(])(sed[[:space:]]+(-[a-zA-Z]*)?-i|perl[[:space:]]+(-[a-zA-Z]*)?-[a-zA-Z]*i)"; then
+    targets=$(printf '%s' "$cmd" \
       | grep -oE "(^|[[:space:]])\"?'?[^\"'[:space:];|&]*${tail}([[:space:]]|$|;|\\|)" \
-      | sed -E "s/^[[:space:]]*[\"']?//; s/[[:space:];|]+$//" | tail -1 || true)
+      | sed -E "s/^[[:space:]]*[\"']?//; s/[[:space:];|]+$//" | _pick_last || true)
   fi
-  if [ -z "$target" ] \
+  if [ -z "$targets" ] \
     && printf '%s' "$cmd" | grep -qE "(^|[[:space:]|;&(])(python3?|node)[[:space:]]+(-[[:space:]]*<<|-c[[:space:]]|-e[[:space:]])" \
     && printf '%s' "$cmd" | grep -qE "open\([^)]*[\"'][wa][\"']|\.write\(|write_text\(|writeFileSync\(|writeFile\("; then
-    target=$(printf '%s' "$cmd" \
+    targets=$(printf '%s' "$cmd" \
       | grep -oE "[\"'][^\"'[:space:]]*${tail}[\"']" \
-      | sed -E "s/^[\"']//; s/[\"']$//" | head -1 || true)
+      | sed -E "s/^[\"']//; s/[\"']$//" | _pick || true)
   fi
-  [ -n "$target" ] || return 0
+  [ -n "$targets" ] || return 0
+
+  while IFS= read -r target; do
+  [ -n "$target" ] || continue
+  word_pos=""
+  # The quoted branch emits "<raw-offset><TAB><word>"; the others emit the path.
+  case "$target" in
+    [0-9]*$'\t'*) word_pos="${target%%$'\t'*}"; target="${target#*$'\t'}" ;;
+  esac
   if [ -n "$word_pos" ]; then
     # Quoted word from raw: the shell's quoting decides what expands. An
     # unresolvable word keeps its literal text with the quotes dropped.
@@ -128,5 +145,6 @@ for (const m of s.matchAll(/(^|\s)(>>?|tee(?:\s+-a)?)/g)) {
   fi
   target="${target/#\~/$HOME}"
   case "$target" in /*) ;; *) target="${cwd:+$cwd/}$target" ;; esac
-  printf '%s' "$target"
+  if [ "$mode" = all ]; then printf '%s\n' "$target"; else printf '%s' "$target"; fi
+  done <<< "$targets"
 }

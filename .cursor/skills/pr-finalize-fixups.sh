@@ -34,12 +34,18 @@
 #                    needs to see fixup commits.
 #
 #   Subcommands:
-#     squash-stale  Run BEFORE adding new fixups in the address-pass. Squashes
-#                   any pre-existing fixups (Fixups A) when (a) mode is
-#                   autosquash, or (b) mode is preserve AND the latest human
-#                   activity timestamp is newer than the latest existing fixup
-#                   commit timestamp (the reviewer has seen Fixups A and
-#                   re-reviewed → start fresh on Fixups B). No-op otherwise.
+#     squash-stale  Run BEFORE adding new fixups in the address-pass. LOCAL
+#                   ONLY: it never pushes (one push per review round, and that
+#                   push is finalize's). In autosquash mode it autosquashes the
+#                   whole branch. In preserve mode it folds exactly the fixups
+#                   AUTHORED before the latest human activity (the reviewer has
+#                   read them) into their targets (git-branch-ops.sh
+#                   fold-before) and leaves newer fixups visible. Author date,
+#                   never committer date: every rebase and slot resets %cI, so
+#                   a committer timestamp makes an already-reviewed fixup look
+#                   new and the fold never fires. When it reports a non-noop
+#                   action, finalize must run this round even if no new fixup
+#                   was made, or the rewrite never reaches the remote.
 #
 #     finalize      (default subcommand) Run AFTER all new fixups are committed
 #                   and slotted. Both modes first re-stamp a committed TDD that
@@ -47,11 +53,13 @@
 #                   stamp asserts the doc was re-read against this tree, so an
 #                   unedited stale doc is left for the Complete gate to bounce).
 #                   In autosquash mode → autosquash + force-push.
-#                   In preserve mode → condense (git-branch-ops.sh
-#                   condense-fixups: one fixup! per target commit, bodies
-#                   concatenated, targets untouched) + force-with-lease push.
-#                   However many bot rounds a review turn takes, the reviewer
-#                   sees one delta per target.
+#                   In preserve mode → the same stale fold squash-stale does
+#                   (so a skipped or failed step 1.5 heals here), then condense
+#                   (git-branch-ops.sh condense-fixups: one fixup! per target
+#                   and kind, bodies concatenated, targets untouched) +
+#                   force-with-lease push. However many bot rounds a review
+#                   turn takes, the reviewer sees at most one human and one
+#                   auto delta per target.
 #
 #   Skill pre-conditions (caller's responsibility):
 #     - All fixup commits for this cycle are committed on HEAD and slotted next
@@ -67,9 +75,11 @@
 #
 # Output (stdout, one line of compact JSON):
 #   finalize / squash-stale shared schema:
-#     {"action": "autosquash" | "push" | "noop", "mode": "...", "newHead": "...", "reason": "...",
-#      "condensed": N (preserve push: fixup commits folded away), "stamped": true|false (TDD re-stamped)}
-#   With --check-only the action becomes "wouldAutosquash" / "wouldPush" / "wouldNoop".
+#     {"action": "autosquash" | "fold" | "push" | "noop", "mode": "...", "newHead": "...", "reason": "...",
+#      "folded": N (stale fixups folded into their targets), "condensed": N (preserve push:
+#      fixup commits folded away), "stamped": true|false (TDD re-stamped)}
+#   squash-stale reports "autosquash" (autosquash mode) or "fold" (preserve mode), never "push".
+#   With --check-only the action becomes "wouldAutosquash" / "wouldFold" / "wouldPush" / "wouldNoop".
 #
 # Exit codes:
 #   0 — done (action completed, deliberately skipped, or --check-only)
@@ -125,6 +135,7 @@ prefix_action() {
     case "$action" in
       autosquash) echo "wouldAutosquash" ;;
       push) echo "wouldPush" ;;
+      fold) echo "wouldFold" ;;
       noop) echo "wouldNoop" ;;
       *) echo "$action" ;;
     esac
@@ -161,22 +172,23 @@ if [[ "$MODE" == "preserve" && "$IS_OWNER" == "true" && -n "${AGENT_TASK_GID:-}"
   fi
 fi
 
-# Find latest existing fixup commit's timestamp on this branch (if any).
 DEFAULT_UPSTREAM="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
   || echo "origin/$(git remote show origin 2>/dev/null | sed -n '/HEAD branch/s/.*: //p')" \
   || echo "origin/master")"
 [[ -z "$DEFAULT_UPSTREAM" || "$DEFAULT_UPSTREAM" == "origin/" ]] && DEFAULT_UPSTREAM="origin/master"
 MERGE_BASE="$(git merge-base "$DEFAULT_UPSTREAM" HEAD 2>/dev/null || true)"
 
-if [[ -n "$MERGE_BASE" ]]; then
-  LATEST_FIXUP_TS=$(git log "$MERGE_BASE..HEAD" --format='%cI %s' \
-    | awk '/^[^ ]+ fixup! / { print $1; exit }')
-else
-  LATEST_FIXUP_TS=""
+# Capture before grepping: under pipefail, `git log | grep -q` dies of SIGPIPE
+# once grep exits on the first match, which reads as "no fixups".
+HAS_FIXUPS="false"
+BRANCH_SUBJECTS="$([[ -n "$MERGE_BASE" ]] && git log "$MERGE_BASE..HEAD" --format='%s' || true)"
+if grep -q '^fixup! ' <<<"$BRANCH_SUBJECTS"; then
+  HAS_FIXUPS="true"
 fi
 
 TDD_STAMPED="false"
 CONDENSED=0
+FOLDED=0
 
 # Re-stamp a committed TDD (src/docs/*.md on the branch) when its stamp is stale
 # AND the doc text (minus the stamp line) changed since the remote head, or has
@@ -201,6 +213,15 @@ stamp_tdd_if_edited() {
   TDD_STAMPED="true"
 }
 
+# Fold the fixups the reviewer already read (authored before the latest human
+# activity) into their targets. Local only. Sets FOLDED.
+fold_stale_fixups() {
+  local plan
+  [[ -n "$LATEST_TS" && -n "$MERGE_BASE" && "$HAS_FIXUPS" == "true" ]] || return 0
+  plan="$("$GIT_BRANCH_OPS_SH" fold-before --before "$LATEST_TS" --base "$MERGE_BASE")" || return 1
+  FOLDED="$(printf '%s' "$plan" | jq -r '.folded // 0')"
+}
+
 run_autosquash_and_push() {
   "$GIT_BRANCH_OPS_SH" autosquash >&2
   "$GIT_BRANCH_OPS_SH" push --force-with-lease >&2
@@ -213,7 +234,7 @@ run_condense_and_push() {
   CONDENSED="$(printf '%s' "$plan" | jq -r '.condensed // 0')"
   # Force-with-lease because per-fixup slotting and the condense rewrote tip.
   "$GIT_BRANCH_OPS_SH" push --force-with-lease >&2
-  emit_json "{action: '$(prefix_action push)', mode: '$MODE', newHead: '$(git rev-parse --short=10 HEAD)', condensed: $CONDENSED, stamped: $TDD_STAMPED}"
+  emit_json "{action: '$(prefix_action push)', mode: '$MODE', newHead: '$(git rev-parse --short=10 HEAD)', folded: $FOLDED, condensed: $CONDENSED, stamped: $TDD_STAMPED}"
 }
 
 emit_noop() {
@@ -228,29 +249,35 @@ if [[ "$SUBCMD" == "squash-stale" ]]; then
     emit_noop "not PR owner — never rewrite owner history"
     exit 0
   fi
-  if [[ -z "$LATEST_FIXUP_TS" ]]; then
+  if [[ "$HAS_FIXUPS" != "true" ]]; then
     emit_noop "no existing fixups"
     exit 0
   fi
 
-  SHOULD_SQUASH="false"
   if [[ "$MODE" == "autosquash" ]]; then
-    SHOULD_SQUASH="true"
-  elif [[ -n "$LATEST_TS" ]] && [[ "$LATEST_TS" > "$LATEST_FIXUP_TS" ]]; then
-    SHOULD_SQUASH="true"
-  fi
-
-  if [[ "$SHOULD_SQUASH" != "true" ]]; then
-    emit_noop "existing fixups still relevant for current review cycle"
+    if [[ "$CHECK_ONLY" == "true" ]]; then
+      emit_json "{action: '$(prefix_action autosquash)', mode: '$MODE', reason: 'no active reviewer'}"
+      exit 0
+    fi
+    "$GIT_BRANCH_OPS_SH" autosquash >&2
+    emit_json "{action: 'autosquash', mode: '$MODE', newHead: '$(git rev-parse --short=10 HEAD)', reason: 'no active reviewer; local only, finalize pushes'}"
     exit 0
   fi
 
+  if [[ -z "$LATEST_TS" ]]; then
+    emit_noop "no human activity to date the fixups against"
+    exit 0
+  fi
   if [[ "$CHECK_ONLY" == "true" ]]; then
-    emit_json "{action: '$(prefix_action autosquash)', mode: '$MODE', reason: 'stale fixups predate latest review'}"
+    emit_json "{action: '$(prefix_action fold)', mode: '$MODE', reason: 'fold fixups authored before $LATEST_TS'}"
     exit 0
   fi
-
-  run_autosquash_and_push
+  fold_stale_fixups || exit 1
+  if [[ "$FOLDED" == "0" ]]; then
+    emit_noop "every existing fixup postdates the latest review ($LATEST_TS)"
+    exit 0
+  fi
+  emit_json "{action: 'fold', mode: '$MODE', newHead: '$(git rev-parse --short=10 HEAD)', folded: $FOLDED, reason: 'fixups authored before $LATEST_TS folded; local only, finalize pushes'}"
   exit 0
 fi
 
@@ -281,5 +308,9 @@ if [[ "$CHECK_ONLY" == "true" ]]; then
   exit 0
 fi
 
+# Only on an owned PR: a non-owner never rewrites history, not even a fold.
+if [[ "$IS_OWNER" == "true" ]]; then
+  fold_stale_fixups || exit 1
+fi
 stamp_tdd_if_edited || exit 1
 run_condense_and_push

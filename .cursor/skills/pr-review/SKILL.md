@@ -65,12 +65,12 @@ Read these files in parallel (skip any already present in context):
 Invoke the workflow with the level and target:
 
 ```
-Workflow({ name: "code-review-sonnet", args: "<level> [angles=N] <pr-url>" })
+Workflow({ name: "code-review-sonnet", args: "<level> [angles=N] [model=X] [effort=X] <pr-url>" })
 ```
 
 It runs in the background; wait for its result (TaskOutput, blocking) before step 5. Its result carries `findings[]` (each with file/line/summary/failure_scenario/category/verdict) and `refuted[]`.
 
-Model allocation, for cost awareness: the workflow's Scope and Synthesize agents inherit the session model; its Find/Verify/Sweep fan-out is pinned to Sonnet running at the level's effort (level IS effort, mirroring the official /code-review). Everything else in this skill runs inline on the session model.
+Model allocation, for cost awareness: the workflow's Scope and Synthesize agents inherit the session model; its Find/Verify/Sweep fan-out defaults to Sonnet running at the level's effort (level IS effort, mirroring the official /code-review). Depth, model, and effort are separate dials: pass `model=sonnet|opus|haiku|inherit` and/or `effort=low|medium|high|xhigh|max|inherit` alongside the level, where `inherit` on either drops that key so the fan-out takes the session's own value. Everything else in this skill runs inline on the session model.
 </sub-step>
 
 <sub-step id="4b" name="Conventions lens (always)">
