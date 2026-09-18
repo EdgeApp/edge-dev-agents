@@ -150,6 +150,8 @@ asana_request() {
 # task description. Owned here so every writer agrees on the byte-exact literal;
 # `--set-current-state` replaces everything from this line down and never touches
 # what sits above it.
+# Matched ANYWHERE on a line, not only at column 1: an authorship marker (🥋)
+# prepended to the delimiter line must not hide a stale section from the strip.
 CURRENT_STATE_DELIM="===== CURRENT STATE (agent-maintained; supersedes any stale prose above) ====="
 
 # --create-subtask: create a subtask under --task, print its gid, and re-point
@@ -405,9 +407,19 @@ if $DO_ATTACH_FILE; then
   if [[ -n "${REPORT_ATTACH_RE:-}" && "$DEDUPE_NAME" =~ $REPORT_ATTACH_RE ]]; then
     WANT_SUFFIX=$(report_name_suffix "$DEDUPE_NAME")
     WANT_ORD=$(report_name_ordinal "$DEDUPE_NAME")
+    # A bare (ordinal-less) report is a PRE-SCHEME doc. It is the same document
+    # as a numbered request only while the task carries no numbered report at
+    # all; once any numbered report exists (<N>-agent-run-report.md or the legacy
+    # agent-run-report-<N>-<slug>.md, whatever its suffix) the bare one belongs
+    # to an earlier segment, so it must neither be replaced nor block the new
+    # ordinal.
+    HAVE_NUMBERED=$(printf '%s\n' "$ATTACH_NAMES" | grep -E "$REPORT_ATTACH_RE" | while read -r n; do
+        if [[ -n "$(report_name_ordinal "$n")" ]]; then echo yes; fi
+      done | grep -m1 yes || true)
     REPORT_FAMILY=$(printf '%s\n' "$ATTACH_NAMES" | grep -E "$REPORT_ATTACH_RE" | while read -r n; do
         [[ "$(report_name_suffix "$n")" == "$WANT_SUFFIX" ]] || continue
         HAVE_ORD=$(report_name_ordinal "$n")
+        if [[ -z "$HAVE_ORD" && -n "$WANT_ORD" && -n "$HAVE_NUMBERED" ]]; then continue; fi
         [[ -z "$HAVE_ORD" || -z "$WANT_ORD" || "$HAVE_ORD" == "$WANT_ORD" ]] && echo "$n"
       done | grep -v '^$' || true)
     [[ -n "$REPORT_FAMILY" ]] && EXISTING_ATTACH=$(printf '%s\n' "$REPORT_FAMILY" | head -1)
@@ -643,7 +655,7 @@ if [[ -n "$SET_CURRENT_STATE_FILE" ]]; then
   # Everything above the delimiter, with trailing whitespace trimmed so the
   # rebuilt notes get exactly one blank line before the delimiter.
   CS_PROSE="$(printf '%s\n' "$CS_NOTES" \
-    | awk -v d="$CURRENT_STATE_DELIM" 'index($0, d) == 1 { exit } { print }')"
+    | awk -v d="$CURRENT_STATE_DELIM" 'index($0, d) > 0 { exit } { print }')"
   CS_PROSE="${CS_PROSE%"${CS_PROSE##*[![:space:]]}"}"
 
   CS_MARKER="$HOME/.config/agent-watcher/agent-authored-text.sh"

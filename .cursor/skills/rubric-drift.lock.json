@@ -138,7 +138,7 @@
       ]
     },
     "pr-create:attach-test-evidence": {
-      "hash": "4a7512dbe6ca",
+      "hash": "528d3b152d3f",
       "dims": [
         "A13"
       ]
@@ -501,9 +501,9 @@
       ]
     },
     "one-shot:pr-body-current-before-complete": {
-      "hash": "18f4153ae4da",
+      "hash": "7ddb4c007665",
       "dims": [
-        "A29"
+        "A31"
       ]
     },
     "one-shot:non-owner-pr-completion": {
@@ -648,7 +648,7 @@
       ]
     },
     "file:operator-hold-gate.sh": {
-      "hash": "ea41bd1a781d",
+      "hash": "3c0e25a44206",
       "dims": [
         "A7"
       ]
@@ -666,7 +666,7 @@
       ]
     },
     "file:require-completion-judgment.sh": {
-      "hash": "df67ed224edb",
+      "hash": "dd36bfac66af",
       "dims": [
         "O9"
       ]
@@ -681,6 +681,12 @@
       "hash": "3ac88a279063",
       "dims": [
         "A22"
+      ]
+    },
+    "pr-create:evidence-dispositions": {
+      "hash": "1984ef57bed7",
+      "dims": [
+        "A13"
       ]
     }
   },
@@ -1398,8 +1404,8 @@
       "hash": "c32f66511e88"
     },
     "build-and-test:hack-verify-visual-changes": {
-      "reason": "2026-07-28: hack provenance is graded via A13 (HACKED token + specific --hack-note banner) and A9 (Testing-section declaration); the rule body is capture procedure the validator/concession layer enforces",
-      "hash": "f12ed2e6a7ae"
+      "reason": "2026-09-17: 2026-09-17: edit only adds a pointer to pr-create:evidence-dispositions; the hack-verify expectation itself is unchanged and stays graded by A13, and the disposition behavior is graded on the pr-create side",
+      "hash": "d9e4958bf7fc"
     },
     "one-shot:description-current-state": {
       "reason": "2026-08-28: 2026-08-28: write-path change only (raw curl+PUT mechanics replaced by asana-task-update.sh --set-current-state, which now owns the delimiter, the strip-and-replace and the authorship marking); the graded expectation — refresh the section when delivered scope diverges, never touch operator prose — is unchanged from the prior ack",
@@ -1456,6 +1462,10 @@
     "pr-address:edit-your-own-comment": {
       "reason": "2026-09-17: author scoping and the replies refusal are mechanically enforced by pr-address.sh edit-comment; remaining edit-vs-reply judgment is rare and low eval value",
       "hash": "a8cc7fabc0c2"
+    },
+    "pr-create:prose-edit-funnel": {
+      "reason": "2026-09-18: tool pointer; misuse is mechanically blocked by block-raw-gh-writes.sh and the script's own lint/author gates",
+      "hash": "1b8815f4af80"
     }
   },
   "excluded_skills": {

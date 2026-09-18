@@ -34,11 +34,21 @@ blocking the false positives:
   require-subtasks-for-multi-repo-pr.sh only --asana-attach calls are gated.
   cmd-executes.sh                 timeout/gtimeout/env/nice/nohup/command/exec/
                                   time wrappers count as executing the program;
-                                  `command -v` and wrapped readers do not.
+                                  `command -v` and wrapped readers do not. Both
+                                  modes: <basename> and --under <dir>, the
+                                  second being the raw-write gates' exemption.
   lib/md-write-target.sh          quoted redirect/tee targets are read from the
                                   raw command and resolved.
   lint-md-on-write.sh             scratchpad paths and $VAR targets that
                                   resolve into allowlisted dirs pass.
+  record-phone-captures.sh        simctl/adb capture destinations are recorded
+                                  (including $VAR paths); a capture quoted in an
+                                  echo or heredoc, an adb DEVICE-side screencap,
+                                  and the macOS screencapture tool are not.
+  downscale-phone-screenshots.sh  a recorded frame is downscaled wherever it
+                                  landed; an unrecorded scratchpad PNG, a frame
+                                  rewritten since it was recorded, and a web
+                                  preview are left alone.
 
 Side effects are confined to temp dirs and /tmp files named with TEST_GID.
 xcrun and adb are PATH stubs, so no simulator or device is needed.
@@ -535,6 +545,29 @@ def cmdexec():
     run('env-wrapped cat of the script', 1, f'env FOO=1 cat {AW}/update-status.sh')
     run('nice-wrapped sed of the script', 1, f'nice sed -n 1p {AW}/update-status.sh')
     run('different basename', 1, f'timeout 5 {AW}/update-status.sh.bak')
+    # Fed the RAW command, so a quoted invocation is an invocation.
+    run('quoted path invocation', 0, f'"$HOME/.config/agent-watcher/update-status.sh" 1 Complete')
+    run('path named inside a commit message', 1, f'git commit -m "ran {AW}/update-status.sh"')
+
+    # --under: a whole sanctioned tree, used by the raw-write gates to exempt a
+    # companion script that is actually INVOKED (never one merely mentioned).
+    def under(label, want, cmd):
+        p = subprocess.run([os.path.join(HOOKS, 'cmd-executes.sh'),
+                            '--under', '/.cursor/skills/', '--under', '/.config/agent-watcher/'],
+                           input=cmd, capture_output=True, text=True)
+        check(f'cmd-executes --under {"exempt" if want == 0 else "gated"}: {label}',
+              p.returncode == want, f'rc={p.returncode}')
+
+    under('bare tilde companion', 0, '~/.cursor/skills/lint-commit.sh -m x')
+    under('quoted $HOME companion', 0, f'"$HOME/.config/agent-watcher/update-status.sh" 1 Complete')
+    under('after cd &&', 0, 'cd /tmp/repo && ~/.cursor/skills/lint-commit.sh -m x')
+    under('behind bash', 0, 'bash ~/.cursor/skills/lint-commit.sh')
+    under('behind timeout 60', 0, 'timeout 60 ~/.cursor/skills/lint-commit.sh')
+    under('git add of a skills path, then commit', 1, 'git add .cursor/skills/x && git commit -m y')
+    under('path quoted in a commit message', 1, 'git commit --no-verify -m "x ~/.cursor/skills/y"')
+    under('cat of a companion script', 1, 'cat ~/.cursor/skills/lint-commit.sh')
+    under('grep arg then a raw commit', 1, 'grep -n foo ~/.cursor/skills/lint-commit.sh && git commit -m y')
+    under('inside a heredoc body', 1, "cat > /tmp/n.md <<'EOF'\n~/.cursor/skills/lint-commit.sh\nEOF")
 
 
 # ---------------------------------------------------------------- md-write-target
@@ -583,6 +616,89 @@ def lintmd():
         {'file_path': '/tmp/partner-api-handoff-test.md', 'content': f'# Handoff\n\nThe plugin {EM} merged.\n'})
 
 
+# ------------------------------------------------------------- phone captures
+def phonecapture(tmp):
+    """Capture-time provenance: what gets recorded, and what that downscales."""
+    led = os.path.join(tmp, 'captures.tsv')
+    shots = os.path.join(tmp, 'shots')
+    os.makedirs(shots, exist_ok=True)
+    env = {'AGENT_PHONE_CAPTURE_LEDGER': led, 'AGENT_SIM_UDID': UDID, 'TMPDIR': tmp}
+
+    def records(label, cmd, want):
+        open(led, 'w').close()
+        rc, out, err = hook('record-phone-captures.sh', cmd, env=env)
+        got = [l.split('\t')[1] for l in open(led).read().splitlines() if l]
+        check(f'capture records: {label}', rc == 0 and got == want,
+              f'rc={rc} got={got} want={want} err={err[:120]}')
+
+    records('plain simctl', f'xcrun simctl io {UDID} screenshot /tmp/shot-a.png',
+            ['/tmp/shot-a.png'])
+    records('quoted udid from env, $VAR destination',
+            'S=/tmp/shot-b.png; xcrun simctl io "$AGENT_SIM_UDID" screenshot "$S" >/dev/null 2>&1; echo ok',
+            ['/tmp/shot-b.png'])
+    records('flags between screenshot and dest',
+            f'xcrun simctl io {UDID} screenshot --type=png /tmp/shot-c.png', ['/tmp/shot-c.png'])
+    records('two captures in one command',
+            f'xcrun simctl io {UDID} screenshot /tmp/one.png; sleep 1; xcrun simctl io {UDID} screenshot /tmp/two.png',
+            ['/tmp/one.png', '/tmp/two.png'])
+    records('adb exec-out redirect', 'adb exec-out screencap -p > /tmp/shot-d.png && echo captured',
+            ['/tmp/shot-d.png'])
+    records('/private/tmp normalizes to /tmp',
+            f'xcrun simctl io {UDID} screenshot /private/tmp/claude-501/x/scratchpad/now.png',
+            ['/tmp/claude-501/x/scratchpad/now.png'])
+    records('capture quoted in an echo is a mention',
+            f'echo "xcrun simctl io {UDID} screenshot /tmp/never.png"', [])
+    records('capture inside a heredoc body is a mention',
+            f"cat > /tmp/agent-notes-{TEST_GID}.md <<'EOF'\n"
+            f'xcrun simctl io {UDID} screenshot /tmp/never.png\nEOF', [])
+    records('adb shell screencap writes to the device', 'adb shell screencap -p /sdcard/x.png', [])
+    records('macOS screencapture is not a phone', 'screencapture -x /tmp/desktop.png', [])
+    records('unresolvable $VAR destination is skipped',
+            'xcrun simctl io X screenshot "$UNSET_DEST_VAR" 2>/dev/null', [])
+    records('relative destination is skipped',
+            f'cd /tmp && xcrun simctl io {UDID} screenshot now.png', [])
+
+    # A real PNG, long edge above the 1000px target so a downscale is expected.
+    def png(path, w=1320, h=2868):
+        import struct, zlib
+        raw = b''.join(b'\x00' + b'\x80\x80\x80' * w for _ in range(h))
+        def chunk(tag, data):
+            c = tag + data
+            return struct.pack('>I', len(data)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
+        with open(path, 'wb') as fh:
+            fh.write(b'\x89PNG\r\n\x1a\n'
+                     + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
+                     + chunk(b'IDAT', zlib.compress(raw, 1)) + chunk(b'IEND', b''))
+        return path
+
+    def reads(label, path, want_downscale):
+        rc, out, err = hook('downscale-phone-screenshots.sh', tool='Read',
+                            tool_input={'file_path': path}, env=env)
+        new = None
+        if out.strip():
+            new = json.loads(out)['hookSpecificOutput']['updatedInput']['file_path']
+        got = new is not None and new != path
+        check(f'capture downscales: {label}', rc == 0 and got == want_downscale,
+              f'rc={rc} new={new} err={err[:120]}')
+
+    recorded = png(os.path.join(shots, 'scratch-recorded.png'))
+    plain = png(os.path.join(shots, 'scratch-plain.png'))
+    stale = png(os.path.join(shots, 'stale-record.png'))
+    preview = png(f'/tmp/preview-{TEST_GID}.png')
+    globbed = png(f'/tmp/agent-{TEST_GID}-state.png')
+    now = int(time.time())
+    with open(led, 'w') as fh:
+        fh.write(f'{now}\t{recorded}\n')
+        fh.write(f'{now - 600}\t{stale}\n')   # file mtime is newer than the record
+    reads('recorded frame outside every glob', recorded, True)
+    reads('unrecorded PNG in the same dir', plain, False)
+    reads('recorded path rewritten since', stale, False)
+    reads('glob fallback: /tmp/agent-*', globbed, True)
+    reads('web preview stays full size', preview, False)
+    for f in (preview, globbed):
+        os.path.exists(f) and os.remove(f)
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix='hook-fp-')
     try:
@@ -606,6 +722,7 @@ def main():
         cmdexec()
         mdtarget()
         lintmd()
+        phonecapture(tmp)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print()

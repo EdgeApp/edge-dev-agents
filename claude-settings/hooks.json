@@ -3,6 +3,16 @@
     {
       "hooks": [
         {
+          "command": "~/.config/agent-watcher/hooks/record-phone-captures.sh",
+          "timeout": 15,
+          "type": "command"
+        }
+      ],
+      "matcher": "Bash"
+    },
+    {
+      "hooks": [
+        {
           "command": "~/.config/agent-watcher/hooks/mark-playbook-read.sh",
           "type": "command"
         }

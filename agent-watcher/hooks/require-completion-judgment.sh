@@ -31,7 +31,7 @@
 # completion event, so nothing else ever puts the verdict in it.
 #
 # Scope: no-op unless AGENT_TASK_GID is set. Exit 0 allow; exit 2 block (stderr to
-# the model). Trigger precision via cmd-executes.sh on the mention-stripped command.
+# the model). Trigger precision via cmd-executes.sh, which strips mentions itself.
 set -uo pipefail
 
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
@@ -43,8 +43,8 @@ CMD_M=$(printf '%s' "$CMD" | "$H/hooks/strip-cmd-mentions.sh" 2>/dev/null || pri
 
 EXEC="$H/hooks/cmd-executes.sh"
 RUNS_UPDATE_STATUS=false; RUNS_PR_CREATE=false
-printf '%s' "$CMD_M" | "$EXEC" update-status.sh 2>/dev/null && RUNS_UPDATE_STATUS=true
-printf '%s' "$CMD_M" | "$EXEC" pr-create.sh 2>/dev/null && RUNS_PR_CREATE=true
+printf '%s' "$CMD" | "$EXEC" update-status.sh 2>/dev/null && RUNS_UPDATE_STATUS=true
+printf '%s' "$CMD" | "$EXEC" pr-create.sh 2>/dev/null && RUNS_PR_CREATE=true
 
 EVENT=""
 if $RUNS_UPDATE_STATUS; then

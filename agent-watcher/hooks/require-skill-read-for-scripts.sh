@@ -128,6 +128,7 @@ need 'set-tested\.sh([[:space:]]|$)'               one-shot:testing
 # build-and-test's drive scripts: the ones that build or drive the app on the
 # sim (select-ios-sim.sh / slot-preflight.sh only pick and check a slot).
 need '(capture-buy-quote|ios-rn-build|ios-rn-build-wait)\.sh([[:space:]]|$)' one-shot:testing
+need 'asana-review-field\.sh([[:space:]]|$)'       one-shot:review
 need 'pr-create\.sh([[:space:]]|$)'                one-shot:pr
 need 'watch-pr\.sh([[:space:]]|$)'                 one-shot:watch
 need 'pr-land-[a-z-]+\.sh([[:space:]]|$)'          one-shot:landing

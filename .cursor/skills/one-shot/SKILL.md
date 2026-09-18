@@ -38,6 +38,7 @@ metadata:
 | 1 | Intake and workspace | not set yet | `references/intake.md` |
 | 2-3 | Plan and implementation | `Planning`, then `Developing` | `references/implementation.md` |
 | 4 | Local verification | `Testing` | `references/testing.md` |
+| 4.5 | Self-review (only when `agent_review` asks for it) | `Testing` | `references/review.md` |
 | 5 | PR creation | `Reviewing` | `references/pr.md` |
 | 6 | PR watch | `Reviewing` | `references/watch.md` |
 | 7.0 | Land / cheese routing | `Reviewing` | `references/landing.md` |

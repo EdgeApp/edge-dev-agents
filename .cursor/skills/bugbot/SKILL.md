@@ -132,7 +132,7 @@ Before applying any new fixups, ask the shared finalize helper whether existing 
 ~/.cursor/skills/pr-finalize-fixups.sh squash-stale --owner <OWNER> --repo <REPO> --pr <NUMBER>
 ```
 
-The script returns either `{"action":"autosquash",...}` (existing fixups were squashed and force-pushed) or `{"action":"noop",...}` (nothing to squash). Identical call site as `/pr-address` Step 1.5 — policy lives in the script so the two skills never drift.
+The script rewrites locally and never pushes. It returns `{"action":"autosquash"|"fold",...}` (prior fixups folded into their targets; Step 4d must then run even with zero new fixups) or `{"action":"noop",...}`. Identical call site as `/pr-address` Step 1.5 — policy lives in the script so the two skills never drift.
 
 If the script exits non-zero (conflict mid-rebase), report and STOP. The cron will retry on the next fire once the user resolves the conflict.
 
@@ -158,19 +158,29 @@ For each thread classified valid, in order:
    ~/.cursor/skills/slot-fixup.sh
    ```
    If `slot-fixup.sh` reports a conflict, STOP — do not continue the cycle. The cron will retry once resolved.
-6. Capture the slotted fixup SHA: `git rev-parse --short HEAD` may not be the new fixup anymore (it's been moved earlier in history). Use `git log --grep="^fixup! <target-headline>$" --format=%h -1` to find the most recent fixup with that headline; that's the one we just made. Record a `{threadId, commentId, fixupSha}` entry so Step 4e can reply with the correct SHA per thread.
+6. Record a `{threadId, commentId, targetHeadline}` entry. SHAs are resolved in Step 4d, after finalize has folded and condensed, so the replies cite commits that exist on the remote.
 
 Do NOT push inside this loop — Step 4d pushes once after all fixups land.
 </sub-step>
 
-<sub-step id="4d" name="Push all fixups once">
-After every valid thread has been committed and slotted, condense same-target fixups (one per target and kind, so the SHAs Step 4e cites survive Step 4f's finalize), then push:
+<sub-step id="4d" name="Finalize: one push (mode-dependent)">
+Delegate to the shared finalize helper, the ONLY push of the cycle. Identical call site as `/pr-address` Step 4 — policy lives in the script so the two skills never drift:
 
 ```bash
-~/.cursor/skills/git-branch-ops.sh condense-fixups && ~/.cursor/skills/git-branch-ops.sh push --force-with-lease
+~/.cursor/skills/pr-finalize-fixups.sh --owner <OWNER> --repo <REPO> --pr <NUMBER>
 ```
 
-Force-with-lease is required because per-fixup slotting (Step 4c.5) and the condense rewrote tip. The push makes all fixup SHAs visible to GitHub so Step 4e's reply bodies render as commit links. Skip this sub-step if Step 4c produced zero fixups (all threads were invalid).
+Output is one line of JSON:
+- `{"action": "autosquash", "mode": "autosquash", "newHead": "<sha>"}` — history rewritten, force-pushed. Use `newHead` in the Step 4g status line.
+- `{"action": "push", "mode": "preserve", "newHead": "<sha>", ...}` — fixups preserved for the active reviewer (at most one human and one auto per target); force-pushed. Use `newHead` in the Step 4g status line.
+
+Then resolve each Step 4c entry's SHA for Step 4e: in preserve mode `git log --grep="^fixup! <targetHeadline>$" --format=%h -1`; in autosquash mode the fixup is gone, so cite the target itself, `git log --grep="^<targetHeadline>$" --format=%h -1`.
+
+**Ownership guard:** if you are not the PR author (`currentUser !== prAuthor`), the helper forces `preserve` mode and never folds or squashes — bugbot never rewrites the history of a PR it doesn't own.
+
+If the script exits non-zero, the rebase hit a conflict. Do NOT reply, emit a status line or run Step 5 — report the error and STOP so the user can resolve manually. An armed cron (from a previous cycle) will keep firing; the next cycle with a clean tree will retry.
+
+Skip this sub-step only if Step 4c produced zero fixups AND Step 4b1 reported `noop`.
 </sub-step>
 
 <sub-step id="4e" name="Reply and resolve every thread (valid and invalid)">
@@ -178,7 +188,7 @@ For each processed thread, post one reply then resolve. Replies and resolves for
 
 **Ownership gate (check `isOwner` from Step 4a `fetch` output):** if `isOwner: false` (`currentUser !== prAuthor` — not our PR), post the reply but do NOT call `resolve-thread`. Leave threads unresolved for the owner; we never mutate the PR state of a PR we don't own (this pairs with the finalize guard's `preserve` mode). Only resolve when `isOwner: true`.
 
-Valid threads — reply body cites the fixup SHA from Step 4c's record:
+Valid threads — reply body cites the SHA Step 4d resolved:
 ```bash
 ~/.cursor/skills/pr-address/scripts/pr-address.sh reply \
   --owner <OWNER> --repo <REPO> --pr <NUMBER> \
@@ -200,26 +210,8 @@ Then resolve:
 ```
 </sub-step>
 
-<sub-step id="4f" name="Finalize: autosquash or push (mode-dependent)">
-Delegate to the shared finalize helper. Identical call site as `/pr-address` Step 4 — policy lives in the script so the two skills never drift:
-
-```bash
-~/.cursor/skills/pr-finalize-fixups.sh --owner <OWNER> --repo <REPO> --pr <NUMBER>
-```
-
-Output is one line of JSON:
-- `{"action": "autosquash", "mode": "autosquash", "newHead": "<sha>"}` — history rewritten, force-pushed. Use `newHead` in the Step 4g status line.
-- `{"action": "push", "mode": "preserve", "newHead": "<sha>"}` — fixups preserved for the active reviewer; force-pushed. Use `newHead` in the Step 4g status line.
-
-**Ownership guard:** if you are not the PR author (`currentUser !== prAuthor`), the helper forces `preserve` mode and squash-stale is a noop — bugbot never rewrites the history of a PR it doesn't own.
-
-If the script exits non-zero, the autosquash hit a conflict. Do NOT emit a status line or run Step 5 — report the error and STOP so the user can resolve manually. An armed cron (from a previous cycle) will keep firing; the next cycle with a clean tree will retry.
-
-Skip this sub-step entirely if Step 4c produced zero fixups.
-</sub-step>
-
 <sub-step id="4g" name="Status line for the findings outcome">
-Set the final status line based on what happened in 4c–4f:
+Set the final status line based on what happened in 4c–4e:
 
 - `bugbot addressed <N> thread(s) on <HEAD_SHORT>; autosquashed to <NEW_HEAD>` — fixups pushed and squashed (autosquash mode).
 - `bugbot addressed <N> thread(s) on <HEAD_SHORT>; new HEAD <NEW_HEAD>` — fixups pushed, autosquash deferred (preserve mode — active reviewer).
@@ -232,7 +224,7 @@ The new HEAD needs a fresh bugbot scan. Step 5 keeps the cron armed so the next 
 <step id="5" name="Manage recurring schedule (Claude Code only)">
 This step runs AFTER every other step, on every outcome. Its job: arm a 5-minute recurring cycle on non-clean outcomes and tear it down on clean outcomes, so interactive `/bugbot` invocations Just Work without the user composing with `/loop`.
 
-**If `CronList`, `CronCreate`, and `CronDelete` tools are NOT available** (Cursor, Codex, agent harnesses without Claude Code scheduling): skip this step entirely. Emit the status line from Step 3/4f and exit. The user's Cursor/Codex Automation (configured per `<scheduling>`) keeps firing until they disable it when they see the clean status.
+**If `CronList`, `CronCreate`, and `CronDelete` tools are NOT available** (Cursor, Codex, agent harnesses without Claude Code scheduling): skip this step entirely. Emit the status line from Step 3/4g and exit. The user's Cursor/Codex Automation (configured per `<scheduling>`) keeps firing until they disable it when they see the clean status.
 
 **If those tools ARE available** (Claude Code):
 

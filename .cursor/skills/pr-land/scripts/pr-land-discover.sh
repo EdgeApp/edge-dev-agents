@@ -7,7 +7,7 @@
 //   PR shorthand:   edge-react-gui#123
 //   Asana tasks:    https://app.asana.com/0/<project>/<taskGid>
 //   --branch-scan:  scan all EdgeApp repos for $GIT_BRANCH_PREFIX/* PRs
-//   No args:        Asana "PR Pipeline" section, incomplete tasks assigned to me
+//   No args:        Engineering Board "Merge/Finalize" section, incomplete tasks assigned to me
 //
 // No args (default): queries the configured Asana section, filters to incomplete
 // tasks assigned to the current Asana user (resolved via asana-whoami.sh), and

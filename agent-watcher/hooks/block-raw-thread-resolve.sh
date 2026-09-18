@@ -54,9 +54,10 @@ echo "$CMD" | grep -q "resolveReviewThread" || exit 0
 printf '%s' "$CMD_M" | grep -qE '(^|[;&|[:space:]])gh[[:space:]]+api[[:space:]]+graphql([[:space:]]|$)' || exit 0
 
 # Companion scripts are exempt by DIRECTORY, but only when one is actually
-# INVOKED: lib/companion-invoked.sh owns the command-position test and the
-# reason a substring match is not good enough.
-printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/lib/companion-invoked.sh" && exit 0
+# INVOKED: cmd-executes.sh owns the command-position test and the reason a
+# substring match is not good enough.
+printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" \
+  --under /.cursor/skills/ --under /.config/agent-watcher/ && exit 0
 
 echo "BLOCKED: raw resolveReviewThread mutations are forbidden in agent sessions. Review threads are resolved through the sanctioned flow, which replies IN-THREAD first: /pr-address for human and mixed feedback, /bugbot for cursor[bot] findings (their companion scripts reply then resolve). A resolved thread without an in-thread reply hides the reasoning from reviewers and the audit trail. Read the relevant SKILL.md and use its scripts." >&2
 exit 2

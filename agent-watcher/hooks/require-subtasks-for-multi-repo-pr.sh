@@ -28,7 +28,7 @@ CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentio
 # 3rd cohort in a row). Match the SCRIPT, not the directory: a bare
 # *pr-create* also matched sibling helpers under skills/pr-create/scripts/
 # (pr-attach-screenshots.sh) with no compliant way through.
-printf '%s' "$CMD_M" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" pr-create.sh || exit 0
+printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" pr-create.sh || exit 0
 # Only a flat-attaching call can violate the rule: pr-create.sh defaults to no
 # Asana attach, so without --asana-attach (exact flag; --no-asana-attach does not
 # count) there is nothing to gate.

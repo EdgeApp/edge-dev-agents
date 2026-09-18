@@ -1,10 +1,13 @@
 # code-review-sonnet: fan-out anatomy
 
 The engine behind /pr-review's deep mode (`~/.claude/workflows/code-review-sonnet.js`,
-level-parity re-pin from Claude Code 2.1.232). The typed level IS the fan-out agents'
-reasoning effort; `angles=N` widens or narrows the correctness fan-out independently.
-Scope and Synthesize inherit the session model; everything between them is pinned
-Sonnet at the level's effort.
+level-parity re-pin from Claude Code 2.1.232). The typed level picks the pipeline
+shape and, by default, the fan-out agents' reasoning effort. Three dials move
+independently of it: `angles=N` widens or narrows the correctness fan-out,
+`model=X` moves the fan-out off pinned Sonnet, and `effort=X` moves the fan-out
+effort off the level's default. `inherit` on either of the last two drops that key
+entirely, so the fan-out takes the caller's own model or effort the way Scope and
+Synthesize always have.
 
 ```mermaid
 flowchart LR
@@ -40,8 +43,9 @@ flowchart LR
     gaps ≤8, re-verify`"] -.-> syn
 ```
 
-All finder/verifier/sweep agents run pinned Sonnet at the level's effort; Scope and
-Synthesize inherit the session model. Dashed = level-gated.
+All finder/verifier/sweep agents run pinned Sonnet at the level's effort unless
+`model=`/`effort=` says otherwise; Scope and Synthesize inherit the session model.
+Dashed = level-gated. Synthesize does not run at `low` (see the reading notes).
 
 Per-level dials (`LEVEL_PARAMS`):
 
@@ -67,6 +71,13 @@ Reading notes:
 - Verify framing: medium judges on the plain verdict ladder (precision); high and
   above add the recall bias.
 - Low is the official single-pass cell: no fan-out, no verify, precision by
-  construction.
+  construction. Synthesis is skipped there too — one finder cannot produce
+  cross-finder duplicates, there are no verdicts to weigh, and the cap is 4, so
+  the assembler's own ranking is the whole job. That leaves low at ONE agent of
+  review work (Scope still runs to pin the diff and the applicable CLAUDE.md files).
+- Low's `medium` effort is a SONNET compensation carried over from the official
+  cell, whose stated premise is that the fan-out is sonnet. Off sonnet that premise
+  is void, which is why `effort=inherit` exists: `low model=inherit effort=inherit`
+  is the cheapest real review, running exactly as the caller runs.
 - Not cloned: ultra (cloud, user-triggered), the diff-size finder-budget hint,
   non-sonnet per-model prompt cells.

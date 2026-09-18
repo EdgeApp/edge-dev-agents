@@ -56,6 +56,17 @@
 #   cannot be determined (no PR, network error): a gate that guesses would
 #   block legitimate pre-review autosquashes.
 #
+#   PLUMBING TYPED DIRECTLY: git-branch-ops.sh `push` and `autosquash` (and
+#   pr-address.sh `autosquash`, a wrapper around the latter) live
+#   under the exempt skills directory but carry no review-mode policy, so a
+#   typed `git-branch-ops.sh push` walked past every check below and put a
+#   mid-round HEAD on a PR under review. Both are matched BEFORE the directory
+#   exemption and face the same preserve checks as raw git. The push block
+#   applies only while the branch carries fixup! commits (an address round in
+#   flight); a landing push after pr-land's prepare has none and passes, as
+#   do all pushes in autosquash mode. Calls made INSIDE a companion script
+#   (pr-finalize-fixups.sh, cheese-build.sh) never reach this hook.
+#
 # Scope: EVERY session, orchestrated or chat. A history rewrite loses the same
 # work either way. Companion scripts are exempt by DIRECTORY.
 # Was: no-ops unless AGENT_TASK_GID is set (exported by spawn-test-session.sh),
@@ -74,9 +85,17 @@ CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
 # Companion scripts are exempt by DIRECTORY, but only when one is actually
-# INVOKED: lib/companion-invoked.sh owns the command-position test and the
-# reason a substring match is not good enough.
-printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/lib/companion-invoked.sh" && exit 0
+# INVOKED: cmd-executes.sh owns the command-position test and the reason a
+# substring match is not good enough.
+GBO_OP=""
+if printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" git-branch-ops.sh pr-address.sh; then
+  GBO_OP=$(printf '%s' "$CMD" | grep -oE '(git-branch-ops\.sh"?[[:space:]]+(push|autosquash)|pr-address\.sh"?[[:space:]]+autosquash)([[:space:]]|$)' \
+    | head -1 | sed -E 's/.*[[:space:]](push|autosquash).*/\1/' || true)
+fi
+if [ -z "$GBO_OP" ]; then
+  printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" \
+    --under /.cursor/skills/ --under /.config/agent-watcher/ && exit 0
+fi
 
 # ---- commit discipline ------------------------------------------------------
 if echo "$CMD_M" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+(-[^[:space:]]+[[:space:]]+)*commit([[:space:]]|$)'; then
@@ -93,7 +112,11 @@ fi
 
 # ---- squash + push discipline -----------------------------------------------
 NEEDS_MODE=""
-if echo "$CMD_M" | grep -qE -- '--autosquash|git-branch-ops\.sh[[:space:]]+autosquash'; then
+if [ "$GBO_OP" = "autosquash" ]; then
+  NEEDS_MODE="squash"
+elif [ "$GBO_OP" = "push" ]; then
+  NEEDS_MODE="push"
+elif echo "$CMD_M" | grep -qE -- '--autosquash|git-branch-ops\.sh[[:space:]]+autosquash'; then
   NEEDS_MODE="squash"
 elif echo "$CMD_M" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+push([[:space:]]|$)'; then
   NEEDS_MODE="push"
@@ -132,6 +155,15 @@ if [ -n "$NEEDS_MODE" ]; then
     else
       # The note exists but does not approve rewriting the WHOLE branch.
       NOTE_TOO_NARROW="$REWRITE_OK"
+    fi
+  fi
+  if [ "$MODE" = "preserve" ] && [ "$GBO_OP" = "push" ]; then
+    UPSTREAM=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/master)
+    MB=$(git merge-base "$UPSTREAM" HEAD 2>/dev/null || true)
+    # Capture first: `git log | grep -q` dies of SIGPIPE under pipefail.
+    SUBJECTS=$([ -n "$MB" ] && git log "$MB..HEAD" --format=%s 2>/dev/null || true)
+    if ! printf '%s\n' "$SUBJECTS" | grep -q '^fixup! '; then
+      exit 0
     fi
   fi
   if [ "$MODE" = "preserve" ]; then
@@ -173,8 +205,8 @@ what changed since their review — squashing now destroys that.
 MSG
     else
       cat >&2 <<'MSG'
-BLOCKED: raw `git push` while review-mode is PRESERVE (a review is active on
-this PR). Reviewer bots bill PER PUSH (bugbot credit gate, 2026-07-31): finish
+BLOCKED: `git push` (raw, or git-branch-ops.sh push with fixup! commits on the
+branch) while review-mode is PRESERVE (a review is active on this PR). Reviewer bots bill PER PUSH (bugbot credit gate, 2026-07-31): finish
 the WHOLE address round locally (one fixup per target and kind per one-fixup-
 per-target-per-turn), then push ONCE via ~/.cursor/skills/pr-finalize-fixups.sh — it owns
 the push, the squash-vs-preserve decision, and the condense to one fixup per
@@ -184,6 +216,9 @@ MSG
     fi
     exit 2
   fi
+  # Plumbing pushes keep their pre-gate behavior outside preserve: the
+  # self-rewrite check is for raw pushes and pr-finalize-fixups.sh.
+  [ -n "$GBO_OP" ] && exit 0
   if [ "$MODE" = "autosquash" ] && [ "$NEEDS_MODE" = "push" ]; then
     SR_ERR=$("$HOME/.cursor/skills/git-branch-ops.sh" self-rewrite --gate 2>&1 >/dev/null) && SR_RC=0 || SR_RC=$?
     if [ "$SR_RC" -eq 2 ]; then

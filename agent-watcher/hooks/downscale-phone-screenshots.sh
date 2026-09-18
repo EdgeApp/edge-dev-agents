@@ -7,28 +7,27 @@
 # REWRITE, never block: the Read is redirected to a cached half-size copy, so the
 # agent needs no knowledge of this and no retry is burned.
 #
-# PHONE APP ONLY, BY PATH — deliberately not by geometry. site-orch's WEB verify
-# captures a mobile-viewport page at 390x844 @2x, which is phone-SHAPED but is a
-# website, and websites are explicitly out of scope. Provenance is what separates
-# them and only the capture path carries it, so the match is a path allowlist and
-# it fails CLOSED: an unlisted path is left alone.
+# PHONE APP ONLY — deliberately not by geometry. site-orch's WEB verify captures
+# a mobile-viewport page at 390x844 @2x, which is phone-SHAPED but is a website,
+# and websites are explicitly out of scope. Only provenance separates them, and
+# it is established two ways, in this order:
 #
-# Allowlist (PHONE_SHOT_GLOBS below), one entry per phone CAPTURE SITE:
-#   /tmp/agent-proof-*                 Edge orch proof frames (iOS sim)
-#   /tmp/arc-shot*                     Edge orch ad-hoc sim captures
-#   /tmp/agent-mvp-buy-quote-screenshot*  build-and-test buy-quote capture
-#   ~/.config/site-orch/*/verify-*/*   site-orch Android app (adb screencap)
+#   1. The capture ledger (lib/phone-capture-ledger.sh). A PostToolUse hook
+#      records where each `simctl io ... screenshot` / `adb exec-out screencap`
+#      wrote, so a frame qualifies because a simulator or a device produced it,
+#      whatever it was named or whichever directory it landed in. This is what
+#      covers ad-hoc working captures and session-scratchpad frames, neither of
+#      which has a stable name to list.
+#   2. PHONE_SHOT_GLOBS below, for captures the ledger cannot see: a frame
+#      written by a tool that names no destination (maestro's own failure
+#      screenshots), or one whose path was a variable nothing could resolve.
 #
-# NOT matched, on purpose: /tmp/preview-* (site-orch web previews, including the
-# -mobile variant).
+# Both fail CLOSED: a frame that neither establishes is left alone. A PNG nothing
+# captured (a design comp, a downloaded asset, a web preview) is in neither, so
+# non-sim scratchpad files are untouched. NOT matched, on purpose: /tmp/preview-*
+# (site-orch web previews, including the -mobile variant).
 #
-# KNOWN LIMITATION: this is a name list, the same shape that let a pinned Asana
-# section GID silently resolve to the wrong queue. A new phone capture site that
-# is not added here is simply not downscaled, which costs tokens and breaks
-# nothing. The durable fix is for every phone capture to write into ONE directory
-# and for this hook to match that directory instead.
-#
-# Cache: $TMPDIR/agent-shot-half/<basename>-<inode>-<mtime>.png, so a re-Read of
+# Cache: $TMPDIR/agent-shot-half/<basename>-<inode>-<mtime>-<target>.png, so a re-Read of
 # the same frame reuses the copy and an edited frame re-renders. Already-cached
 # paths pass through, which makes the hook idempotent.
 #
@@ -52,24 +51,36 @@ case "$FILE" in
   "$CACHE"/*) exit 0 ;;   # already a downscaled copy
 esac
 
+# /private/tmp and /tmp are the same file; compare one form so neither the globs
+# nor the ledger need twin entries.
+MATCH="$FILE"
+case "$MATCH" in /private/tmp/*) MATCH="${MATCH#/private}" ;; esac
+
 # Every element stays FULLY QUOTED so it remains a literal case-pattern. Leaving a
 # `*` unquoted here pathname-expands at assignment time, replacing the pattern
 # with whatever files happen to exist, which matches by accident and stops
 # matching the moment the directory is empty.
 PHONE_SHOT_GLOBS=(
-  "/tmp/agent-proof-*"
-  "/private/tmp/agent-proof-*"
+  "/tmp/agent-*"
+  "/tmp/probe-*"
   "/tmp/arc-shot*"
-  "/private/tmp/arc-shot*"
-  "/tmp/agent-mvp-buy-quote-screenshot*"
-  "/private/tmp/agent-mvp-buy-quote-screenshot*"
+  "$HOME/.maestro/tests/*/screenshot-*"
   "$HOME/.config/site-orch/*/verify-*"
 )
 matched=0
 for g in "${PHONE_SHOT_GLOBS[@]}"; do
   # shellcheck disable=SC2053 -- glob match is the point
-  case "$FILE" in $g) matched=1; break ;; esac
+  case "$MATCH" in $g) matched=1; break ;; esac
 done
+
+# Ledger second: it costs a subprocess, the globs cost a string compare.
+if [ "$matched" != 1 ]; then
+  LEDGER_LIB="$HOME/.config/agent-watcher/hooks/lib/phone-capture-ledger.sh"
+  # shellcheck source=lib/phone-capture-ledger.sh
+  if [ -r "$LEDGER_LIB" ] && . "$LEDGER_LIB" 2>/dev/null; then
+    ledger_says_phone "$FILE" 2>/dev/null && matched=1
+  fi
+fi
 [ "$matched" = 1 ] || exit 0
 
 [ -r "$FILE" ] || exit 0

@@ -1,7 +1,7 @@
 export const meta = {
   name: "code-review-sonnet",
   description: "Workflow-backed code review with Sonnet fan-out — one finder per correctness angle plus one finder covering all cleanup angles, an independent verifier for every distinct (file, line) location across the pooled candidates, then a ranked, capped findings report.",
-  whenToUse: "Model-invocable clone of the built-in /code-review workflow, re-pinned for level parity with Claude Code 2.1.232, with Find/Verify/Sweep forced onto Sonnet while Scope and Synthesize inherit the session model. Callable from a skill step or an orch task without the disable-model-invocation gate on /code-review. Pass args as \"<level> [angles=N] [target]\" — level is low, medium, high, xhigh, or max and sets the fan-out agents' reasoning effort (level IS effort, as in the official build); angles=N overrides the correctness-angle count (1-5) independently of level; target is an optional PR number or URL, branch, ref range, path, or free-form review instructions.",
+  whenToUse: "Model-invocable clone of the built-in /code-review workflow, re-pinned for level parity with Claude Code 2.1.232, with Find/Verify/Sweep forced onto Sonnet while Scope and Synthesize inherit the session model. Callable from a skill step or an orch task without the disable-model-invocation gate on /code-review. Pass args as \"<level> [angles=N] [model=X] [effort=X] [target]\" — level is low, medium, high, xhigh, or max and picks the pipeline shape plus, by default, the fan-out agents' reasoning effort (level IS effort, as in the official build); angles=N overrides the correctness-angle count (1-5) independently of level; model=sonnet|opus|haiku|inherit overrides the fan-out model (default sonnet, inherit = the caller\u0027s session model); effort=low|medium|high|xhigh|max|inherit overrides the fan-out reasoning effort (default: the level's own effort; inherit = the caller's session effort, leaving level to control shape only); target is an optional PR number or URL, branch, ref range, path, or free-form review instructions.",
   phases: [{"title":"Scope","detail":"Pin the diff command, changed files, applicable CLAUDE.md files, and conventions"},{"title":"Find","detail":"One finder per correctness angle plus one finder covering all cleanup angles, pooled before verify"},{"title":"Verify","detail":"One independent verifier per distinct (file, line) location — CONFIRMED / PLAUSIBLE / REFUTED per candidate"},{"title":"Sweep","detail":"Fresh finder hunting only for gaps (xhigh/max)"},{"title":"Synthesize","detail":"Merge duplicates, rank, cap the report"}],
 }
 
@@ -38,10 +38,28 @@ const LEVEL_PARAMS = {
   max: { correctnessAngles: 5, perAngle: 8, maxFindings: 15, sweep: true, effort: "max", recall: true, singlePass: false },
 }
 const SWEEP_MAX = 8
-// Fan-out model pin (Find, Verify, Sweep). Scope and Synthesize deliberately
-// carry neither model nor effort, so they inherit the caller's session model
-// and effort. Fan-out effort is per-level (see LEVEL_PARAMS), not a dial.
-const FANOUT_MODEL = "sonnet"
+// Fan-out model pin (Find, Verify, Sweep), overridable with model=<name>.
+// Scope and Synthesize deliberately carry neither model nor effort, so they
+// inherit the caller's session model and effort.
+// Default fan-out model. `model=<name>` overrides it per invocation, and
+// `model=inherit` drops the pin entirely so the finders run on the caller's
+// session model, the way Scope and Synthesize already do. Depth (level) and
+// model are separate dials: a single-finder pass on a strong model is a
+// different trade from a wide fan-out on a cheap one, and collapsing them into
+// one flag is what made the old --quick mean two things at once.
+const FANOUT_MODEL_DEFAULT = "sonnet"
+const FANOUT_MODELS = ["sonnet", "opus", "haiku", "inherit"]
+// Fan-out effort. Defaults to the level's own effort, which is the parity
+// behavior (the official threads the typed level through as modelEffort, with
+// exactly one override in its whole table: claude-sonnet-5 + low, bumped to
+// medium, which LEVEL_PARAMS.low.effort carries).
+// `effort=inherit` drops the key so the finders take the caller's session
+// effort, the same way `model=inherit` drops the model. It exists because that
+// bump is a SONNET compensation: once the model is no longer sonnet, the stated
+// premise for it is void, and an inherited fan-out should run as the caller
+// runs. Effort is its own dial rather than a side effect of model=inherit, so
+// a pinned-model run can still be re-effort-ed without losing the pin.
+const FANOUT_EFFORTS = ["low", "medium", "high", "xhigh", "max", "inherit"]
 
 const RAW_ARGS = (typeof args === "string" ? args : "").trim()
 const TOKENS = RAW_ARGS.split(/\s+/).filter(Boolean)
@@ -50,16 +68,29 @@ const FIRST = TOKENS[0] || ""
 const FIRST_IS_LEVEL = Object.prototype.hasOwnProperty.call(LEVEL_PARAMS, FIRST)
 const LEVEL = FIRST_IS_LEVEL ? FIRST : "high"
 let rest = FIRST_IS_LEVEL ? TOKENS.slice(1) : TOKENS
-// angles=N may appear before the target; it never applies to low (single-pass).
+// angles=N, model=X and effort=X may appear before the target, in any order.
+// angles never applies to low (single-pass).
 let ANGLES_OVERRIDE
-if (rest[0] != null && /^angles=[1-5]$/.test(rest[0])) {
-  ANGLES_OVERRIDE = Number(rest[0].slice(7))
-  rest = rest.slice(1)
+let FANOUT_MODEL = FANOUT_MODEL_DEFAULT
+let EFFORT_OVERRIDE
+for (;;) {
+  const t = rest[0]
+  if (t != null && /^angles=[1-5]$/.test(t)) { ANGLES_OVERRIDE = Number(t.slice(7)); rest = rest.slice(1); continue }
+  if (t != null && /^model=/.test(t) && FANOUT_MODELS.includes(t.slice(6))) { FANOUT_MODEL = t.slice(6); rest = rest.slice(1); continue }
+  if (t != null && /^effort=/.test(t) && FANOUT_EFFORTS.includes(t.slice(7))) { EFFORT_OVERRIDE = t.slice(7); rest = rest.slice(1); continue }
+  break
 }
 const TARGET = rest.join(" ")
 const P = LEVEL_PARAMS[LEVEL]
 const CORRECTNESS_COUNT = P.singlePass ? 0 : (ANGLES_OVERRIDE ?? P.correctnessAngles)
-const FANOUT = { model: FANOUT_MODEL, effort: P.effort }
+const FANOUT_EFFORT = EFFORT_OVERRIDE ?? P.effort
+// `inherit` omits the key so the agent takes the caller's value; every other
+// value pins it. Both dials are omittable independently, so an inherited
+// fan-out carries neither key and runs exactly as Scope and Synthesize do.
+const FANOUT = {
+  ...(FANOUT_MODEL === "inherit" ? {} : { model: FANOUT_MODEL }),
+  ...(FANOUT_EFFORT === "inherit" ? {} : { effort: FANOUT_EFFORT }),
+}
 
 // Prompt fragments shared with the inline /code-review cells (one source of truth).
 const CORRECTNESS_ANGLES = [{"label":"angle-A","text":"### Angle A — line-by-line diff scan\n\nRead every hunk in the diff, line by line. Then Read the enclosing function for\neach hunk — bugs in unchanged lines of a touched function are in scope (the PR\nre-exposes or fails to fix them). For every line ask: what input, state, timing,\nor platform makes this line wrong? Look for inverted/wrong conditions,\noff-by-one, null/undefined deref, missing `await`, falsy-zero checks,\nwrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.\n"},{"label":"angle-B","text":"### Angle B — removed-behavior auditor\n\nFor every line the diff DELETES or replaces, name the invariant or behavior it\nenforced, then search the new code for where that invariant is re-established.\nIf you can't find it, that's a candidate: a removed guard, a dropped error\npath, a narrowed validation, a deleted test that was covering a real case.\n"},{"label":"angle-C","text":"### Angle C — cross-file tracer\n\nFor each function the diff changes, find its callers (Grep for the symbol) and\ncheck whether the change breaks any call site: a new precondition, a changed\nreturn shape, a new exception, a timing/ordering dependency. Also check callees:\ndoes a parallel change in the same PR make a call unsafe?\n"},{"label":"angle-D","text":"### Angle D — language-pitfall specialist\n\nScan for the classic pitfalls of the diff's language/framework — for example:\nJS falsy-zero, `==` coercion, closure-captured loop var; Python mutable default\nargs, late-binding closures; Go nil-map write, range-var capture; SQL injection;\ntimezone/DST drift; float equality. Flag any instance the diff introduces.\n"},{"label":"angle-E","text":"### Angle E — wrapper/proxy correctness\n\nWhen the PR adds or modifies a type that wraps another (cache, proxy, decorator,\nadapter): check that every method routes to the wrapped instance and not back\nthrough a registry/session/global — e.g. a caching provider holding a\n`delegate` field that resolves IDs via `session.get(...)` instead of\n`delegate.get(...)` will re-enter the cache or recurse. Also check that the\nwrapper forwards all the methods the callers actually use.\n"}]
@@ -145,7 +176,7 @@ if (!scope) {
 if (!scope.files || scope.files.length === 0) {
   return { level: LEVEL, target: TARGET || undefined, summary: "No changes found to review.", findings: [], stats: { finders: 0, candidates: 0, verifierAgents: 0, verified: 0 } }
 }
-log(LEVEL + " review (fan-out effort " + P.effort + "): " + scope.files.length + " changed files")
+log(LEVEL + " review (fan-out model " + FANOUT_MODEL + ", effort " + FANOUT_EFFORT + "): " + scope.files.length + " changed files")
 
 const claudeMdFiles = scope.claudeMdFiles || []
 const SCOPE_BLOCK =
@@ -330,7 +361,8 @@ log(P.singlePass
 
 const stats = {
   level: LEVEL,
-  effort: P.effort,
+  effort: FANOUT_EFFORT,
+  fanoutModel: FANOUT_MODEL,
   finders: FINDERS.length,
   correctnessAngles: CORRECTNESS_COUNT,
   candidates: candidatesSeen,
@@ -349,7 +381,12 @@ if (surviving.length === 0) {
 }
 
 // ─── Synthesize: rank, merge semantic dupes, cap ───
-phase("Synthesize")
+// Skipped at single-pass: one finder cannot produce cross-finder duplicates,
+// there are no verdicts to weigh, and the cap is 4. That leaves the synthesizer
+// nothing to decide, so the assembler's own ranking and backfill (below) are
+// the whole job. Skipping it is what makes the single-pass level ONE agent of
+// review work rather than two.
+if (!P.singlePass) phase("Synthesize")
 // Correctness bugs outrank cleanup findings when the cap forces a cut;
 // CONFIRMED outranks PLAUSIBLE within each group.
 const rank = c => (c.kind === "cleanup" ? 2 : 0) + (c.verdict === "PLAUSIBLE" ? 1 : 0)
@@ -360,7 +397,7 @@ const block = ranked.map((c, i) =>
   (c.evidence ? "\nVerifier evidence: " + c.evidence : "") + "\n"
 ).join("\n")
 
-const report = await agent(
+const report = P.singlePass ? null : await agent(
   "## Synthesis: final code-review report\n\n" +
   ranked.length + " findings " + (P.singlePass ? "from a single-pass low-effort review" : "survived independent verification (" + LEVEL + "-effort review)") + ". They are numbered [0]-[" + (ranked.length - 1) + "] below.\n\n" + block + "\n" +
   "## Instructions\n" +
@@ -402,7 +439,9 @@ for (let i = 0; i < ranked.length && findings.length < P.maxFindings; i++) {
 }
 const summary = usedDecisions && report
   ? report.summary + (backfilled > 0 ? " (" + backfilled + " additional verified finding" + (backfilled === 1 ? "" : "s") + " appended unmerged.)" : "")
-  : "Synthesis step was skipped or its decisions were unusable — returning verified findings ranked, unmerged."
+  : P.singlePass
+    ? findings.length + " unverified finding" + (findings.length === 1 ? "" : "s") + " from a single-pass review — no verification and no synthesis at this level; treat each as a candidate."
+    : "Synthesis step was skipped or its decisions were unusable — returning verified findings ranked, unmerged."
 
 return {
   level: LEVEL,

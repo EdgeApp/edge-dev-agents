@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Pipe tests for require-skill-for-file.sh, lint-md-on-write.sh, mark-skill-read.sh.
+# Pipe tests for require-skill-for-file.sh (basename rows + author path globs),
+# lint-md-on-write.sh, mark-skill-read.sh.
 cd /Users/eddy
 G=~/.config/agent-watcher/hooks/require-skill-for-file.sh
 L=~/.config/agent-watcher/hooks/lint-md-on-write.sh
@@ -35,6 +36,38 @@ t "orch Bash report heredoc mentioning CHANGELOG.md" 0 env AGENT_TASK_GID=TESTGI
 t "orch Bash git add CHANGELOG (not a write)" 0 env AGENT_TASK_GID=TESTGID $G <<< "{\"tool_name\":\"Bash\",\"session_id\":\"S1\",\"cwd\":\"/x\",\"tool_input\":{\"command\":\"git add CHANGELOG.md && git commit -m x\"}}"
 t "orch Write unrelated md" 0 env AGENT_TASK_GID=TESTGID $G <<< '{"tool_name":"Write","session_id":"S1","tool_input":{"file_path":"/x/README.md","content":"x"}}'
 rm -f /tmp/agent-skill-read-TESTGID-* /tmp/agent-skill-read-sess-S1-* /tmp/agent-skill-read-sess-S2-*
+
+# The author rows are PATH GLOBS over whole trees, so each vector needs its own
+# session: the denial delivers the body and writes the marker, which would clear
+# every later vector sharing the key.
+echo "== require-skill-for-file: author rows"
+A=0
+ta(){ local name="$1" want="$2" json="$3"; A=$((A+1))
+  out=$($G <<< "${json//SESS/A$A}" 2>&1); rc=$?
+  [ "$rc" = "$want" ] && v=PASS || v=FAIL
+  printf '%s rc=%s want=%s  %s\n' "$v" "$rc" "$want" "$name"
+  [ "$v" = FAIL ] && printf '      %s\n' "$(printf '%s' "$out" | head -2 | cut -c1-150)"
+  case "$out" in *"owned by the \`author\`"*) [ "$want" = 2 ] || echo "      (claimed by author unexpectedly)" ;; esac
+  rm -f /tmp/agent-skill-read-sess-A$A-*; }
+
+ta "Write a SKILL.md" 2 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/.cursor/skills/foo/SKILL.md","content":"x"}}'
+ta "Write a rules .mdc" 2 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/.cursor/rules/bar.mdc","content":"x"}}'
+ta "Write a skill companion script" 2 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/.cursor/skills/foo/scripts/do.sh","content":"x"}}'
+ta "Write an agent-watcher hook" 2 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/.config/agent-watcher/hooks/new-gate.sh","content":"x"}}'
+ta "Write an agent-watcher lib .js" 2 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/.config/agent-watcher/hooks/lib/x.js","content":"x"}}'
+ta "Write the repo distribution copy" 2 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/git/edge-dev-agents/.cursor/skills/foo/SKILL.md","content":"x"}}'
+ta "Write an unrelated /tmp script" 0 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/tmp/scratch.sh","content":"x"}}'
+ta "Write a doc inside a skill dir" 0 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/.cursor/skills/foo/references/x.md","content":"x"}}'
+ta "Write a png in the hooks dir" 0 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/.config/agent-watcher/hooks/x.png","content":"x"}}'
+ta "Bash heredoc into a hook" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > ~/.config/agent-watcher/hooks/x.sh <<EOF\necho hi\nEOF"}}'
+ta "Bash sed -i on a SKILL.md" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"sed -i \"\" s/a/b/ ~/.cursor/skills/foo/SKILL.md"}}'
+ta "Bash quoted $D target" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"D=\"$HOME/.config/agent-watcher/hooks\"; cat > \"$D/new.sh\" <<EOF\nx\nEOF"}}'
+ta "Bash python heredoc writing a hook" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"python3 - <<PY\nopen(\"/Users/eddy/.config/agent-watcher/hooks/z.sh\",\"w\").write(\"x\")\nPY"}}'
+# An ungated write before a gated one must not clear the command (all-targets).
+ta "Bash ungated .sh then a gated .sh" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > /tmp/a.sh <<EOF\nx\nEOF\ncat > ~/.cursor/skills/foo/scripts/b.sh <<EOF\ny\nEOF"}}'
+ta "Bash gated .sh then an ungated .sh" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > ~/.config/agent-watcher/hooks/g.sh <<EOF\nx\nEOF\ncat > /tmp/b.sh <<EOF\ny\nEOF"}}'
+ta "Bash two ungated .sh writes" 0 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > /tmp/a.sh <<EOF\nx\nEOF\ncat > /tmp/b.sh <<EOF\ny\nEOF"}}'
+ta "Bash grep of a hook writing to /tmp" 0 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"grep -n foo ~/.config/agent-watcher/hooks/x.sh > /tmp/out.txt"}}'
 
 echo "== lint-md-on-write"
 t "Edit 300-char entry" 2 $L <<< "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$CL\",\"old_string\":\"x\",\"new_string\":\"$LONG\"}}"

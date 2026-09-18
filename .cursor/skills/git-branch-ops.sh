@@ -5,6 +5,7 @@
 # Usage:
 #   git-branch-ops.sh autosquash [--base <ref> | --merge-base-with <ref>]
 #   git-branch-ops.sh fold-one --fixup <sha> [--base <ref> | --merge-base-with <ref>]
+#   git-branch-ops.sh fold-before --before <iso-ts> [--base <ref> | --merge-base-with <ref>]
 #   git-branch-ops.sh condense-fixups [--base <ref> | --merge-base-with <ref>]
 #   git-branch-ops.sh push [--remote <name>] [--branch <name>] [--force-with-lease]
 #   git-branch-ops.sh self-rewrite [--upstream <ref>] [--min-lines N] [--min-ratio N] [--gate]
@@ -20,6 +21,25 @@
 # ONE fixup into the commit its subject names and leaves every other pending
 # fixup where it is; that is the fold lint-commit.sh performs after creating a
 # fixup.
+#
+# fold-before --before <iso-ts>: fold every fixup! whose AUTHOR date is older
+# than <iso-ts> into the commit its subject names, in ONE rebase, and leave
+# every newer fixup where it is. This is the stale-fixup fold: a reviewer who
+# reviewed at <iso-ts> has already read the older fixups, so they collapse into
+# their targets while the fixups written after that review stay visible. Author
+# date, never committer date: every rebase and slot resets %cI, so a committer
+# timestamp makes a fixup the reviewer already read look new. Timestamps are
+# compared as instants (Date.parse), never as strings: a `Z` suffix and a
+# `-07:00` offset sort wrong lexically. Local only; it never pushes. Output: one
+# JSON line {"folded":N,"fixups":["<sha10> <subject>",...],"before":"...",
+# "base":"..."}. A fixup whose target is not on the branch is left in place.
+#
+# condense-fixups conflict fallback: the normal plan keeps one fixup per target
+# AND kind (human, auto), which regroups interleaved human/auto fixups and can
+# reorder two edits of the same lines. When that rebase conflicts it is aborted
+# and retried ONCE with a single group per target in original commit order
+# (kind = human when any member is human), which cannot reorder. The output
+# then carries "fallback":"one-per-target". Still at most two fixups per target.
 #
 # fold-mode: may THIS fixup be squashed into its target RIGHT NOW?
 # One JSON line: {"fold":true|false,"mode":"autosquash"|"preserve"|"no-pr"|
@@ -84,8 +104,10 @@
 # Exit codes:
 #   0 - success (self-rewrite: nothing flagged, or flagged without --gate;
 #       note-scope: a note exists)
-#   1 - error (fold-one: target not on the branch, detached HEAD, or a rebase
-#       conflict — the rebase is aborted and the fixup stays where it was;
+#   1 - error (fold-one / fold-before: target not on the branch, detached
+#       HEAD, or a rebase conflict — the rebase is aborted and the fixups stay
+#       where they were; condense-fixups: both the per-kind and the
+#       one-per-target rebase conflicted, aborted;
 #       note-scope: no note)
 #   2 - self-rewrite --gate: flagged commits, no concession note
 set -euo pipefail
@@ -104,6 +126,7 @@ MIN_RATIO=80
 GATE="false"
 WHOLE_BRANCH="false"
 FIXUP=""
+BEFORE=""
 TARGET=""
 NOTE=""
 
@@ -111,6 +134,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --fixup)
       FIXUP="$2"
+      shift 2
+      ;;
+    --before)
+      BEFORE="$2"
       shift 2
       ;;
     --target)
@@ -395,6 +422,7 @@ const { execSync } = require('child_process')
 const [mode, arg] = process.argv.slice(2)
 const tmp = process.env.CONDENSE_TMP
 const base = process.env.CONDENSE_BASE
+const oneGroup = process.env.CONDENSE_ONE_GROUP === '1'
 const git = a => execSync('git ' + a, { encoding: 'utf8' })
 
 const strip = s => { let n = 0; while (s.startsWith('fixup! ')) { s = s.slice(7); n++ } return { headline: s, depth: n } }
@@ -415,9 +443,14 @@ for (const c of commits) {
   if (depth === 0) continue
   const t = targets.get(headline)
   if (!t) continue
-  let g = t.groups.find(g => g.kind === c.kind)
-  if (!g) { g = { kind: c.kind, fixups: [] }; t.groups.push(g) }
+  // Fallback mode: one group per target, original order, so no reordering.
+  const key = oneGroup ? '*' : c.kind
+  let g = t.groups.find(g => g.key === key)
+  if (!g) { g = { key, kind: c.kind, fixups: [] }; t.groups.push(g) }
   g.fixups.push(c); member.set(c.sha, t)
+}
+if (oneGroup) for (const t of targets.values()) for (const g of t.groups) {
+  g.kind = g.fixups.some(f => f.kind === 'human') ? 'human' : g.fixups[0].kind
 }
 const needsWork = g => g.fixups.length > 1 || (g.fixups.length === 1 && strip(g.fixups[0].subj).depth > 1)
 const work = []
@@ -425,7 +458,8 @@ for (const t of targets.values()) for (const g of t.groups) if (needsWork(g)) wo
 const plan = {
   condensed: work.reduce((n, w) => n + w.g.fixups.length - 1, 0),
   groups: work.map(w => ({ target: w.t.subj, for: w.g.kind, fixups: w.g.fixups.length })),
-  base: base.slice(0, 10)
+  base: base.slice(0, 10),
+  ...(oneGroup ? { fallback: 'one-per-target' } : {})
 }
 
 if (mode === 'plan') { process.stdout.write(JSON.stringify(plan) + '\n'); process.exit(0) }
@@ -461,17 +495,114 @@ NODEEOF
     printf '%s\n' "$plan"
     return 0
   fi
+  if ! condense_rebase "$tmp" 0; then
+    # The per-kind plan regroups interleaved human/auto fixups; a reordered
+    # edit of the same lines conflicts. Retry once in original order.
+    echo ">> Condense by kind conflicted; retrying with one group per target in original order" >&2
+    plan="$(CONDENSE_TMP="$tmp" CONDENSE_BASE="$BASE" CONDENSE_ONE_GROUP=1 node "$tmp/condense.js" plan)"
+    if ! condense_rebase "$tmp" 1; then
+      echo "Error: rebase failed while condensing fixups (one-per-target fallback also conflicted)" >&2
+      sed 's/^/  /' "$tmp/rebase.log" | tail -20 >&2
+      exit 1
+    fi
+  fi
+  echo ">> Condensed fixups: $(printf '%s' "$plan" | jq -r '.condensed') commit(s) folded into their target group's first fixup (base: $BASE)" >&2
+  printf '%s\n' "$plan"
+}
+
+# One condense rebase attempt; on failure the rebase is aborted so HEAD is
+# back where it started. $2 = 1 selects the one-group-per-target plan.
+condense_rebase() {
+  local tmp="$1" one="$2"
   rm -f "$(git rev-parse --git-path index.lock)"
-  if ! CONDENSE_TMP="$tmp" CONDENSE_BASE="$BASE" GIT_SEQUENCE_EDITOR="node $tmp/condense.js todo" GIT_EDITOR=true \
+  if CONDENSE_TMP="$tmp" CONDENSE_BASE="$BASE" CONDENSE_ONE_GROUP="$one" \
+      GIT_SEQUENCE_EDITOR="node $tmp/condense.js todo" GIT_EDITOR=true \
       git rebase --autostash -i "$BASE" >"$tmp/rebase.log" 2>&1; then
-    echo "Error: rebase failed while condensing fixups" >&2
+    return 0
+  fi
+  if [[ -d "$(git rev-parse --git-path rebase-merge)" ]] || [[ -d "$(git rev-parse --git-path rebase-apply)" ]]; then
+    git rebase --abort >/dev/null 2>&1 || true
+  fi
+  return 1
+}
+
+# fold-before --before <iso-ts>: fold every fixup authored before <iso-ts> into
+# its target in one rebase, original order kept. See the header.
+run_fold_before() {
+  local tmp plan
+  if [[ -z "$BEFORE" ]]; then
+    echo "Error: fold-before needs --before <iso-timestamp>" >&2
+    exit 1
+  fi
+  if ! git symbolic-ref --quiet HEAD >/dev/null 2>&1; then
+    echo "Error: HEAD is detached; check out the branch before folding fixups" >&2
+    exit 1
+  fi
+  resolve_base
+  tmp="$(mktemp -d -t fold-before.XXXXXX)"
+  # shellcheck disable=SC2064  # expand now: the local is gone when EXIT fires
+  trap "rm -rf '$tmp'" EXIT
+  cat > "$tmp/fold-before.js" <<'NODEEOF'
+const fs = require('fs')
+const { execSync } = require('child_process')
+const [mode, arg] = process.argv.slice(2)
+const base = process.env.FOLD_BASE
+const before = Date.parse(process.env.FOLD_BEFORE)
+if (Number.isNaN(before)) { console.error('ERROR: --before is not a parseable timestamp: ' + process.env.FOLD_BEFORE); process.exit(1) }
+const git = a => execSync('git ' + a, { encoding: 'utf8' })
+const strip = s => { while (s.startsWith('fixup! ')) s = s.slice(7); return s }
+const log = git('log --reverse --format=%H%x1f%aI%x1f%s%x1e ' + base + '..HEAD').trim()
+const commits = log ? log.split('\x1e').map(l => l.replace(/^\n/, '')).filter(Boolean).map(l => {
+  const [sha, at, subj] = l.split('\x1f'); return { sha, at: Date.parse(at), subj }
+}) : []
+const targets = new Map()
+const stale = []
+for (const c of commits) {
+  if (!c.subj.startsWith('fixup! ')) { if (!targets.has(c.subj)) targets.set(c.subj, c.sha); continue }
+  const t = targets.get(strip(c.subj))
+  if (t && c.at < before) stale.push({ ...c, target: t })
+}
+if (mode === 'plan') {
+  process.stdout.write(JSON.stringify({
+    folded: stale.length,
+    fixups: stale.map(c => c.sha.slice(0, 10) + ' ' + c.subj),
+    before: process.env.FOLD_BEFORE,
+    base: base.slice(0, 10)
+  }) + '\n')
+  process.exit(0)
+}
+// todo mode: drop each stale fixup's pick and re-insert it as `fixup` right
+// after its target, in original order. git abbreviates todo shas.
+const same = (a, b) => a.startsWith(b) || b.startsWith(a)
+const shaOf = l => { const m = l.match(/^(?:pick|p)\s+([0-9a-f]+)/); return m ? m[1] : null }
+const out = []
+for (const line of fs.readFileSync(arg, 'utf8').split('\n')) {
+  const sha = shaOf(line)
+  if (sha && stale.some(c => same(c.sha, sha))) continue
+  out.push(line)
+  if (!sha) continue
+  for (const c of stale) if (same(c.target, sha)) out.push('fixup ' + c.sha + ' ' + c.subj)
+}
+fs.writeFileSync(arg, out.join('\n'))
+NODEEOF
+  plan="$(FOLD_BASE="$BASE" FOLD_BEFORE="$BEFORE" node "$tmp/fold-before.js" plan)" || exit 1
+  if [[ "$(printf '%s' "$plan" | jq -r '.folded')" == "0" ]]; then
+    printf '%s\n' "$plan"
+    return 0
+  fi
+  rm -f "$(git rev-parse --git-path index.lock)"
+  if ! FOLD_BASE="$BASE" FOLD_BEFORE="$BEFORE" \
+      GIT_SEQUENCE_EDITOR="node $tmp/fold-before.js todo" GIT_EDITOR=true \
+      git rebase --autostash -i "$BASE" >"$tmp/rebase.log" 2>&1; then
+    echo "Error: rebase failed while folding fixups authored before $BEFORE" >&2
     sed 's/^/  /' "$tmp/rebase.log" | tail -20 >&2
     if [[ -d "$(git rev-parse --git-path rebase-merge)" ]] || [[ -d "$(git rev-parse --git-path rebase-apply)" ]]; then
+      echo "Aborting the rebase; every fixup stays where it was" >&2
       git rebase --abort 2>&1 | sed 's/^/  /' >&2 || true
     fi
     exit 1
   fi
-  echo ">> Condensed fixups: $(printf '%s' "$plan" | jq -r '.condensed') commit(s) folded into their target+kind group's first fixup (base: $BASE)" >&2
+  echo ">> Folded $(printf '%s' "$plan" | jq -r '.folded') fixup(s) authored before $BEFORE into their targets (base: $BASE)" >&2
   printf '%s\n' "$plan"
 }
 
@@ -624,6 +755,9 @@ case "$CMD" in
   note-scope)
     run_note_scope
     ;;
+  fold-before)
+    run_fold_before
+    ;;
   condense-fixups)
     run_condense_fixups
     ;;
@@ -634,7 +768,7 @@ case "$CMD" in
     run_self_rewrite
     ;;
   *)
-    echo "Usage: git-branch-ops.sh {autosquash|fold-one|condense-fixups|push|self-rewrite|fold-mode|note-scope} [args]" >&2
+    echo "Usage: git-branch-ops.sh {autosquash|fold-one|fold-before|condense-fixups|push|self-rewrite|fold-mode|note-scope} [args]" >&2
     exit 1
     ;;
 esac

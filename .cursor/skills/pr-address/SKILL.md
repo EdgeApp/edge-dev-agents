@@ -91,11 +91,9 @@ Before applying any new fixups for this address-pass, ask the shared finalize he
 ~/.cursor/skills/pr-finalize-fixups.sh squash-stale --owner <OWNER> --repo <REPO> --pr <NUMBER>
 ```
 
-The script returns one of:
-- `{"action": "autosquash", "mode": "...", "newHead": "..."}` — existing fixups were squashed and force-pushed (clean slate for this pass).
-- `{"action": "noop", "mode": "...", "reason": "..."}` — nothing to squash (no existing fixups, or fixups are still part of the current review cycle).
-
-Policy (single source of truth lives in `pr-finalize-fixups.sh`): squash existing fixups when (a) mode is autosquash (no active reviewer), or (b) mode is preserve AND the latest human review timestamp postdates the latest fixup commit (the reviewer has already seen those fixups in their last review and has now come back with new feedback — start fresh). **Exception:** if you are not the PR author (`currentUser !== prAuthor`), squash-stale is always a noop — we never rewrite history on a PR we don't own.
+The script rewrites LOCALLY and never pushes; policy lives in its header. It returns one of:
+- `{"action": "autosquash" | "fold", ...}`: prior fixups were folded into their targets. Step 4 must run this pass even if the pass makes no new fixup, since finalize's push is what carries the fold to the remote.
+- `{"action": "noop", "mode": "...", "reason": "..."}`: nothing to fold.
 
 If the script exits non-zero (conflict), report and STOP so the user can resolve manually.
 </step>
@@ -215,7 +213,7 @@ The script appends `<!-- addressed:review:ID -->` or `<!-- addressed:comment:ID 
 </step>
 
 <step id="4" name="Finalize fixups (autosquash or push, mode-dependent)">
-Delegate the autosquash-vs-push decision and execution to the shared finalize helper. It calls `pr-address.sh review-mode` to derive the mode from the latest human activity, then either autosquashes + force-pushes (autosquash mode) or condenses same-target fixups into one per kind (human, auto) and force-pushes (preserve mode); in both modes it re-stamps a committed TDD the pass edited. Policy lives in that one script and is shared with other skills (bugbot) so behavior never drifts.
+Delegate the autosquash-vs-push decision and execution to the shared finalize helper. It calls `pr-address.sh review-mode` to derive the mode from the latest human activity, then either autosquashes + force-pushes (autosquash mode) or folds the fixups the reviewer already read (a backstop for step 1.5), condenses same-target fixups into one per kind (human, auto) and force-pushes (preserve mode); in both modes it re-stamps a committed TDD the pass edited. Policy lives in that one script and is shared with other skills (bugbot) so behavior never drifts.
 
 **Ownership guard:** if you are not the PR author (`currentUser !== prAuthor`), the helper forces `preserve` mode and never autosquashes — we never rewrite the history of a PR we don't own. Fixups stay on top for the owner to squash at merge.
 
@@ -225,7 +223,7 @@ Delegate the autosquash-vs-push decision and execution to the shared finalize he
 
 Output is one line of JSON:
 - `{"action": "autosquash", "mode": "autosquash", "newHead": "<sha>"}` — branch history rewritten, force-pushed.
-- `{"action": "push", "mode": "preserve", "newHead": "<sha>", "condensed": N, "stamped": bool}` — one fixup per target and kind left in place for the reviewer to see (N surplus fixups folded away); force-pushed (slotting and condensing rewrote tip).
+- `{"action": "push", "mode": "preserve", "newHead": "<sha>", "folded": N, "condensed": N, "stamped": bool}` — fixups the reviewer already read folded into their targets, then one fixup per target and kind left in place for the reviewer to see; force-pushed (slotting and condensing rewrote tip).
 
 If the script exits non-zero, the autosquash hit a conflict mid-rebase. The working tree is in `REBASE_HEAD` state; report the error and STOP so the user can resolve manually (`git status`, fix files, `GIT_EDITOR=true git rebase --continue`, or `git rebase --abort`).
 </step>

@@ -38,9 +38,10 @@ printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])(curl|wget|http|xh)([[:space
 # lives under one of these two roots, and a name list silently stops covering
 # the next script added there.
 # Companion scripts are exempt by DIRECTORY, but only when one is actually
-# INVOKED: lib/companion-invoked.sh owns the command-position test and the
-# reason a substring match is not good enough.
-printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/lib/companion-invoked.sh" && exit 0
+# INVOKED: cmd-executes.sh owns the command-position test and the reason a
+# substring match is not good enough.
+printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" \
+  --under /.cursor/skills/ --under /.config/agent-watcher/ && exit 0
 
 echo "BLOCKED: raw Asana API calls are forbidden in every session, chat included — the sanctioned scripts carry contracts a raw curl drops (attachment download, followup-scope watermark arithmetic, authored-text marking, gated status writes). Use instead:
   task ingestion (task+comments+subtasks+ATTACHMENTS): ~/.cursor/skills/asana-get-context.sh <gid>
