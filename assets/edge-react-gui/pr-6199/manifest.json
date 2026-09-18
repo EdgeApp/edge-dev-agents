@@ -110,7 +110,7 @@
       "addedAt": "2026-09-16T10:19:55.946Z"
     },
     {
-      "path": "assets/edge-react-gui/pr-6199/20260917-173207-agent-proof-1210180856778864-01-promo-held-buy-tab.png",
+      "path": "assets/edge-react-gui/pr-6199/20260917-173329-agent-proof-1210180856778864-01-promo-held-buy-tab.png",
       "caption": "promo held buy tab",
       "index": "1",
       "hacked": false,
@@ -119,10 +119,10 @@
       "hackNote": null,
       "batchAt": "2026-09-18T00:32:07Z",
       "headSha": "20fdb073886a88626702636d4c50e4caf06c25a1",
-      "addedAt": "2026-09-18T00:32:07Z"
+      "addedAt": "2026-09-18T00:33:29Z"
     },
     {
-      "path": "assets/edge-react-gui/pr-6199/20260917-173207-agent-proof-1210180856778864-02-send2-above-tabs-promo-held.png",
+      "path": "assets/edge-react-gui/pr-6199/20260917-173329-agent-proof-1210180856778864-02-send2-above-tabs-promo-held.png",
       "caption": "send2 above tabs promo held",
       "index": "2",
       "hacked": false,
@@ -131,10 +131,10 @@
       "hackNote": null,
       "batchAt": "2026-09-18T00:32:07Z",
       "headSha": "20fdb073886a88626702636d4c50e4caf06c25a1",
-      "addedAt": "2026-09-18T00:32:07Z"
+      "addedAt": "2026-09-18T00:33:29Z"
     },
     {
-      "path": "assets/edge-react-gui/pr-6199/20260917-173207-agent-proof-1210180856778864-03-tab-switch-releases-promo.png",
+      "path": "assets/edge-react-gui/pr-6199/20260917-173329-agent-proof-1210180856778864-03-tab-switch-releases-promo.png",
       "caption": "tab switch releases promo",
       "index": "3",
       "hacked": false,
@@ -143,10 +143,10 @@
       "hackNote": null,
       "batchAt": "2026-09-18T00:32:07Z",
       "headSha": "20fdb073886a88626702636d4c50e4caf06c25a1",
-      "addedAt": "2026-09-18T00:32:07Z"
+      "addedAt": "2026-09-18T00:33:29Z"
     },
     {
-      "path": "assets/edge-react-gui/pr-6199/20260917-173207-agent-proof-1210180856778864-04-swap-preselected.png",
+      "path": "assets/edge-react-gui/pr-6199/20260917-173329-agent-proof-1210180856778864-04-swap-preselected.png",
       "caption": "swap preselected",
       "index": "4",
       "hacked": false,
@@ -155,10 +155,10 @@
       "hackNote": null,
       "batchAt": "2026-09-18T00:32:07Z",
       "headSha": "20fdb073886a88626702636d4c50e4caf06c25a1",
-      "addedAt": "2026-09-18T00:32:07Z"
+      "addedAt": "2026-09-18T00:33:29Z"
     },
     {
-      "path": "assets/edge-react-gui/pr-6199/20260917-173207-agent-proof-1210180856778864-05-bare-swap-clears-selection.png",
+      "path": "assets/edge-react-gui/pr-6199/20260917-173329-agent-proof-1210180856778864-05-bare-swap-clears-selection.png",
       "caption": "bare swap clears selection",
       "index": "5",
       "hacked": false,
@@ -167,7 +167,7 @@
       "hackNote": null,
       "batchAt": "2026-09-18T00:32:07Z",
       "headSha": "20fdb073886a88626702636d4c50e4caf06c25a1",
-      "addedAt": "2026-09-18T00:32:07Z"
+      "addedAt": "2026-09-18T00:33:29Z"
     }
   ]
 }
