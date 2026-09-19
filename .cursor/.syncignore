@@ -22,3 +22,10 @@ skills/build-and-test/maestro/swap-*.yaml
 # claims no author the repo distributes). Listing one here only hides it from
 # that report. Use this file for paths that ARE the operator's but should stay
 # local, and for a secret-scan false positive.
+
+# Sync announcement mechanic: machine-local by decision, not distributed. These
+# resolve which session wrote each file the sync carries, and compose the
+# #edge-dev-agents commit announcement. Both are this box's habit rather than
+# part of the setup a second Mac reproduces, and the announcement has no reason
+# to announce changes to its own announcer.
+skills/convention-sync/scripts/sync-*.sh
