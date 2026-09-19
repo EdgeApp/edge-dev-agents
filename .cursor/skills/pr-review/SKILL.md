@@ -15,7 +15,13 @@ metadata:
 <rule id="no-script-bypass">If a companion script fails, report the error and STOP. Do NOT fall back to raw `gh`, `curl`, or other workarounds.</rule>
 <rule id="no-duplicate-feedback">Check existing reviews AND `inlineComments` from the context output (inline comments include resolved threads). Do not repeat feedback already given by another reviewer — this dedupe applies to workflow findings and conventions findings alike.</rule>
 <rule id="posting-gate">Posting is configured, never assumed. Default (no flag): present the formatted draft comments in chat and submit only after the user approves. `--comment`: submit without the ask. `--no-comment`: never submit; findings go to chat (and the run report in orch) only. In an orchestrated hands-off session the interactive ask is unavailable, so the default degrades to `--no-comment` with drafts delivered in the run report — post only when the task text explicitly directs posting.</rule>
-<rule id="never-approve">Never submit an `APPROVE` review. An agent approval can make a PR landable; approval is a human act. Events are `COMMENT`, or `REQUEST_CHANGES` only when there are Critical findings AND the PR is authored by us — on a PR we do not author, always `COMMENT` regardless of severity.</rule>
+<rule id="never-approve">THIS RULE'S ID IS STALE (rename to `review-event-mapping` proposed, not yet applied); the body below is the contract. A submitted review carries a real verdict, and AUTHORSHIP decides which events are legal. Step 1 resolves it (`gh api user --jq .login` vs `author`).
+
+ON A PR WE DO NOT AUTHOR: `REQUEST_CHANGES` when the review found something that must change before merge (a Critical or High finding: a real defect, a dropped guard, a broken caller). `APPROVE` when it found nothing, or nothing beyond nits, style preferences, and optional suggestions. Deliver the nits as inline comments on the approving review rather than withholding the verdict over them.
+
+ON OUR OWN PR: `COMMENT` only. GitHub rejects a self-review verdict, so `APPROVE` or `REQUEST_CHANGES` there fails the API call instead of posting.
+
+`APPROVE` asserts that the review RAN and found no blocking defect. It is never a way to say "I did not look": a review that could not examine the diff, or whose workflow failed, submits nothing and says so. The mapping applies to every submission, whether `--comment` posted it directly or the user approved the draft first.</rule>
 <rule id="curation-owns-truth">Workflow findings are candidates, not conclusions. Before delivery, judge each against your own read of the diff: reject false positives (state the evidence), downgrade findings whose failure mode pre-exists the PR (say so in the comment), and drop findings that only restate a documented intent of the PR. Rejected findings are reported in chat/report, never posted.</rule>
 <rule id="batch-reads">When reviewing changed files, batch independent Read/Grep calls in a single message.</rule>
 <rule id="script-timeouts">The companion script may take up to 30s. Set `block_until_ms: 60000` when invoking it.</rule>
@@ -107,7 +113,7 @@ Resolve the posting decision per `posting-gate`:
 2. Default interactive → show the drafts (grouped per PR file/line, with category), ask for approval, then submit the approved subset.
 3. `--comment` → submit directly.
 
-Submit via the companion script with the event per `never-approve` (`COMMENT`, or `REQUEST_CHANGES` for Critical findings on an owned PR):
+Submit via the companion script with the event per the event-mapping rule (`rule id="never-approve"`): on a PR we do not author, `REQUEST_CHANGES` when something must change before merge and `APPROVE` when only nits or nothing remain; on our own PR, `COMMENT`:
 
 ```bash
 echo '<review-json>' | ~/.cursor/skills/pr-review/scripts/github-pr-review.sh submit \

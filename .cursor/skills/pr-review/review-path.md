@@ -76,8 +76,13 @@ Reading notes:
   the assembler's own ranking is the whole job. That leaves low at ONE agent of
   review work (Scope still runs to pin the diff and the applicable CLAUDE.md files).
 - Low's `medium` effort is a SONNET compensation carried over from the official
-  cell, whose stated premise is that the fan-out is sonnet. Off sonnet that premise
-  is void, which is why `effort=inherit` exists: `low model=inherit effort=inherit`
-  is the cheapest real review, running exactly as the caller runs.
+  cell, whose stated premise is that the fan-out is sonnet. That premise HOLDS on
+  both of our surfaces: /pr-review never passes `model=`, and the `agent_review`
+  field resolves to a bare level, so the fan-out is pinned Sonnet either way and
+  low at medium effort is correct rather than an accident.
+- `model=` and `effort=` therefore change nothing unless a caller types them. They
+  exist for the case the compensation was never meant to cover: once the fan-out is
+  NOT sonnet, low-at-medium-effort has no premise left, and `effort=inherit` is how
+  such a call runs as its caller runs. No default path passes either token.
 - Not cloned: ultra (cloud, user-triggered), the diff-size finder-budget hint,
   non-sonnet per-model prompt cells.

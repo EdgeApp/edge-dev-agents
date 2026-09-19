@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# asana-review-field.sh — resolve a task's `agent_review` value and turn it into
-# the review VARIANT an orch run passes to the code-review-sonnet workflow, so
-# no caller has to know which values exist or how they map.
+# asana-review-field.sh — resolve a task's `agent_review` value into the review
+# LEVEL an orch run passes to the code-review-sonnet workflow, so no caller has
+# to know which values exist or what an unset field means.
 #
-# The field carries operator INTENT (how much review this task is worth), never
-# workflow syntax. The mapping from intent to variant lives here alone, so
-# changing what `quick` costs is an edit to this file and not to a single task,
-# and the board never has to learn the workflow's flag vocabulary.
+# The field carries the workflow's own level vocabulary, ONE TO ONE. There are no
+# preset names in front of it: the board says `high` and the workflow runs `high`,
+# with the Sonnet fan-out pin the workflow defaults to, exactly as /pr-review runs
+# it. One engine, one set of names, nothing to translate in either direction.
 #
 # Values and what they mean:
 #   (unset)  → the fleet default (watcher.default_review in asana-config.json,
@@ -18,29 +18,35 @@
 #              field also reads as "none" through asana-field-value.sh, so the
 #              two are indistinguishable there, and an operator needs a way to
 #              opt one task out once the fleet default is on.
-#   quick    → ONE agent of review work: one finder, one diff pass, no verify,
-#              no synthesis, capped at 4 findings, running on the caller's own
-#              model AND effort. Cheapest review that is still a review. The one
-#              thing it does not inherit is the context: it stays an isolated
-#              agent, so the review never lands in the orch session's window.
-#   deep     → the full Sonnet fan-out at the workflow's default level, which is
-#              what /pr-review's deep mode has always run: correctness angles in
-#              parallel, an independent verifier per location, then synthesis.
-#   a level  → passed through verbatim (low|medium|high|xhigh|max), so a level
-#              added to the workflow works from the board on arrival.
+#   low      → one finder, one diff pass, no verify, no synthesis, cap 4.
+#   medium   → 3 correctness angles + 1 cleanup finder, 6 candidates each, one
+#              verifier per location judging on the plain ladder, cap 8.
+#   high     → medium's shape at high effort, verifiers given the recall bias
+#              as well, cap 10.
+#   xhigh    → 5 angles + cleanup, 8 candidates each, plus a gap-hunting sweep,
+#              cap 15.
+#
+# `max` is deliberately NOT reachable from the board. It is xhigh's fan-out at
+# max effort, so it buys reasoning depth and no extra coverage, which is not a
+# trade an orch run should make unattended. Typed anyway, it CLAMPS to xhigh:
+# it is a real level, so it is a deliberate ask for the most depth available
+# rather than a typo, and the cheapest-level fallback would invert it.
+#
+# Depth is the only dial the board turns. `model=` and `effort=` exist on the
+# workflow for a caller who needs them, and nothing on this path passes either:
+# a level alone means Sonnet at that level's effort.
 #
 # STRUCTURAL, NOT AN ALLOWLIST. asana-build-field.sh learned this the hard way:
 # a four-name list of cheeses went stale and a run silently skipped an owed
 # build. So an UNRECOGNIZED value is never "no review" — an operator who typed
-# something wants one. It resolves to the cheapest variant, which honors the
-# intent without spending deep-review money on a typo.
+# something wants one. It resolves to the cheapest level, which honors the
+# intent without spending xhigh money on a typo.
 #
 # Usage:
 #   asana-review-field.sh <task-gid>             → the resolved value, lowercased
 #                                                  ("none" when no review is owed)
-#   asana-review-field.sh <task-gid> --variant   → "none", or workflow args
-#                                                  ("low model=inherit effort=inherit",
-#                                                   "high")
+#   asana-review-field.sh <task-gid> --variant   → "none", or the workflow args
+#                                                  (a bare level: "low".."xhigh")
 # Exit: 0 = resolved (incl. none), 1 = auth/network error, 2 = usage.
 set -euo pipefail
 
@@ -70,15 +76,17 @@ if [ "$MODE" = "value" ]; then
   exit 0
 fi
 
-# The cheapest preset is named once: the unrecognized-value arm below resolves
-# to the SAME string, and writing it twice means retuning `quick` silently
-# leaves typo'd tasks on the old variant.
-QUICK_VARIANT="low model=inherit effort=inherit"
+# The cheapest level is named once: the unrecognized-value arm resolves to the
+# SAME string, and writing it twice means changing the fallback in one place and
+# not the other.
+CHEAPEST_LEVEL="low"
 
 case "$val" in
-  none|off)                      echo "none" ;;
-  quick)                         echo "$QUICK_VARIANT" ;;
-  deep)                          echo "high" ;;
-  low|medium|high|xhigh|max)     echo "$val" ;;
-  *)                             echo "$QUICK_VARIANT" ;;
+  none|off)                 echo "none" ;;
+  low|medium|high|xhigh)    echo "$val" ;;
+  # `max` is a real workflow level, so typing it is a deliberate ask for the most
+  # depth available and NOT a typo. It clamps DOWN to xhigh rather than falling to
+  # the cheapest arm, which would invert the one thing the operator asked for.
+  max)                      echo "xhigh" ;;
+  *)                        echo "$CHEAPEST_LEVEL" ;;
 esac

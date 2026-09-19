@@ -16,6 +16,9 @@ metadata:
 <rule id="cross-machine-safety">The script auto-fetches origin and HARD-BLOCKS (exit non-zero) a `--stage`/`--commit` (user-to-repo) on any of: (a) `originAhead > 0` — remote has commits you lack; pull first. (b) Wrong branch — HEAD is NOT the repo default branch; the sync commits directly to `main` since 2026-08-26, and committing on another session's feature branch rides the sync onto its PR (the PR #3 fast-forward-merge incident) (override: `--force-branch`). (c) Blocking `warnings` of kind `deletion`, `stale-local`, or `re-adding-deleted` — the sync would delete or revert canonical files, in `~/.cursor` OR the portable extra trees (override: `--force`). (d) Non-empty `droppedHooks` — the export would blank canonical hook registrations for every machine (override: `--force`); see `hooks-projection-loss`. Warnings are NO LONGER advisory. When blocked by (c), the right fix is almost always `--repo-to-user --stage` to de-stale this machine first, THEN re-run user-to-repo to push. The dry-run summary computes all of these by content hash (not mtime), so timestamp churn no longer inflates the diff. Always surface `warnings` in the summary.</rule>
 <rule id="hooks-projection-loss">The hooks projection replaces the WHOLE `.hooks` block in whichever direction it runs, so registrations present only on the receiving side are destroyed and their `matcher` values are unrecoverable. The script reports these in `droppedHooks` (event + matcher + command) in BOTH directions and on dry runs, so the loss is visible BEFORE it happens. Never wave this away: surface every entry to the user. A dropped hook is machine-specific (hardcoded device ids, absolute paths outside the synced trees) → it belongs in `~/.claude/settings.local.json`, which is never projected. Otherwise it is real work → re-add it to `~/.claude/settings.json` and push it up. On `--repo-to-user --stage` the script also writes `settingsBackup` (a timestamped copy of the pre-overwrite settings.json); cite that path when registrations were dropped.</rule>
 <rule id="use-companion-script">Use `~/.cursor/skills/convention-sync/scripts/convention-sync.sh` for diffing and syncing. Do NOT manually diff or copy files.</rule>
+<rule id="no-silent-ride-along">A sync carries whatever is newer, which routinely includes files OTHER sessions wrote. Never let that land undocumented. Before committing, attribute every file with `scripts/sync-attribution.sh --from-sync <repo> --self <your-transcript-uuid>` (your uuid is the directory name of your scratchpad path), then: put its block verbatim in the commit body; tell the operator in the step 2 summary who else's work is riding along; and after the push, SendMessage each session whose row shows `live:` so the other side knows its work shipped and can close the thread. A session that shows `(ended)` needs no message. A file that comes back `unattributed` is reported as unattributed, never silently omitted or guessed at.</rule>
+<rule id="announce-every-sync">Every pushed sync is announced in Slack, in `#edge-dev-agents`. Compose with `scripts/sync-slack-message.sh <sha>` and post the output with `slack_send_message` (the operator has standing approval for this one message, so it is a direct send, not a draft, per the slack skill's `draft-first-for-unreviewed` carve-out). The script passes the commit title and body through verbatim with the title bolded and linked to the commit; do NOT re-summarize, re-order, or add commentary. Announce AFTER the push: the script refuses a commit that is not yet on a remote branch, because the link would 404. Relay the returned `message_link` per the slack skill's `relay-message-link`.</rule>
+<rule id="announcer-stays-local">`scripts/sync-attribution.sh` and `scripts/sync-slack-message.sh` are machine-local by decision and are excluded in `.syncignore`. They will be ABSENT on any other machine, so each step that calls them checks first and skips cleanly when missing. Never "fix" their absence by copying them into the repo.</rule>
 <rule id="dry-run-first">Always run without `--stage` first to show the summary. Only stage/commit after user confirms.</rule>
 <rule id="no-script-bypass">If the script fails, report the error and STOP.</rule>
 <rule id="readme-is-source">`~/.cursor/README.md` is the canonical local documentation source. The sync script mirrors it to the repo root README, which is the repo's front page.</rule>
@@ -33,6 +36,15 @@ Run the sync script in dry-run mode:
 ```
 
 Parse the JSON output and extract `repoDir`; reuse it for subsequent git commands. If BOTH `total` and `extraTotal` are 0, report "Everything is in sync" and stop.
+
+Then attribute the changes per `no-silent-ride-along` (skip when the script is absent, per `announcer-stays-local`):
+
+```bash
+[ -x ~/.cursor/skills/convention-sync/scripts/sync-attribution.sh ] && \
+  ~/.cursor/skills/convention-sync/scripts/sync-attribution.sh --from-sync <repo-dir> --self <your-transcript-uuid>
+```
+
+It walks the transcript tree, so allow it 1-2 minutes on a large sync. Keep its block for the commit body and its `live:` rows for the post-push messages.
 </step>
 
 <step id="2" name="Present summary">
@@ -85,7 +97,26 @@ Then push (HEAD is `main`, enforced by the branch guard):
 cd <repo-dir> && git push origin HEAD
 ```
 
+The commit message ends with the attribution block from step 1 per `no-silent-ride-along`, so the commit itself records whose work rode along.
+
 Do NOT run `gh pr edit`: there is no sync PR anymore, and a bare `gh pr edit` targets whatever PR the current branch happens to have (this overwrote the merged PR #3's body on 2026-08-26).
+
+</step>
+
+<step id="4" name="Announce and close the loop">
+Both actions here are OUTWARD and happen only after the push succeeded. Skip either one whose script is absent, per `announcer-stays-local`.
+
+1. **Slack**, per `announce-every-sync`:
+
+```bash
+~/.cursor/skills/convention-sync/scripts/sync-slack-message.sh <sha>
+```
+
+Post that output verbatim to `#edge-dev-agents` with `slack_send_message`, then relay the returned `message_link` to the operator.
+
+2. **The other sessions**, per `no-silent-ride-along`. For each attribution row showing `live: <tmux>`, resolve its addressable name with `ListAgents` (match the tmux name) and SendMessage it: what shipped, the commit sha, and that its thread can close. One message per session, not per file. Rows showing `(ended)` get nothing.
+
+If the Slack send is denied by slack-prose-gate, the lint findings describe text that came from the COMMIT MESSAGE, so the commit prose is what violated the standard. Report it to the operator rather than rewording only the Slack copy: the two should not diverge.
 </step>
 
 <edge-cases>
