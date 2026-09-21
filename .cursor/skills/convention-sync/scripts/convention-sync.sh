@@ -166,7 +166,7 @@ LEGACY_REPO_README="$REPO_CURSOR/README.md"
 # committable code/config is mirrored. Format: "SRC_ABS|REPO_SUBDIR|csv-excludes"
 # Excludes are rsync patterns (matched against the path relative to SRC).
 EXTRA_TREES=(
-  "$HOME/.config/agent-watcher|agent-watcher|credentials.json,secrets,*.log,*.state,*.lock,pool.json,slots.json,watchdog-state.json,oom-repro/forensics,oom-repro/logs,.DS_Store,.git"
+  "$HOME/.config/agent-watcher|agent-watcher|credentials.json,secrets,*.log,*.state,*.lock,pool.json,slots.json,watchdog-state.json,oom-repro/forensics,oom-repro/logs,*-anchor-brief.*,.DS_Store,.git"
   "$HOME/.claude/memory-shared|memory-shared|.DS_Store,.git"
   "$HOME/.claude/workflows|claude-workflows|.DS_Store,.git"
 )

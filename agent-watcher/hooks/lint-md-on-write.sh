@@ -154,8 +154,13 @@ case "$TOOL" in
     # A --body-file is linted whole; an inline --body is linted as a fragment
     # of the command text. No allowlist check: a comment is outward wherever
     # its body file sits.
+    # The trigger reads the mention-stripped view (heredoc bodies and quoted
+    # spans blanked), so a commit message or report that QUOTES "gh issue
+    # comment --body" is not an invocation; the body-file path and the inline
+    # body are read from the raw command, where the text lives.
+    CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
     GH_COMMENT=""
-    if printf '%s' "$CMD" | grep -qE '(^|[[:space:];&|(])gh[[:space:]]+issue[[:space:]]+comment([[:space:]]|$)'; then
+    if printf '%s' "$CMD_M" | grep -qE '(^|[[:space:];&|(])gh[[:space:]]+issue[[:space:]]+comment([[:space:]]|$)'; then
       GH_COMMENT=1
       BF=$(printf '%s' "$CMD" | grep -oE -- '--body-file(=|[[:space:]]+)[^[:space:]]+' | head -1 \
         | sed -E 's/^--body-file(=|[[:space:]]+)//; s/^["'"'"']//; s/["'"'"']$//')

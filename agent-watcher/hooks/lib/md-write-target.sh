@@ -114,7 +114,18 @@ if (hits.length) process.stdout.write(hits.join("\n"));
     && printf '%s' "$cmd" | grep -qE "open\([^)]*[\"'][wa][\"']|\.write\(|write_text\(|writeFileSync\(|writeFile\("; then
     targets=$(printf '%s' "$cmd" \
       | grep -oE "[\"'][^\"'[:space:]]*${tail}[\"']" \
-      | sed -E "s/^[\"']//; s/[\"']$//" | _pick || true)
+      | sed -E "s/^[\"']//; s/[\"']$//" \
+      | while IFS= read -r t; do
+          # A bare basename inside a script body has no directory the resolver
+          # can see: the script may have joined it to a path built in code
+          # (pathlib.Path(dir) / "x.md"), so joining it to the cwd names a file
+          # the command never touches. Keep it only when the cwd holds that
+          # file (open("CHANGELOG.md", "w") from the repo root); otherwise
+          # allowing is safer than guessing.
+          # (an if, not a case: bash 3.2 misparses a case pattern inside $(...))
+          if printf '%s' "$t" | grep -qE '/|^~|^\$'; then printf '%s\n' "$t"
+          elif [ -n "$cwd" ] && [ -f "$cwd/$t" ]; then printf '%s\n' "$t"; fi
+        done | _pick || true)
   fi
   [ -n "$targets" ] || return 0
 

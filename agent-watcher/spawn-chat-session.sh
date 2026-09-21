@@ -13,7 +13,11 @@
 #                         [--cwd <dir>] [--effort low|medium|high|xhigh|max]
 #                         [--pointer "<one sentence>"] [--no-chrome]
 #   --name        session slug; tmux session = claude-asana-chat-<slug>, RC name chat-<slug>
-#   --brief-file  the full brief (markdown or text); the session is told to read it
+#   --brief-file  the full brief (markdown or text). It is COPIED to
+#                 $STATE/briefs/<session>.<ext> and the session is told to read
+#                 the copy, so a scratchpad brief outlives its scratchpad. A brief
+#                 is this box's prompt to one session, never distributed config:
+#                 a source inside a tree convention-sync carries is refused.
 #   --model       claude model id (default: the CLI default)
 #   --pointer     optional one-sentence summary appended to the pointer prompt
 #   --no-chrome   omit --chrome (default: Chrome bridge on)
@@ -44,6 +48,17 @@ BRIEF="${BRIEF/#\~/$HOME}"
 [ -d "$CWD" ] || { echo "cwd not a directory: $CWD" >&2; exit 1; }
 NAME="${NAME#chat-}"
 if $ANCHOR; then S="claude-asana-$NAME"; RC="$NAME"; else S="claude-asana-chat-$NAME"; RC="chat-$NAME"; fi
+
+case "$(cd "$(dirname "$BRIEF")" && pwd -P)/" in
+  "$HOME/.config/agent-watcher/"*|"$HOME/.cursor/"*|"$HOME/.claude/workflows/"*|"$HOME/.claude/memory-shared/"*)
+    echo "brief file is inside a synced tree ($BRIEF): convention-sync would publish it. Write it anywhere else (your scratchpad is fine); this script keeps the durable copy." >&2
+    exit 1 ;;
+esac
+BRIEF_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/briefs"
+mkdir -p "$BRIEF_DIR" || { echo "cannot create $BRIEF_DIR" >&2; exit 1; }
+BRIEF_EXT="${BRIEF##*.}"; [ "$BRIEF_EXT" != "$BRIEF" ] || BRIEF_EXT="txt"
+cp "$BRIEF" "$BRIEF_DIR/$S.$BRIEF_EXT" || { echo "cannot copy the brief to $BRIEF_DIR" >&2; exit 1; }
+BRIEF="$BRIEF_DIR/$S.$BRIEF_EXT"
 tmux has-session -t "$S" 2>/dev/null && { echo "session already exists: $S (kill it first or pick another --name)" >&2; exit 1; }
 
 cmd="claude"

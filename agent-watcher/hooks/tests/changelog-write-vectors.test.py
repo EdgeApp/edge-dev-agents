@@ -59,8 +59,15 @@ check('extractor: node -e writeFileSync -> docs/x.md',
       target("node -e \"require('fs').writeFileSync('docs/x.md','y')\"") == '/repo/docs/x.md')
 check('extractor: python read-only open() is not a write',
       target("python3 -c \"print(open('CHANGELOG.md').read())\"") == '')
+# A bare basename inside a script body resolves only when the cwd holds that
+# file; otherwise the directory was built in code and the resolver cannot see it.
+rdir = tempfile.mkdtemp(prefix='cl-extract-')
+open(os.path.join(rdir, 'CHANGELOG.md'), 'w').write('# Changelog\n')
 check('extractor: exact basename filter',
-      target(py_write(LONG), '/r', 'CHANGELOG.md') == '/r/CHANGELOG.md' and target(py_write(LONG), '/r', 'README.md') == '')
+      target(py_write(LONG), rdir, 'CHANGELOG.md') == f'{rdir}/CHANGELOG.md' and target(py_write(LONG), rdir, 'README.md') == '')
+shutil.rmtree(rdir)
+check('extractor: bare basename absent from the cwd is not a target',
+      target(py_write(LONG), '/r', 'CHANGELOG.md') == '')
 rc, err = hook(py_write(LONG))
 check("gate: the run's exact python-heredoc write is BLOCKED", rc == 2 and '253 chars' in err, f'rc={rc} {err[:120]}')
 rc, err = hook(py_write(SHORT))

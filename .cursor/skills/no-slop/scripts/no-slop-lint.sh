@@ -185,17 +185,20 @@ LINES.forEach((raw, i) => {
   // others (mobile clients, terminals, code spans never linkify), so the
   // markdown form is the only one that is clickable everywhere. Accepted
   // shapes: "](url)", "<url>" autolinks, HTML attributes ("src=", "href=").
-  // Checked on the raw line, tables included (a table cell of bare URLs is the
-  // shape that shipped), before backticked spans are blanked: a URL inside a
-  // code span is the classic unclickable form. Locale strings and frontmatter
-  // are data, not prose.
+  // Checked on the line with code spans blanked, tables included (a table cell
+  // of bare URLs is the shape that shipped). A URL inside backticks is verbatim
+  // text, an identifier or a pattern (a changelog naming a deep-link host), the
+  // same reading the vocabulary rule gives code spans; whether it should have
+  // been a link is prose judgment, not this rule. Locale strings and
+  // frontmatter are data, not prose.
   if (!STRINGS && front !== 1) {
+    const rawNoCode = raw.replace(/`[^`]*`/g, (m) => " ".repeat(m.length))
     const URL_RE = new RegExp("https?://[^\\s<>()\\[\\]\"\x27\x60]+", "g")
     let um
-    while ((um = URL_RE.exec(raw)) !== null) {
-      const before = raw.slice(Math.max(0, um.index - 2), um.index)
+    while ((um = URL_RE.exec(rawNoCode)) !== null) {
+      const before = rawNoCode.slice(Math.max(0, um.index - 2), um.index)
       if (/\]\($/.test(before) || /<$/.test(before) || /=["\x27]$/.test(before)) continue
-      findings.push(["HARD", n, "bare URL: write it as a markdown link [label](url); a bare or backticked URL is plain text on some surfaces"])
+      findings.push(["HARD", n, "bare URL: write it as a markdown link [label](url); a bare URL is plain text on some surfaces"])
       break
     }
   }

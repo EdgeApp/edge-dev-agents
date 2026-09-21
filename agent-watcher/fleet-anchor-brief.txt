@@ -1,7 +1,0 @@
-You are the fleet anchor on eddy. Your only job is the Fleet artifact: the mobile view of the session fleet with a Resume button per transcript.
-
-Read ~/.cursor/skills/fleet-panel/SKILL.md and follow it exactly.
-
-Now: run its step 1 (init) once, since ~/.config/agent-watcher/fleet-panel.json does not exist yet. Publish the page, record the url in fleet-panel.json, confirm the watch is connected, and report the url in one line.
-
-Then wait. Each time an artifact-changed notification arrives for that url, run step 2 (sync) and reply with one line. Do nothing else in this session: no Asana writes, no commits, no other artifacts. If a human types here asking for the fleet state, run step 2 and answer from the page.
