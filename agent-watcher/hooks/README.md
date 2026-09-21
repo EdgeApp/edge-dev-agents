@@ -4,7 +4,7 @@ This file is the reference for every Claude Code hook registered on this box. Th
 
 Most gates no-op unless `AGENT_TASK_GID` is set, which is what confines them to orchestrated runs. The exceptions, verified against the scripts:
 
-- Every session, orchestrated or chat: `block-raw-asana-api.sh`, `block-raw-gh-writes.sh`, `block-raw-thread-resolve.sh`, `git-history-gate.sh`, `nudge-asana-mcp.sh`, `slack-prose-gate.sh`, `lint-md-on-write.sh`, `inject-no-slop-line.sh`, `inject-no-slop-reminder.sh`, `downscale-phone-screenshots.sh`, `record-phone-captures.sh`, `socket-guard.mjs`.
+- Every session, orchestrated or chat: `record-file-writes.sh`, `block-raw-asana-api.sh`, `block-raw-gh-writes.sh`, `block-raw-thread-resolve.sh`, `git-history-gate.sh`, `nudge-asana-mcp.sh`, `slack-prose-gate.sh`, `lint-md-on-write.sh`, `inject-no-slop-line.sh`, `inject-no-slop-reminder.sh`, `downscale-phone-screenshots.sh`, `record-phone-captures.sh`, `socket-guard.mjs`.
 - Keyed on the session instead of the run: `mark-skill-read.sh` and `require-skill-for-file.sh` use `AGENT_TASK_GID` in a run and `sess-<session_id>` otherwise, so the all-scope rows of the file gate apply in chat too.
 - Keyed on a different variable: `block-simctl-booted.sh` and `require-maestro-device.sh` gate on `AGENT_SIM_UDID` (slot sessions), `spec-read-gate.sh` and `spec-read-receipt.sh` on `ORCH_SLUG`, `compact-ground-truth.sh` on `ORCH_TASK` plus `ORCH_SLUG`.
 - Stricter than the env var: `mark-agent-authored-asana.sh` and `record-own-asana-story.sh` call `orch-run-context.sh`, which requires an in-flight run (env var plus a live tmux pane), because retired and chat-fork sessions keep `AGENT_TASK_GID`.
@@ -44,7 +44,7 @@ Most gates no-op unless `AGENT_TASK_GID` is set, which is what confines them to 
 
 | Script | Event / matcher | What it does | What it prevents |
 |---|---|---|---|
-| `require-skill-for-file.sh` | PreToolUse / Bash and Write, Edit | Matches the target path against a glob-to-skill table and denies with the skill body inlined | Editing an AGENTS.md, CHANGELOG.md, skill, rule, or hook without the owning contract in context |
+| `require-skill-for-file.sh` | PreToolUse / Bash and Write, Edit | Matches the target path against a glob-to-skill table and denies with the skill body inlined | Editing an AGENTS.md, CHANGELOG.md, skill, rule, companion script, hook (site-orch's included) or `~/.claude/settings.json` without the owning contract in context |
 | `require-skill-read-for-scripts.sh` | PreToolUse / Bash | Requires the owning skill's read marker (or a one-shot phase slice) before a `skills/<name>/scripts/*.sh` execution, delivering the body on deny | Running one step of a skill's contract bare, without the contract around it |
 | `spec-read-gate.sh` | PreToolUse / Bash | Denies reading a site-orch task spec through command stdout (`gh issue view`, unredirected `gh pr diff`, `cat`/`head`/`sed` on the spec files) | Reasoning from an issue or diff silently truncated at the shell tool's ~20 KB output cap |
 
@@ -82,6 +82,7 @@ Most gates no-op unless `AGENT_TASK_GID` is set, which is what confines them to 
 | `mark-operator-present.sh` | UserPromptSubmit / `*` | Stamps `/tmp/agent-operator-present-<gid>` on human prompts, skipping spawn prompts, watchdog pings, and headless children | The post-Complete push block treating human-directed work in a live session as a headless resume |
 | `record-own-asana-story.sh` | PostToolUse / `mcp__claude_ai_Asana__add_comment` | Appends the story gid of a run's own comment on its own task to `/tmp/agent-own-stories-<gid>` | The Complete gate mistaking the run's own completion comment for new operator scope |
 | `record-phone-captures.sh` | PostToolUse / Bash | Writes where a `simctl io ... screenshot` or `adb exec-out screencap` landed into the capture ledger | The Read rewrite missing ad-hoc captures that no filename glob can cover |
+| `record-file-writes.sh` | PreToolUse / Bash (stamp) and PostToolUse / Write, Edit, NotebookEdit, Bash | Appends `{ts, session, agent, path, via}` to `~/.local/state/agent-watcher/write-ledger.jsonl` as each write happens; `via` is `tool`, `bash` (changed during the call and named by the command) or `bash-window` (changed, never named). Format and roots live in `lib/write-ledger.sh` | convention-sync shipping a file without knowing which session wrote it, which transcripts cannot answer (a Read names a path as much as an Edit does, and an interpreter write names none) |
 | `spec-read-receipt.sh` | PostToolUse / Read | Appends one JSON receipt per Read under the site-orch task spec dir to `.reads.jsonl` | Routing a task before the issue, comments, and diff were read in full |
 
 ## Operator hold

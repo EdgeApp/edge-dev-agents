@@ -149,6 +149,21 @@ flowchart TD
   1M-context; effort low through max). Unset falls back to config defaults
   (currently `.watcher.agent_model` = Opus 5 1M, `.watcher.agent_effort` =
   high).
+- **Per-task self-review.** The task's `agent_review` field (`low`, `medium`,
+  `high`, `xhigh`; unset follows `.watcher.default_review`, currently `none`)
+  decides whether the run reviews its own branch before opening the PR, and at
+  what depth. `asana-review-field.sh` resolves it to the arguments of the
+  `code-review-sonnet` workflow, one level per field value. The phase runs
+  after local verification and before PR creation: findings are judged against
+  the diff, survivors are fixed as fixups folded into the commits they belong
+  to, rejections are recorded with their evidence in the run report, and
+  nothing is posted to GitHub.
+- **Which Asana fields a run sees.** A task is homed on several boards, and a
+  task read lists every board's fields. Runs read and write only the
+  Engineering Board's fields (Priority, LOE, Repo, Category, Release, Build,
+  Board State, Developer) and the jon-claude project's (`agent_*`, `tested`,
+  `blocked`, `TDD?`). `asana-get-context.sh` prints only those, and
+  `asana-task-update.sh` has no flag for any other board's field.
 - **Version stamp.** Every spawn and resume segment records which orch version
   governs it: `stamp-orch-version.sh` appends content digests of the governing
   trees (skills, rules, watcher, hooks, settings hooks) plus repo head, CLI
@@ -236,6 +251,26 @@ just a viewport.
   `resume-task.sh` and `resume-agent.sh` are watcher/operator tools and
   refuse to run from inside their target. The `no-self-respawn.sh` hook
   enforces the agent side.
+- **Discussion sessions and briefs.** `spawn-chat-session.sh` starts a fresh
+  session (a `chat-<slug>` discussion, or a named anchor with `--anchor`) and
+  hands it a brief. The brief is copied to
+  `~/.local/state/agent-watcher/briefs/<tmux-session>.<ext>` and the session
+  receives only a short pointer to that copy, because a long prompt pasted
+  into a just-started TUI loses its head. A brief is this machine's prompt to
+  one session, so it never syncs: a brief saved inside a synced tree is
+  refused before anything spawns.
+- **Anchor hygiene.** Long-lived operator anchors (`watcher.persistent_anchors`)
+  degrade as their conversation grows, so `reanchor-sweep.sh` (launchd, every
+  30 min) resets one once it crosses 4 compactions or 25 MB AND has sat idle
+  for 2 hours. It first has the anchor distill its open threads into its
+  ledger (`anchor-<name>-open-threads.md` in auto-memory) and aborts unless
+  that ledger was freshly written, then respawns the same tmux name with the
+  same flags and points the fresh session at the ledger. The transcript is
+  resolved from the process's own record (`~/.claude/sessions/<pid>.json`),
+  and a resumed session is measured together with the transcript it resumed.
+  `watcher.reanchor_exclude` lists anchors that stay persistent but are never
+  swept (an anchor that holds standing instructions has nothing to distill).
+  `touch /tmp/reanchor-hold` or `/tmp/reanchor-hold-<name>` vetoes a sweep.
 - **The host must not idle-sleep.** All of this dies with the machine, so the
   box runs a keep-awake LaunchAgent (machine-local, not synced; an idle-sleep
   default once killed every bridge in the fleet after hours of quiet).
@@ -429,7 +464,7 @@ done.
 | Group | Hook | Enforces |
 |---|---|---|
 | Status gates | `require-plan-before-developing.sh` | No Developing until ingestion evidence (`asana-get-context.sh` ran, attachments downloaded) AND the plan doc exist |
-| | `require-concession-validation.sh` | A block or a downgrade-finalize needs a fresh concession-validator verdict bound to the exact reason |
+| | `require-completion-judgment.sh` | Every completion event (Complete, PR creation, `blocked = Yes`) is ruled on by a headless judge OUTSIDE the run, from an evidence bundle; the verdict is bound to the evidence hash, so an unchanged retry is instant and new evidence is re-judged. A block needs `--reason`. The run never writes a verdict or a waiver. `require-concession-validation.sh` remains as a 6-line shim that forwards here |
 | | `require-followup-scope-on-complete.sh` | Complete needs a fresh live scope check: no newer operator comments unaddressed, zero blocking threads, reviewer bots concluded, watermark last; refreshes the check itself when only the run's own comments postdate it |
 | | `require-continuation-or-block.sh` (Stop) | A turn may not end except at Complete or a validated block |
 | | `require-tdd-current.sh` | TDD-flagged tasks keep the design doc current before finalize |
@@ -455,10 +490,11 @@ done.
 | | `guard-piped-watcher-scripts.sh` | Watcher status scripts run bare (pipes silently masked their exit codes); gated-claim commands hard-block instead of rewriting |
 | | `mark-agent-authored-asana.sh` | In-flight-run Asana prose carries the 🥋/👊 authorship markers; operator-context text stays unmarked |
 | | `record-own-asana-story.sh` (PostToolUse) | Records the story gid of each in-flight run's own MCP comment so the Complete gate can tell it from operator scope (`asana-task-update.sh --comment-file` records the script path) |
-| | `require-skill-for-file.sh` | A file whose NAME has an owning skill (AGENTS.md: agents-md, every session; CHANGELOG.md: changelog, orch runs) is written only after that skill entered context; deny-with-body via the shared gate library, one table for all such files |
+| | `require-skill-for-file.sh` | A file with an owning skill is written only after that skill entered context, on every vector (Write, Edit, redirect, tee, sed -i, interpreter heredoc); deny-with-body via the shared gate library, one glob table for all of them. AGENTS.md: agents-md, every session. CHANGELOG.md: changelog, orch runs. The workflow itself (`SKILL.md`, `.mdc` rules, skill and agent-watcher scripts, site-orch's hooks, and `~/.claude/settings.json`, where a wrong registration means a hook never fires): author, every session |
 | | `lint-md-on-write.sh` | Markdown written outside the internal allowlist passes the mechanical no-slop tier on every vector (Write, Edit, redirect, tee, sed -i, perl -pi); CHANGELOG.md targets also pass the changelog entry-shape lint (length cap, mechanism tails, second sentences) |
 | | `require-skill-read-for-scripts.sh` + `mark-skill-read.sh` | A skill's companion script runs only after its SKILL.md FULLY entered context; the deny message delivers the complete body itself (deny-with-body) and writes the marker, so the retry passes educated, and states that the whole Bash command was cancelled. Marking is strict and content-checked against the current file: Read pages covering every line (a token-capped Read counts only the lines it returned), a `cat` whose unaltered stdout holds the body, Skill tool, or gate/session-start injection; partial reads (sed slices, cat piped to head or redirected) earn nothing. Before denying, the gate credits a body the transcript proves is in context since the last compaction (slash-command delivery, uncut `invoked_skills` re-injection, covering Read pages). `--help`/`-h`-only invocations are exempt. Bodies over 50KB (pr-land) fall back to a read-in-pages pointer without a marker. The same gate also delivers a /one-shot PHASE SLICE (`one-shot:<phase>`, `references/<phase>.md`) at the first companion-script call of that phase, since the split left only the core in context by default |
 | | `mark-playbook-read.sh` | Records the playbook read the drive gate requires |
+| | `record-file-writes.sh` (PreToolUse Bash + PostToolUse) | Records which session wrote which file, as the write happens, into `~/.local/state/agent-watcher/write-ledger.jsonl`: Write/Edit by `file_path`, Bash by what changed under the synced trees since a pre-call stamp (so `sed -i`, redirects and interpreter heredocs are seen). A file the command names is a strong row; one that only changed during the call is a weak row, since a long command overlaps every other session's writes. A subagent's write lands on its parent session. `/convention-sync` reads it to learn whose diffs it has not seen. Machine-local state, every session, never blocks |
 | | `nudge-asana-mcp.sh` | Steers bulk Asana reads to the cheaper script path |
 | | `block-raw-asana-api.sh` | Raw Asana API calls go through the sanctioned scripts (ingestion with attachment download, field reads, writes, scope checks) |
 | | `inject-run-context.sh`, `inject-no-slop-reminder.sh`, `inject-no-slop-line.sh` | Session-start run context, plus the asana-plan + task-review bodies on every fresh segment (startup/resume, and compact while unplanned); a fresh segment (startup/resume) expires the prior segment's ingestion + skill-read markers, and compact/clear expire skill-read markers too, since compaction destroys the in-context text the marker attests to (the read-gate then re-delivers bodies lazily); headless `claude -p` children (no-slop judge etc.) inherit the gid but are ignored, since a child's startup is not a run segment; no-slop refresh at session start and every prompt |
@@ -466,7 +502,7 @@ done.
 | | `cmd-executes.sh` | Command-position matching, so naming a script in a grep never fires the gate that guards executing it |
 
 `retired/require-block-validation.sh` is an unregistered legacy kept for history; the
-concession gate replaced it.
+completion judge's `block` event replaced it.
 
 ## Prose standards & enforcement
 
@@ -558,9 +594,9 @@ finding carrying a citation an auditor can open.
   PRs, Asana state, attempt log, friction block (hook blocks, tool errors,
   compactions), version stamps, release receipt.
 - **`/agent-eval`** grades process compliance and outcome honesty against the
-  agent-behavior rubric (dimensions A1-A35: status hygiene, completion
+  agent-behavior rubric (dimensions A1-A36: status hygiene, completion
   honesty, report discipline, testing depth, tested-field accuracy, deferral
-  validity, and more). A profile run reads only its rows
+  validity, self-review discipline, and more). A profile run reads only its rows
   (`scripts/rubric-slice.sh <profile>`); dated expectations live in one era
   table (`references/era.md`, split per run by `scripts/era.sh` into the
   manifest's `era` block) instead of inside the rows; `references/tiers.md`
@@ -605,7 +641,8 @@ reproducible from a single clone + `./bootstrap.sh`:
   `~/.config/agent-watcher`. Committed: scripts, `*.js`, `asana-config.json`,
   docs, and `credentials.example.json`. **Never committed:** `credentials.json`
   (secret) and machine-local state (`pool.json`, `slots.json`,
-  `watchdog-state.json`, `*.state`, `*.log`, forensics).
+  `watchdog-state.json`, `*.state`, `*.log`, forensics) and session briefs
+  (`*-anchor-brief.*`; briefs live in `~/.local/state/agent-watcher/briefs`).
 - **`agent-watcher/launchd/`**: templates for every `com.jontz.*` launchd job
   (watcher, watchdog, reanchor sweep, checkout refresh, guards) plus
   `install-launchd.sh`, which renders `__HOME__` and `__NODE_BIN__`, writes
@@ -637,6 +674,15 @@ reproducible from a single clone + `./bootstrap.sh`:
   skills need no entry: the sync ships only skills this repo already tracks or
   whose frontmatter names an author it distributes, and reports every other
   entry under `excludedSkills` with its reason.
+
+The session that runs `/convention-sync` owns the whole commit. A sync
+routinely carries files other sessions wrote, so it reads every diff, asks a
+live author when a diff does not explain itself (the write ledger says whose
+it is), and then describes all of it by subject, as one body of work, in the
+commit and the Slack announcement. This README and the hook registry
+(`agent-watcher/hooks/README.md`) are brought current in the same commit;
+`readme-gaps.sh` lists added files no README names and deleted files one still
+names, and blocks the commit until they are dealt with.
 
 `/convention-sync` keeps all of the above in sync (home to repo) and hard-blocks
 staging when the remote is ahead, the branch is wrong, or the sync would delete
@@ -734,7 +780,7 @@ scripts, not be re-described independently across skills.
 | [`/staging-cherry-pick`](.cursor/skills/staging-cherry-pick/SKILL.md) | Cherry-pick landed staging-targeted commits onto staging |
 | [`/cheese`](.cursor/skills/cheese/SKILL.md) | Push a test-branch build, pinning unpublished dep PRs when required |
 | [`/changelog`](.cursor/skills/changelog/SKILL.md) | Update CHANGELOG entries using repo conventions |
-| [`/dep-pr`](.cursor/skills/dep-pr/SKILL.md) | Create dependent Asana tasks and downstream PR work in another repo |
+| [`/dep-pr`](.cursor/skills/dep-pr/SKILL.md) | Create dependent Asana tasks and downstream PR work in another repo; the dep task joins the parent's projects, inherits its Engineering Priority and Release, and blocks it |
 | [`/tdd`](.cursor/skills/tdd/SKILL.md) | Write or update a technical design document for shipped work |
 
 ### Guards and validators
@@ -759,7 +805,7 @@ scripts, not be re-described independently across skills.
 
 | Skill | Description |
 |------|-------------|
-| [`/asana-task-update`](.cursor/skills/asana-task-update/SKILL.md) | Generic Asana mutations: attach PR, assign, status, fields |
+| [`/asana-task-update`](.cursor/skills/asana-task-update/SKILL.md) | Generic Asana mutations: attach PR or file, comment, assign, Board State, Engineering Priority / Release / Developer, description tail |
 | [`/asana-task-create`](.cursor/skills/asana-task-create/SKILL.md) | Create Edge dev tasks on the standard boards with the right fields |
 | [`/kanban-categorize`](.cursor/skills/kanban-categorize/SKILL.md) | Sweep a kanban board and populate Category fields |
 | [`/convention-sync`](.cursor/skills/convention-sync/SKILL.md) | Sync `~/.cursor/` + portable trees with this repo; mirror this README; update the PR description |
@@ -826,7 +872,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 
 | Script | What it does |
 |------|-------------|
-| [`asana-get-context.sh`](.cursor/skills/asana-get-context.sh) | Fetch task details, comments, subtasks, attachments |
+| [`asana-get-context.sh`](.cursor/skills/asana-get-context.sh) | Fetch task details, comments, subtasks, attachments, and the Engineering Board fields (other boards' fields on the task are not printed) |
 | [`asana-task-update.sh`](.cursor/skills/asana-task-update/scripts/asana-task-update.sh) | Reusable Asana mutations (the report-attach path is hook-gated) |
 | [`asana-field-value.sh`](.cursor/skills/asana-field-value.sh), [`asana-build-field.sh`](.cursor/skills/asana-build-field.sh), [`asana-force-land.sh`](.cursor/skills/asana-force-land.sh) | Live single-field reads the finalize gate consumes |
 | [`update-status.sh`](agent-watcher/update-status.sh) | The gated `agent_status` write every phase transition goes through |
