@@ -65,7 +65,10 @@ mkdir -p "$ST"
 [[ -f "$STATE" ]] || echo '{}' > "$STATE"
 NOW=$(date +%s)
 
-ANCHORS=$(jq -r '.watcher.persistent_anchors[]?' "$DIR/asana-config.json" 2>/dev/null)
+# reanchor_exclude: anchors that stay persistent (watchdog, fleet model) but are
+# never swept. An anchor that holds standing instructions rather than a
+# conversation has nothing to distill, so a sweep could only ever ABORT on it.
+ANCHORS=$(jq -r '.watcher | (.persistent_anchors // []) - (.reanchor_exclude // []) | .[]' "$DIR/asana-config.json" 2>/dev/null)
 [[ -n "$ANCHORS" ]] || { echo "no persistent_anchors configured"; exit 0; }
 
 for name in $ANCHORS; do
@@ -85,10 +88,16 @@ for name in $ANCHORS; do
   # sessions; a `--fork-session` pane WRITES to the registry child, never the
   # argv uuid; a fresh spawn (no --resume, e.g. right after a reanchor) is
   # matched by the newest transcript born after the process started.
+  # FIRST the process's own session record, ~/.claude/sessions/<pid>.json: it
+  # carries the sessionId the process is writing RIGHT NOW, so it is correct for
+  # a resume, a fork, a fresh spawn and a /clear alike. The argv and birthtime
+  # paths below are the fallback for a CLI build that does not write that file.
   argv=$(ps -ww -o command= -p "$cpid")
   ruuid=$(printf '%s' "$argv" | grep -oE -- '--resume [0-9a-fA-F-]{36}' | awk '{print $2}')
-  uuid="$ruuid"
-  if printf '%s' "$argv" | grep -q -- '--fork-session' && [[ -n "$ruuid" ]]; then
+  uuid=$(jq -r '.sessionId // empty' "$HOME/.claude/sessions/$cpid.json" 2>/dev/null || true)
+  if [[ -n "$uuid" ]]; then
+    :
+  elif uuid="$ruuid"; printf '%s' "$argv" | grep -q -- '--fork-session' && [[ -n "$ruuid" ]]; then
     uuid=$(grep -F "\"parent\":\"$ruuid\"" "$ST/chat-forks.jsonl" 2>/dev/null | tail -1 | sed -E 's/.*"child":"([0-9a-f-]{36})".*/\1/')
   fi
   jsonl=""
@@ -106,8 +115,18 @@ for name in $ANCHORS; do
   fi
   [[ -n "$jsonl" && -f "$jsonl" ]] || { echo "$name: no transcript resolved"; continue; }
 
-  bytes=$(stat -f %z "$jsonl")
-  compacts=$(jq -R 'fromjson? | select(.type == "system" and .subtype == "compact_boundary") | .uuid' "$jsonl" 2>/dev/null | sort -u | wc -l | tr -d ' '); compacts=${compacts:-0}
+  # A resumed process appends to a NEW transcript under its own sessionId while
+  # the conversation it loaded stays in the `--resume` file, so the context the
+  # anchor carries is both files. Measure the pair. (After a /clear the resumed
+  # file no longer counts, and this overstates; the cost is one early reanchor.)
+  chain=("$jsonl")
+  if [[ -n "$ruuid" && "$ruuid" != "$uuid" ]]; then
+    parent=$(ls "$HOME/.claude/projects/"*/"$ruuid.jsonl" 2>/dev/null | head -1)
+    [[ -n "$parent" && -f "$parent" ]] && chain+=("$parent")
+  fi
+  bytes=0
+  for t in "${chain[@]}"; do bytes=$((bytes + $(stat -f %z "$t"))); done
+  compacts=$(cat "${chain[@]}" | jq -R 'fromjson? | select(.type == "system" and .subtype == "compact_boundary") | .uuid' 2>/dev/null | sort -u | wc -l | tr -d ' '); compacts=${compacts:-0}
   armed=false
   [[ "$compacts" -ge "$MAX_COMPACT" || "$bytes" -ge "$MAX_BYTES" ]] && armed=true
 

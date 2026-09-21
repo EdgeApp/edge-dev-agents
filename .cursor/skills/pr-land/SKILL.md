@@ -10,7 +10,9 @@ metadata:
 
 <usage>
 ```
-/pr-land                                          # Asana "Merge/Finalize" section, incomplete tasks assigned to me
+/pr-land                                          # Asana "Merge/Finalize" section, my incomplete tasks, lowest release only
+/pr-land 4.52                                     # Same section, only Release 4.52 tasks (= --release 4.52)
+/pr-land --all-releases                           # Same section, every release
 /pr-land --branch-scan                            # All EdgeApp repos with $GIT_BRANCH_PREFIX/* PRs (legacy)
 /pr-land edge-react-gui                           # Specific repo (branch-prefix scan)
 /pr-land edge-react-gui edge-core-js              # Multiple repos
@@ -22,7 +24,8 @@ metadata:
 ```
 
 Arguments are classified automatically:
-- **No args** → queries the Engineering Board's "Merge/Finalize" section (matched by name at call time in `pr-land-discover.sh`; a missing section errors with the names that exist), filters to incomplete tasks assigned to the current Asana user (resolved from `ASANA_TOKEN` via `~/.cursor/skills/asana-whoami.sh`), and walks each task's attachments + subtasks for GitHub PR links. Tasks with no PR link are reported in `errors` but do not block.
+- **No args** → queries the Engineering Board's "Merge/Finalize" section (matched by name at call time in `pr-land-discover.sh`; a missing section errors with the names that exist), filters to incomplete tasks assigned to the current Asana user (resolved from `ASANA_TOKEN` via `~/.cursor/skills/asana-whoami.sh`), and walks each task's attachments + subtasks for GitHub PR links. Tasks with no PR link are reported in `errors` but do not block. Only ONE release lands per run: by default the lowest "Release (4.x.x)" among those tasks (4.51 and 4.52 both queued → only 4.51 lands). Later-release tasks and tasks with no release set come back in `deferredTasks`, unresolved.
+- **A release** (`4.52`, or `--release 4.52`) → the same section scan, limited to that release. **`--all-releases`** → the same section scan with no release filter. Both refuse to combine with explicit args (exit 2); explicit args are never release-filtered.
 - **`--branch-scan`** → legacy behavior: scans all EdgeApp repos for `$GIT_BRANCH_PREFIX/*` PRs.
 - **Repo names** → branch-prefix scan, limited to the named repos.
 - **PR URLs / shorthand** (`repo#N`) → fetched directly, no branch-prefix filter.
@@ -117,9 +120,11 @@ ONE tool call:
 ```
 
 Args can be repo names, PR URLs, PR shorthand (`repo#N`), Asana task URLs (mixed freely), or `--branch-scan`.
-No args = pull incomplete tasks assigned to me from the Engineering Board's "Merge/Finalize" section and walk each for PR attachments + subtask PR attachments. Use `--branch-scan` for the legacy "scan all EdgeApp repos for `$GIT_BRANCH_PREFIX/*` PRs" behavior.
+No args = pull incomplete tasks assigned to me from the Engineering Board's "Merge/Finalize" section, keep only the lowest release, and walk each for PR attachments + subtask PR attachments. Use `--branch-scan` for the legacy "scan all EdgeApp repos for `$GIT_BRANCH_PREFIX/*` PRs" behavior.
 
-Returns JSON: `{ "prs": [...], "errors": [...] }`. Each PR has `repo`, `prNumber`, `branch`, `title`, `approved`, `changesRequested`, `reviewers`. Errors include Asana resolution failures or PR fetch failures.
+Release selection is the operator's call, never the agent's: pass `--release <v>` only when the operator names a release ("land 4.52", "/pr-land 4.52 tasks" → `--release 4.52`, dropping the non-release words), and `--all-releases` only when they ask for every release. Otherwise run with no args and let the lowest-release default stand. Name the selected release in the landing summary and list every `deferredTasks` entry (name + release, or "no release set") as not landed.
+
+Returns JSON: `{ "prs": [...], "errors": [...] }`, plus `release` (`mode`: lowest/requested/all, `selected`) and `deferredTasks` on a section scan. Each PR has `repo`, `prNumber`, `branch`, `title`, `approved`, `changesRequested`, `reviewers`. Errors include Asana resolution failures or PR fetch failures.
 
 <sub-step name="Split by type">
 After discovery, partition `prs` into `nonGuiPrs` (`repo !== "edge-react-gui"`) and `guiPrs` (`repo === "edge-react-gui"`).

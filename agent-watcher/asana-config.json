@@ -147,8 +147,12 @@
       "eval-run",
       "fleet",
       "homepage",
+      "jev",
       "pokemon",
       "wwe-app"
+    ],
+    "reanchor_exclude": [
+      "fleet"
     ],
     "idle_reap_hours": 72,
     "operator_hold_ttl_min": 15,

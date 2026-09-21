@@ -14,7 +14,7 @@ metadata:
 <rule id="attach-graceful-without-secret">`--attach-pr` uses the Asana ↔ GitHub widget integration. The secret is resolved from `$ASANA_GITHUB_SECRET`, else falls back to `credentials.json` (`.asana_github_secret`) — so it works in spawned agent shells that lack the env var. If it's still unset, or if the integration endpoint returns 401/403/404 (integration disabled at the workspace level), the script warns once and skips the widget call with exit 0 — it does NOT fail the workflow. `ASANA_TOKEN` is resolved the same way (env, else `credentials.json` `.asana_token`).</rule>
 <rule id="create-subtask">`--create-subtask --subtask-name "<name>"` creates a subtask under `--task` and re-points the rest of the invocation at the new subtask, so a SINGLE call can create the per-PR subtask AND `--attach-pr` its PR. Prints `>> subtask created: <gid>`. Used by `/one-shot`'s `multi-repo-subtasks` to give each repo's PR its own subtask under the umbrella task.</rule>
 <rule id="current-state-owns-the-tail">`--set-current-state <file>` is the ONLY sanctioned way to write a task description. It rewrites the agent-maintained tail and preserves operator prose above the delimiter; the delimiter literal, the strip-and-replace, and the authorship marking all live in the script, so callers supply bullets only. Never assemble a `notes` PUT by hand — raw Asana API calls are hook-blocked in agent sessions, and a hand-rolled write drops the marking and risks clobbering the operator half. The section's content contract (when it is owed, what the bullets say) belongs to one-shot `description-current-state`.</rule>
-<rule id="prompt-codes">If the script exits code 2 with `PROMPT_REVIEWER` or `PROMPT_IMPLEMENTOR`, ask the user and re-run with explicit `--reviewer` or `--implementor`. Hands-off callers may instead pass `--skip-assign-if-missing` to convert missing-reviewer assignment into a non-blocking skip.</rule>
+<rule id="prompt-codes">If the script exits code 2 with `PROMPT_REVIEWER`, ask the user who to assign and re-run with `--assign <user_gid>`. Hands-off callers may instead pass `--skip-assign-if-missing` to convert missing-reviewer assignment into a non-blocking skip.</rule>
 <rule id="script-timeouts">Asana updates can take time. Use `block_until_ms: 120000` for script calls.</rule>
 </rules>
 
@@ -25,17 +25,17 @@ metadata:
   --task <task_gid> \
   --attach-pr --pr-url <url> --pr-title "<title>" --pr-number <num>
 
-# Attach + assign reviewer + set review-needed status + estimate review hours
+# Attach + assign reviewer + move the card to PR Review
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
   --task <task_gid> \
   --attach-pr --pr-url <url> --pr-title "<title>" --pr-number <num> \
-  --assign --set-status "Review Needed" --auto-est-review-hrs
+  --assign <user_gid> --set-board-state "PR Review"
 
 # Hands-off attach + best-effort assign (skip if reviewer missing)
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
   --task <task_gid> \
   --attach-pr --pr-url <url> --pr-title "<title>" --pr-number <num> \
-  --assign --skip-assign-if-missing --set-status "Review Needed" --auto-est-review-hrs
+  --assign --skip-assign-if-missing --set-board-state "PR Review"
 
 # Post-merge: set Board State to QA Verification and unassign
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
@@ -77,19 +77,15 @@ Determine which updates are needed by the caller and build one command with all 
 - `--attach-pr --pr-url --pr-title --pr-number`
 - `--attach-file <path> [--attach-name <name>]` (upload a local file, e.g. a run-report `.md`, as a native task attachment; distinct from `--attach-pr`)
 - `--comment-file <path>` (post the file's text as a task comment, marked as agent-authored)
-- `--assign` or `--assign <user_gid>` (sets the task assignee, e.g. a roster member below; it also fills the legacy Reviewer/Implementor fields only when one of the task's projects carries them, so `PROMPT_IMPLEMENTOR` appears only there)
+- `--assign` or `--assign <user_gid>` (sets the task assignee, e.g. a roster member below; with no gid there is no field to read one from, so it prompts or skips)
 - `--skip-assign-if-missing`
 - `--unassign`
-- `--set-status "<option name>"` (legacy Status field), `--set-board-state "<option name>"` (Board State 🤖 field). Both resolve the name against the FIELD'S OWN options on the task at call time, so this file never lists them: the operator adds and renames options in Asana and any list here would go stale. Matching ignores case, surrounding whitespace, and a leading emoji. An option gid is accepted too (for callers copying a field between tasks) and is validated the same way. An unrecognized value exits 1 naming every real option, so ask the script rather than guessing:
+- `--set-board-state "<option name>"` (Board State 🤖), `--set-priority "<option name>"` (Priority), `--set-release "<option name>"` (Release (4.x.x)). Only Engineering Board and jon-claude fields are writable here; other boards' fields that show on a task (the old Status, Reviewer, Implementor, Planned) are not. Each resolves the name against the FIELD'S OWN options on the task at call time, so this file never lists them: the operator adds and renames options in Asana and any list here would go stale. Matching ignores case, surrounding whitespace, and a leading emoji. An option gid is accepted too (for callers copying a field between tasks) and is validated the same way. An unrecognized value exits 1 naming every real option, so ask the script rather than guessing:
   ```bash
   ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh --task <gid> --set-board-state "?"
   ```
-- `--set-reviewer <user_gid>`
-- `--set-implementor <user_gid>`
-- `--set-priority <enum_gid>`
-- `--set-planned <enum_gid>`
+- `--set-developer <user_gid>` (🤖 - Developer people field)
 - `--set-current-state <file>` (rewrite the description's agent-maintained tail; body file carries the bullets only)
-- `--auto-est-review-hrs`
 </step>
 
 <step id="2" name="Run update script">
@@ -99,8 +95,7 @@ Run `asana-task-update.sh` with the built flags. Prefer one call with combined o
 <step id="3" name="Handle prompts">
 If exit code is 2:
 
-- `PROMPT_REVIEWER`: ask who to assign, then re-run with `--reviewer <gid>` and `--assign`
-- `PROMPT_IMPLEMENTOR`: ask who to set as implementor, then re-run with `--implementor <gid>`
+- `PROMPT_REVIEWER`: ask who to assign, then re-run with `--assign <gid>`
 
 If the caller used `--skip-assign-if-missing`, do not ask about `PROMPT_REVIEWER` because the script will not emit it for missing-reviewer cases.
 </step>
@@ -120,5 +115,5 @@ Summarize one line per action from script output (attach result, assignment, sta
 <exit-codes>
 - `0`: success
 - `1`: error
-- `2`: needs user input (`PROMPT_REVIEWER`, `PROMPT_IMPLEMENTOR`)
+- `2`: needs user input (`PROMPT_REVIEWER`)
 </exit-codes>

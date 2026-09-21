@@ -121,11 +121,17 @@ if len(notes) > ceiling:
 print(f\"TASK_DESCRIPTION: {notes or '(empty)'}\")
 print(f\"DESCRIPTION_FILE: {desc_path}\")
 
+# Matched by GID, and only fields owned by the Engineering Board or the
+# jon-claude project. A task is multi-homed, so its custom_fields also carry
+# other boards' fields (a marketing priority, legacy Status/Implementor/Reviewer);
+# those are other teams' state and a same-named one reads as ours if shown. The
+# jon-claude agent_* fields are the watcher's inputs, not task context, so they
+# are not printed.
 FIELDS = {
-    '795866930204488': 'PRIORITY',
-    '1190660107346181': 'STATUS',
-    '1203334386796983': 'IMPLEMENTOR',
-    '1203334388004673': 'REVIEWER',
+    '1213843686985522': 'PRIORITY',
+    '1213901829133612': 'LOE',
+    '1213919399225909': 'REPO',
+    '1214085985050203': 'CATEGORY',
     '1213939602865824': 'RELEASE',   # Release (4.x.x): CHANGELOG placement signal
     '1213928707858644': 'BUILD',     # Build (staging/cheese): placement + routing
 }

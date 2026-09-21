@@ -8,11 +8,17 @@
 //   Asana tasks:    https://app.asana.com/0/<project>/<taskGid>
 //   --branch-scan:  scan all EdgeApp repos for $GIT_BRANCH_PREFIX/* PRs
 //   No args:        Engineering Board "Merge/Finalize" section, incomplete tasks assigned to me
+//   --release <v>:  section scan limited to one release (also a bare `4.52`)
+//   --all-releases: section scan across every release
 //
 // No args (default): queries the configured Asana section, filters to incomplete
 // tasks assigned to the current Asana user (resolved via asana-whoami.sh), and
 // walks each task's attachments + subtasks for GitHub PR links. Tasks without a
 // PR link are reported in `errors` but do not block. Requires ASANA_TOKEN.
+// The section scan lands ONE release by default: the lowest "Release (4.x.x)"
+// among those tasks. Tasks in later releases, or with no release set, are listed
+// in `deferredTasks` and never resolved to PRs. `--release` picks a different
+// release; `--all-releases` drops the filter. Explicit args are never filtered.
 //
 // Explicit PRs (URL/shorthand) are fetched directly — no branch-prefix filter.
 // Asana tasks are resolved to linked GitHub PRs via the Asana API.
@@ -46,15 +52,36 @@ const ASANA_PR_LAND_SECTION_NAME = "Merge/Finalize";
 
 const BRANCH_PREFIX = process.env.GIT_BRANCH_PREFIX || "jon";
 
+const RELEASE_FIELD_NAME = "Release (4.x.x)";
+// "4.52", "4.52.0", "52", "52.0" and the field's own "52.0" all mean 4.52.0.
+const RELEASE_ARG_RE = /^v?\d+(\.\d+){0,2}$/;
+
 // Parse flags out of args (the rest is classified below).
 let useBranchScan = false;
+let allReleases = false;
+let releaseArg = null;
 const args = [];
-for (const arg of rawArgs) {
+for (let i = 0; i < rawArgs.length; i++) {
+  const arg = rawArgs[i];
   if (arg === "--branch-scan") {
     useBranchScan = true;
+  } else if (arg === "--all-releases") {
+    allReleases = true;
+  } else if (arg === "--release") {
+    releaseArg = rawArgs[++i];
+    if (!releaseArg || !RELEASE_ARG_RE.test(releaseArg)) {
+      console.error(`ERROR: --release needs a version like 4.52, got "${releaseArg ?? ""}"`);
+      process.exit(2);
+    }
+  } else if (RELEASE_ARG_RE.test(arg)) {
+    releaseArg = arg;
   } else {
     args.push(arg);
   }
+}
+if (releaseArg && allReleases) {
+  console.error("ERROR: --release and --all-releases are mutually exclusive");
+  process.exit(2);
 }
 
 // --- Argument classification ---
@@ -92,6 +119,12 @@ const scanRepos =
     ? edgeAppRepos
     : repoArgs;
 const useAsanaSection = noArgs && !useBranchScan;
+if ((releaseArg || allReleases) && !useAsanaSection) {
+  console.error(
+    "ERROR: --release/--all-releases only apply to the no-args section scan; explicit args are never release-filtered"
+  );
+  process.exit(2);
+}
 
 // --- Helpers ---
 
@@ -212,6 +245,27 @@ function extractReviewers(reviews) {
   };
 }
 
+// Normalize a release to a comparable [minor, patch] pair, dropping the
+// leading major 4 when present. Returns null for an unset/unparseable value.
+function parseRelease(value) {
+  const nums = String(value ?? "")
+    .replace(/^v/, "")
+    .split(".")
+    .filter((p) => p !== "")
+    .map(Number);
+  if (nums.length === 0 || nums.some((n) => !Number.isInteger(n))) return null;
+  if (nums[0] === 4 && nums.length >= 2) nums.shift();
+  return [nums[0], nums[1] ?? 0];
+}
+
+function compareRelease(a, b) {
+  return a[0] - b[0] || a[1] - b[1];
+}
+
+function formatRelease(r) {
+  return `4.${r[0]}.${r[1]}`;
+}
+
 // --- Main ---
 
 async function main() {
@@ -246,12 +300,45 @@ async function main() {
 
         const sectionTasks = await asanaGet(
           `/sections/${sectionGid}/tasks` +
-            `?opt_fields=name,assignee.gid,completed&completed_since=now&limit=100`
+            `?opt_fields=name,assignee.gid,completed,custom_fields.name,custom_fields.display_value` +
+            `&completed_since=now&limit=100`
         );
+        const candidates = [];
         for (const t of sectionTasks) {
           if (t.completed) continue;
           if (!t.assignee || t.assignee.gid !== userGid) continue;
-          asanaGids.push(t.gid);
+          const field = (t.custom_fields || []).find(
+            (f) => (f.name || "").trim().toLowerCase() === RELEASE_FIELD_NAME.toLowerCase()
+          );
+          candidates.push({ gid: t.gid, name: t.name, release: parseRelease(field?.display_value) });
+        }
+
+        // One release per land: the requested one, else the lowest present.
+        let selected = null;
+        if (releaseArg) {
+          selected = parseRelease(releaseArg);
+        } else if (!allReleases) {
+          for (const c of candidates) {
+            if (c.release && (!selected || compareRelease(c.release, selected) < 0)) {
+              selected = c.release;
+            }
+          }
+        }
+        results.release = {
+          mode: allReleases ? "all" : releaseArg ? "requested" : "lowest",
+          selected: selected ? formatRelease(selected) : null,
+        };
+        results.deferredTasks = [];
+        for (const c of candidates) {
+          if (allReleases || (c.release && compareRelease(c.release, selected) === 0)) {
+            asanaGids.push(c.gid);
+          } else {
+            results.deferredTasks.push({
+              gid: c.gid,
+              name: c.name,
+              release: c.release ? formatRelease(c.release) : null,
+            });
+          }
         }
       } catch (e) {
         results.errors.push(`Asana section scan: ${e.message}`);

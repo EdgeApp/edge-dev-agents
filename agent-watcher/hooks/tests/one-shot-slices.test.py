@@ -7,8 +7,9 @@ Run: python3 ~/.config/agent-watcher/hooks/tests/one-shot-slices.test.py
 Claude Code truncates each re-attached skill body at 20,000 characters after a
 compaction, so the core SKILL.md must stay under that and the phase rules must
 live in reference files the core step map points at. The pre-split file is the
-baseline: every rule id it carried must survive, exactly once, with a
-byte-identical body.
+baseline for ONE thing: every rule id it carried must still exist, exactly once.
+Rule bodies and prose are edited freely after the split and new rules are added,
+so neither is compared against the baseline.
 
 Baseline source: fixtures/one-shot-pre-split.SKILL.md, a pinned copy of the
 file the split was actually taken from. The scratchpad backup tarball is the
@@ -63,7 +64,7 @@ ref_files = sorted(f for f in os.listdir(refs_dir) if f.endswith('.md'))
 if len(core) >= LIMIT:
     fails.append('core SKILL.md is %d chars, must be under %d' % (len(core), LIMIT))
 
-# --- 2 + 3. every rule survives, exactly once, byte for byte -----------------
+# --- 2 + 3. every baseline rule id survives, exactly once ---------------------
 seen = {}
 for name, text in [('SKILL.md', core)] + [(f, read(os.path.join(refs_dir, f)))
                                           for f in ref_files]:
@@ -76,28 +77,8 @@ for name, text in [('SKILL.md', core)] + [(f, read(os.path.join(refs_dir, f)))
 for rid, body in sorted(pre_rules.items()):
     if rid not in seen:
         fails.append('rule %s was lost in the split' % rid)
-    elif seen[rid][1] != body:
-        fails.append('rule %s body changed (was %d chars, now %d) in %s'
-                     % (rid, len(body), len(seen[rid][1]), seen[rid][0]))
-for rid in sorted(set(seen) - set(pre_rules)):
-    fails.append('rule %s is new; the split may only move rules' % rid)
 
-# --- 3b. no prose was lost either: the split moves text, never rewrites it ----
-# Two lines are allowed to differ: the generic <rules> opener (each file carries its
-# own), and the worktree-provisioning line, whose "per Per-task worktrees above" pointed
-# at text that now lives in another file and was repointed to references/intake.md.
-ALLOW_DROPPED = {
-    '<rules description="Non-negotiable constraints.">',
-    'First provision the workspace (per **Per-task worktrees** above): from the plan, create a co-located worktree for the target repo — plus any gui-dependency repos the task modifies, then `updot`-link them into the gui worktree — and `cd` into the primary repo\'s worktree. (Skip on manual non-watcher runs already inside a normal checkout.) Before setting agent_status=Developing, the plan file `plan-<gid>-<short-slug>.md` (asana-plan `create-plan-required`) must already exist and be attached via `asana-task-update.sh --attach-file`; a followup segment skips this. Then set agent_status=Developing and run `/im` using the approved `/asana-plan` output.',
-}
-split_lines = set()
-for name, text in [('SKILL.md', core)] + [(f, read(os.path.join(refs_dir, f)))
-                                          for f in ref_files]:
-    split_lines |= {ln for ln in text.split('\n') if ln.strip()}
-for ln in pre.split('\n'):
-    if ln.strip() and ln not in split_lines and ln not in ALLOW_DROPPED:
-        fails.append('line dropped in the split: %s' % ln[:120])
-
+# --- 3b. every baseline step id still lives in exactly one file ---------------
 STEP_RE = re.compile(r'^<step id="([^"]+)"', re.M)
 for sid in STEP_RE.findall(pre):
     hits = [n for n, t in [('SKILL.md', core)] +

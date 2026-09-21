@@ -15,7 +15,7 @@ metadata:
 <rule id="no-script-bypass">If a companion script fails, report the error and STOP. Do NOT fall back to raw `gh`, `curl`, or other workarounds.</rule>
 <rule id="no-duplicate-feedback">Check existing reviews AND `inlineComments` from the context output (inline comments include resolved threads). Do not repeat feedback already given by another reviewer — this dedupe applies to workflow findings and conventions findings alike.</rule>
 <rule id="posting-gate">Posting is configured, never assumed. Default (no flag): present the formatted draft comments in chat and submit only after the user approves. `--comment`: submit without the ask. `--no-comment`: never submit; findings go to chat (and the run report in orch) only. In an orchestrated hands-off session the interactive ask is unavailable, so the default degrades to `--no-comment` with drafts delivered in the run report — post only when the task text explicitly directs posting.</rule>
-<rule id="never-approve">THIS RULE'S ID IS STALE (rename to `review-event-mapping` proposed, not yet applied); the body below is the contract. A submitted review carries a real verdict, and AUTHORSHIP decides which events are legal. Step 1 resolves it (`gh api user --jq .login` vs `author`).
+<rule id="review-event-mapping">A submitted review carries a real verdict, and AUTHORSHIP decides which events are legal. Step 1 resolves it (`gh api user --jq .login` vs `author`).
 
 ON A PR WE DO NOT AUTHOR: `REQUEST_CHANGES` when the review found something that must change before merge (a Critical or High finding: a real defect, a dropped guard, a broken caller). `APPROVE` when it found nothing, or nothing beyond nits, style preferences, and optional suggestions. Deliver the nits as inline comments on the approving review rather than withholding the verdict over them.
 
@@ -46,7 +46,7 @@ If the user provides a PR URL or number, pass `--pr`. If they also specify a rep
 
 If the script exits code 2 with `PROMPT_GH_AUTH`, prompt: "`gh` CLI is not authenticated. Run `gh auth login` first."
 
-Save the output JSON — it contains `number`, `title`, `url`, `author`, `headRef`, `baseRef`, `headSha`, `reviews[]`, `inlineComments[]`, and `files[]` (with patches). Note whether the PR author is us (`gh api user --jq .login` vs `author`) — it decides the `never-approve` event mapping.
+Save the output JSON — it contains `number`, `title`, `url`, `author`, `headRef`, `baseRef`, `headSha`, `reviews[]`, `inlineComments[]`, and `files[]` (with patches). Note whether the PR author is us (`gh api user --jq .login` vs `author`) — it decides the `review-event-mapping` rule.
 </step>
 
 <step id="2" name="Checkout PR branch">
@@ -113,7 +113,7 @@ Resolve the posting decision per `posting-gate`:
 2. Default interactive → show the drafts (grouped per PR file/line, with category), ask for approval, then submit the approved subset.
 3. `--comment` → submit directly.
 
-Submit via the companion script with the event per the event-mapping rule (`rule id="never-approve"`): on a PR we do not author, `REQUEST_CHANGES` when something must change before merge and `APPROVE` when only nits or nothing remain; on our own PR, `COMMENT`:
+Submit via the companion script with the event per the event-mapping rule (`review-event-mapping`): on a PR we do not author, `REQUEST_CHANGES` when something must change before merge and `APPROVE` when only nits or nothing remain; on our own PR, `COMMENT`:
 
 ```bash
 echo '<review-json>' | ~/.cursor/skills/pr-review/scripts/github-pr-review.sh submit \

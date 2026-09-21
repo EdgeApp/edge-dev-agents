@@ -178,11 +178,12 @@ Scope: the external destinations in rule 15, and above all Slack messages to par
 - **One proof per claim.** After the observation that proves the point, stop. A second confirming observation ("our production plugin sees this too: ...") is cut, not appended; if the second observation is the stronger one, it replaces the first.
 - **One ask, no asides.** A message carries one request. A second request ("if the key changed, please send the current one") and a history aside ("it was disabled once before, on Apr 27") are cut unless the recipient must act on them, in which case they are the message.
 - **No intro labels.** "Measured today:", "What we get today:", "Observed:" become "We see:" or nothing; the list speaks for itself.
+- **Links, not bare URLs.** Every URL in prose, tables included, is a markdown link target: `[latest.apk](https://...)`, `[owner/repo#12](https://github.com/...)`. A bare URL autolinks on some surfaces and stays plain text on others, and a URL inside backticks is never clickable. HTML attributes (`src=`, `href=`) and `<url>` autolinks pass; frontmatter fields are data.
 
 > Bad: "What we get today: [list]. Our production plugin sees this too: quotes fail with 401. If the key changed, please send us the current one. It was disabled once before, on Apr 27."
 > Good: "We see: [list]. Was the key revoked or rotated around your Sep 1 deploy, or are our requests blocked by IP?"
 
-The first two bullets and the last are enforced by `scripts/no-slop-lint.sh`; the proof and ask bullets are judged by `scripts/no-slop-judge.sh` at the Slack and report boundaries.
+The first two bullets, the intro-label bullet and the links bullet are enforced by `scripts/no-slop-lint.sh`; the proof and ask bullets are judged by `scripts/no-slop-judge.sh` at the Slack and report boundaries.
 
 ## Examples
 

@@ -75,7 +75,7 @@ If the parent task name already has a prefix (e.g. `gui: Some feature`), strip i
 The script:
 - Checks if a matching dependency already exists (by name) — if so, outputs `CREATED: false` and the existing GID
 - Creates the task in all parent project memberships (including release-version tags)
-- Copies priority, status, and `Planned` from the parent
+- Copies the Engineering Board's Priority and Release from the parent and sets its developer field to the current user; no other board's fields are copied
 - Assigns to the current user (auto-resolved via `asana-whoami.sh`)
 - Sets the new task as a blocking dependency of the parent
 

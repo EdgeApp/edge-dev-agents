@@ -47,7 +47,10 @@ if $ANCHOR; then S="claude-asana-$NAME"; RC="$NAME"; else S="claude-asana-chat-$
 tmux has-session -t "$S" 2>/dev/null && { echo "session already exists: $S (kill it first or pick another --name)" >&2; exit 1; }
 
 cmd="claude"
-[ -n "$MODEL" ] && cmd="$cmd --model $MODEL"
+# The model id is quoted: ids carry a context suffix in brackets
+# (claude-fable-5-1[1m]) and zsh treats an unquoted [1m] as a glob, so the
+# send-keys line died with "no matches found" (2026-09-21, jev anchor spawn).
+[ -n "$MODEL" ] && cmd="$cmd --model '$MODEL'"
 [ -n "$EFFORT" ] && cmd="$cmd --effort $EFFORT"
 $CHROME && cmd="$cmd --chrome"
 cmd="$cmd --dangerously-skip-permissions --remote-control $RC"

@@ -26,6 +26,9 @@
 #          perl -pi; lib/md-write-target.sh owns the vector list) -> FRAGMENT
 #          lint of the command text (prose interleaved with shell syntax, so
 #          shape checks would false-positive)
+#   Bash   `gh issue comment --body-file <f>` -> FULL lint of <f> (no
+#          allowlist: the file is usually in the scratchpad); `--body "..."`
+#          -> FRAGMENT lint of the command text. See ISSUE COMMENTS below.
 #
 # CHANGELOG.md targets additionally run the changelog skill's entry-shape lint
 # (~/.cursor/skills/changelog/scripts/changelog-entry-lint.sh): length cap,
@@ -141,6 +144,30 @@ case "$TOOL" in
   Bash)
     CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
     [ -n "$CMD" ] || exit 0
+    CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)
+    # ISSUE COMMENTS (operator ruling 2026-09-21): `gh issue comment --body /
+    # --body-file` is the orch's report channel (run reports, verify verdicts,
+    # address-round summaries, APK links) and no posting funnel lints it:
+    # block-raw-gh-writes.sh owns PR comments and reviews, and the body file
+    # almost always lives in the allowlisted scratchpad, so the write-time lint
+    # above never saw it either (R2 asset URLs reached issues as plain text).
+    # A --body-file is linted whole; an inline --body is linted as a fragment
+    # of the command text. No allowlist check: a comment is outward wherever
+    # its body file sits.
+    GH_COMMENT=""
+    if printf '%s' "$CMD" | grep -qE '(^|[[:space:];&|(])gh[[:space:]]+issue[[:space:]]+comment([[:space:]]|$)'; then
+      GH_COMMENT=1
+      BF=$(printf '%s' "$CMD" | grep -oE -- '--body-file(=|[[:space:]]+)[^[:space:]]+' | head -1 \
+        | sed -E 's/^--body-file(=|[[:space:]]+)//; s/^["'"'"']//; s/["'"'"']$//')
+      if [ -n "$BF" ]; then
+        case "$BF" in /*) ;; *) BF="${CWD:-.}/$BF" ;; esac
+        [ -f "$BF" ] || exit 0
+        TEXT=$(cat "$BF"); MODE=""; TARGET="$BF"
+      else
+        TEXT="$CMD"; MODE="--fragment"; TARGET="the inline --body"
+      fi
+    fi
+    if [ -z "$GH_COMMENT" ]; then
     # Target from the mention-stripped view (heredoc bodies and quoted spans
     # blanked): a command that QUOTES 'sed -i x.md' in a report is not a write.
     # The lint itself runs on the raw text, since the heredoc body IS the prose.
@@ -169,6 +196,7 @@ case "$TOOL" in
     # vocabulary); STRINGS stays empty here on purpose.
     TEXT="$CMD"
     MODE="--fragment"
+    fi
     ;;
 esac
 [ -n "$TEXT" ] || exit 0
@@ -182,6 +210,11 @@ rm -f "$TMP"
 
 if [ "$RC" -eq 1 ]; then
   HARD=$(printf '%s' "$OUT" | grep '^HARD' | head -6)
+  if [ -n "${GH_COMMENT:-}" ]; then
+    echo "BLOCKED: this gh issue comment body ($TARGET) fails the shared no-slop lint (an issue comment is outward prose: no em dashes, no banned vocabulary, every URL a markdown link [label](url)). Fix these and retry the command:
+$HARD" >&2
+    exit 2
+  fi
   if [ -n "$STRINGS" ]; then
     echo "BLOCKED: user-facing copy being written to $TARGET fails the shared no-slop lint (locale strings are outward prose: no em dashes, no banned vocabulary, no count-announcement openers, no send-time stamps). Fix these values and rewrite:
 $HARD" >&2

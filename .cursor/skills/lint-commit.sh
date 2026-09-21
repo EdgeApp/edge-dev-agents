@@ -295,7 +295,7 @@ if [[ -n "$MESSAGE" && -z "$FIXUP" ]]; then
     "fixup! "*|"squash! "*|"Revert \""*|"Merge "*) ;;
     *)
       if [[ ${#SUBJECT} -gt 50 ]]; then
-        echo "BLOCKED: commit subject is ${#SUBJECT} characters; the Edge convention is at most 50 (reviewer-enforced on every repo). Shorten the first line and retry:" >&2
+        echo "BLOCKED: commit subject is ${#SUBJECT} characters; the cap is 50 in every repo this script commits to (git log, blame and PR lists truncate past it). Shorten the first line and retry:" >&2
         echo "  $SUBJECT" >&2
         exit 1
       fi

@@ -7,16 +7,17 @@ Run: python3 ~/.config/agent-watcher/hooks/tests/asana-flags.test.py
 
 Covers:
   A. asana-task-update.sh --assign <gid>
-     A1 sets the assignee only when the task's projects carry neither legacy
-        Reviewer nor Implementor field (no custom_fields in the PUT, no prompt).
-     A2 mirrors into both fields when a project carries them, resolving the
-        implementor via asana-whoami.sh with a token read from credentials.json.
+     A1 sets the assignee and nothing else (no custom_fields in the PUT, no
+        task read, no prompt).
+     A2 --set-priority / --set-release / --set-developer write the Engineering
+        Board fields, options resolved by name, token read from credentials.json.
      A3 a refused PUT exits 1 and prints the HTTP status and Asana's message.
      A4 a refused task read exits 1 with the HTTP status.
      A5 a transport failure exits 1 and names curl's exit code.
      A6 missing reviewer: --skip-assign-if-missing skips (0); otherwise exit 2
         with PROMPT_REVIEWER.
-     A7 an explicit --set-reviewer is still sent even off-project.
+     A7 the removed other-board flags (Status, Reviewer, Implementor, Planned,
+        review estimate) are unknown flags: exit 1, no API call.
   B. pr-create.sh --asana-attach
      B1 `--asana-task <gid> --asana-attach` (one-shot references/pr.md, step 5) attaches and
         reports asana_attached true; B2 the reverse flag order does too.
@@ -34,8 +35,9 @@ REAL = os.path.expanduser('~')
 SRC = os.environ.get('ASANA_FLAGS_SRC')
 GID = '9990000000002'
 PROJ = '8880000000001'
-REVIEWER = '1203334388004673'
-IMPLEMENTOR = '1203334386796983'
+PRIORITY = '1213843686985522'
+RELEASE = '1213939602865824'
+DEVELOPER = '1214028561571290'
 fails = []
 
 
@@ -104,8 +106,10 @@ for name, body in [('curl', CURL)]:
 
 def routes(put_code=200, put_body=None, task_code=200, project_fields=(), put_exit=0):
     task = {'data': {'gid': GID, 'name': 't', 'memberships': [{'project': {'gid': PROJ}}],
-                     'custom_fields': [{'gid': REVIEWER, 'people_value': []},
-                                       {'gid': IMPLEMENTOR, 'people_value': []}]}}
+                     'custom_fields': [
+                         {'gid': PRIORITY, 'enum_options': [{'gid': 'p-high', 'name': 'High'}]},
+                         {'gid': RELEASE, 'enum_options': [{'gid': 'r-53', 'name': '53.0'}]},
+                         {'gid': DEVELOPER, 'people_value': []}]}}
     rs = [
         {'method': 'GET', 'path': f'/tasks/{GID}', 'code': task_code,
          'body': task if task_code == 200 else {'errors': [{'message': 'task not found'}]}},
@@ -142,17 +146,20 @@ pb = puts()
 check('A1 off-project assign exits 0', p.returncode == 0, p.stdout + p.stderr)
 check('A1 PUT carries the assignee and no custom_fields',
       len(pb) == 1 and pb[0]['data'] == {'assignee': '522823585857811'}, pb)
-check('A1 says the legacy fields were skipped', 'assignee only' in p.stdout and 'PROMPT' not in p.stdout, p.stdout)
+check('A1 needs no task read and no prompt',
+      not [c for c in calls() if c['method'] == 'GET'] and 'PROMPT' not in p.stdout, p.stdout)
 
 cred = os.path.join(HOME, '.config/agent-watcher/credentials.json')
 os.makedirs(os.path.dirname(cred), exist_ok=True)
 json.dump({'asana_token': 'from-cred'}, open(cred, 'w'))
-p = update(['--assign', '522823585857811'], token=None, project_fields=(REVIEWER, IMPLEMENTOR))
+p = update(['--set-priority', 'high', '--set-release', '53.0', '--set-developer', '1111'], token=None)
 pb = puts()
-check('A2 on-project assign exits 0', p.returncode == 0, p.stdout + p.stderr)
-check('A2 mirrors Reviewer and resolves Implementor via whoami (credentials token exported)',
-      len(pb) == 1 and pb[0]['data'].get('assignee') == '522823585857811'
-      and pb[0]['data'].get('custom_fields') == {REVIEWER: ['522823585857811'], IMPLEMENTOR: ['1111']}, pb)
+check('A2 Engineering field write exits 0', p.returncode == 0, p.stdout + p.stderr)
+check('A2 writes Priority, Release and Developer by Engineering gid (credentials token)',
+      len(pb) == 1 and pb[0]['data'].get('custom_fields') == {PRIORITY: 'p-high', RELEASE: 'r-53', DEVELOPER: ['1111']}, pb)
+p = update(['--set-priority', 'urgent'])
+check('A2 unknown option exits 1, lists the real options, no PUT',
+      p.returncode == 1 and 'High' in p.stderr and not puts(), p.stdout + p.stderr)
 os.remove(cred)
 
 p = update(['--assign', '522823585857811'], put_code=400,
@@ -161,7 +168,7 @@ check('A3 refused PUT exits 1 (not a bare 56)', p.returncode == 1, f'rc={p.retur
 check('A3 stderr names HTTP status and Asana message',
       'HTTP 400' in p.stderr and 'is not on given object' in p.stderr and 'assignee' in p.stderr, p.stderr)
 
-p = update(['--assign', '522823585857811'], task_code=404)
+p = update(['--set-priority', 'High'], task_code=404)
 check('A4 refused task read exits 1 with HTTP status',
       p.returncode == 1 and 'Task read: FAILED (HTTP 404' in p.stderr and not puts(), p.stdout + p.stderr)
 
@@ -174,10 +181,11 @@ check('A6 missing reviewer with skip exits 0, no PUT', p.returncode == 0 and 'sk
 p = update(['--assign'])
 check('A6 missing reviewer without skip exits 2 PROMPT_REVIEWER', p.returncode == 2 and 'PROMPT_REVIEWER' in p.stdout, p.stdout + p.stderr)
 
-p = update(['--assign', '522823585857811', '--set-reviewer', '777'])
-pb = puts()
-check('A7 explicit --set-reviewer is sent off-project',
-      p.returncode == 0 and len(pb) == 1 and pb[0]['data'].get('custom_fields') == {REVIEWER: ['777']}, pb)
+for flag in (['--set-reviewer', '777'], ['--set-implementor', '777'], ['--set-status', 'Review Needed'],
+             ['--set-planned', '1'], ['--auto-est-review-hrs']):
+    p = update(['--assign', '522823585857811'] + flag)
+    check(f'A7 {flag[0]} is an unknown flag, no API call',
+          p.returncode == 1 and 'Unknown flag' in p.stderr and not calls(), p.stdout + p.stderr)
 
 # ---------------- B. pr-create.sh --asana-attach ----------------
 PRC = install('.cursor/skills/pr-create/scripts/pr-create.sh', from_path=src('.cursor/skills/pr-create/scripts/pr-create.sh'))

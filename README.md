@@ -465,7 +465,7 @@ done.
 | Shared helpers | `strip-cmd-mentions.sh` | Blanks quoted/heredoc spans so hooks trigger on commands, not on text that merely mentions them |
 | | `cmd-executes.sh` | Command-position matching, so naming a script in a grep never fires the gate that guards executing it |
 
-`require-block-validation.sh` is an unregistered legacy kept for history; the
+`retired/require-block-validation.sh` is an unregistered legacy kept for history; the
 concession gate replaced it.
 
 ## Prose standards & enforcement

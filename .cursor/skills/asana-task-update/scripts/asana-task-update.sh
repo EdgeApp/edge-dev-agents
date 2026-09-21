@@ -5,7 +5,7 @@
 # Exit codes:
 #   0 = success
 #   1 = error
-#   2 = needs user input (PROMPT_REVIEWER, PROMPT_IMPLEMENTOR)
+#   2 = needs user input (PROMPT_REVIEWER)
 set -euo pipefail
 
 TASK_GID=""
@@ -23,13 +23,10 @@ ASSIGN_GID=""
 SKIP_ASSIGN_IF_MISSING=false
 DO_UNASSIGN=false
 
-SET_STATUS=""
 SET_BOARD_STATE=""
-SET_REVIEWER_GID=""
-SET_IMPLEMENTOR_GID=""
-SET_PRIORITY_GID=""
-SET_PLANNED_GID=""
-AUTO_EST_REVIEW=false
+SET_PRIORITY=""
+SET_RELEASE=""
+SET_DEVELOPER_GID=""
 
 CREATE_SUBTASK=false
 SUBTASK_NAME=""
@@ -62,13 +59,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-assign-if-missing) SKIP_ASSIGN_IF_MISSING=true; shift ;;
     --unassign) DO_UNASSIGN=true; shift ;;
-    --set-status) SET_STATUS="$2"; shift 2 ;;
     --set-board-state) SET_BOARD_STATE="$2"; shift 2 ;;
-    --set-reviewer|--reviewer) SET_REVIEWER_GID="$2"; shift 2 ;;
-    --set-implementor|--implementor) SET_IMPLEMENTOR_GID="$2"; shift 2 ;;
-    --set-priority) SET_PRIORITY_GID="$2"; shift 2 ;;
-    --set-planned) SET_PLANNED_GID="$2"; shift 2 ;;
-    --auto-est-review-hrs) AUTO_EST_REVIEW=true; shift ;;
+    --set-priority) SET_PRIORITY="$2"; shift 2 ;;
+    --set-release) SET_RELEASE="$2"; shift 2 ;;
+    --set-developer) SET_DEVELOPER_GID="$2"; shift 2 ;;
     *) echo "Unknown flag: $1" >&2; exit 1 ;;
   esac
 done
@@ -78,7 +72,7 @@ if [[ -z "$TASK_GID" ]]; then
   exit 1
 fi
 
-if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_STATUS" ]] && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_REVIEWER_GID" ]] && [[ -z "$SET_IMPLEMENTOR_GID" ]] && [[ -z "$SET_PRIORITY_GID" ]] && [[ -z "$SET_PLANNED_GID" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$COMMENT_FILE" ]] && ! $AUTO_EST_REVIEW; then
+if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_PRIORITY" ]] && [[ -z "$SET_RELEASE" ]] && [[ -z "$SET_DEVELOPER_GID" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$COMMENT_FILE" ]]; then
   echo "Error: No operations specified" >&2
   exit 1
 fi
@@ -155,7 +149,7 @@ asana_request() {
 CURRENT_STATE_DELIM="===== CURRENT STATE (agent-maintained; supersedes any stale prose above) ====="
 
 # --create-subtask: create a subtask under --task, print its gid, and re-point
-# TASK_GID to it so any --attach-pr/--set-status in the SAME invocation lands on
+# TASK_GID to it so any --attach-pr/--set-board-state in the SAME invocation lands on
 # the new subtask (one call: make the per-PR subtask AND attach its PR).
 if $CREATE_SUBTASK; then
   [[ -n "$SUBTASK_NAME" ]] || { echo "Error: --create-subtask requires --subtask-name" >&2; exit 1; }
@@ -168,13 +162,14 @@ if $CREATE_SUBTASK; then
   TASK_GID="$SUB_GID"
 fi
 
-# Airbitz.co workspace field GIDs
-STATUS_FIELD="1190660107346181"
+# Engineering Board field gids. Only Engineering and jon-claude fields are
+# written here: a task GET also lists workspace-global fields from other boards
+# (the old Status / Reviewer / Implementor / Planned set), and Asana refuses a
+# whole PUT that names a field outside the task's projects.
 BOARD_STATE_FIELD="1213992584300456"
-REVIEWER_FIELD="1203334388004673"
-IMPLEMENTOR_FIELD="1203334386796983"
-SPENT_DEV_HRS_FIELD="1202996660964169"
-EST_REVIEW_HRS_FIELD="1203002792997295"
+PRIORITY_FIELD="1213843686985522"
+RELEASE_FIELD="1213939602865824"
+DEVELOPER_FIELD="1214028561571290"
 
 # Resolve an enum option to its gid by NAME, from the field's OWN enum_options
 # on this task. Never from a hand-maintained table: the operator adds and renames
@@ -239,40 +234,6 @@ load_task_fields() {
   asana_request "Task read" "$ASANA_API/tasks/$TASK_GID?opt_fields=name,assignee.name,memberships.project.gid,custom_fields.gid,custom_fields.name,custom_fields.people_value.gid,custom_fields.people_value.name,custom_fields.number_value,custom_fields.enum_value.gid,custom_fields.enum_value.name,custom_fields.enum_options.gid,custom_fields.enum_options.name" \
     -H "Authorization: Bearer $ASANA_TOKEN" || exit 1
   TASK_FIELDS="$ASANA_RESPONSE"
-}
-
-# Custom field gids attached to the task's projects. A task's GET lists
-# workspace-global fields (the legacy Reviewer/Implementor/Status set) even when
-# none of its projects carries them, so "the field shows on the task" does not
-# mean a write to it is accepted. Only the projects' custom_field_settings say
-# which fields belong to the task.
-PROJECT_FIELD_GIDS=""
-PROJECT_FIELDS_LOADED=false
-load_project_fields() {
-  $PROJECT_FIELDS_LOADED && return 0
-  load_task_fields
-  local proj
-  for proj in $(printf '%s' "$TASK_FIELDS" | jq -r '.data.memberships[]?.project.gid // empty'); do
-    asana_request "Project fields read ($proj)" "$ASANA_API/projects/$proj/custom_field_settings?limit=100&opt_fields=custom_field.gid" \
-      -H "Authorization: Bearer $ASANA_TOKEN" || exit 1
-    PROJECT_FIELD_GIDS="$PROJECT_FIELD_GIDS $(printf '%s' "$ASANA_RESPONSE" | jq -r '[.data[]?.custom_field.gid] | join(" ")')"
-  done
-  PROJECT_FIELDS_LOADED=true
-}
-
-# field_on_task_projects <field_gid>: call load_project_fields first (it exits
-# on a failed read, which a function used as an `if` condition cannot do).
-field_on_task_projects() {
-  [[ " $PROJECT_FIELD_GIDS " == *" $1 "* ]]
-}
-
-read_people_field() {
-  local field_gid="$1"
-  echo "$TASK_FIELDS" | jq -r --arg gid "$field_gid" '
-    .data.custom_fields[]
-    | select(.gid == $gid)
-    | (.people_value[0].gid // "")
-  ' | head -n 1
 }
 
 if $DO_ATTACH; then
@@ -483,85 +444,34 @@ if $DO_ATTACH_FILE; then
   fi
 fi
 
-if $DO_ASSIGN || [[ -n "$SET_REVIEWER_GID" ]] || [[ -n "$SET_IMPLEMENTOR_GID" ]] || $AUTO_EST_REVIEW || [[ -n "$SET_PRIORITY_GID" ]] || [[ -n "$SET_PLANNED_GID" ]]; then
-  load_task_fields
-fi
-
-if $DO_ASSIGN; then
-  if [[ -z "$ASSIGN_GID" ]]; then
-    ASSIGN_GID="${SET_REVIEWER_GID:-$(read_people_field "$REVIEWER_FIELD")}"
-  fi
-  if [[ -z "$ASSIGN_GID" ]]; then
-    if $SKIP_ASSIGN_IF_MISSING; then
-      echo ">> Assignee: skipped (no reviewer provided or found on task)"
-      DO_ASSIGN=false
-    else
-      echo ">> PROMPT_REVIEWER"
-      exit 2
-    fi
-  fi
-
-  # The assignee is the operation --assign asks for. Mirroring it into the legacy
-  # Reviewer/Implementor people fields is a side effect, done only for a field
-  # one of the task's projects carries: Asana refuses the whole PUT, assignee
-  # included, when it names a field outside the task's projects (the current
-  # boards carry neither field). An explicit --set-reviewer/--set-implementor is
-  # still sent as asked, and a refusal is reported by the PUT below.
-  if $DO_ASSIGN; then
-    load_project_fields
-    MIRRORED=""
-    if [[ -z "$SET_REVIEWER_GID" ]] && field_on_task_projects "$REVIEWER_FIELD"; then
-      SET_REVIEWER_GID="$ASSIGN_GID"
-      MIRRORED="Reviewer"
-    fi
-
-    if [[ -z "$SET_IMPLEMENTOR_GID" ]] && field_on_task_projects "$IMPLEMENTOR_FIELD"; then
-      SET_IMPLEMENTOR_GID="$(read_people_field "$IMPLEMENTOR_FIELD")"
-      if [[ -z "$SET_IMPLEMENTOR_GID" ]]; then
-        SET_IMPLEMENTOR_GID="$("$SCRIPT_DIR/../../asana-whoami.sh" 2>/dev/null || true)"
-        if [[ -n "$SET_IMPLEMENTOR_GID" ]]; then
-          echo ">> Implementor: auto-resolved to current user ($SET_IMPLEMENTOR_GID)"
-        fi
-      fi
-      if [[ -z "$SET_IMPLEMENTOR_GID" ]]; then
-        echo ">> PROMPT_IMPLEMENTOR"
-        exit 2
-      fi
-      MIRRORED="${MIRRORED:+$MIRRORED, }Implementor"
-    fi
-    if [[ -z "$MIRRORED" ]]; then
-      echo ">> Reviewer/Implementor fields: not on this task's projects; setting the assignee only"
-    fi
+# --assign with no gid has no field to read a reviewer from (the Engineering
+# Board has none), so it asks, or skips under --skip-assign-if-missing.
+if $DO_ASSIGN && [[ -z "$ASSIGN_GID" ]]; then
+  if $SKIP_ASSIGN_IF_MISSING; then
+    echo ">> Assignee: skipped (no assignee gid provided)"
+    DO_ASSIGN=false
+  else
+    echo ">> PROMPT_REVIEWER"
+    exit 2
   fi
 fi
 
 CUSTOM_FIELDS_PATCH='{}'
 
-if [[ -n "$SET_STATUS" ]]; then
-  STATUS_GID="$(enum_option_gid "$STATUS_FIELD" "Status" "$SET_STATUS")" || exit 1
-  CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$STATUS_FIELD" --arg v "$STATUS_GID" '. + {($k): $v}')
-fi
 if [[ -n "$SET_BOARD_STATE" ]]; then
   BOARD_STATE_GID="$(enum_option_gid "$BOARD_STATE_FIELD" "Board State 🤖" "$SET_BOARD_STATE")" || exit 1
   CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$BOARD_STATE_FIELD" --arg v "$BOARD_STATE_GID" '. + {($k): $v}')
 fi
-if [[ -n "$SET_REVIEWER_GID" ]]; then
-  CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$REVIEWER_FIELD" --arg v "$SET_REVIEWER_GID" '. + {($k): [$v]}')
+if [[ -n "$SET_PRIORITY" ]]; then
+  PRIORITY_GID="$(enum_option_gid "$PRIORITY_FIELD" "Priority" "$SET_PRIORITY")" || exit 1
+  CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$PRIORITY_FIELD" --arg v "$PRIORITY_GID" '. + {($k): $v}')
 fi
-if [[ -n "$SET_IMPLEMENTOR_GID" ]]; then
-  CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$IMPLEMENTOR_FIELD" --arg v "$SET_IMPLEMENTOR_GID" '. + {($k): [$v]}')
+if [[ -n "$SET_RELEASE" ]]; then
+  RELEASE_GID="$(enum_option_gid "$RELEASE_FIELD" "Release (4.x.x)" "$SET_RELEASE")" || exit 1
+  CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$RELEASE_FIELD" --arg v "$RELEASE_GID" '. + {($k): $v}')
 fi
-if [[ -n "$SET_PRIORITY_GID" ]]; then
-  PRIORITY_FIELD_GID=$(echo "$TASK_FIELDS" | jq -r '.data.custom_fields[] | select(.name == "Priority") | .gid' | head -n 1)
-  if [[ -n "$PRIORITY_FIELD_GID" ]]; then
-    CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$PRIORITY_FIELD_GID" --arg v "$SET_PRIORITY_GID" '. + {($k): $v}')
-  fi
-fi
-if [[ -n "$SET_PLANNED_GID" ]]; then
-  PLANNED_FIELD_GID=$(echo "$TASK_FIELDS" | jq -r '.data.custom_fields[] | select(.name == "Planned") | .gid' | head -n 1)
-  if [[ -n "$PLANNED_FIELD_GID" ]]; then
-    CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$PLANNED_FIELD_GID" --arg v "$SET_PLANNED_GID" '. + {($k): $v}')
-  fi
+if [[ -n "$SET_DEVELOPER_GID" ]]; then
+  CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$DEVELOPER_FIELD" --arg v "$SET_DEVELOPER_GID" '. + {($k): [$v]}')
 fi
 
 UPDATE_BODY='{"data":{}}'
@@ -590,49 +500,22 @@ if $HAS_UPDATE; then
 fi
 
 if $DO_ASSIGN; then
-  echo ">> Assigned to reviewer: $ASSIGN_GID"
+  echo ">> Assigned to: $ASSIGN_GID"
 fi
 if $DO_UNASSIGN; then
   echo ">> Assignee: unset"
 fi
-if [[ -n "$SET_STATUS" ]]; then
-  echo ">> Status: $SET_STATUS"
-fi
 if [[ -n "$SET_BOARD_STATE" ]]; then
   echo ">> Board State: $SET_BOARD_STATE"
 fi
-if [[ -n "$SET_REVIEWER_GID" ]]; then
-  echo ">> Reviewer field: set"
+if [[ -n "$SET_PRIORITY" ]]; then
+  echo ">> Priority: $SET_PRIORITY"
 fi
-if [[ -n "$SET_IMPLEMENTOR_GID" ]]; then
-  echo ">> Implementor field: set"
+if [[ -n "$SET_RELEASE" ]]; then
+  echo ">> Release: $SET_RELEASE"
 fi
-if [[ -n "$SET_PRIORITY_GID" ]]; then
-  echo ">> Priority field: set"
-fi
-if [[ -n "$SET_PLANNED_GID" ]]; then
-  echo ">> Planned field: set"
-fi
-
-if $AUTO_EST_REVIEW; then
-  load_task_fields
-  EST_REVIEW=$(echo "$TASK_FIELDS" | jq -r --arg gid "$EST_REVIEW_HRS_FIELD" '.data.custom_fields[] | select(.gid == $gid) | (.number_value // empty)' | head -n 1)
-  if [[ -n "$EST_REVIEW" ]]; then
-    echo ">> Est. Review Hrs: already set ($EST_REVIEW)"
-  else
-    SPENT_DEV=$(echo "$TASK_FIELDS" | jq -r --arg gid "$SPENT_DEV_HRS_FIELD" '.data.custom_fields[] | select(.gid == $gid) | (.number_value // empty)' | head -n 1)
-    if [[ -z "$SPENT_DEV" ]]; then
-      echo ">> Est. Review Hrs: skipped (no Spent Dev Hrs)"
-    else
-      EST_VAL=$(python3 -c "v=float('$SPENT_DEV'); x=round(v*0.1,1); print(x if x >= 0.1 else 0.1)")
-      REVIEW_PATCH=$(jq -n --arg f "$EST_REVIEW_HRS_FIELD" --argjson v "$EST_VAL" '{data:{custom_fields:{($f):$v}}}')
-      asana_request "Est. Review Hrs update" -X PUT "$ASANA_API/tasks/$TASK_GID" \
-        -H "Authorization: Bearer $ASANA_TOKEN" \
-        -H "Content-Type: application/json" \
-        -d "$REVIEW_PATCH" || exit 1
-      echo ">> Est. Review Hrs: set to $EST_VAL (10% of Spent Dev Hrs)"
-    fi
-  fi
+if [[ -n "$SET_DEVELOPER_GID" ]]; then
+  echo ">> Developer field: set"
 fi
 
 # --set-current-state <file>: rewrite ONLY the agent-maintained tail of the task

@@ -279,13 +279,13 @@
       ]
     },
     "one-shot:followup-reopens-status": {
-      "hash": "b038f47d8de8",
+      "hash": "54bfc1a7c0e3",
       "dims": [
         "A24"
       ]
     },
     "one-shot:ignore-refired-one-shot": {
-      "hash": "05e3b9f20b15",
+      "hash": "d80ea3ed23a2",
       "dims": [
         "A1"
       ]
@@ -564,7 +564,7 @@
       ]
     },
     "file:lint-commit.sh": {
-      "hash": "b51033020748",
+      "hash": "f16f81395268",
       "dims": [
         "A12"
       ]
@@ -688,6 +688,48 @@
       "dims": [
         "A13"
       ]
+    },
+    "one-shot:field-deltas-are-re-entry": {
+      "hash": "bb2c291d54d4",
+      "dims": [
+        "A1"
+      ]
+    },
+    "one-shot:fix-through-the-fixup-path": {
+      "hash": "3761bc9a6f99",
+      "dims": [
+        "A12"
+      ]
+    },
+    "one-shot:field-decides": {
+      "hash": "7dc9c502a508",
+      "dims": [
+        "A36"
+      ]
+    },
+    "one-shot:before-the-pr": {
+      "hash": "2dbafe2661a1",
+      "dims": [
+        "A36"
+      ]
+    },
+    "one-shot:findings-are-candidates": {
+      "hash": "6dae834b689e",
+      "dims": [
+        "A36"
+      ]
+    },
+    "file:block-raw-gh-writes.sh": {
+      "hash": "3e2a9c22c735",
+      "dims": [
+        "A36"
+      ]
+    },
+    "one-shot:report-both-sides": {
+      "hash": "5106c9fbec45",
+      "dims": [
+        "A18"
+      ]
     }
   },
   "acked_uncovered": {
@@ -708,8 +750,8 @@
       "hash": "035e8ee5a1fb"
     },
     "asana-task-update:prompt-codes": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "110303ef9977"
+      "reason": "2026-09-21: exit-code handshake for an interactive assignee prompt; hands-off callers pass --skip-assign-if-missing, so no run behavior for an eval to grade. Re-acked after PROMPT_IMPLEMENTOR was removed with the other-board fields.",
+      "hash": "6cdd548478be"
     },
     "asana-task-update:script-timeouts": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1466,6 +1508,10 @@
     "pr-create:prose-edit-funnel": {
       "reason": "2026-09-18: tool pointer; misuse is mechanically blocked by block-raw-gh-writes.sh and the script's own lint/author gates",
       "hash": "1b8815f4af80"
+    },
+    "one-shot:no-posting": {
+      "reason": "2026-09-21: mechanically enforced by ~/.config/agent-watcher/hooks/block-raw-gh-writes.sh (gh pr comment/review and comment-endpoint API writes are blocked); a post from the self-review phase is a hook regression, noted in A36's grounding",
+      "hash": "5cef6de697fe"
     }
   },
   "excluded_skills": {

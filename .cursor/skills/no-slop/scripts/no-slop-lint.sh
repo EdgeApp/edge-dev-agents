@@ -126,6 +126,9 @@ const PRED = /\b(?:are|is)\s+(?:easy to miss|worth noting|worth calling out|wort
 const findings = []
 const locators = []  // [line, text]; SKILL rule 22, at most one per document
 let fence = false
+// 0 = no frontmatter, 1 = inside the leading --- block, 2 = past it. Frontmatter
+// holds URL fields as data (stamp lines, artifact ids), not prose.
+let front = 0
 // Hard-wrapped prose (commit bodies wrap at 72, and PR bodies often inherit the
 // habit) puts one sentence across several physical lines. The line-scoped checks
 // below are unaffected, but every sentence-shape check needs the whole sentence:
@@ -173,6 +176,29 @@ LINES.forEach((raw, i) => {
   let line = raw
   // Em dashes: everywhere, including headings/tables.
   if (line.includes("—")) findings.push(["HARD", n, "em dash"])
+  if (i === 0 && /^---\s*$/.test(raw)) front = 1
+  else if (front === 1 && /^---\s*$/.test(raw)) front = 2
+  // Links, not bare URLs (writing-style "reference links must be clickable",
+  // operator ruling 2026-09-21 after R2 asset links reached issue comments and
+  // run reports as plain text): every URL in prose is a markdown link target
+  // "[label](url)". Bare URLs autolink on some surfaces and stay plain text on
+  // others (mobile clients, terminals, code spans never linkify), so the
+  // markdown form is the only one that is clickable everywhere. Accepted
+  // shapes: "](url)", "<url>" autolinks, HTML attributes ("src=", "href=").
+  // Checked on the raw line, tables included (a table cell of bare URLs is the
+  // shape that shipped), before backticked spans are blanked: a URL inside a
+  // code span is the classic unclickable form. Locale strings and frontmatter
+  // are data, not prose.
+  if (!STRINGS && front !== 1) {
+    const URL_RE = new RegExp("https?://[^\\s<>()\\[\\]\"\x27\x60]+", "g")
+    let um
+    while ((um = URL_RE.exec(raw)) !== null) {
+      const before = raw.slice(Math.max(0, um.index - 2), um.index)
+      if (/\]\($/.test(before) || /<$/.test(before) || /=["\x27]$/.test(before)) continue
+      findings.push(["HARD", n, "bare URL: write it as a markdown link [label](url); a bare or backticked URL is plain text on some surfaces"])
+      break
+    }
+  }
   if (/^\s*#|^\s*\||^\s*>/.test(line)) return
   const isListItem = /^\s*(?:[-*]\s+|\d+[.)]\s+)/.test(line)
   line = line.replace(/^\s*(?:[-*]\s+|\d+[.)]\s+)?/, "") // markers stripped, content participates

@@ -46,7 +46,7 @@ Per `findings-are-candidates`, judge every finding against the diff. Keep the re
 <step id="4.5d" name="Fix">
 Group survivors by target commit and apply them per `fix-through-the-fixup-path`. A finding you reject produces no commit.
 
-Re-run the local verification that phase 4 ran if a fix touches code that verification covered; a fix that breaks the build is worse than the finding it answered.
+Then re-verify at the SAME bar a reviewer-thread fix carries (watch.md step 6 point 3, reached from followup.md `followup-reopens-status` (4)), whether or not phase 4 ran in this segment: a fix that reaches code the app runs owes `/build-and-test` again (status back to `Developing` while fixing, `Testing` while verifying); an inert one owes nothing but the note in the report. A fix that breaks the build is worse than the finding it answered.
 </step>
 
 <step id="4.5e" name="Record">
@@ -55,6 +55,6 @@ Update `/tmp/agent-state-<gid>.md` (Decisions and Verified) and carry both lists
 
 <edge-cases>
 <case name="Field absent on the task">`asana-review-field.sh` returns the fleet default for an unset field, so an ordinary non-agent task without the field behaves exactly like the default. No special handling.</case>
-<case name="Followup run with an open PR">The phase still runs when the field asks for it. The fold-mode oracle answers `preserve` if a human is mid-review, so fixes stay visible as `fixup!` commits and reach the remote through the sanctioned finalize path rather than this phase.</case>
+<case name="Followup run with an open PR">The phase still runs when the field asks for it, and on a re-armed task an `agent_review` value the operator just set is what re-enters it, per followup.md `field-deltas-are-re-entry`. The fold-mode oracle answers `preserve` if a human is mid-review, so fixes stay visible as `fixup!` commits and reach the remote through the sanctioned finalize path rather than this phase.</case>
 <case name="Workflow fails or returns nothing">A review that cannot run is not a blocker: record it in the report and continue to PR creation. The field asked for a review, not for a gate.</case>
 </edge-cases>

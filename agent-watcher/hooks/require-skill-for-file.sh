@@ -22,8 +22,13 @@
 #   */.cursor/skills/*/SKILL.md   author     all   \
 #   */.cursor/rules/*.mdc         author     all    | the workflow itself: a
 #   */.cursor/skills/*.sh         author     all    | skill, rule, companion
-#   */.config/agent-watcher/*.sh  author     all    | script, or hook. Editing
-#   */.config/agent-watcher/*.js  author     all   /  one without the authoring
+#   */.config/agent-watcher/*.sh  author     all    | script, hook (site-orch's
+#   */.config/agent-watcher/*.js  author     all    | tenant hooks included), or
+#   */git/site-orch/hooks/*.sh    author     all    | the hook REGISTRATIONS, where
+#   */.claude/settings.json       author     all   /  a missing or wrong entry
+#                                                     means a hook never fires,
+#                                                     with no error. Editing
+#                                                     one without the authoring
 #                                                     contract in context is how
 #                                                     duplicated helpers, prose
 #                                                     a mechanism already
@@ -65,7 +70,9 @@ TABLE="*/AGENTS.md:agents-md:all
 */.cursor/rules/*.mdc:author:all
 */.cursor/skills/*.sh:author:all
 */.config/agent-watcher/*.sh:author:all
-*/.config/agent-watcher/*.js:author:all"
+*/.config/agent-watcher/*.js:author:all
+*/git/site-orch/hooks/*.sh:author:all
+*/.claude/settings.json:author:all"
 
 # What the Bash vector searches the command for, derived from the table so a new
 # row needs no second edit: a pattern ending in a literal name probes that name,

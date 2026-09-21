@@ -52,7 +52,7 @@ Compute `reason_hash` as `printf %s "<reason>" | shasum -a 256 | cut -c1-16` so 
 </step>
 
 <invocation>
-Invoked two ways, identical contract:
-- NOW (single-agent): the block-validation gate (`require-block-validation.sh`) denies a `--blocked yes` write that has no fresh matching verdict; the main agent runs `/blocker-validator <gid> "<reason>"`, which writes the verdict, then re-attempts the block.
+Two ways, identical contract:
+- NOW: a `--blocked yes` write is a `block` completion event. `require-completion-judgment.sh` sends it to the completion judge, which rules on it outside the run with this taxonomy as one section of its rubric; the run never writes a verdict itself.
 - LATER (tester split): the same contract runs as a dedicated agent (a PreToolUse agent-hook, or `subagent_type: blocker-validator`). The attempt-log makes this transition seamless — the tester subagent writes attempts, this validator reads them, no change here.
 </invocation>

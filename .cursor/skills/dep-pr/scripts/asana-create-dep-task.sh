@@ -84,7 +84,7 @@ fi
 parent_info=$(curl -s "$API/tasks/$PARENT_GID?opt_fields=workspace.gid,memberships.project.gid,memberships.project.name,custom_fields.gid,custom_fields.enum_value.gid,custom_fields.enum_value.name,custom_fields.people_value.gid,custom_fields.people_value.name" \
   -H "$AUTH")
 
-read -r WORKSPACE_GID PROJECT_GIDS PRIORITY_INFO STATUS_INFO PLANNED_INFO REVIEWER_INFO < <(echo "$parent_info" | python3 -c "
+read -r WORKSPACE_GID PROJECT_GIDS PRIORITY_INFO RELEASE_INFO < <(echo "$parent_info" | python3 -c "
 import sys, json, re
 data = json.load(sys.stdin)['data']
 ws = data.get('workspace', {}).get('gid', '')
@@ -100,66 +100,36 @@ if not projects and data.get('memberships'):
     projects.append(data['memberships'][0]['project']['gid'])
 proj_str = ','.join(projects)
 
-# Field GIDs (stable known fields)
+# Engineering Board fields a blocking dep inherits: it has to be scheduled with
+# its parent, so Priority and Release carry over. Repo, LOE and Category describe
+# the parent's own work and are left for the dep task to set. Other boards'
+# fields on the parent (a task GET lists them too) are never copied.
 ENUM_FIELDS = {
-    '795866930204488': 'priority',
-    '1190660107346181': 'status',
-}
-PEOPLE_FIELDS = {
-    '1203334388004673': 'reviewer',
+    '1213843686985522': 'priority',
+    '1213939602865824': 'release',
 }
 
 enum_results = {}
-people_results = {}
-
 for f in data.get('custom_fields', []):
     fgid = f['gid']
     if fgid in ENUM_FIELDS and f.get('enum_value'):
-        label = ENUM_FIELDS[fgid]
-        enum_results[label] = (fgid, f['enum_value']['gid'], f['enum_value'].get('name', ''))
-    # "Planned" is workspace-specific, so detect by field name:
-    if f.get('name') == 'Planned' and f.get('enum_value'):
-        enum_results['planned'] = (
-            fgid,
-            f['enum_value']['gid'],
-            f['enum_value'].get('name', '')
-        )
-    if fgid in PEOPLE_FIELDS:
-        label = PEOPLE_FIELDS[fgid]
-        pv = f.get('people_value', [])
-        if pv:
-            people_results[label] = (fgid, pv[0]['gid'], pv[0].get('name', ''))
+        enum_results[ENUM_FIELDS[fgid]] = (fgid, f['enum_value']['gid'], f['enum_value'].get('name', ''))
 
 def fmt_enum(key):
     if key in enum_results:
         return ':'.join(enum_results[key])
     return '::'
 
-def fmt_people(key):
-    if key in people_results:
-        return ':'.join(people_results[key])
-    return '::'
-
-print(f\"{ws} {proj_str} {fmt_enum('priority')} {fmt_enum('status')} {fmt_enum('planned')} {fmt_people('reviewer')}\")
+print(f\"{ws} {proj_str} {fmt_enum('priority')} {fmt_enum('release')}\")
 ")
 
-PRIORITY_FIELD=$(echo "$PRIORITY_INFO" | cut -d: -f1)
 PRIORITY_ENUM=$(echo "$PRIORITY_INFO" | cut -d: -f2)
 PRIORITY_NAME=$(echo "$PRIORITY_INFO" | cut -d: -f3)
-STATUS_FIELD=$(echo "$STATUS_INFO" | cut -d: -f1)
-STATUS_ENUM=$(echo "$STATUS_INFO" | cut -d: -f2)
-STATUS_NAME=$(echo "$STATUS_INFO" | cut -d: -f3)
-PLANNED_FIELD=$(echo "$PLANNED_INFO" | cut -d: -f1)
-PLANNED_ENUM=$(echo "$PLANNED_INFO" | cut -d: -f2)
-PLANNED_NAME=$(echo "$PLANNED_INFO" | cut -d: -f3)
-REVIEWER_FIELD=$(echo "$REVIEWER_INFO" | cut -d: -f1)
-REVIEWER_GID=$(echo "$REVIEWER_INFO" | cut -d: -f2)
-REVIEWER_NAME=$(echo "$REVIEWER_INFO" | cut -d: -f3)
+RELEASE_ENUM=$(echo "$RELEASE_INFO" | cut -d: -f2)
+RELEASE_NAME=$(echo "$RELEASE_INFO" | cut -d: -f3)
 
-# Auto-resolve implementor to current user
-IMPLEMENTOR_FIELD="1203334386796983"
-IMPLEMENTOR_GID="$CURRENT_USER_GID"
-IMPLEMENTOR_NAME="current user"
+# The Engineering Board's developer field is the current user.
+DEVELOPER_GID="$CURRENT_USER_GID"
 
 # Phase 3: Create the task
 # Mark agent-authored description (🥋 / 👊), idempotently — same markers the MCP
@@ -210,17 +180,11 @@ UPDATE_CMD=("$SCRIPT_DIR/../../asana-task-update/scripts/asana-task-update.sh" "
 if [[ -n "$PRIORITY_ENUM" ]]; then
   UPDATE_CMD+=("--set-priority" "$PRIORITY_ENUM")
 fi
-if [[ -n "$STATUS_ENUM" ]]; then
-  UPDATE_CMD+=("--set-status" "$STATUS_ENUM")
+if [[ -n "$RELEASE_ENUM" ]]; then
+  UPDATE_CMD+=("--set-release" "$RELEASE_ENUM")
 fi
-if [[ -n "$PLANNED_ENUM" ]]; then
-  UPDATE_CMD+=("--set-planned" "$PLANNED_ENUM")
-fi
-if [[ -n "$REVIEWER_GID" ]]; then
-  UPDATE_CMD+=("--set-reviewer" "$REVIEWER_GID")
-fi
-if [[ -n "$IMPLEMENTOR_GID" ]]; then
-  UPDATE_CMD+=("--set-implementor" "$IMPLEMENTOR_GID")
+if [[ -n "$DEVELOPER_GID" ]]; then
+  UPDATE_CMD+=("--set-developer" "$DEVELOPER_GID")
 fi
 if [[ ${#UPDATE_CMD[@]} -gt 3 ]]; then
   "${UPDATE_CMD[@]}" > /dev/null
@@ -242,8 +206,6 @@ echo "DEPENDENCY_SET: $NEW_GID blocks $PARENT_GID"
 
 fields_msg=""
 [[ -n "$PRIORITY_NAME" ]] && fields_msg="priority=$PRIORITY_NAME"
-[[ -n "$STATUS_NAME" ]] && fields_msg="${fields_msg:+$fields_msg, }status=$STATUS_NAME"
-[[ -n "$PLANNED_NAME" ]] && fields_msg="${fields_msg:+$fields_msg, }planned=$PLANNED_NAME"
-[[ -n "$REVIEWER_NAME" ]] && fields_msg="${fields_msg:+$fields_msg, }reviewer=$REVIEWER_NAME"
-[[ -n "$IMPLEMENTOR_GID" ]] && fields_msg="${fields_msg:+$fields_msg, }implementor=$IMPLEMENTOR_NAME"
+[[ -n "$RELEASE_NAME" ]] && fields_msg="${fields_msg:+$fields_msg, }release=$RELEASE_NAME"
+[[ -n "$DEVELOPER_GID" ]] && fields_msg="${fields_msg:+$fields_msg, }developer=current user"
 [[ -n "$fields_msg" ]] && echo "FIELDS_SET: $fields_msg"

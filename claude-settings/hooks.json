@@ -48,6 +48,16 @@
         }
       ],
       "matcher": "mcp__claude_ai_Asana__add_comment"
+    },
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/record-file-writes.sh",
+          "timeout": 15,
+          "type": "command"
+        }
+      ],
+      "matcher": "Write|Edit|NotebookEdit|Bash"
     }
   ],
   "PreToolUse": [
@@ -186,6 +196,11 @@
         },
         {
           "command": "/Users/eddy/git/site-orch/hooks/spec-read-gate.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/record-file-writes.sh",
           "timeout": 10,
           "type": "command"
         }
