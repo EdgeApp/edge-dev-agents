@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6217/20260921-122132-agent-proof-1211086099095860-01-HACKED-unstake-insufficient-funds.png",
+      "caption": "unstake insufficient funds",
+      "index": "1",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Stubbed the Kiln stakePosition and the change quote (its approve() rejects with a bridged InsufficientFundsError), because the mainnet Kiln position will not load on the sim; the catch block, getStakeErrorMessage and the error tile are all real.",
+      "batchAt": "2026-09-21T19:21:32Z",
+      "headSha": "fd82ed854a8b67ecbb5969c6c3164e78d9c66243",
+      "addedAt": "2026-09-21T19:21:32Z"
+    }
+  ]
+}
