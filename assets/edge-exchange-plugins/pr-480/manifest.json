@@ -300,6 +300,90 @@
       "batchAt": "2026-09-18T19:06:34Z",
       "headSha": "cc052f8629191f4e6885bfbea626300a466dde0d",
       "addedAt": "2026-09-18T19:06:34Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260922-165545-agent-proof-1217036054017879-60-mptrade-dash-usdc-swap-success.png",
+      "caption": "mptrade dash usdc swap success",
+      "index": "60",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-22T23:55:45Z",
+      "headSha": "e951aebe08272867e2610dac3ab8c530e128aec1",
+      "addedAt": "2026-09-22T23:55:45Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260922-165545-agent-proof-1217036054017879-61-mptrade-below-limit-error.png",
+      "caption": "mptrade below limit error",
+      "index": "61",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-22T23:55:45Z",
+      "headSha": "e951aebe08272867e2610dac3ab8c530e128aec1",
+      "addedAt": "2026-09-22T23:55:45Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260922-165545-agent-proof-1217036054017879-62-mptrade-max-probe-amount.png",
+      "caption": "mptrade max probe amount",
+      "index": "62",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-22T23:55:45Z",
+      "headSha": "e951aebe08272867e2610dac3ab8c530e128aec1",
+      "addedAt": "2026-09-22T23:55:45Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260922-165545-agent-proof-1217036054017879-63-HACKED-registertxs-503-quote.png",
+      "caption": "registertxs 503 quote",
+      "index": "63",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Installed sim plugin bundle only, never committed: registerTxs stubbed to HTTP 503 (503-quote, 503-swap-success frames) and the getPaths error body forced to {success:false,error:{code:GEO_BLOCKED,statusCode:451}} (geo-blocked frame). Bundle restored to its pristine md5 afterwards; the post-revert-clean-quote frame is the proof.",
+      "batchAt": "2026-09-22T23:55:45Z",
+      "headSha": "e951aebe08272867e2610dac3ab8c530e128aec1",
+      "addedAt": "2026-09-22T23:55:45Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260922-165545-agent-proof-1217036054017879-64-HACKED-registertxs-503-swap-success.png",
+      "caption": "registertxs 503 swap success",
+      "index": "64",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Installed sim plugin bundle only, never committed: registerTxs stubbed to HTTP 503 (503-quote, 503-swap-success frames) and the getPaths error body forced to {success:false,error:{code:GEO_BLOCKED,statusCode:451}} (geo-blocked frame). Bundle restored to its pristine md5 afterwards; the post-revert-clean-quote frame is the proof.",
+      "batchAt": "2026-09-22T23:55:45Z",
+      "headSha": "e951aebe08272867e2610dac3ab8c530e128aec1",
+      "addedAt": "2026-09-22T23:55:45Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260922-165545-agent-proof-1217036054017879-65-HACKED-geo-blocked.png",
+      "caption": "geo blocked",
+      "index": "65",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Installed sim plugin bundle only, never committed: registerTxs stubbed to HTTP 503 (503-quote, 503-swap-success frames) and the getPaths error body forced to {success:false,error:{code:GEO_BLOCKED,statusCode:451}} (geo-blocked frame). Bundle restored to its pristine md5 afterwards; the post-revert-clean-quote frame is the proof.",
+      "batchAt": "2026-09-22T23:55:45Z",
+      "headSha": "e951aebe08272867e2610dac3ab8c530e128aec1",
+      "addedAt": "2026-09-22T23:55:45Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-480/20260922-165545-agent-proof-1217036054017879-66-mptrade-post-revert-clean-quote.png",
+      "caption": "mptrade post revert clean quote",
+      "index": "66",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-22T23:55:45Z",
+      "headSha": "e951aebe08272867e2610dac3ab8c530e128aec1",
+      "addedAt": "2026-09-22T23:55:45Z"
     }
   ]
 }
