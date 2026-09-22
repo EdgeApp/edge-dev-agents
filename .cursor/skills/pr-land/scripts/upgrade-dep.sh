@@ -60,12 +60,6 @@ export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 ~/.cursor/skills/pm.sh run prepare
 ~/.cursor/skills/pm.sh run prepare.ios
 
-# yarn.lock-only cleanup: yarn writes git+ prefixes for git deps; npm's
-# package-lock does not. Skip the sed when there is no yarn.lock.
-if [[ -f yarn.lock ]]; then
-  sed -i "" "s/git+//" yarn.lock
-fi
-
 # No CHANGELOG entry: dep bumps are not user-visible release notes. When an
 # upgrade IS the user-facing change (e.g. an SDK bump enabling a protocol
 # feature), a human writes that entry deliberately — tooling never does.

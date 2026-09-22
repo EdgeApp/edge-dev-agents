@@ -80,7 +80,7 @@ Arguments are classified automatically:
 | `pr-land-discover.sh` | Success | Error | Auth needed | - | - |
 | `pr-land-comments.sh` | Success | Error | - | - | - |
 | `git-branch-ops.sh` | Success | Error | - | - | - |
-| `pr-land-prepare.sh` | Ready | All failed | - | - | - |
+| `pr-land-prepare.sh` | Ready | All failed | - | Base branch unbuildable (`broken-develop-gate`) | - |
 | `verify-repo.sh` | Pass | Code fail | CHANGELOG fail | - | - |
 | `pr-land-merge.sh` | Merged | Verify fail | - | - | Conflict needs resolution (CHANGELOG or code) |
 | `pr-land-automerge.sh` | All armed/disarmed/merged | Blocked / unsupported / error | Usage or missing dep | - | - |
