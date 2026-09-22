@@ -238,6 +238,14 @@ function capturePane(session) {
   return sh(`tmux capture-pane -t "${session}" -p`)
 }
 
+// Archiving a session in the desktop app closes its RC bridge with code 4090 and
+// the CLI prints "Remote Control disconnected — this session was ended or archived
+// from another device or app (code 4090)" (wrapped across lines), then keeps
+// running. The code is the stable part; the prose wraps with pane width.
+function isArchivedPane(content) {
+  return /\(code 4090\)/.test(content)
+}
+
 // True when the pane is parked at an interactive prompt awaiting a human CHOICE
 // (permission/tool-approval dialog, trust prompt, numbered selection menu). Such a
 // prompt makes the pane go STATIC — indistinguishable from "hung" by the idle
@@ -1070,6 +1078,22 @@ function main() {
     const prior = state.sessions[session]
     const isBlocked = /^yes$/i.test(blocked || '')
 
+    // Desktop ARCHIVE (see isArchivedPane): the operator discarded the session, but
+    // the CLI and tmux outlive it, and the RC revive below would respawn it with
+    // --resume, un-archiving it. Anchors and chats: honor the archive by killing
+    // the session (transcript survives). Run sessions: only suppress the revive;
+    // archiving a run's desktop entry to tidy the list must not kill an in-flight task.
+    const archived = !rcUp && isArchivedPane(content)
+    if (archived && !/^\d+$/.test(taskGid)) {
+      const spawned = chatSpawns.load().byTmux.get(session)
+      const resurrect = spawned ? chatSpawns.resumeCommand(spawned) : `resume-agent --uuid <id> --chat --in-place${taskGid.startsWith('chat-') ? '' : ' --name <name>'}`
+      log(`[${session}] archived from the desktop app (RC code 4090) → killed (transcript survives; resurrect: ${resurrect})`)
+      sh(`tmux kill-session -t "${session}"`)
+      delete state.sessions[session]
+      continue
+    }
+    if (archived && !prior?.archivedLogged) log(`[${session}] archived from the desktop app (RC code 4090) → run session kept alive, RC revive suppressed.`)
+
     // LEGACY NET (policy 2026-07-30: a block is a BLOCKED COMPLETION — agents set
     // `Complete --blocked yes` in one write, so blocked tasks retire through the
     // normal completion sweep and never park here). This branch only catches a
@@ -1178,7 +1202,7 @@ function main() {
         parkEscalated = true
       }
     }
-    if (stateOk && !isBlocked && !awaitingChoice && !isHeld && !changed && !rcUp && now - prior.lastChange > IDLE_THRESHOLD_MS) {
+    if (stateOk && !isBlocked && !awaitingChoice && !isHeld && !archived && !changed && !rcUp && now - prior.lastChange > IDLE_THRESHOLD_MS) {
       // Require stateOk: never revive on an UNCONFIRMED status. A transient Asana
       // fetch failure returns blocked:null (=> isBlocked false); without this gate a
       // blocked/parked session gets pinged on the blip tick (the 2026-06-15 regression).
@@ -1196,7 +1220,7 @@ function main() {
     }
     // On an unconfirmed fetch, preserve the prior heavyFreed rather than letting a
     // null-blocked blip reset it to false and re-free next tick.
-    state.sessions[session] = { lastContent: content, lastChange, heldLogged: isHeld, declinedAt, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated, respawnedAt, heldLogged: isHeld }
+    state.sessions[session] = { lastContent: content, lastChange, heldLogged: isHeld, declinedAt, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated, respawnedAt, heldLogged: isHeld, archivedLogged: archived }
   }
 
   // Cap retired (completed-but-kept-alive) sessions so they don't accumulate in memory.

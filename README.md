@@ -197,6 +197,9 @@ the task's own unpublished dep PRs when the deliverable requires them.
 `agent-watcher/session-watchdog.js`, launchd every 120s, tends live sessions:
 
 - RC-bridge revive (only when the bridge is dead)
+- desktop archive (RC disconnect code 4090): kills anchor and chat sessions
+  (transcript survives, `resume-agent --uuid <id> --chat --in-place` brings one
+  back); run sessions stay alive with the revive suppressed
 - completion sweep: `Complete` retires `claude-asana-(gid)` to
   `done-asana-(gid)`, frees sim/Metro/slot, keeps claude alive for
   re-engagement
