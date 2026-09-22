@@ -56,6 +56,16 @@ metadata:
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
   --task <task_gid> --comment-file /tmp/comment-<task_gid>.md
 
+# Rewrite or retire a comment already posted (ours only, and only a real comment:
+# the script refuses another author's story and any system story). --edit-comment
+# keeps the story gid, so followers see the correction in place rather than a
+# second comment; --delete-comment runs before a post in the same call, which
+# retires a wrong comment and leaves the replacement as the newest story.
+~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
+  --task <task_gid> --edit-comment <story_gid> --comment-file /tmp/comment-<task_gid>.md
+~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
+  --task <task_gid> --delete-comment <story_gid>
+
 # Refresh the agent-maintained CURRENT STATE tail of a task description.
 # Body file holds the bullets ONLY: the script adds the delimiter, preserves the
 # operator prose above it, replaces any previous section, and applies the markers.
@@ -77,6 +87,8 @@ Determine which updates are needed by the caller and build one command with all 
 - `--attach-pr --pr-url --pr-title --pr-number`
 - `--attach-file <path> [--attach-name <name>]` (upload a local file, e.g. a run-report `.md`, as a native task attachment; distinct from `--attach-pr`)
 - `--comment-file <path>` (post the file's text as a task comment, marked as agent-authored)
+- `--edit-comment <story_gid> --comment-file <path>` (replace that comment's body in place; the gid survives, so use it to correct a comment rather than posting a second one)
+- `--delete-comment <story_gid>` (remove that comment; pair it with `--comment-file` in one call to replace a comment with a fresh story). Both refuse a story that is not a comment, belongs to another task, or was written by another user, so a gid typo cannot erase the task's audit trail.
 - `--assign` or `--assign <user_gid>` (sets the task assignee, e.g. a roster member below; with no gid there is no field to read one from, so it prompts or skips)
 - `--skip-assign-if-missing`
 - `--unassign`

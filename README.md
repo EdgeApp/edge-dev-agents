@@ -808,7 +808,7 @@ scripts, not be re-described independently across skills.
 
 | Skill | Description |
 |------|-------------|
-| [`/asana-task-update`](.cursor/skills/asana-task-update/SKILL.md) | Generic Asana mutations: attach PR or file, comment, assign, Board State, Engineering Priority / Release / Developer, description tail |
+| [`/asana-task-update`](.cursor/skills/asana-task-update/SKILL.md) | Generic Asana mutations: attach PR or file, comment (post, edit or delete our own), assign, Board State, Engineering Priority / Release / Developer, description tail |
 | [`/asana-task-create`](.cursor/skills/asana-task-create/SKILL.md) | Create Edge dev tasks on the standard boards with the right fields |
 | [`/kanban-categorize`](.cursor/skills/kanban-categorize/SKILL.md) | Sweep a kanban board and populate Category fields |
 | [`/convention-sync`](.cursor/skills/convention-sync/SKILL.md) | Sync `~/.cursor/` + portable trees with this repo; mirror this README; update the PR description |

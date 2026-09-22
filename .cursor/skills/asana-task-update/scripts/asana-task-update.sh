@@ -34,6 +34,8 @@ SUBTASK_NAME=""
 SET_CURRENT_STATE_FILE=""
 
 COMMENT_FILE=""
+EDIT_COMMENT_GID=""
+DELETE_COMMENT_GID=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -47,6 +49,8 @@ while [[ $# -gt 0 ]]; do
     --attach-file) DO_ATTACH_FILE=true; ATTACH_FILE_PATH="$2"; shift 2 ;;
     --set-current-state) SET_CURRENT_STATE_FILE="$2"; shift 2 ;;
     --comment-file) COMMENT_FILE="$2"; shift 2 ;;
+    --edit-comment) EDIT_COMMENT_GID="$2"; shift 2 ;;
+    --delete-comment) DELETE_COMMENT_GID="$2"; shift 2 ;;
     --attach-name) ATTACH_FILE_NAME="$2"; shift 2 ;;
     --assign)
       DO_ASSIGN=true
@@ -72,8 +76,21 @@ if [[ -z "$TASK_GID" ]]; then
   exit 1
 fi
 
-if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_PRIORITY" ]] && [[ -z "$SET_RELEASE" ]] && [[ -z "$SET_DEVELOPER_GID" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$COMMENT_FILE" ]]; then
+if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_PRIORITY" ]] && [[ -z "$SET_RELEASE" ]] && [[ -z "$SET_DEVELOPER_GID" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$COMMENT_FILE" ]] && [[ -z "$DELETE_COMMENT_GID" ]] && [[ -z "$EDIT_COMMENT_GID" ]]; then
   echo "Error: No operations specified" >&2
+  exit 1
+fi
+
+# --edit-comment and --delete-comment each act on ONE story, so they never pair
+# with each other, and --edit-comment carries its new body in --comment-file
+# (which otherwise means "post a new comment" — the pairing is what selects PUT
+# over POST).
+if [[ -n "$EDIT_COMMENT_GID" && -n "$DELETE_COMMENT_GID" ]]; then
+  echo "Error: --edit-comment and --delete-comment are mutually exclusive" >&2
+  exit 1
+fi
+if [[ -n "$EDIT_COMMENT_GID" && -z "$COMMENT_FILE" ]]; then
+  echo "Error: --edit-comment <story_gid> requires --comment-file <path> (the replacement body)" >&2
   exit 1
 fi
 
@@ -270,6 +287,54 @@ if $DO_ATTACH; then
   rm -f "$ATTACH_BODY_FILE"
 fi
 
+# assert_own_comment <story_gid>
+# Gate for --edit-comment / --delete-comment: Asana only lets a comment's own
+# author rewrite or remove it, and the API answers a violation with a bare 403.
+# Checking first turns that into a specific refusal, and rules out the two
+# mistakes a gid typo actually produces: acting on a SYSTEM story (an
+# assignment, a field change — those are the task's audit trail and are not
+# ours to erase) or on a comment belonging to a different task than --task.
+assert_own_comment() {
+  local sgid="$1" subtype target author me
+  asana_request "Comment $sgid" -X GET \
+    "$ASANA_API/stories/$sgid?opt_fields=resource_subtype,created_by.gid,target.gid" \
+    -H "Authorization: Bearer $ASANA_TOKEN" || exit 1
+  subtype="$(printf '%s' "$ASANA_RESPONSE" | jq -r '.data.resource_subtype // empty')"
+  target="$(printf '%s' "$ASANA_RESPONSE" | jq -r '.data.target.gid // empty')"
+  author="$(printf '%s' "$ASANA_RESPONSE" | jq -r '.data.created_by.gid // empty')"
+  if [[ "$subtype" != "comment_added" ]]; then
+    echo ">> Comment $sgid: REFUSED (story is '${subtype:-unknown}', not a comment; system stories are the task's audit trail)" >&2
+    exit 1
+  fi
+  if [[ "$target" != "$TASK_GID" ]]; then
+    echo ">> Comment $sgid: REFUSED (belongs to task ${target:-unknown}, not --task $TASK_GID)" >&2
+    exit 1
+  fi
+  me="$("$SCRIPT_DIR/../../asana-whoami.sh" 2>/dev/null || true)"
+  if [[ -n "$me" && "$author" != "$me" ]]; then
+    echo ">> Comment $sgid: REFUSED (authored by ${author:-unknown}, not this token's user $me; Asana allows neither an edit nor a delete of someone else's comment)" >&2
+    exit 1
+  fi
+}
+
+# --delete-comment <story_gid>: remove one of our own comments. Runs BEFORE the
+# post/edit path so a single call can retire a wrong comment and leave the
+# replacement as the newest story.
+if [[ -n "$DELETE_COMMENT_GID" ]]; then
+  assert_own_comment "$DELETE_COMMENT_GID"
+  asana_request "Comment delete" -X DELETE "$ASANA_API/stories/$DELETE_COMMENT_GID" \
+    -H "Authorization: Bearer $ASANA_TOKEN" || exit 1
+  # Drop it from the own-stories ledger: a deleted comment must stop counting as
+  # the run's own when require-followup-scope-on-complete.sh separates the run's
+  # comments from operator scope.
+  LEDGER="/tmp/agent-own-stories-$TASK_GID"
+  if [[ -f "$LEDGER" ]]; then
+    grep -vxF "$DELETE_COMMENT_GID" "$LEDGER" > "$LEDGER.tmp" 2>/dev/null || true
+    mv "$LEDGER.tmp" "$LEDGER" 2>/dev/null || rm -f "$LEDGER.tmp"
+  fi
+  echo ">> Comment: deleted story $DELETE_COMMENT_GID from task $TASK_GID"
+fi
+
 # --comment-file <path>: post the file's text as a task comment. Runs BEFORE
 # --attach-file so a single call that does both keeps the watermark order the
 # one-shot report-as-attachment rule requires (comment first, report last).
@@ -300,7 +365,16 @@ if [[ -n "$COMMENT_FILE" ]]; then
     CM_BODY="$(printf '%s' "$CM_BODY" | "$CM_MARKER")"
   fi
   CM_PAYLOAD="$(jq -n --arg t "$CM_BODY" '{data:{text:$t}}')"
-  if CM_OUT=$(curl -sf -X POST "$ASANA_API/tasks/$TASK_GID/stories" \
+  if [[ -n "$EDIT_COMMENT_GID" ]]; then
+    # Editing replaces the body of an EXISTING story, so the gid does not
+    # change and the ledger already holds it.
+    assert_own_comment "$EDIT_COMMENT_GID"
+    asana_request "Comment edit" -X PUT "$ASANA_API/stories/$EDIT_COMMENT_GID" \
+      -H "Authorization: Bearer $ASANA_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "$CM_PAYLOAD" || exit 1
+    echo ">> Comment: edited story $EDIT_COMMENT_GID on task $TASK_GID"
+  elif CM_OUT=$(curl -sf -X POST "$ASANA_API/tasks/$TASK_GID/stories" \
       -H "Authorization: Bearer $ASANA_TOKEN" \
       -H "Content-Type: application/json" \
       -d "$CM_PAYLOAD" 2>/dev/null); then
