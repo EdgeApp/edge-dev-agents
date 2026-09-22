@@ -350,6 +350,17 @@
       ]
     }
   ],
+  "StopFailure": [
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/record-api-error-stop.sh",
+          "timeout": 10,
+          "type": "command"
+        }
+      ]
+    }
+  ],
   "UserPromptSubmit": [
     {
       "hooks": [

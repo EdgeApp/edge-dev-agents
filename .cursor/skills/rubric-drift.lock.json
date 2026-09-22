@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "da110eb06ed4",
+      "hash": "876842b1048e",
       "dims": [
         "O4",
         "O5",
@@ -273,7 +273,7 @@
       ]
     },
     "file:setup-task-workspace.sh": {
-      "hash": "ebd59c4afcfe",
+      "hash": "7806c9ac2764",
       "dims": [
         "O8"
       ]
@@ -441,7 +441,7 @@
       ]
     },
     "pr-land:bot-thread-gate": {
-      "hash": "fb58781eaffe",
+      "hash": "8254c99e383b",
       "dims": [
         "A15"
       ]
@@ -1512,6 +1512,10 @@
     "one-shot:no-posting": {
       "reason": "2026-09-21: mechanically enforced by ~/.config/agent-watcher/hooks/block-raw-gh-writes.sh (gh pr comment/review and comment-endpoint API writes are blocked); a post from the self-review phase is a hook regression, noted in A36's grounding",
       "hash": "5cef6de697fe"
+    },
+    "pr-land:broken-develop-gate": {
+      "reason": "2026-09-22: mechanically enforced: pr-land-prepare.sh calls develop-buildable.sh and exits 3; the operator-only --allow-broken-develop flag is visible in a run transcript if a rubric dimension is later wanted",
+      "hash": "975547054852"
     }
   },
   "excluded_skills": {

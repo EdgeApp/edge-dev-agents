@@ -117,7 +117,11 @@ flowchart TD
   and the pool recloned, so runs test against a current build. A JS-only
   advance skips the rebuild (clones bundle JS live from Metro). The check is a
   cheap `git fetch` plus SHA compare; a build failure is non-fatal
-  (provisioning continues on the last-good master).
+  (provisioning continues on the last-good master). The failed develop SHA is
+  memoized as `failed_sha` in `master-build.json` and not retried until develop
+  moves; while develop HEAD equals it, a fresh edge-react-gui worktree branches
+  from the last-good `develop_sha` instead (`setup-task-workspace.sh`), and
+  `pr-land` refuses to land onto it (`develop-buildable.sh`, exit 3).
 - **Fresh vs revisit.** A never-run task spawns fresh: `agent_status =
   Planning`, a tmux session `claude-asana-(gid)` running `/one-shot --yolo
   (task-url)`. A task with a prior transcript is RESUMED instead, on a fresh
@@ -849,7 +853,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 |------|-------|
 | [`pr-land-discover.sh`](.cursor/skills/pr-land/scripts/pr-land-discover.sh) | Find relevant PRs and approval state |
 | [`pr-land-comments.sh`](.cursor/skills/pr-land/scripts/pr-land-comments.sh) | Detect unresolved inline, review-body, and top-level comments |
-| [`pr-land-prepare.sh`](.cursor/skills/pr-land/scripts/pr-land-prepare.sh) | Autosquash, rebase, detect conflicts, verify |
+| [`pr-land-prepare.sh`](.cursor/skills/pr-land/scripts/pr-land-prepare.sh) | Autosquash, rebase, detect conflicts, verify; refuses (exit 3) a base branch the master-build memo marks unbuildable unless `--allow-broken-develop` |
 | [`pr-land-merge.sh`](.cursor/skills/pr-land/scripts/pr-land-merge.sh) | Rebase again, verify, merge sequentially |
 | [`pr-land-publish.sh`](.cursor/skills/pr-land/scripts/pr-land-publish.sh) | Version bump, changelog, commit, tag |
 | [`upgrade-dep.sh`](.cursor/skills/pr-land/scripts/upgrade-dep.sh) | Bump one package on the current branch and commit lockfile updates |

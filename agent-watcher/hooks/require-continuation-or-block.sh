@@ -22,6 +22,10 @@ set -euo pipefail
 GID="${AGENT_TASK_GID:-}"
 [ -n "$GID" ] || exit 0   # not an orchestrated session
 
+# A normal Stop means the API answered again: clear any API-error stop marker so the
+# watchdog does not resume a run that already recovered (record-api-error-stop.sh).
+rm -f "/tmp/agent-apierror-$GID.json" 2>/dev/null || true
+
 STOP_BLOCK_MAX=3
 COUNT_FILE="/tmp/agent-stop-block-count-$GID"
 STUCK_FILE="/tmp/agent-stuck-$GID.md"

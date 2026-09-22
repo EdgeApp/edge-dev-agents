@@ -15,6 +15,10 @@
 // revive WAKE PING, and that is gated to a DEAD RC bridge (!rcUp) — a different failure
 // (broken comms the agent can't receive through) than a clean stop. The two are
 // complementary, not redundant; do not re-add a general continue-prod here.
+// ONE NARROW EXCEPTION: a turn ended by an API error (529, rate limit, auth) fires
+// StopFailure instead of Stop, so the Stop hook never sees it and nothing else would
+// resume the run. hooks/record-api-error-stop.sh marks that stop and
+// resumeAfterApiError() below sends the resume prompt. It acts ONLY on that marker.
 //
 // Variants handled:
 //  - Variant 1 (RC bridge dead, claude alive): the pane footer ("Remote Control active") is the source of truth. Absent + idle past IDLE_THRESHOLD_MS → revive by RESPAWN: kill the pane's claude (verified dead first), relaunch in place with `--remote-control <name> --resume <live-id>` + the preserved argv flags. A fresh process arms RC at startup; the old keystroke re-arm (`/remote-control` typed into the pane) stopped existing as a slash command on CLI 2.1.220 and burned ~232 no-op attempts during the 2026-08-02/03 auth outage. Present → do NOT touch at all (a half-open bridge is left for the operator to reconnect on next attach). This is NOT the removed Variant 2 (see below): it only ever fires on a VERIFIED-ALIVE claude, kills it and confirms death before the one replacement spawn, and is bound by a per-session cooldown — process count is 1→0→1, never additive.
@@ -252,6 +256,44 @@ function isArchivedPane(content) {
 // heuristic — but reviving it is harmful: the revive keystrokes (ping+Enter,
 // /remote-control+Enter, Esc) answer the dialog blindly. The normal idle composer
 // ("❯ " with an empty input line) is NOT a choice prompt and must not match here.
+// API-error stop resume (see hooks/record-api-error-stop.sh). The marker exists only
+// when the CLI ended a run's turn on an API error, a stop the Stop hook never saw.
+// Resume ONLY a run session whose pane is parked at the composer (unchanged for a
+// tick, not mid-turn, no dialog, no operator hold, not blocked, status confirmed),
+// after a delay that doubles with each consecutive API-error stop so a long outage
+// is not hammered. Past API_ERROR_RESUME_MAX consecutive failures, log ONE
+// escalation and leave the run for the operator. The prompt is <watchdog-revive-ping>,
+// whose one-shot rule (ignore-watchdog-revive-ping) already means "prove liveness,
+// re-drive dead waits, resume the phase"; if the model only answers pong, the normal
+// Stop hook then forces continuation for a non-terminal status.
+const API_ERROR_RESUME_BASE_MS = 2 * 60 * 1000
+const API_ERROR_RESUME_MAX = 6
+function apiErrorMarkerPath(taskGid) { return `/tmp/agent-apierror-${taskGid}.json` }
+function resumeAfterApiError(session, taskGid, s) {
+  let m
+  try { m = JSON.parse(fs.readFileSync(apiErrorMarkerPath(taskGid), 'utf8')) } catch { return false }
+  if (!m || m.pinged_at) return false   // already pinged; a new error or a normal Stop resets
+  if (!s.stateOk || s.isBlocked || s.awaitingChoice || s.isHeld || s.archived || s.changed) return false
+  if (/esc to interrupt/.test(s.content)) return false
+  const count = Math.max(1, m.count || 1)
+  if (count > API_ERROR_RESUME_MAX) {
+    if (!m.escalated) {
+      log(`[${session}] turn ended on an API error ${count} times in a row (last: ${m.error}) → NOT resuming again; operator attention needed (attach: tmux attach -t ${session}).`)
+      m.escalated = true
+      try { fs.writeFileSync(apiErrorMarkerPath(taskGid), JSON.stringify(m)) } catch {}
+    }
+    return false
+  }
+  const delay = API_ERROR_RESUME_BASE_MS * 2 ** (count - 1)
+  if (s.now - (m.last_at || 0) < delay) return false
+  sh(`tmux send-keys -t "${session}" C-u`)
+  sh(`tmux send-keys -t "${session}" "<watchdog-revive-ping>" Enter`)
+  m.pinged_at = s.now
+  try { fs.writeFileSync(apiErrorMarkerPath(taskGid), JSON.stringify(m)) } catch {}
+  log(`[${session}] turn ended on an API error (${m.error}, #${count}) ${Math.round((s.now - m.last_at) / 60000)}m ago, pane idle → <watchdog-revive-ping> sent to resume.`)
+  return true
+}
+
 // Operator hold stamp (see operator-hold.sh): held while the stamp exists. No
 // TTL: a steered run waits for the operator; the park escalation below is the
 // reminder. Read directly (no shell-out) so the tick stays cheap.
@@ -1180,6 +1222,9 @@ function main() {
       sh(`tmux send-keys -t "${session}" "<operator-hold-expired>" Enter`)
       log(`[${session}] operator hold expired (${ageM}m > ${Math.round(HOLD_TTL_MS() / 60000)}m, pane idle) → released + resume prompt sent.`)
       isHeld = false
+      lastChange = now
+    }
+    if (isRunSession && resumeAfterApiError(session, taskGid, { content, changed, awaitingChoice, isHeld, isBlocked, stateOk, archived, now })) {
       lastChange = now
     }
     // Park tracking: a session parked at a human-choice prompt is correctly NOT

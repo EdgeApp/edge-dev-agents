@@ -37,7 +37,9 @@
 #
 #   --task-gid     REQUIRED. Asana task GID; namespaces the worktree + branch.
 #   --repo         REQUIRED. Repo name under ~/git, e.g. edge-react-gui.
-#   --base         Base ref for the new branch (default: origin/develop).
+#   --base         Base ref for the new branch (default: origin/develop; when that HEAD
+#                  is memoized as unbuildable in master-build.json, the default falls
+#                  back to the last-good develop the master image was built from).
 #
 # Idempotent: if the worktree already exists it is reused (env.json copy re-ensured;
 # with --existing-branch the branch is first reconciled with origin, see
@@ -64,6 +66,7 @@ REINSTALL="$HOME/.config/agent-watcher/lib/node-modules-reinstall.sh"
 TASK_GID=""
 REPO=""
 BASE=""        # empty = resolve per-repo below (prefer origin/develop, else the repo's default branch)
+BASE_FROM_CLI=""  # set when --base was given: an explicit base is never redirected to the last-good develop
 BRANCH_ARG=""  # explicit branch name; default is "$GIT_BRANCH_PREFIX/<gid>" (see below)
 EXISTING_BRANCH=""  # followup/resume: check out THIS existing remote branch (an open PR's head) instead of cutting a fresh one off base
 
@@ -71,7 +74,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --task-gid)    TASK_GID="$2";    shift 2 ;;
     --repo)        REPO="$2";        shift 2 ;;
-    --base)        BASE="$2";        shift 2 ;;
+    --base)        BASE="$2"; BASE_FROM_CLI=1; shift 2 ;;
     --branch)      BRANCH_ARG="$2";  shift 2 ;;
     --existing-branch) EXISTING_BRANCH="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
@@ -371,6 +374,25 @@ else
   # Best-effort refresh of the base ref so we branch from current develop.
   git -C "$MAIN_REPO" fetch --quiet origin "${BASE#origin/}" 2>/dev/null \
     || echo ">> setup-task-workspace: WARN — fetch of $BASE failed; using local ref" >&2
+
+  # Unbuildable develop HEAD: refresh-master-build.sh memoizes a develop SHA that
+  # failed to build (`failed_sha` in master-build.json) and keeps the pool on the
+  # last-good master. A branch cut from that HEAD would carry JS and native deps the
+  # cloned app image does not have, so base it on the master's own commit instead
+  # (`develop_sha`, an ancestor of HEAD; pr-land's rebase absorbs the gap). Applies
+  # only to the repo the master is built from, on a fresh branch, with no --base.
+  MASTER_MARKER="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/master-build.json"
+  if [[ -z "$BASE_FROM_CLI" && -f "$MASTER_MARKER" && "$REPO" == "$(jq -r '.watcher.default_repo // empty' "$CONFIG" 2>/dev/null)" ]]; then
+    FAILED_SHA="$(jq -r '.failed_sha // empty' "$MASTER_MARKER" 2>/dev/null)"
+    GOOD_SHA="$(jq -r '.develop_sha // empty' "$MASTER_MARKER" 2>/dev/null)"
+    HEAD_SHA="$(git -C "$MAIN_REPO" rev-parse --verify --quiet "$BASE" 2>/dev/null || true)"
+    if [[ -n "$FAILED_SHA" && "$FAILED_SHA" == "$HEAD_SHA" && -n "$GOOD_SHA" ]] \
+       && git -C "$MAIN_REPO" cat-file -e "$GOOD_SHA^{commit}" 2>/dev/null \
+       && git -C "$MAIN_REPO" merge-base --is-ancestor "$GOOD_SHA" "$HEAD_SHA" 2>/dev/null; then
+      echo ">> setup-task-workspace: $BASE (${HEAD_SHA:0:9}) is memoized as unbuildable; basing on last-good develop ${GOOD_SHA:0:9} (the master image's commit)" >&2
+      BASE="$GOOD_SHA"
+    fi
+  fi
 
   echo ">> setup-task-workspace: git worktree add -b $BRANCH $WT $BASE" >&2
   # Route git's stdout to a log so the ONLY thing on our stdout is the worktree path.

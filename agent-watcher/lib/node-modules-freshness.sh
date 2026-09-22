@@ -42,13 +42,15 @@ NM_WANT=""
 NM_HAVE=""
 
 # Normalized hash of a package-lock.json / .package-lock.json. Prints 16 hex
+# (`resolved` drops a leading "git+": npm writes git deps as ssh:// in one file
+# and git+ssh:// in the other for the same commit, a false stale otherwise.)
 # chars; returns 1 when the file is missing or not parseable.
 nm_lockfile_hash() {
   local f="$1" out
   [[ -f "$f" ]] || return 1
   out=$(jq -S '(.packages // {}) | del(.[""])
     | with_entries(select(((.value.optional // false) or (.value.devOptional // false) or (.value.extraneous // false)) | not)
-      | .value = ((.value.version // "") + "|" + (.value.resolved // "") + "|" + (.value.integrity // "")))' "$f" 2>/dev/null) || return 1
+      | .value = ((.value.version // "") + "|" + ((.value.resolved // "") | sub("^git\\+"; "")) + "|" + (.value.integrity // "")))' "$f" 2>/dev/null) || return 1
   [[ -n "$out" ]] || return 1
   printf '%s' "$out" | shasum -a 256 | cut -c1-16
 }

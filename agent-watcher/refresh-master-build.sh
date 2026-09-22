@@ -38,9 +38,17 @@
 #   operator's chosen tradeoff: runs get a fresh master before they provision.
 #
 # NON-FATAL: a fetch failure or a build failure does NOT block provisioning. It logs
-#   loudly and exits 0 WITHOUT updating the marker, so the next tick retries while the
+#   the failure and exits 0 WITHOUT updating the marker's last-good fields, so the
 #   fleet keeps moving on the last-good master. A broken develop must never wedge the
 #   whole fleet. (--strict makes a build failure exit 1 instead, for manual runs.)
+#
+# FAILURE MEMO: a build failure records the develop SHA it failed on (`failed_sha` in
+#   the marker). While develop still points at that SHA the rebuild is NOT retried;
+#   otherwise every spawn tick pays the full doomed build (npm ci + run-ios + the
+#   xcodebuild fallback, ~30 min) and holds load above the guardrail the whole time.
+#   Any new develop commit clears the memo: the fix can land in package-lock,
+#   Podfile.lock, a native module, anywhere, so the commit SHA is the only key that
+#   covers them all. --force bypasses the memo.
 #
 # Usage:
 #   refresh-master-build.sh [--repo <name>] [--bundle-id <id>] [--device <name>]
@@ -149,6 +157,7 @@ marker_get() { [[ -f "$MARKER" ]] && jq -r "$1 // empty" "$MARKER" 2>/dev/null |
 HAVE_SHA="$(marker_get '.develop_sha')"
 HAVE_PODHASH="$(marker_get '.podfile_lock_hash')"
 HAVE_UDID="$(marker_get '.master_udid')"
+FAILED_SHA="$(marker_get '.failed_sha')"
 
 # Fast no-op: marker matches current develop AND the same master sim AND the master
 # still has the app installed. (--force overrides.)
@@ -156,15 +165,32 @@ if ! $FORCE && [[ "$HAVE_SHA" == "$TARGET_SHA" && "$HAVE_UDID" == "$MASTER" ]]; 
   log "master up to date with $DEVELOP_REF (${TARGET_SHA:0:9}) — no-op"; exit 0
 fi
 
+# Failure memo: this exact develop SHA already failed to build; do not pay for it
+# again until develop moves. Provisioning continues on the last-good master.
+if ! $FORCE && [[ -n "$FAILED_SHA" && "$FAILED_SHA" == "$TARGET_SHA" ]]; then
+  log "develop ${TARGET_SHA:0:9} already failed to build (memo in marker) — staying on last-good master ${HAVE_SHA:0:9}; a new develop commit or --force retries"; exit 0
+fi
+
 # Native-change probe straight from the ref (no working-tree mutation yet). Matches
 # ios-rn-build.sh's native_deps_hash (shasum -a 256 of ios/Podfile.lock, first 16).
 TARGET_PODHASH="$(git -C "$REPO_DIR" show "$DEVELOP_REF:ios/Podfile.lock" 2>/dev/null | shasum -a 256 | cut -c1-16 || true)"
 [[ -n "$TARGET_PODHASH" ]] || TARGET_PODHASH="no-podfile-lock"
 
+# A successful build drops any failed_sha memo (develop moved past the failure).
 write_marker() {
   local tmp; tmp="$(mktemp)"
   jq -n --arg sha "$TARGET_SHA" --arg ph "$TARGET_PODHASH" --arg u "$MASTER" --arg ref "$DEVELOP_REF" \
     '{develop_sha:$sha, podfile_lock_hash:$ph, master_udid:$u, develop_ref:$ref}' > "$tmp" && mv "$tmp" "$MARKER"
+}
+
+# Record the failed develop SHA WITHOUT touching the last-good fields.
+write_failed_memo() {
+  local tmp; tmp="$(mktemp)"
+  if [[ -f "$MARKER" ]]; then
+    jq --arg f "$TARGET_SHA" '. + {failed_sha:$f}' "$MARKER" > "$tmp" && mv "$tmp" "$MARKER"
+  else
+    jq -n --arg f "$TARGET_SHA" --arg ref "$DEVELOP_REF" '{failed_sha:$f, develop_ref:$ref}' > "$tmp" && mv "$tmp" "$MARKER"
+  fi
 }
 
 # JS-only develop advance: native app unchanged, clones bundle JS live → no rebuild.
@@ -196,7 +222,8 @@ fi
 
 build_failed() {
   log "FAIL — $1"
-  log "leaving marker stale so the next tick retries; provisioning continues on the last-good master"
+  write_failed_memo
+  log "memoized failed_sha=${TARGET_SHA:0:9}; not retried until develop moves. Provisioning continues on the last-good master ${HAVE_SHA:0:9}"
   $STRICT && exit 1 || exit 0
 }
 

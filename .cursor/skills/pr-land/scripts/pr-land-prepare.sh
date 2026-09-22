@@ -16,13 +16,19 @@
 //      agent to resolve semantically (abort + skip only if not resolvable)
 //   5. Run full verification (CHANGELOG + code)
 //
+// Flags: --allow-broken-develop  land onto a develop HEAD the master-build memo
+//   marks unbuildable (~/.config/agent-watcher/develop-buildable.sh exit 3).
+//   Operator-only: the PR being landed IS the fix. Never passed by an orch run.
+//
 // Exit codes:
 //   0 = At least one branch prepared (or has resolvable CHANGELOG conflict)
 //   1 = All branches failed (verification or other errors, none ready)
+//   3 = Every branch was refused because its base is memoized as unbuildable
+//       (reported in `baseUnbuildable`); a mixed batch exits 0/1 by the others
 //
 // Output: JSON with results for each branch
 
-const { execSync } = require("child_process");
+const { execSync, spawnSync } = require("child_process");
 const { existsSync, readFileSync } = require("fs");
 const path = require("path");
 const {
@@ -240,6 +246,19 @@ async function prepareBranch(repo, branch, buildField) {
   const upstream = getUpstreamBranch(repo, repoDir);
   console.error(`Upstream: ${upstream}`);
 
+  // Base gate: refuse to rebase onto a develop HEAD the master-build memo marks
+  // unbuildable (see develop-buildable.sh). Runs before any checkout so the
+  // primary checkout is untouched for a refused PR.
+  if (!ALLOW_BROKEN_DEVELOP) {
+    const gate = spawnSync(DEVELOP_BUILDABLE, ["--repo", repo, "--ref", upstream], { encoding: "utf8" });
+    if (gate.status === 3) {
+      result.status = "base_unbuildable";
+      result.message = (gate.stderr || "").trim();
+      console.error(`✗ ${result.message}`);
+      return result;
+    }
+  }
+
   // Step 2: Fetch and checkout.
   // Dirty-tree policy: prepare operates on the user's primary checkout, which
   // may hold in-progress local work. Auto-stash it under a labeled stash so
@@ -414,6 +433,9 @@ for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) {
   process.on(sig, () => { releaseLeases([...leaseRelease.all]); process.exit(130); });
 }
 
+const ALLOW_BROKEN_DEVELOP = process.argv.includes("--allow-broken-develop");
+const DEVELOP_BUILDABLE = path.join(process.env.HOME, ".config/agent-watcher/develop-buildable.sh");
+
 async function main() {
   let input = "";
   for await (const chunk of process.stdin) {
@@ -438,6 +460,7 @@ async function main() {
     skipped: [],
     codeConflicts: [],
     changelogConflicts: [],
+    baseUnbuildable: [],
   };
 
   let exitCode = 0;
@@ -454,6 +477,9 @@ async function main() {
         break;
       case "changelog_conflict":
         results.changelogConflicts.push(result);
+        break;
+      case "base_unbuildable":
+        results.baseUnbuildable.push(result);
         break;
       default:
         results.failed.push(result);
@@ -500,6 +526,12 @@ async function main() {
       );
     }
   }
+  if (results.baseUnbuildable.length > 0) {
+    console.error(`\nRefused, base branch memoized as unbuildable (${results.baseUnbuildable.length}):`);
+    for (const r of results.baseUnbuildable) {
+      console.error(`  ✗ ${r.repo}/${r.branch}: ${r.message}`);
+    }
+  }
   if (results.failed.length > 0) {
     console.error(`\nFailed (${results.failed.length}):`);
     for (const r of results.failed) {
@@ -512,6 +544,7 @@ async function main() {
     ...results.skipped,
     ...results.codeConflicts,
     ...results.changelogConflicts,
+    ...results.baseUnbuildable,
     ...results.failed,
   ].filter((r) => r.autostash);
   if (autostashed.length > 0) {
@@ -527,7 +560,7 @@ async function main() {
     results.codeConflicts.length === 0 &&
     exitCode === 0
   ) {
-    exitCode = 1;
+    exitCode = results.baseUnbuildable.length > 0 ? 3 : 1;
   }
 
   const liveRepos = new Set(
