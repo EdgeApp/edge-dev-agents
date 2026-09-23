@@ -163,11 +163,12 @@ LEGACY_REPO_README="$REPO_CURSOR/README.md"
 # --- Extra portable trees (beyond ~/.cursor) ----------------------------------
 # Home is canonical; these are mirrored into the repo so a second machine can be
 # bootstrapped from it. Secrets and machine-local state are excluded so only
-# committable code/config is mirrored. Format: "SRC_ABS|REPO_SUBDIR|csv-excludes"
+# committable code/config is mirrored. ~/.claude/memory-shared is deliberately
+# NOT mirrored: memories stay off the public repo and travel only in the
+# machine-migration bundle (NEW-MACHINE-SETUP.md). Format: "SRC_ABS|REPO_SUBDIR|csv-excludes"
 # Excludes are rsync patterns (matched against the path relative to SRC).
 EXTRA_TREES=(
   "$HOME/.config/agent-watcher|agent-watcher|credentials.json,secrets,*.log,*.state,*.lock,pool.json,slots.json,watchdog-state.json,oom-repro/forensics,oom-repro/logs,*-anchor-brief.*,.DS_Store,.git"
-  "$HOME/.claude/memory-shared|memory-shared|.DS_Store,.git"
   "$HOME/.claude/workflows|claude-workflows|.DS_Store,.git"
 )
 # Single committable files (home canonical) → repo relpath. Format: "SRC_FILE|REPO_RELPATH"

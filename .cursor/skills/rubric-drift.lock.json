@@ -234,7 +234,7 @@
       ]
     },
     "build-and-test:gui-dependency-integration": {
-      "hash": "190a36c10943",
+      "hash": "a556107af308",
       "dims": [
         "A21"
       ]
@@ -273,7 +273,7 @@
       ]
     },
     "file:setup-task-workspace.sh": {
-      "hash": "7806c9ac2764",
+      "hash": "447c2e49a248",
       "dims": [
         "O8"
       ]
@@ -357,13 +357,13 @@
       ]
     },
     "build-and-test:force-swap-provider-locally": {
-      "hash": "c52e7a7ed3c7",
+      "hash": "b776ad0863c2",
       "dims": [
         "A27"
       ]
     },
     "build-and-test:funded-test-accounts": {
-      "hash": "b164d8be728c",
+      "hash": "070de24d38c3",
       "dims": [
         "A27"
       ]
@@ -654,9 +654,10 @@
       ]
     },
     "file:concession-taxonomy.md": {
-      "hash": "65f7ff37202e",
+      "hash": "0d3c070b6a87",
       "dims": [
-        "A32"
+        "A32",
+        "A7"
       ]
     },
     "completion-judge:deny-is-actionable": {
@@ -874,8 +875,8 @@
       "hash": "6769bb66b04a"
     },
     "build-and-test:executable-pair-must-complete": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "25e341f6dc25"
+      "reason": "2026-09-23: 2026-09-23: only dropped the stale SQLite-crash aside; expectation unchanged",
+      "hash": "6ce01177d6e3"
     },
     "build-and-test:spaced-pin-taps": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1536,6 +1537,10 @@
     "sentry:claims-need-a-query": {
       "reason": "2026-09-23: sentry skill ported from the jon branch 2026-09-23; a sentry-grounded-claims dimension is proposed to the operator, pending that ruling",
       "hash": "c958a5abe4fa"
+    },
+    "build-and-test:create-missing-destination-wallet": {
+      "reason": "2026-09-23: graded through the concession-taxonomy deny item (A7 deferral validity); no separate dimension",
+      "hash": "c7360bd58918"
     }
   },
   "excluded_skills": {

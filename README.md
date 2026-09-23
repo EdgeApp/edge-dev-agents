@@ -26,8 +26,8 @@ the repo copy should not keep a second `.cursor/README.md`.
 
 **Fresh machine (one command):** clone this repo and run the bootstrap. It
 installs everything (cursor skills/rules, the orchestration system, hook
-registrations, workflows, and shared memories) into your home dir, seeds
-`credentials.json` from the example, and links skills + shared memory:
+registrations, and workflows) into your home dir, seeds `credentials.json`
+from the example, and links skills:
 
 ```bash
 git clone <this-repo> ~/git/edge-dev-agents && cd ~/git/edge-dev-agents && ./bootstrap.sh
@@ -680,12 +680,11 @@ reproducible from a single clone + `./bootstrap.sh`:
 - **`claude-workflows/`**: multi-agent Workflow scripts installed to
   `~/.claude/workflows` (currently `code-review-sonnet.js`, the deep
   multi-agent PR review harness `/pr-review` launches).
-- **`memory-shared/`** + **`bin/link-shared-memory.sh`**: cross-cutting Claude
-  memory notes that should surface regardless of working directory. Canonical
-  home `~/.claude/memory-shared`; the link script symlinks them into each
-  per-project auto-memory dir and maintains a managed block in each
-  `MEMORY.md`. Claude auto-memory itself is machine-local and intentionally
-  NOT synced. The only officially global Claude file is `~/.claude/CLAUDE.md`,
+- **`bin/link-shared-memory.sh`**: symlinks the cross-cutting Claude memory
+  notes in `~/.claude/memory-shared` into each per-project auto-memory dir and
+  maintains a managed block in each `MEMORY.md`. The notes themselves are
+  NEVER published here: they travel only in the machine-migration bundle.
+  Claude auto-memory is machine-local and also NOT synced. The only officially global Claude file is `~/.claude/CLAUDE.md`,
   generated here from always-apply rules.
 - **`.cursor/.syncignore`**: permanent sync exclusions, read from the REPO
   copy so every machine honors the same list. Currently: WIP commands and
@@ -715,7 +714,7 @@ sync machinery exists for the other hop, home to checkout, and the honest
 rationale splits into structural reasons and historical ones:
 
 - **The canonical "tree" is not one tree, and not all files** (structural).
-  It spans `~/.cursor`, `~/.config/agent-watcher`, `~/.claude/memory-shared`,
+  It spans `~/.cursor`, `~/.config/agent-watcher`, `~/.claude/workflows`,
   and the `.hooks` KEY inside `~/.claude/settings.json`, whose sibling keys
   (model, theme) are machine-local. Git versions whole files; the settings
   projection needs a key-level merge step under any design, and no checkout
@@ -756,7 +755,6 @@ edge-dev-agents/
 ├── agent-watcher/     # Orchestration system incl. hooks/, launchd/ (-> ~/.config/agent-watcher)
 ├── claude-settings/   # hooks.json registration projection (-> ~/.claude/settings.json .hooks)
 ├── claude-workflows/  # Workflow scripts (-> ~/.claude/workflows)
-├── memory-shared/     # Shared Claude memory notes (-> ~/.claude/memory-shared)
 ├── bin/               # link-shared-memory.sh
 └── .cursor/
     ├── skills/        # Slash skills (*/SKILL.md) + companion scripts
