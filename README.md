@@ -266,6 +266,12 @@ just a viewport.
   into a just-started TUI loses its head. A brief is this machine's prompt to
   one session, so it never syncs: a brief saved inside a synced tree is
   refused before anything spawns.
+- **One auto-compact window for every spawn.** `lib/autocompact-flag.sh` prints
+  the `--autocompact` flag from `watcher.autocompact_window` (default 200k) and
+  every spawn path uses it: orch runs, chat sessions, rc-heal anchors and
+  resume-agent resumes; the watchdog's RC respawn carries the flag over from the
+  old argv. Left at `auto` a long session re-sends its whole history on every
+  call, so the cap is what keeps a long run's cost linear.
 - **Healing without the orch.** A box that hosts a pinned anchor but runs no Asana
   watcher (an operator laptop while the orch host is down) runs `rc-heal.sh`
   instead of `session-watchdog.js`: the watchdog's healing slice only, per

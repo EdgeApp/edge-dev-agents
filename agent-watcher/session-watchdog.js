@@ -456,6 +456,8 @@ function attemptRcRespawn(session, prior) {
   if (model) keep.push(`--model '${model}'`)
   const effort = (proc.args.match(/--effort\s+(\S+)/) || [])[1]
   if (effort) keep.push(`--effort ${effort}`)
+  const autocompact = (proc.args.match(/--autocompact\s+(\S+)/) || [])[1]
+  if (autocompact) keep.push(`--autocompact ${autocompact}`)
   const cwd = sh(`tmux display-message -p -t "${session}" '#{pane_current_path}'`) || HOME
   // A pinned composer draft dies with the process — preserve its text in the log.
   const draft = (capturePane(session).match(/^❯\s+(\S.*)$/m) || [])[1]

@@ -620,7 +620,8 @@ if $CHAT; then
   tmux send-keys -t "$TMUX_NAME" C-u   # clear any stray typed text before the command
   CHROME_FLAG=""
   $CHROME && CHROME_FLAG="--chrome"
-  tmux send-keys -t "$TMUX_NAME" "claude --resume $LATEST_UUID $FORK_FLAG $CHROME_FLAG --dangerously-skip-permissions --remote-control $RC_NAME" Enter
+  AC_FLAG="$("$DIR/lib/autocompact-flag.sh")"
+  tmux send-keys -t "$TMUX_NAME" "claude --resume $LATEST_UUID $FORK_FLAG $CHROME_FLAG $AC_FLAG --dangerously-skip-permissions --remote-control $RC_NAME" Enter
   # Auto-answer the resume-summary menu (option 1, pre-selected) when it appears.
   for _ in $(seq 1 30); do
     sleep 2

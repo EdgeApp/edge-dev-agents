@@ -129,6 +129,7 @@ claude_cmd() { # cwd name model effort sid mode(new|resume)
   c="cd '$cwd' && claude --dangerously-skip-permissions"
   [[ -n "$model" ]] && c="$c --model '$model'"
   [[ -n "$effort" ]] && c="$c --effort $effort"
+  local ac; ac="$("$DIR/lib/autocompact-flag.sh")"; [[ -n "$ac" ]] && c="$c $ac"
   c="$c --remote-control '$name'"
   if [[ "$mode" == new ]]; then c="$c --session-id $sid"; else c="$c --resume $sid"; fi
   echo "$c"

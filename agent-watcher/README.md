@@ -158,6 +158,7 @@ name/runtime, Metro defaults to 8081.
 | `refresh-main-checkouts.sh` | keep the ~/git main checkouts (the node_modules clone SOURCES) current: fast-forward the default branch + reinstall (`lib/node-modules-reinstall.sh`) when the installed tree differs from the lockfile by normalized hash, ONLY when clean, on the default branch, and no setup is cloning that checkout right now (dirty/feature/detached checkouts are reported and left alone). A failed install is recorded and retried next sweep; the stamp is written only after a sweep with a current repo and nothing retryable. Scheduled: launchd daily 04:15 + every 30min sweep (idle job throttled to one complete sweep per 6h; `--require-idle` is accepted but the per-repo clone handshake replaced the whole-sweep idle skip) |
 | `clone-ios-sim.sh` / `delete-ios-sim.sh` | per-slot sim clone / delete |
 | `lib/slots.js` | atomic slot allocator (lib + CLI) |
+| `lib/autocompact-flag.sh` | prints the `--autocompact <window>` flag every claude spawn on the box passes (orch runs, chat sessions, rc-heal anchors, resume-agent resumes; the watchdog's RC respawn carries it over from the old argv), from `watcher.autocompact_window` (default 200k, `auto` = no flag) |
 | `slots.json` | slot state |
 | `gc-worktrees.sh` | manual orphan cleanup |
 | `session-index.sh` | inventory of live sessions + all transcripts (kind, task, lineage, content search with fork-echo demotion); feeds /resume-session |

@@ -67,6 +67,7 @@ cmd="claude"
 # send-keys line died with "no matches found" (2026-09-21, jev anchor spawn).
 [ -n "$MODEL" ] && cmd="$cmd --model '$MODEL'"
 [ -n "$EFFORT" ] && cmd="$cmd --effort $EFFORT"
+AC="$("$HOME/.config/agent-watcher/lib/autocompact-flag.sh")"; [ -n "$AC" ] && cmd="$cmd $AC"
 $CHROME && cmd="$cmd --chrome"
 # The transcript id is MINTED here and passed as --session-id, so the transcript
 # path is known before claude starts and the watchdog reads the id straight from
