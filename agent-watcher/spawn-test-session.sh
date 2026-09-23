@@ -99,7 +99,7 @@ MCP_FLAG=""
 # Model + effort pin: what spawned sessions START on (a human can still flip a LIVE
 # session per-turn via the RC/desktop picker). Resolution order, both flags:
 #   1. Per-task Asana custom field (agent_model / agent_effort) if the task selected one.
-#   2. Config default (.watcher.agent_model = claude-opus-4-8[1m], .watcher.agent_effort = high).
+#   2. Config default (.watcher.agent_model = opus[1m], .watcher.agent_effort = high).
 # Both the fresh-spawn path (asana-watcher) and the follow-up-resume path (resume-task)
 # pass --task-gid, so this ONE resolver covers new tasks and follow-ups alike. The
 # per-task lookup is best-effort: no token / API error / unset field → config default.
@@ -131,7 +131,7 @@ MODEL_FLAG=""
 [[ -n "$AGENT_MODEL" ]] && MODEL_FLAG="--model \"$AGENT_MODEL\" "
 EFFORT_FLAG=""
 [[ -n "$AGENT_EFFORT" ]] && EFFORT_FLAG="--effort $AGENT_EFFORT "
-# Auto-compact window. Every model we spawn (opus-5, fable-5-1, sonnet-5) is
+# Auto-compact window. Every model we spawn (opus, fable, sonnet aliases) is
 # NATIVE 1M, so the [1m] in the model strings is redundant and dropping it does
 # NOT cap anything: the window is a separate flag. Left at `auto`, a run holds its
 # whole history and re-sends it on every call, so cost is average context times

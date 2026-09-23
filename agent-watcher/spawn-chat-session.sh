@@ -63,7 +63,7 @@ tmux has-session -t "$S" 2>/dev/null && { echo "session already exists: $S (kill
 
 cmd="claude"
 # The model id is quoted: ids carry a context suffix in brackets
-# (claude-fable-5-1[1m]) and zsh treats an unquoted [1m] as a glob, so the
+# (fable[1m]) and zsh treats an unquoted [1m] as a glob, so the
 # send-keys line died with "no matches found" (2026-09-21, jev anchor spawn).
 [ -n "$MODEL" ] && cmd="$cmd --model '$MODEL'"
 [ -n "$EFFORT" ] && cmd="$cmd --effort $EFFORT"
