@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-currency-accountbased/pr-1108/20260923-151538-agent-proof-1218753833235509-01-HACKED-prefix-watch-only-error.png",
+      "caption": "prefix watch only error",
+      "index": "1",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "restored the pre-fix code in the linked node_modules copy (getCurrentAddress without the unlock span, background refresh catch rethrowing) to reproduce the reported alert; reverted after capture",
+      "batchAt": "2026-09-23T22:15:38Z",
+      "headSha": "60d9ea47d18027be03f3c617565deab91c13ab1a",
+      "addedAt": "2026-09-23T22:15:38Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1108/20260923-151538-agent-proof-1218753833235509-02-receive-address-restored.png",
+      "caption": "receive address restored",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-23T22:15:38Z",
+      "headSha": "60d9ea47d18027be03f3c617565deab91c13ab1a",
+      "addedAt": "2026-09-23T22:15:38Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1108/20260923-151538-agent-proof-1218753833235509-03-send-scene-no-alert.png",
+      "caption": "send scene no alert",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-23T22:15:38Z",
+      "headSha": "60d9ea47d18027be03f3c617565deab91c13ab1a",
+      "addedAt": "2026-09-23T22:15:38Z"
+    }
+  ]
+}
