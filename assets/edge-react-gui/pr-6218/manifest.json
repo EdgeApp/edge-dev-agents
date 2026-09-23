@@ -1,0 +1,53 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6218/20260922-204853-agent-proof-1218559592688374-01-wizardswap-quote.png",
+      "caption": "wizardswap quote",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-23T03:48:53Z",
+      "headSha": "3481092e4972173ec38e3be614dbf14c7a80eb57",
+      "addedAt": "2026-09-23T03:48:53Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6218/20260922-204853-agent-proof-1218559592688374-02-swap-success.png",
+      "caption": "swap success",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-23T03:48:53Z",
+      "headSha": "3481092e4972173ec38e3be614dbf14c7a80eb57",
+      "addedAt": "2026-09-23T03:48:53Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6218/20260922-204853-agent-proof-1218559592688374-03-tx-details.png",
+      "caption": "tx details",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-23T03:48:53Z",
+      "headSha": "3481092e4972173ec38e3be614dbf14c7a80eb57",
+      "addedAt": "2026-09-23T03:48:53Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6218/20260922-204853-agent-proof-1218559592688374-04-exchange-details.png",
+      "caption": "exchange details",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-23T03:48:53Z",
+      "headSha": "3481092e4972173ec38e3be614dbf14c7a80eb57",
+      "addedAt": "2026-09-23T03:48:53Z"
+    }
+  ]
+}
