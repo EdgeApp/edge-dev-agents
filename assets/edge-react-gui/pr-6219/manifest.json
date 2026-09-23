@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6219/20260922-235542-agent-proof-1218765031427354-03-x86_64-fix-no-pod-install-launched.png",
+      "caption": "x86 64 fix no pod install launched",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-23T06:55:42Z",
+      "headSha": "15f043d76c5b241c1a890bc62f43c106132721bf",
+      "addedAt": "2026-09-23T06:55:42Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6219/20260922-235542-agent-proof-1218765031427354-04-arm64-fix-no-pod-install-launched.png",
+      "caption": "arm64 fix no pod install launched",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-23T06:55:42Z",
+      "headSha": "15f043d76c5b241c1a890bc62f43c106132721bf",
+      "addedAt": "2026-09-23T06:55:42Z"
+    }
+  ]
+}
