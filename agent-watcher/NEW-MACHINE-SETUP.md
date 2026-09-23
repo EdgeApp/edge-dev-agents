@@ -81,7 +81,7 @@ Everything below this line is for Claude, not you.
 > 1. **Verify the transferred config** (already placed by the bundle + APPLY.sh — no SSH):
 >    confirm `~/.config/agent-watcher/credentials.json` (mode 600), `~/git/edge-react-gui/env.json`
 >    (147 keys, incl. `BREEZ_API_KEY`), `~/.config/edge-secrets/` (incl. the local-only
->    test-account roster `test-accounts.json` and throwaway ledger; copy the folder from
+>    test-account roster `test-accounts.json`; copy the folder from
 >    the old machine if the bundle lacks it, workspace init pins the YOLO login from it),
 >    `~/.cursor/skills` + `~/.cursor/rules`, the 6
 >    `~/Library/LaunchAgents/com.jontz.*.plist`, and that `~/.claude/skills/one-shot/SKILL.md`

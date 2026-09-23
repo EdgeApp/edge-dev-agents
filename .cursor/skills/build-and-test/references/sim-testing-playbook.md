@@ -23,7 +23,7 @@ already encodes, params and gotchas included.
 | `common/ramp-set-region-fiat.yaml` | COUNTRY_ROW/SEARCH, STATE_ROW/SEARCH, FIAT_ROW/SEARCH | Set ramp region + fiat from Buy/Sell scene (row selectors are the COMBINED row string, e.g. "United States of America US") |
 | `common/send-to-address.yaml` | WALLET_SEARCH, ADDRESS, AMOUNT | Assets → wallet → Send → address → amount → confirm slider |
 | `common/create-throwaway-account.yaml` | NEW_USERNAME, NEW_PASSWORD, NEW_PIN, NEW_WALLETS, VERIFY_ACCOUNT_INFO | Login scene → new empty account, logged in (never `clearState`). For tests that would dirty a roster account's SYNCED state |
-| `common/delete-throwaway-account.yaml` | DELETE_USERNAME, DELETE_PASSWORD | Deletes the logged-in account. Cleanup is NOT required (throwaways are reusable) — keep it for when you do want one gone |
+| `common/delete-throwaway-account.yaml` | DELETE_USERNAME, DELETE_PASSWORD | Deletes the logged-in account. REQUIRED before the run ends for every throwaway the run created (throwaways are single-use) |
 | `buy-quote-input.yaml` / `buy-quote.yaml` | (see file) | Canonical Buy $500 proof flow |
 | `swap-quote-input.yaml` / `swap-confirm.yaml` | (see file) | Swap quote + confirm proof pair |
 
@@ -68,11 +68,11 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   Settings and mixnet toggles all sync to the account, so exercising them on a
   roster account thrashes every parallel session. Create an empty one with
   `common/create-throwaway-account.yaml` and log in the normal env.json way.
-  They are REUSABLE across sessions and need NOT be deleted — the ledger of live
-  ones (username / password / PIN / which sim) is
-  `references/throwaway-accounts.md`; check it before creating another, and
-  append a row when you do. Uniqueness is the only requirement; the flow's
-  default `agent-tw-<random>` username guarantees it.
+  They are SINGLE-USE: delete each one you created with
+  `common/delete-throwaway-account.yaml` before the run ends, and never write
+  its username or password anywhere (no ledger, report, PR, or skill). The
+  flow's random username and password guarantee uniqueness
+  (`references/throwaway-accounts.md`).
 - **HOW to switch accounts: edit env.json, do NOT drive the UI.** The canonical
   switch is: set `YOLO_USERNAME`/`YOLO_PIN` in the WORKTREE's `env.json` (a
   local-only, gitignored copy) to the target roster account, then

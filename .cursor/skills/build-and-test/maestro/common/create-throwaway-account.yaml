@@ -19,8 +19,8 @@
 # PARAMS
 #   NEW_USERNAME  default "agent-tw-<random>"; must be unused
 #   NEW_PASSWORD  default is random per run and meets the requirements (10+
-#                 chars, upper, lower, digit); record it from
-#                 output.newAccountPassword in the local throwaway ledger
+#                 chars, upper, lower, digit); it stays in
+#                 output.newAccountPassword for delete-throwaway-account.yaml
 #   NEW_PIN       default "1234" (deliberately outside the roster PIN space)
 #   NEW_WALLETS   JSON array of wallet names to end up with, e.g.
 #                 '["Ethereum"]'. "" (default) keeps the app's default set.
