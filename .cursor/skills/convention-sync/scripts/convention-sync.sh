@@ -39,7 +39,6 @@ DO_COMMIT=false
 COMMIT_MSG=""
 DIRECTION="user-to-repo"
 FORCE_WARN=false       # --force: override blocking deletion/stale-local warnings
-FORCE_BRANCH=false     # --force-branch: override the sync-branch safety check
 
 resolve_default_repo_dir() {
   local cwd remote_url default_repo
@@ -100,7 +99,6 @@ while [[ $# -gt 0 ]]; do
     -m) COMMIT_MSG="$2"; shift 2 ;;
     --repo-to-user) DIRECTION="repo-to-user"; shift ;;
     --force) FORCE_WARN=true; shift ;;
-    --force-branch) FORCE_BRANCH=true; shift ;;
     *) REPO_DIR="$1"; shift ;;
   esac
 done
@@ -205,20 +203,39 @@ dropped_hooks_between() {
   ' 2>/dev/null || echo '[]'
 }
 
+# The sync deals with the repo's DEFAULT branch only (the perpetual sync PR is
+# retired; PR #1 merged 2026-08-26). A checkout parked on any other branch is put
+# back on the default branch here, in BOTH directions and on dry runs too, so a
+# diff is never computed against, and a commit never lands on, some other
+# branch (the PR #3 develop-staging incident; a per-machine work branch that
+# drifted for three weeks). A dirty tree blocks the switch: the sync never
+# discards or carries someone's uncommitted work.
+git -C "$REPO_DIR" fetch origin --quiet 2>/dev/null || true
+DEF_BRANCH="$(git -C "$REPO_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || true)"
+[[ -z "$DEF_BRANCH" ]] && DEF_BRANCH="main"
+current_branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+if [[ "$current_branch" != "$DEF_BRANCH" ]]; then
+  if [[ -n "$(git -C "$REPO_DIR" status --porcelain 2>/dev/null)" ]]; then
+    echo "ERROR: $REPO_DIR is on '$current_branch' with uncommitted changes; the sync works on '$DEF_BRANCH' only." >&2
+    echo "  Commit or stash them, then re-run (the sync checks out $DEF_BRANCH itself)." >&2
+    exit 1
+  fi
+  if ! git -C "$REPO_DIR" checkout --quiet "$DEF_BRANCH" 2>/dev/null; then
+    echo "ERROR: could not check out '$DEF_BRANCH' in $REPO_DIR (was on '$current_branch')." >&2
+    exit 1
+  fi
+  echo "convention-sync: switched $REPO_DIR from '$current_branch' to '$DEF_BRANCH'" >&2
+fi
+
 # Pull-before-push gate (user-to-repo only).
-# Fetches origin and detects whether the remote branch has commits we don't.
+# Detects whether origin's default branch has commits we don't.
 # Dry-run includes the count for visibility; --stage/--commit aborts if > 0.
 ORIGIN_AHEAD=0
 ORIGIN_BRANCH=""
 if [[ "$DIRECTION" == "user-to-repo" ]]; then
-  if git -C "$REPO_DIR" fetch origin --quiet 2>/dev/null; then
-    current_branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-    if [[ -n "$current_branch" && "$current_branch" != "HEAD" ]]; then
-      if git -C "$REPO_DIR" rev-parse --verify --quiet "origin/$current_branch" >/dev/null 2>&1; then
-        ORIGIN_AHEAD=$(git -C "$REPO_DIR" rev-list --count "HEAD..origin/$current_branch" 2>/dev/null || echo 0)
-        ORIGIN_BRANCH="origin/$current_branch"
-      fi
-    fi
+  if git -C "$REPO_DIR" rev-parse --verify --quiet "origin/$DEF_BRANCH" >/dev/null 2>&1; then
+    ORIGIN_AHEAD=$(git -C "$REPO_DIR" rev-list --count "HEAD..origin/$DEF_BRANCH" 2>/dev/null || echo 0)
+    ORIGIN_BRANCH="origin/$DEF_BRANCH"
   fi
 fi
 
@@ -227,26 +244,6 @@ if [[ "$DO_STAGE" == "true" && "$ORIGIN_AHEAD" -gt 0 ]]; then
   echo "Pull first to integrate remote changes, then re-run convention-sync:" >&2
   echo "  cd $REPO_DIR && git pull --rebase" >&2
   exit 1
-fi
-
-# Branch safety (#1, user-to-repo + stage). Since 2026-08-26 the sync targets
-# the DEFAULT branch directly (the perpetual sync PR is retired; PR #1 merged
-# intentionally). The hazard is now the inverse of the old one: the shared
-# checkout parked on some OTHER session's feature branch, where committing
-# rides the sync onto that branch and a later HEAD:main push can fast-forward
-# an open PR's head into main, closing it unreviewed (the PR #3
-# develop-staging incident, 2026-08-26). Refuse any non-default branch.
-# Override with --force-branch.
-if [[ "$DO_STAGE" == "true" && "$DIRECTION" == "user-to-repo" && "$FORCE_BRANCH" != "true" ]]; then
-  cur_branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-  def_branch="$(git -C "$REPO_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || true)"
-  [[ -z "$def_branch" ]] && def_branch="main"
-  if [[ "$cur_branch" != "$def_branch" ]]; then
-    echo "ERROR: on branch '$cur_branch' but the sync commits directly to '$def_branch'." >&2
-    echo "  cd $REPO_DIR && git checkout $def_branch   (or pass --force-branch)" >&2
-    echo "If '$cur_branch' is another session's PR branch, committing here would ride the sync onto its PR." >&2
-    exit 1
-  fi
 fi
 
 # Load ignore patterns from .syncignore (one glob per line, # comments, blank lines skipped)
