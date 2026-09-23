@@ -4,12 +4,13 @@
 # Installs (repo -> home), idempotent, never clobbers secrets/state:
 #   .cursor/            -> ~/.cursor/                 (skills, rules, scripts, README)
 #   agent-watcher/      -> ~/.config/agent-watcher/   (orchestration code + config)
-#   memory-shared/      -> ~/.claude/memory-shared/   (shared memory notes)
 #   claude-workflows/   -> ~/.claude/workflows/       (Workflow-tool scripts)
 #   bin/link-shared-memory.sh -> ~/.claude/link-shared-memory.sh
 #   agent-watcher/launchd/*.plist -> ~/Library/LaunchAgents/ (rendered + loaded)
 # Then: links ~/.claude/skills -> ~/.cursor/skills, regenerates ~/.claude/CLAUDE.md,
-# and links shared memory into the standard entry points (~ and ~/git).
+# and links any shared memory notes already in ~/.claude/memory-shared (they are
+# never in this repo; carry them over in the machine-migration bundle) into the
+# standard entry points (~ and ~/git).
 #
 # Secrets are NOT in the repo. agent-watcher/credentials.json is seeded from
 # credentials.example.json (fill it in afterward). Machine-local state (pools,
@@ -48,12 +49,6 @@ if [[ -d "$REPO/agent-watcher" ]]; then
     chmod 600 "$CRED"
     warn "Seeded $CRED from example — EDIT IT and add your real asana_token."
   fi
-fi
-
-# 3. Shared memory store
-if [[ -d "$REPO/memory-shared" ]]; then
-  say "Installing ~/.claude/memory-shared from repo/memory-shared"
-  copy_tree "$REPO/memory-shared" "$HOME/.claude/memory-shared"
 fi
 
 # 3b. Workflow-tool scripts (model-invocable workflows, e.g. code-review-sonnet)
