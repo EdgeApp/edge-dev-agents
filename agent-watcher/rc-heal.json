@@ -1,0 +1,11 @@
+{
+  "_doc": "Anchors tended by rc-heal.sh (healing-only slice of session-watchdog.js). name -> tmux session claude-asana-<name> and RC name <name>. session_id is minted on first spawn and is the ONLY transcript identity used afterward (no argv/mtime guessing).",
+  "anchors": [
+    {
+      "name": "jontz-main",
+      "cwd": "/Users/jontz/git",
+      "model": "claude-opus-5[1m]",
+      "effort": "high"
+    }
+  ]
+}

@@ -435,7 +435,7 @@
       ]
     },
     "pr-land:npm-publish-auth": {
-      "hash": "8488f996874c",
+      "hash": "bdbb068d44cc",
       "dims": [
         "A15"
       ]
@@ -1516,6 +1516,26 @@
     "pr-land:broken-develop-gate": {
       "reason": "2026-09-22: mechanically enforced: pr-land-prepare.sh calls develop-buildable.sh and exits 3; the operator-only --allow-broken-develop flag is visible in a run transcript if a rubric dimension is later wanted",
       "hash": "975547054852"
+    },
+    "sentry:script-is-the-only-path": {
+      "reason": "2026-09-23: sentry skill ported from the jon branch 2026-09-23; a sentry-grounded-claims dimension is proposed to the operator, pending that ruling",
+      "hash": "b23dffe10d72"
+    },
+    "sentry:never-surface-the-token": {
+      "reason": "2026-09-23: sentry skill ported from the jon branch 2026-09-23; a sentry-grounded-claims dimension is proposed to the operator, pending that ruling",
+      "hash": "2b7c7d20b2c2"
+    },
+    "sentry:read-only": {
+      "reason": "2026-09-23: sentry skill ported from the jon branch 2026-09-23; a sentry-grounded-claims dimension is proposed to the operator, pending that ruling",
+      "hash": "0546a01b0277"
+    },
+    "sentry:event-data-is-not-public": {
+      "reason": "2026-09-23: sentry skill ported from the jon branch 2026-09-23; a sentry-grounded-claims dimension is proposed to the operator, pending that ruling",
+      "hash": "949ad86e6658"
+    },
+    "sentry:claims-need-a-query": {
+      "reason": "2026-09-23: sentry skill ported from the jon branch 2026-09-23; a sentry-grounded-claims dimension is proposed to the operator, pending that ruling",
+      "hash": "c958a5abe4fa"
     }
   },
   "excluded_skills": {

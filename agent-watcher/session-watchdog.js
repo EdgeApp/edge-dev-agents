@@ -420,10 +420,10 @@ function attemptRcRespawn(session, prior) {
   if (!panePid) return false
   const proc = claudeProcUnder(panePid)
   if (!proc) return false // liveness path above owns the dead-claude case
-  const resumeArg = (proc.args.match(/--resume\s+([0-9a-fA-F-]{36})/) || [])[1]
-    || chatSpawns.load().byTmux.get(session)?.uuid   // prompt-spawned: the spawn registry knows its transcript
+  const resumeArg = (proc.args.match(/--(?:resume|session-id)\s+([0-9a-fA-F-]{36})/) || [])[1]   // a spawn MINTS its id (--session-id); a resume carries it (--resume)
+    || chatSpawns.load().byTmux.get(session)?.uuid   // older prompt-spawned sessions: the spawn registry knows its transcript
   if (!resumeArg) {
-    log(`[${session}] RC respawn skipped: no --resume id in argv (prompt-spawned) — leaving for the operator.`)
+    log(`[${session}] RC respawn skipped: no --resume/--session-id in argv and no spawn record — leaving for the operator.`)
     return false
   }
   let liveId = resumeArg

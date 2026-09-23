@@ -68,13 +68,17 @@ cmd="claude"
 [ -n "$MODEL" ] && cmd="$cmd --model '$MODEL'"
 [ -n "$EFFORT" ] && cmd="$cmd --effort $EFFORT"
 $CHROME && cmd="$cmd --chrome"
-cmd="$cmd --dangerously-skip-permissions --remote-control $RC"
+# The transcript id is MINTED here and passed as --session-id, so the transcript
+# path is known before claude starts and the watchdog reads the id straight from
+# argv. The old "newest jsonl after spawn" guess resolved to another session's
+# transcript when two spawns shared a cwd (rc-heal.sh carried the fix first).
+SID=$(uuidgen | tr 'A-Z' 'a-z')
+cmd="$cmd --session-id $SID --dangerously-skip-permissions --remote-control $RC"
 
-# Transcripts land under the project dir derived from cwd; note the newest
-# BEFORE spawning so the new one can be identified afterwards.
+# Transcripts land under the project dir derived from cwd.
 enc=$(printf '%s' "$CWD" | sed 's#/#-#g')
 pdir="$HOME/.claude/projects/$enc"
-before=$(ls -t "$pdir"/*.jsonl 2>/dev/null | head -1 || true)
+newest="$pdir/$SID.jsonl"
 
 tmux new-session -d -s "$S" -c "$CWD"
 tmux send-keys -t "$S" C-u
@@ -108,13 +112,12 @@ record_spawn() { # $1=transcript path
     '{uuid:$uuid,rc:$rc,tmux:$tmux,anchor:$anchor,chrome:$chrome,brief:$brief,created:$created}' >> "$REGISTRY"
 }
 
-# Verify: the newest transcript in the project dir should be new and its first
-# human message should equal the pointer.
+# Verify: the minted transcript should exist and its first human message should
+# equal the pointer.
 ok=""
 for _ in $(seq 1 20); do
   sleep 2
-  newest=$(ls -t "$pdir"/*.jsonl 2>/dev/null | head -1 || true)
-  [ -n "$newest" ] && [ "$newest" != "$before" ] || continue
+  [ -f "$newest" ] || continue
   first=$(python3 - "$newest" <<'EOF'
 import json,sys
 for line in open(sys.argv[1], errors='ignore'):

@@ -39,6 +39,7 @@ DO_COMMIT=false
 COMMIT_MSG=""
 DIRECTION="user-to-repo"
 FORCE_WARN=false       # --force: override blocking deletion/stale-local warnings
+BRANCH_ARG=""          # --branch <name>: work on this branch for the run instead of the default branch
 
 resolve_default_repo_dir() {
   local cwd remote_url default_repo
@@ -99,6 +100,7 @@ while [[ $# -gt 0 ]]; do
     -m) COMMIT_MSG="$2"; shift 2 ;;
     --repo-to-user) DIRECTION="repo-to-user"; shift ;;
     --force) FORCE_WARN=true; shift ;;
+    --branch) BRANCH_ARG="$2"; shift 2 ;;
     *) REPO_DIR="$1"; shift ;;
   esac
 done
@@ -203,28 +205,39 @@ dropped_hooks_between() {
   ' 2>/dev/null || echo '[]'
 }
 
-# The sync deals with the repo's DEFAULT branch only (the perpetual sync PR is
-# retired; PR #1 merged 2026-08-26). A checkout parked on any other branch is put
-# back on the default branch here, in BOTH directions and on dry runs too, so a
-# diff is never computed against, and a commit never lands on, some other
-# branch (the PR #3 develop-staging incident; a per-machine work branch that
-# drifted for three weeks). A dirty tree blocks the switch: the sync never
-# discards or carries someone's uncommitted work.
+# The sync works on ONE branch per run: the repo's DEFAULT branch unless --branch
+# names another (the perpetual sync PR is retired; PR #1 merged 2026-08-26). The
+# checkout is put on that branch here, in BOTH directions and on dry runs too, so
+# a diff is never computed against, and a commit never lands on, whatever branch
+# the checkout happened to be parked on (the PR #3 develop-staging incident; a
+# per-machine work branch that drifted for three weeks). --branch never persists:
+# the next run without it is back on the default branch. A branch given with
+# --branch that does not exist yet is created from origin/<default>, tracking
+# origin/<name>. A dirty tree blocks the switch: the sync never discards or
+# carries someone's uncommitted work.
 git -C "$REPO_DIR" fetch origin --quiet 2>/dev/null || true
 DEF_BRANCH="$(git -C "$REPO_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || true)"
 [[ -z "$DEF_BRANCH" ]] && DEF_BRANCH="main"
+SYNC_BRANCH="${BRANCH_ARG:-$DEF_BRANCH}"
 current_branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-if [[ "$current_branch" != "$DEF_BRANCH" ]]; then
+if [[ "$current_branch" != "$SYNC_BRANCH" ]]; then
   if [[ -n "$(git -C "$REPO_DIR" status --porcelain 2>/dev/null)" ]]; then
-    echo "ERROR: $REPO_DIR is on '$current_branch' with uncommitted changes; the sync works on '$DEF_BRANCH' only." >&2
-    echo "  Commit or stash them, then re-run (the sync checks out $DEF_BRANCH itself)." >&2
+    echo "ERROR: $REPO_DIR is on '$current_branch' with uncommitted changes; this run works on '$SYNC_BRANCH'." >&2
+    echo "  Commit or stash them, then re-run (the sync checks out $SYNC_BRANCH itself)." >&2
     exit 1
   fi
-  if ! git -C "$REPO_DIR" checkout --quiet "$DEF_BRANCH" 2>/dev/null; then
-    echo "ERROR: could not check out '$DEF_BRANCH' in $REPO_DIR (was on '$current_branch')." >&2
+  if git -C "$REPO_DIR" rev-parse --verify --quiet "refs/heads/$SYNC_BRANCH" >/dev/null 2>&1; then
+    git -C "$REPO_DIR" checkout --quiet "$SYNC_BRANCH"
+  elif git -C "$REPO_DIR" rev-parse --verify --quiet "refs/remotes/origin/$SYNC_BRANCH" >/dev/null 2>&1; then
+    git -C "$REPO_DIR" checkout --quiet --track "origin/$SYNC_BRANCH"
+  elif [[ -n "$BRANCH_ARG" ]]; then
+    git -C "$REPO_DIR" checkout --quiet -b "$SYNC_BRANCH" "origin/$DEF_BRANCH"
+    echo "convention-sync: created branch '$SYNC_BRANCH' from origin/$DEF_BRANCH" >&2
+  else
+    echo "ERROR: could not check out '$SYNC_BRANCH' in $REPO_DIR (was on '$current_branch')." >&2
     exit 1
   fi
-  echo "convention-sync: switched $REPO_DIR from '$current_branch' to '$DEF_BRANCH'" >&2
+  echo "convention-sync: switched $REPO_DIR from '$current_branch' to '$SYNC_BRANCH'" >&2
 fi
 
 # Pull-before-push gate (user-to-repo only).
@@ -233,9 +246,9 @@ fi
 ORIGIN_AHEAD=0
 ORIGIN_BRANCH=""
 if [[ "$DIRECTION" == "user-to-repo" ]]; then
-  if git -C "$REPO_DIR" rev-parse --verify --quiet "origin/$DEF_BRANCH" >/dev/null 2>&1; then
-    ORIGIN_AHEAD=$(git -C "$REPO_DIR" rev-list --count "HEAD..origin/$DEF_BRANCH" 2>/dev/null || echo 0)
-    ORIGIN_BRANCH="origin/$DEF_BRANCH"
+  if git -C "$REPO_DIR" rev-parse --verify --quiet "origin/$SYNC_BRANCH" >/dev/null 2>&1; then
+    ORIGIN_AHEAD=$(git -C "$REPO_DIR" rev-list --count "HEAD..origin/$SYNC_BRANCH" 2>/dev/null || echo 0)
+    ORIGIN_BRANCH="origin/$SYNC_BRANCH"
   fi
 fi
 

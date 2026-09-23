@@ -266,6 +266,17 @@ just a viewport.
   into a just-started TUI loses its head. A brief is this machine's prompt to
   one session, so it never syncs: a brief saved inside a synced tree is
   refused before anything spawns.
+- **Healing without the orch.** A box that hosts a pinned anchor but runs no Asana
+  watcher (an operator laptop while the orch host is down) runs `rc-heal.sh`
+  instead of `session-watchdog.js`: the watchdog's healing slice only, per
+  anchor in `rc-heal.json` (recreate a dead tmux session, revive a dead claude,
+  kill+respawn a dead RC bridge), one spawn per tick with verified-dead and
+  cooldown guards; `tmux-keepalive.sh` is the KeepAlive LaunchAgent that keeps
+  the tmux server alive across ticks, `install-rc-heal.sh` arms or disarms the
+  pair, `rc-heal-test.sh` exercises the decisions. Not installed on the orch
+  host; there the watchdog owns anchors. Both spawn paths mint the transcript id
+  (`--session-id`) so the watchdog reads it from argv instead of guessing by
+  newest jsonl.
 - **Anchor hygiene.** Long-lived operator anchors (`watcher.persistent_anchors`)
   degrade as their conversation grows, so `reanchor-sweep.sh` (launchd, every
   30 min) resets one once it crosses 4 compactions or 25 MB AND has sat idle
@@ -882,6 +893,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`asana-get-context.sh`](.cursor/skills/asana-get-context.sh) | Fetch task details, comments, subtasks, attachments, and the Engineering Board fields (other boards' fields on the task are not printed) |
 | [`asana-task-update.sh`](.cursor/skills/asana-task-update/scripts/asana-task-update.sh) | Reusable Asana mutations (the report-attach path is hook-gated) |
 | [`asana-field-value.sh`](.cursor/skills/asana-field-value.sh), [`asana-build-field.sh`](.cursor/skills/asana-build-field.sh), [`asana-force-land.sh`](.cursor/skills/asana-force-land.sh) | Live single-field reads the finalize gate consumes |
+| [`sentry-query.sh`](.cursor/skills/sentry-query.sh) | Read-only Sentry queries for the `/sentry` skill (issue, search, tag distributions, event context); token from `~/.config/sentry-edge-token` via a mode-600 curl config, never argv |
 | [`update-status.sh`](agent-watcher/update-status.sh) | The gated `agent_status` write every phase transition goes through |
 | [`check-followup-scope.sh`](agent-watcher/check-followup-scope.sh) | The live followup-scope + watermark check backing the Complete gate |
 | [`log-attempt.sh`](agent-watcher/log-attempt.sh) | Append truthful attempt-log entries |
