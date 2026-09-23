@@ -88,6 +88,11 @@
           "type": "command"
         },
         {
+          "command": "~/.config/agent-watcher/hooks/block-broad-process-kill.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
           "command": "~/.config/agent-watcher/hooks/require-plan-before-developing.sh",
           "timeout": 10,
           "type": "command"

@@ -1,7 +1,8 @@
 # Maestro flow: Edge iOS "Buy" $500 quote — end-to-end proof screenshot.
 #
 # Target: the iPhone 16 Pro Max / iOS 18 simulator that holds the pre-provisioned
-# test account "roster-qa-b" (PIN 1111, region California/USA, BTC wallet). The Edge
+# roster account `qa-b` (see ~/.config/edge-secrets/test-accounts.json: region
+# California/USA, BTC wallet). The Edge
 # app must already be installed (build + install steps are in build-and-test/SKILL.md).
 #
 # Run: maestro test ~/.cursor/skills/build-and-test/maestro/buy-quote.yaml

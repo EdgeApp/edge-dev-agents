@@ -581,7 +581,8 @@ the app.
   `clone-ios-sim.sh`, `restore-sim-app-container.sh`).
 - **The sim-testing playbook**
   (`build-and-test/references/sim-testing-playbook.md`) carries the working
-  knowledge runs need: funded test accounts and rosters, per-provider drive
+  knowledge runs need: how to use the funded test-account roster (the roster
+  itself is local-only, `~/.config/edge-secrets/test-accounts.json`), per-provider drive
   recipes, known gotchas with their continue-workarounds, the corePlugins
   working-set trim (filter to the assets the task needs, with a funding
   carve-out: filtering is a convenience, never a constraint), and the fallback
@@ -721,8 +722,7 @@ rationale splits into structural reasons and historical ones:
   layout absorbs it.
 - **Both machines operate unattended** (structural). The home tree has
   concurrent uncoordinated writers: anchor sessions editing skills, agent runs
-  appending to skill references (the throwaway-account registry rows are
-  written by runs mid-task), eval tooling rewriting `rubric-drift.lock.json`.
+  appending to skill references mid-task, eval tooling rewriting `rubric-drift.lock.json`.
   A checkout of home would be perpetually dirty, and a pull that conflicts
   needs a human at the keyboard that these boxes do not have. The sync's
   content-hash staleness blocks and mtime `skippedNewer` protection are

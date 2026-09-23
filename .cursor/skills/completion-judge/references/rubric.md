@@ -127,7 +127,9 @@ behavior driven). The attempt-log is the ground truth: a `success` test-drive en
 corroborates; no entry means no drive. Funding: when the drive needed an asset the
 account lacked, the playbook prescribes swap-to-fund from the roster at the
 minimum-viable amount BEFORE any "no funds" claim, and the attempt-log must show the
-swap attempt. A "no funds", "no fixture", "could only verify statically", "repro not
+swap attempt. Likewise a send whose destination wallet did not exist: the playbook
+prescribes creating it (build-and-test `create-missing-destination-wallet`), so a
+"no destination wallet" story is a `fail`. A "no funds", "no fixture", "could only verify statically", "repro not
 constructible" story with no logged attempt at the prescribed remedy is a `fail`.
 `na` only when the segment's scope needed no runtime exercise (documentation-only, a
 report-only or investigation-only ask with its result logged) or the report's Testing

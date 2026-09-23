@@ -286,17 +286,22 @@ ensure_env_json() {
     rm -f "$WT/env.json"
     cp "$MAIN_REPO/env.json" "$WT/env.json"
     echo ">> setup-task-workspace: copied env.json ← $MAIN_REPO/env.json" >&2
-    # Enforce the standard agent login: every new run starts on roster-primary (the
-    # funded account), regardless of master env.json drift. YOLO auto-login
-    # re-asserts this account on every app relaunch.
+    # Enforce the standard agent login: every new run starts on the roster's
+    # default role (the funded `primary` account), regardless of master env.json
+    # drift. YOLO auto-login re-asserts this account on every app relaunch. The
+    # roster is local-only (~/.config/edge-secrets/test-accounts.json) so account
+    # names never land in the synced tree.
     node -e '
-      const fs = require("fs"); const p = process.argv[1];
+      const fs = require("fs"); const [p, rosterPath] = process.argv.slice(1);
+      const roster = JSON.parse(fs.readFileSync(rosterPath, "utf8"));
+      const acct = roster.roster[roster.defaultRole];
+      if (acct == null) throw new Error("no default roster account");
       const env = JSON.parse(fs.readFileSync(p, "utf8"));
-      env.YOLO_USERNAME = "roster-primary"; env.YOLO_PIN = "0000";
+      env.YOLO_USERNAME = acct.username; env.YOLO_PIN = acct.pin;
       fs.writeFileSync(p, JSON.stringify(env, null, 2) + "\n");
-    ' "$WT/env.json" 2>/dev/null \
-      && echo ">> setup-task-workspace: env.json YOLO login pinned to roster-primary" >&2 \
-      || echo ">> setup-task-workspace: WARN — could not pin YOLO login (env.json left as copied)" >&2
+    ' "$WT/env.json" "$HOME/.config/edge-secrets/test-accounts.json" 2>/dev/null \
+      && echo ">> setup-task-workspace: env.json YOLO login pinned to the default roster account" >&2 \
+      || echo ">> setup-task-workspace: WARN — could not pin YOLO login (roster file missing or env.json unreadable; env.json left as copied)" >&2
   else
     echo ">> setup-task-workspace: WARN — $MAIN_REPO/env.json not found; worktree has NO secrets" >&2
   fi

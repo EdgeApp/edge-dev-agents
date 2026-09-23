@@ -720,7 +720,7 @@
       ]
     },
     "file:block-raw-gh-writes.sh": {
-      "hash": "3e2a9c22c735",
+      "hash": "fbef6537e034",
       "dims": [
         "A36"
       ]
@@ -1042,8 +1042,8 @@
       "hash": "14718b3cf86d"
     },
     "pr-address:script-timeouts": {
-      "reason": "2026-09-17: only added edit-comment to the list of body-carrying verbs that need the 600000 timeout; eval expectation unchanged",
-      "hash": "88692089b02f"
+      "reason": "2026-09-23: timeout list gained edit-review-body; mechanical call hygiene, not eval-graded behavior",
+      "hash": "b2dc23bf8c34"
     },
     "pr-address:operate-in-worktree": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1502,8 +1502,8 @@
       "hash": "844bc093a159"
     },
     "pr-address:edit-your-own-comment": {
-      "reason": "2026-09-17: author scoping and the replies refusal are mechanically enforced by pr-address.sh edit-comment; remaining edit-vs-reply judgment is rare and low eval value",
-      "hash": "a8cc7fabc0c2"
+      "reason": "2026-09-23: extended to review summary bodies via edit-review-body; script enforces author and addressed-marker refusals",
+      "hash": "1b04577849cd"
     },
     "pr-create:prose-edit-funnel": {
       "reason": "2026-09-18: tool pointer; misuse is mechanically blocked by block-raw-gh-writes.sh and the script's own lint/author gates",

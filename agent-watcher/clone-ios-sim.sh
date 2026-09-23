@@ -2,7 +2,7 @@
 # clone-ios-sim.sh — Clone the master iOS simulator into a per-slot sim.
 #
 # The master is the iOS 18 "iPhone 16 Pro Max" device that holds the test
-# account (roster-qa-b / PIN 1111). Each parallel agent slot gets its own clone so
+# roster accounts (~/.config/edge-secrets/test-accounts.json). Each parallel agent slot gets its own clone so
 # concurrent UI tests don't fight over one simulator.
 #
 # Usage:

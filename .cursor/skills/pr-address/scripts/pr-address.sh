@@ -18,6 +18,13 @@
 #                                                          review comment that already has replies. Body is
 #                                                          linted like every outbound verb. Prints
 #                                                          `edited: <url>` or `unchanged: <id>`.
+#   edit-review-body --owner <o> --repo <r> --pr <n> --review-id <id> --body <text>|--body-file <path>
+#                                                          Replace the summary body of a review YOU submitted
+#                                                          (inline comments are edited with edit-comment).
+#                                                          Refuses any other author, and refuses a review that
+#                                                          already carries an addressed-marker. Body is linted
+#                                                          like every outbound verb. Prints `edited: <url>`
+#                                                          or `unchanged: <id>`.
 #   mark-addressed --owner <o> --repo <r> --pr <n> --type <review|comment> --target-id <id> --body <text>
 #   comment        --owner <o> --repo <r> --pr <n> --body <text>|--body-file <path>
 #                                                          Post a standalone top-level PR comment (no
@@ -40,7 +47,7 @@ set -euo pipefail
 CMD="${1:-}"
 shift || true
 
-OWNER="" REPO="" PR="" COMMENT_ID="" NODE_ID="" BODY="" BODY_FILE="" SHA="" THREAD_ID="" TARGET_TYPE="" TARGET_ID=""
+OWNER="" REPO="" PR="" COMMENT_ID="" NODE_ID="" BODY="" BODY_FILE="" SHA="" THREAD_ID="" TARGET_TYPE="" TARGET_ID="" REVIEW_ID=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --owner) OWNER="$2"; shift 2 ;;
@@ -54,6 +61,7 @@ while [[ $# -gt 0 ]]; do
     --thread-id) THREAD_ID="$2"; shift 2 ;;
     --type) TARGET_TYPE="$2"; shift 2 ;;
     --target-id) TARGET_ID="$2"; shift 2 ;;
+    --review-id) REVIEW_ID="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -452,6 +460,49 @@ case "$CMD" in
     fi
     ;;
 
+  edit-review-body)
+    # In-place correction of the summary body of a review this user submitted.
+    # Same contract as edit-comment: author-scoped, linted, and refused once
+    # someone has engaged with it. A review body has no reply structure, so
+    # engagement is an `addressed:review:<id>` marker in the PR's top-level
+    # comments (mark-addressed), which means the body was already answered.
+    require_gh
+    if [[ -n "$BODY_FILE" ]]; then
+      [[ -f "$BODY_FILE" ]] || { echo "Error: --body-file not found: $BODY_FILE" >&2; exit 1; }
+      BODY="$(cat "$BODY_FILE")"
+    fi
+    if [[ -z "$OWNER" || -z "$REPO" || -z "$PR" || -z "$REVIEW_ID" || -z "$BODY" ]]; then
+      echo "Error: --owner, --repo, --pr, --review-id, and --body or --body-file required" >&2; exit 1
+    fi
+    ME=$(gh api user --jq '.login')
+    GOT=$(gh api "repos/$OWNER/$REPO/pulls/$PR/reviews/$REVIEW_ID" 2>/dev/null) || {
+      echo "Error: review $REVIEW_ID not found on $OWNER/$REPO#$PR" >&2; exit 1
+    }
+    AUTHOR=$(echo "$GOT" | jq -r '.user.login // empty')
+    if [[ "$AUTHOR" != "$ME" ]]; then
+      echo "Error: review $REVIEW_ID was authored by '$AUTHOR', not '$ME'. edit-review-body only edits your own reviews." >&2; exit 1
+    fi
+    MARKERS=$(gh api "repos/$OWNER/$REPO/issues/$PR/comments" --paginate \
+      --jq "[.[] | select(.body | contains(\"<!-- addressed:review:$REVIEW_ID -->\"))] | length" | awk '{s+=$1} END {print s+0}')
+    if [[ "$MARKERS" -gt 0 ]]; then
+      echo "Error: review $REVIEW_ID was already answered (addressed-marker present). Post the correction as a top-level comment instead: pr-address.sh comment --owner $OWNER --repo $REPO --pr $PR --body-file <path>" >&2
+      exit 1
+    fi
+    if [[ "$(echo "$GOT" | jq -r '.body // ""')" == "$BODY" ]]; then
+      echo "unchanged: $REVIEW_ID"
+      exit 0
+    fi
+    lint_outbound_body "$BODY"
+    RESULT=$(jq -n --arg body "$BODY" '{body: $body}' | \
+      gh api "repos/$OWNER/$REPO/pulls/$PR/reviews/$REVIEW_ID" -X PUT --input -)
+    URL=$(echo "$RESULT" | jq -r '.html_url // empty')
+    if [[ -n "$URL" ]]; then
+      echo "edited: $URL"
+    else
+      echo "Edit failed: $RESULT" >&2; exit 1
+    fi
+    ;;
+
   resolve-thread)
     require_gh
     if [[ -z "$THREAD_ID" ]]; then
@@ -718,7 +769,7 @@ case "$CMD" in
     ;;
 
   *)
-    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|delete-comment|edit-comment|resolve-thread|mark-addressed|comment|resolve-id|headline|fetch-pr-body|ensure-branch|review-mode|autosquash} [args]" >&2
+    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|delete-comment|edit-comment|edit-review-body|resolve-thread|mark-addressed|comment|resolve-id|headline|fetch-pr-body|ensure-branch|review-mode|autosquash} [args]" >&2
     exit 1
     ;;
 esac

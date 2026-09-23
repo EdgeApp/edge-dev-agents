@@ -172,7 +172,7 @@ Confirm the dev-server recompiled cleanly first: `curl -s localhost:8083/edge-ex
 
 ### 5e. Clean up (MANDATORY)
 
-Revert ALL injected `__diag` helper and calls from the dep source (`git checkout -- <file>`, or remove by hand) and stop YOUR server only — `pkill -f "diag-server-$DIAG_PORT"` (NEVER a bare `pkill -f diag-server`, which kills other slots' capture servers too). Remove `$DIAG_SRV` and `$DIAG_LOG`. The instrumentation is local-only and is never committed.
+Revert ALL injected `__diag` helper and calls from the dep source (`git checkout -- <file>`, or remove by hand) and stop YOUR server only, by the PID listening on your slot port: `kill $(lsof -ti tcp:$DIAG_PORT)`. Remove `$DIAG_SRV` and `$DIAG_LOG`. The instrumentation is local-only and is never committed.
 
 </step>
 

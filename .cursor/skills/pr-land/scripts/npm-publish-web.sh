@@ -21,6 +21,11 @@ set -uo pipefail
 # The agent tails stdout for these machine lines and relays them:
 #   AUTH_URL login <url>     — user must open on ANY device (passkey lives
 #   AUTH_URL publish <url>     with them, not this machine)
+#   AUTH_DONE login <user>   — the login link was tapped and npm has a
+#                              session. Printed ONLY after a login phase ran
+#                              (not on a whoami-preflight pass). The publish
+#                              link can follow many minutes later: a repo's
+#                              prepack (e.g. a native rebuild) runs first.
 #   PUBLISHED <name>@<version>
 #   FAILED <phase> <reason>
 #
@@ -197,6 +202,10 @@ if ! (cd "$REPO_DIR" && $NPM whoami > "$WORK_DIR/whoami" 2>/dev/null); then
     fi
   done
   [ -n "$ok" ] || { echo "FAILED login auth never completed"; exit 2; }
+  # Stdout phase marker, so a watch filtered on the machine lines sees the tap
+  # land. The stderr "logged in as" line below is not one, and missed taps
+  # left the operator waiting on the agent twice (2026-08-31, 2026-09-22).
+  echo "AUTH_DONE login $(tail -1 "$WORK_DIR/whoami" 2>/dev/null)"
 fi
 echo "logged in as $(cat "$WORK_DIR/whoami" 2>/dev/null | tail -1)" >&2
 

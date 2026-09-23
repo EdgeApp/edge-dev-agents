@@ -48,12 +48,18 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   error opaquely ("amount too low" at best, provider errors at worst). Don't burn
   cycles trying to swap $2; fund to >$10 first. (DEX-style providers vary; the
   $10 floor is the safe default assumption.)
-- **Test-account ROSTER (exhaustive — search no further)**: `roster-primary`
-  (PIN 0000 — the heavily-funded swap-execution account, holds HYPE; **the
-  default YOLO login**, pinned into every worktree env.json by workspace init),
-  `roster-qa-a` (PIN 1111), `roster-qa-b` (PIN 1111), `roster-secondary` (PIN 0000).
-  The sim image also contains many junk/leftover accounts — they are NOT test
-  accounts; never trawl beyond the roster. **Switching among roster accounts
+- **Test-account ROSTER (exhaustive — search no further)** lives in the
+  LOCAL-ONLY file `~/.config/edge-secrets/test-accounts.json`: roles `primary` (the
+  heavily-funded swap-execution account; **the default YOLO login**, pinned
+  into every worktree env.json by workspace init), `qa-a`, `qa-b` (region
+  California/USA with a BTC wallet), `secondary`, and `agent` (2FA ON; its
+  password + OTP key are in the `credsFile` the roster names, so its 2FA is
+  never a user-only-credential wall; set `YOLO_OTP_KEY` from that file if a
+  login asks for the code). Each entry carries username, PIN, and notes. Refer
+  to accounts BY ROLE in anything synced, committed, or posted (skills, PRs,
+  reports, Asana): usernames and PINs never leave that file. The sim image also
+  contains many junk/leftover accounts — they are NOT test accounts; never trawl
+  beyond the roster. **Switching among roster accounts
   mid-test is normal and expected** — check them for the asset you need before
   acquiring it, and BEFORE creating a new wallet ("no account holds X" is not a
   valid conclusion until each ROSTER account was actually checked).
@@ -75,75 +81,40 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   account-dropdown churn (an agent burned 20+ min fumbling that dropdown).
   Drive the in-app account switcher ONLY when you must preserve live in-app
   state across the switch (rare).
-- **PIN space:** every roster PIN is one of `0000` / `1111` (exact mapping in
-  the roster above). If you're ever at a PIN prompt unsure which: prefer looking
-  it up; at most try the two, ONCE each — wrong-PIN retries trigger exponential
+- **PINs:** look the PIN up in the roster file; never guess. Wrong-PIN retries trigger exponential
   lockout (465s → 914s → …), so never brute-force, and back off immediately on
   "Account locked".
 - **Wallet creation is a SUPPORTED test path — not to be avoided.** Prefer an
   existing funded wallet when the task doesn't involve creation (faster, no
   setup), but create wallets freely when the task targets creation behavior or
   no account holds the needed asset.
-- **The "SQLite crash on wallet creation" is a PRODUCT bug, not an environment
-  one, and is NOT actually caused by creating a wallet** (diagnosed in Asana
-  1215619633542395, 2026-06-11; the env fix it hoped for does not exist). Root
-  cause: the OLD `react-native-piratechain` module (a ZcashLightClientKit fork,
-  `piratelc_*` Rust FFI, `PirateSdk_mainnet…pirate_data.db`) opens TWO SQLite
-  connections on the same `data.db` — a Swift SQLite.swift reader and a Rust
-  `rusqlite` writer — with no shared locking. When the Rust scanner holds the DB
-  (`processNewBlocks` → `block_height_extrema` / balance) while the Swift
-  `CompactBlockProcessor.resolveMempools` mempool consumer reads via
-  `TransactionSQLDAO.find(rawID:)`, the read gets `SQLITE_BUSY`, SQLite.swift
-  throws, and the async mempool task does not catch it → `swift_unexpectedError`
-  / `EXC_BREAKPOINT`. It fires from the roster-primary account's BACKGROUND ARRR/ZEC
-  sync at any time (it crash-looped 15× on 2026-06-09/10), independent of your
-  actions, account (roster-primary + roster-secondary both), and JS diff. The DB is NOT
-  corrupt and disk is NOT full — neither resetting the sim data container nor
-  re-cloning the master fixes it (the race re-arms on every re-sync), which is
-  why this is left to the in-flight Piratechain SDK rewrite (Asana
-  1214721783909451 / accountbased #1055 / gui #6021) that REPLACES this module.
-  Practical handling, in order:
-  1. **PRESCRIBED mitigation when the task is NOT piratechain/zcash-related and
-     the test needs wallet creation/import (or the crash recurs): disable
-     piratechain locally.** In the gui worktree edit
-     `src/util/corePlugins.ts` → `piratechain: false` (it is hardcoded `true`,
-     not ENV-gated), then relaunch the app — JS-only, Metro reload picks it up,
-     no native rebuild. Core never initializes the plugin, the background ARRR
-     scanner never starts, and the race cannot fire, while you keep roster-primary
-     and all its funding. REVERT IMMEDIATELY after the test
-     (`git checkout -- src/util/corePlugins.ts`); never commit the flip. Off
-     limits when the task under test IS piratechain/zcash (e.g. the SDK rewrite
-     chain) — there the module must run.
-  2. Lighter alternative when you don't need roster-primary' balances: switch to a
-     roster account with NO ARRR wallet — the crash fires from the logged-in
-     account's background ARRR sync, so no ARRR wallet means no trigger.
-  3. Otherwise: it's intermittent, so relaunch and continue — the app usually
-     runs fine for long stretches; capture the `Edge-*.ips` crash log if it
-     recurs, note it as a known product blocker (link 1215619633542395), and
-     fall back to an existing wallet. Do NOT spend the slot trying to "fix the
-     sim."
-- **A SECOND ARRR/ZEC crash family: Rust-panic SIGABRT at app start**
+- **Sending to a wallet that does not exist: CREATE it.** When a test sends to
+  another wallet (another roster account's same-asset wallet, a second wallet
+  on the same account, a swap/transfer/sweep target) and it is missing, create
+  it in the account that needs it and continue (build-and-test
+  `create-missing-destination-wallet`). A receive-side wallet needs no funds,
+  so skip the roster search. A missing destination wallet is never a blocker or
+  a concession.
+- **RETIRED 2026-09-23: the "SQLite crash on wallet creation" (Asana
+  1215619633542395) and its `piratechain: false` corePlugins mitigation.** The
+  crash lived in the OLD `react-native-piratechain` module, which gui #6021
+  replaced with `react-native-pirate-wallet` (on develop 2026-09-21). Retest on
+  an unmodified develop build (0c4d2e9) with 4 active ARRR + 3 active ZEC
+  wallets on one account: 8 cold launches plus ~25 min of background sync, zero
+  Pirate Chain crashes. Do not flip `piratechain: false`. A crash with
+  `RNPiratechain` or `PirateSdk_mainnet` frames means the app binary predates
+  #6021: rebuild from current develop.
+- **ZEC crash: Rust-panic SIGABRT at app start (still live on develop).**
   (`Edge-*.ips` faulting stack: `RNZcash.initialize` → `ZcashRustBackend.initializeRust`
   → `zcashlc_init_on_load` → `unwrap_failed` → `rust_panic` → abort).
-  `ZcashRustBackend` guards its one-time Rust init with a NON-thread-safe
-  static bool (`if !Self.rustInitialized`); when a login starts N ZEC wallet
-  engines concurrently, two initializers race the check and the loser calls
-  `zcashlc_init_on_load` twice → Rust panic → SIGABRT. Crash probability
-  scales with the number of ACTIVE ZEC/ARRR wallets on the logged-in account
-  (the 2026-07 diagnosis found 6 ZEC + 5 ARRR accumulated on `roster-primary` from
-  weeks of run testing; confirmed hits 2026-07-24 and 2026-07-30). It is a
-  PRODUCT bug (same fix venue as the SQLite race above: the SDK rewrite);
-  environment handling is ACCOUNT HYGIENE, below. Relaunch on hit — it is a
-  boot-time race, the retry usually survives.
-- **ACCOUNT HYGIENE (prevents both ARRR/ZEC crash families): roster accounts
-  carry at most ONE active ZEC and ZERO active ARRR wallets.** Every extra
-  active wallet multiplies the init race and adds a background scanner.
-  If your test CREATED a ZEC/ARRR wallet (or any wallet the task does not
-  deliver), ARCHIVE it before the run ends — archiving is reversible (keys
-  stay on the account; unarchive when a future task needs it) and is done in
-  the wallet row's menu, or headlessly via `changeWalletStates`. A pirate/zcash
-  task that needs its wallet active leaves ONE and archives the rest.
-  The same hygiene applies to SYNCED SETTINGS: Privacy Settings mixnet
+  `ZcashRustBackend` (`react-native-zcash`) guards its one-time Rust init with
+  a NON-thread-safe static bool; when a login starts several ZEC wallet engines
+  concurrently, two initializers can race and the loser panics. The
+  2026-09-23 retest above hit it on 1 of 8 cold launches. It is a PRODUCT bug
+  and a boot-time race: relaunch on hit, the retry survives. It is never a
+  reason to archive, avoid, or limit ZEC or ARRR wallets; there is no wallet
+  count limit on any account.
+- **SYNCED-SETTINGS HYGIENE:** Privacy Settings mixnet
   toggles (`networkPrivacy: 'nym'`, toggled ON by NYM/mixfetch test plans)
   sync to every session on the account — a toggle left on routes that
   network's RPC through the flaky NYM mixnet for EVERY subsequent run and
@@ -249,7 +220,7 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   app"). Size sends ≤ ~60 sats from a single freshly-claimed leaf
   (leaf-headroom). Mint the receive invoice and verify receipt out-of-band with
   the `@breeztech/breez-sdk-spark` node SDK.
-- **roster-primary funding snapshot (2026-07-02, re-verify balances before relying):**
+- **Primary-account funding snapshot (2026-07-02, re-verify balances before relying):**
   My Bitcoin (BTC) is EMPTY — a BTC Send triggers the wallet-empty modal. Funded:
   My Base 4 (0.35 ETH, ~$600), My Zano (~$460), L3USD on Fantom (~$240),
   My MAYAChain (CACAO). EVM chains block a SECOND send while one is unconfirmed —
@@ -291,8 +262,8 @@ Promoted from the 3-way login-perf run (2026-07-21, Samsung Galaxy S9, task
   The unlock PIN is operator-only and is NOT the Edge account PIN space
   (`0000`/`1111`) — do not guess it, a wrong-guess streak escalates to lockout
   and eventually a factory wipe, taking the provisioned account with it. When
-  the device is locked, the whole android errand (including "is roster-primary
-  logged in?", which needs the UI) is blocked on a user-only credential
+  the device is locked, the whole android errand (including "is the primary
+  account logged in?", which needs the UI) is blocked on a user-only credential
   (one-shot `yolo-true-blockers` (b)); say so and move on rather than grinding.
   Ask the operator to unlock and leave the screen on, or to disable the lock on
   the test device. (Hit 2026-08-03, task 1216926437132721.)
@@ -339,7 +310,7 @@ Promoted from the 3-way login-perf run (2026-07-21, Samsung Galaxy S9, task
 ## Navigation
 - **Gift Card Marketplace (EdgeSpend):** reachable in-app from Home → 'Spend
   Crypto' tile → the EdgeSpend list → 'Purchase New'. Requires a non-light account
-  (roster-primary qualifies) and `ENV.PLUGIN_API_KEYS.phaze.apiKey` set. Real Phaze
+  (the primary account qualifies) and `ENV.PLUGIN_API_KEYS.phaze.apiKey` set. Real Phaze
   productIds for a per-brand test come from `GET <phaze baseUrl>/gift-cards/full/US`
   with header `API-Key: <key>` (the on-disk `brands-us.json` cache is encrypted and
   unreadable, so hit the API for live ids).
@@ -415,14 +386,14 @@ debugging screenshots of the wrong device.
 - **Feature-enablement check (the Rango lesson):** when a provider/feature you
   expect simply ISN'T THERE (no quotes from it, not in the list), FIRST suspect a
   setting: a swap provider can be disabled in **Settings → Exchange Settings**,
-  which is PER-ACCOUNT state (differs between roster-qa-b and roster-primary). Use this
+  which is PER-ACCOUNT state (differs between the qa-b and primary accounts). Use this
   only to DIAGNOSE (read it from code/state or ONE screenshot) — do NOT toggle it.
 - **FORCE a provider via the LOCAL corePlugins hack, NEVER the in-app Exchange
   Settings.** To isolate one swap provider, edit the gui worktree's
   `src/util/corePlugins.ts` `swapPlugins` map and set every OTHER provider to
   `false`, leaving only the target's `*_INIT` — local, uncommitted (per
   `force-swap-provider-locally`). Exchange Settings are ACCOUNT-SYNCED: toggling
-  them on roster-primary thrashes against every other parallel session on the same
+  them on the primary account thrashes against every other parallel session on the same
   account (and persists to the next run / a human), so it is parallel-UNSAFE and
   forbidden as the forcing lever. The corePlugins edit is worktree-local, so
   parallel sessions never collide. (Preferred/preferPluginId do NOT pin — the
@@ -562,7 +533,7 @@ debugging screenshots of the wrong device.
   quotes reliably and exercises the same source-side token-spend code.
 - **Create-wallet entry points.** The Wallets bottom tab is labeled **"Assets"**;
   the create-wallet entry is the header `addButton` (testID) — use it instead of
-  scrolling a long wallet list. YOLO auto-login (roster-primary / 0000) lands logged-in
+  scrolling a long wallet list. YOLO auto-login (primary roster account) lands logged-in
   a few seconds after launch.
 - **EVM send-flow drive recipe:** search "Ethereum" in Assets to filter ETH
   wallets → wallet "Send" → address tile "Enter" (regex `.*Enter.*`) → type a
@@ -575,7 +546,7 @@ debugging screenshots of the wrong device.
   bundle no longer contains the old symbol before crediting the fix. (2026-07-09 eval)
 
 ## Asset & provider specifics
-- **`roster-primary` holds a funded My MAYAChain (CACAO) wallet (~$150).** Usable for
+- **The primary account holds a funded My MAYAChain (CACAO) wallet (~$150).** Usable for
   real Maya swap execution (e.g. CACAO→BTC). Maya is the only provider for CACAO
   pairs, so no provider forcing is needed for CACAO sources.
 - **keys-only create-wallet exclusion — proxy without the target asset:**
@@ -592,7 +563,7 @@ debugging screenshots of the wrong device.
   Platform check). A helper it calls must not reference a module-level `const`
   declared AFTER `SPECIAL_CURRENCY_INFO`, or it hits the temporal dead zone at
   import.
-- **TON send/sync tests need no swap-to-fund:** roster-primary holds funded
+- **TON send/sync tests need no swap-to-fund:** the primary account holds funded
   "My Toncoin" (~3.4 TON) and "My Toncoin 2"; a wallet-to-wallet self-send at
   ~0.0064 TON exercises pending→confirmed reconciliation. (2026-07-09 eval)
 - **TON public endpoint rate-limits under parallel slots:** toncenter.com/api/v2
@@ -601,7 +572,7 @@ debugging screenshots of the wrong device.
   estimate is the recovery signal. (2026-07-09 eval, TON run)
 - **Maya/Thorchain pending-metadata tests: confirm the FIRST fresh quote.** The
   60s timeout is on the quote re-fetch, not the broadcast — slide immediately,
-  don't let the quote expire. roster-primary USDT(Ethereum)→ETH is a reliable
+  don't let the quote expire. The primary account's USDT(Ethereum)→ETH is a reliable
   executable Maya token-source pair; min ~5.21 USDT. (2026-07-09 eval)
 - **SideShift geo-gate is per-request from the CURRENT egress — re-verify fresh
   each run:** `curl https://sideshift.ai/api/v2/permissions` →

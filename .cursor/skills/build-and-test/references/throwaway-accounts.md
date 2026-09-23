@@ -1,39 +1,31 @@
-# Throwaway test accounts (shared ledger)
+# Throwaway test accounts
 
 Accounts created by `maestro/common/create-throwaway-account.yaml`. They are
-EMPTY, disposable, and **reusable across sessions** — a followup does not need to
+EMPTY, disposable, and **reusable across sessions**: a followup does not need to
 create a new one, and there is no need to delete them at the end of a run.
 Uniqueness is what matters: the flow's default username is
-`agent-tw-<random>`, so two sessions never collide.
+`agent-tw-<random>` and its default password is random per run, so two
+sessions never collide.
 
 Use one of these instead of a roster account whenever a test would otherwise
 mutate ACCOUNT-SYNCED state that other sessions share: `activePromotions`,
 referral/affiliate attribution (`installerId`, `CreationReason.json`), Exchange
-Settings, Privacy/mixnet toggles, wallet lists. The roster accounts
-(`roster-primary`, `roster-qa-a`, `roster-qa-b`, `roster-secondary`) stay for FUNDED work.
+Settings, Privacy/mixnet toggles, wallet lists. The roster accounts (see
+`~/.config/edge-secrets/test-accounts.json`) stay for FUNDED work.
 
 Log in the usual way: set `YOLO_USERNAME`/`YOLO_PIN` in the worktree `env.json`,
 then `simctl terminate` + `launch`. Restore the roster account when done.
 
-**Append a row when you create one. Do not delete rows for accounts you did not
-delete.**
-
-| Username | Password | PIN | Sim | Created | Wallets | Notes |
-|---|---|---|---|---|---|---|
-| `agent-tw-REDACTED` | `REDACTED-PASSWORD` | `1234` | agent-sim-pool-0 | 2026-08-07 | BTC, ETH, LTC, BCH, DASH (app defaults) | Empty. Region unset. |
-| `agent-tw-REDACTED` | `REDACTED-PASSWORD` | `1234` | agent-sim-pool-0 | 2026-08-07 | app defaults | Empty. Region unset. |
-| `agent-tw-REDACTED` | `REDACTED-PASSWORD` | `1234` | agent-sim-pool-0 | 2026-08-07 | app defaults | Empty. Region unset. |
-| `agent-tw-REDACTED` | `REDACTED-PASSWORD` | `1234` | agent-sim-pool-0 | 2026-08-14 | app defaults + AVAX, COREUM, XMR | Region set to California/USA + USD. Carries promo code `agentramptest` in activePromotions (inert without a matching info-server entry). 2026-08-17 NYM run: added the three wallets above, held ~0.001 ETH dust in My Ether, and accepted the Nym-mixnet and scam-warning notices. All four Privacy Settings mixnet toggles were turned back OFF. 2026-08-31 NYM cooldown run: reused for the Ethereum Network Privacy toggle; set back to Standard and verified on screen. |
+**The ledger is local-only:** `~/.config/edge-secrets/throwaway-accounts.md`
+(username / password / PIN / which sim / notes). Check it before creating
+another, and append a row when you do, including the password the flow
+returned in `output.newAccountPassword`. Do not delete rows for accounts you
+did not delete. Never copy a row, username, or password into a synced skill,
+commit, PR, or report.
 
 Notes on the sim column: the account's device stash lives on ONE simulator, so a
 row is only usable from that sim (or from any clone cut after it was created).
 On a different pool sim, create a fresh one rather than trying to import.
 
 An account whose test dirtied synced state (an activated promo code, an
-affiliate attribution) should say so in Notes, or be left off the reusable list.
-| `agent-tw-REDACTED` | `REDACTED-PASSWORD` | `1234` | agent-sim-pool-1 | 2026-08-18 | app defaults (BTC, ETH, LTC, BCH, DASH) | Empty. Lives in the **Coinhub** white-label app (`app.coinhubatm.wallet`), NOT `co.edgesecure.app` — the two bundles have separate data containers, so this row is unusable from the Edge app. Region set to California/USA. |
-| `agent-tw-REDACTED` | `REDACTED-PASSWORD` | `1234` | agent-sim-pool-0 | 2026-08-20 | app defaults (BTC, ETH, LTC, BCH, DASH) | Empty. Lives in the **Coinhub** white-label app (`app.coinhubatm.wallet`), NOT `co.edgesecure.app` — separate data containers, so this row is unusable from the Edge app. Region set to California/USA. |
-| `agent-tw-REDACTED` | `REDACTED-PASSWORD` | `1234` | agent-sim-pool-3 | 2026-08-27 | BTC, ETH, LTC, BCH, DASH (app defaults) | Empty. Created as `agent-tw-REDACTED`, renamed to `...a` by the password-reminder test. Password reminder counters are used up (passwordUseCount 1). |
-| `agent-tw-REDACTED` | `REDACTED-PASSWORD` | `1234` | agent-sim-pool-0 | 2026-08-27 | DASH only ("My Dash") | Empty (funded to $24 in DASH for the password-recovery-milestone test, then swept back to roster-primary). Region unset. `passwordRecoveryRemindersShown['20']` is now TRUE and the Send-scene scam-warning acknowledgement is accepted, so it is NOT a clean slate for a re-test of the $20 milestone — create a fresh one for that. |
-| `agent-tw-REDACTED` | `REDACTED-PASSWORD` | `1234` | agent-sim-pool-2 | 2026-09-01 | BTC, LTC, BCH, DASH (both ETH wallets ARCHIVED) | Empty (funded to $24.05 in DASH for the password-recovery-milestone re-test, then swept back to roster-primary). `passwordRecoveryRemindersShown['20']` is now TRUE and the Send-scene scam-warning acknowledgement is accepted, so it is NOT a clean slate for a re-test of the $20 milestone. Region unset. 2026-09-08 seed-vs-private-key run: its `My Ether` seed and an imported `My Ether 2` hex key were published in PR proof screenshots, so BOTH ETH wallets were archived and must stay archived - do NOT unarchive or fund them. Create a fresh EVM wallet if a future test needs one here. |
-| `agent-tw-REDACTED` | `REDACTED-PASSWORD` | `1234` | agent-sim-pool-1 | 2026-09-03 | BTC, ETH, LTC, BCH, DASH (app defaults) | Empty (funded to $23.00 in DASH for the password-recovery per-account-grace test, then swept back to roster-primary). `passwordRecoveryRemindersShown['20']` is now TRUE and the Send-scene scam-warning acknowledgement is accepted, so it is NOT a clean slate for a re-test of the $20 milestone. Region unset. |
+affiliate attribution) should say so in its ledger Notes.

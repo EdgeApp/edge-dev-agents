@@ -4,8 +4,8 @@
 # scene's dropdown forever).
 #
 # ENTRY STATE: logged into the account you want gone. Deletion is irreversible;
-# never point this at a roster account (roster-primary, roster-qa-a, roster-qa-b,
-# roster-secondary).
+# never point this at a roster account (any username in
+# ~/.config/edge-secrets/test-accounts.json).
 #
 # PARAMS
 #   DELETE_USERNAME  defaults to output.newAccountUsername (set by the create flow)

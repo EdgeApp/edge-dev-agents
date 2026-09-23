@@ -1,9 +1,9 @@
 # common/login-if-needed.yaml — PIN-login ONLY when the PIN screen is showing.
 # Safe under YOLO auto-login (app usually lands already logged in: the gate makes
 # this a no-op) and after a relaunch that returns to the PIN screen.
-# PARAMS: PIN_DIGIT (single digit tapped 4x; all roster PINs are repeated digits:
-#   0000 → "0" [roster-primary/roster-secondary — roster-primary is the default YOLO login],
-#   1111 → "1" [roster-qa-a/roster-qa-b]).
+# PARAMS: PIN_DIGIT (single digit tapped 4x; every roster PIN is one digit
+#   repeated, so pass that digit; look the PIN up by role in
+#   ~/.config/edge-secrets/test-accounts.json).
 # GOTCHA: taps MUST stay spaced (waitToSettleTimeoutMs) — fast taps drop digits →
 # wrong PIN → exponential lockout. Never tighten these.
 appId: ${APP_ID}

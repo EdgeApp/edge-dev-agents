@@ -18,7 +18,9 @@
 #
 # PARAMS
 #   NEW_USERNAME  default "agent-tw-<random>"; must be unused
-#   NEW_PASSWORD  default meets the requirements (10+ chars, upper, lower, digit)
+#   NEW_PASSWORD  default is random per run and meets the requirements (10+
+#                 chars, upper, lower, digit); record it from
+#                 output.newAccountPassword in the local throwaway ledger
 #   NEW_PIN       default "1234" (deliberately outside the roster PIN space)
 #   NEW_WALLETS   JSON array of wallet names to end up with, e.g.
 #                 '["Ethereum"]'. "" (default) keeps the app's default set.
@@ -46,7 +48,7 @@ env:
   # own `env:` block SHADOWS the value a parent `runFlow: env:` passes in
   # (maestro 2.x on this host), so a bare default silently wins over the caller.
   NEW_USERNAME: ${NEW_USERNAME || "agent-tw-" + Math.floor(Math.random() * 1000000000)}
-  NEW_PASSWORD: ${NEW_PASSWORD || "REDACTED-PASSWORD"}
+  NEW_PASSWORD: ${NEW_PASSWORD || "Tw" + Math.random().toString(36).slice(2, 10).padEnd(8, "x") + "A1"}
   NEW_PIN: ${NEW_PIN || "1234"}
   NEW_WALLETS: ${NEW_WALLETS || ""}
   DEFAULT_WALLETS: ${DEFAULT_WALLETS || '["Bitcoin", "Ethereum", "Litecoin", "Bitcoin Cash", "Dash"]'}
