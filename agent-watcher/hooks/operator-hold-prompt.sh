@@ -67,6 +67,10 @@ printf '%s' "$HUMAN" | tr -d '[:space:]' | grep -q . || exit 0
 
 NORM=$(printf '%s' "$HUMAN" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ' | sed -E 's/^ +//; s/ +$//')
 . "$H/hooks/lib/operator-directives.sh"
+# Jev shadow, log only (lib/jev-shadow.sh): on exit, spool the human text beside
+# the branch taken (LIVE), for the Jev intent Choice. Never changes the outcome.
+LIVE=hold
+. "$H/lib/jev-shadow.sh" 2>/dev/null && trap 'jq -cn --arg p "$HUMAN" --arg l "$LIVE" --arg t "$GID" "{prompt:\$p,live:\$l,task:\$t}" 2>/dev/null | jev_shadow_enqueue prompt' EXIT
 ANCHOR=$(printf '%s' "$NORM" | release_anchor)
 KINDS=$(printf '%s' "$NORM" | directive_kinds)
 RELEASE=false; STOP=false; COMPLETE_DIRECTIVE=false; BYPASS=false
@@ -84,12 +88,14 @@ if $BYPASS; then
   fi
 fi
 if $STOP; then
+  LIVE=stop
   write_waiver stop
   "$H/operator-hold.sh" set "$GID"
   echo "[operator hold: stop directive] The operator asked you to STOP this run. Do it now, in this turn: update-status.sh $GID <current status> --blocked yes --reason \"operator-directed: <their words>\" (this passes every gate while the hold is active, and the completion judge is waived for that one write; it applies again to any later completion event), write and attach the run report describing where things stand, then end your turn. Do not resume the phase, push, or open a PR."
   exit 0
 fi
 if $RELEASE; then
+  LIVE=release
   "$H/operator-hold.sh" release "$GID"
   if $COMPLETE_DIRECTIVE; then
     write_waiver complete
@@ -101,6 +107,7 @@ if $RELEASE; then
 fi
 
 if [ "$(printf '%s' "$NORM" | hold_trigger)" != hold ]; then
+  LIVE=steer
   echo "[operator steer, no hold] A human wrote this mid-run. Carry it out (where it conflicts with the plan, the operator wins), answer briefly if it asks nothing, and keep going: the run stays autonomous and no phase, push or PR action is blocked."
   exit 0
 fi

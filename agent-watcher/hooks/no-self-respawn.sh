@@ -36,6 +36,8 @@ case "$TOOL" in
 # argument extraction, where quoted values are load-bearing. Fail-open to the
 # raw command if the helper is unavailable.
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+# Jev shadow, log only (lib/jev-shadow.sh): on a raw trigger hit, log execute-vs-quote beside this hook's decision.
+. "$HOME/.config/agent-watcher/lib/jev-shadow.sh" 2>/dev/null && jev_shadow_cmd_trap no-self-respawn "claude --resume, claude -p/--print, a backgrounded claude, or /loop" 'claude[^|;&]*(--resume|[[:space:]]-p([[:space:]]|$)|--print)|claude[^|;]*&|/loop' "$CMD" || true
     # claude re-launch (resume/print) or a backgrounded claude or a /loop invocation.
     if printf '%s' "$CMD_M" | grep -qE '(^|[;&|]|[[:space:]])claude([[:space:]]+[^|;&]*)?[[:space:]]+(--resume|-p|--print)([[:space:]]|$)' \
        || printf '%s' "$CMD_M" | grep -qE '(^|[;&|]|[[:space:]])claude[^|;]*&[[:space:]]*$' \

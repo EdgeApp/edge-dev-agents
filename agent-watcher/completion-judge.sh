@@ -47,6 +47,21 @@ EFFORT="${COMPLETION_JUDGE_EFFORT:-high}"
 DEADLINE="${COMPLETION_JUDGE_DEADLINE:-480}"
 mkdir -p "$LOG_DIR" 2>/dev/null
 
+# Jev shadow, blocker path (log only, no Jev call): every block event mirrors one
+# row with the blocker REASON beside the verdict to ~/.config/jev/shadow/blocker/,
+# because the judge cache keeps no reason text. rc 0 allow, 1 deny, 3 unavailable.
+JUDGE_PATH=fresh
+shadow_blocker_row() {
+  local rc=$1 root="${JEV_SHADOW_ROOT:-$HOME/.config/jev/shadow}" v
+  [ "$EVENT" = block ] && [ ! -f "$root/OFF" ] || return 0
+  case "$rc" in 0) v=allow ;; 1) v=deny ;; 3) v=unavailable ;; *) return 0 ;; esac
+  mkdir -p "$root/blocker" 2>/dev/null && jq -cn --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg gid "$GID" \
+    --arg v "$v" --arg via "$JUDGE_PATH" --arg reason "$REASON" --arg hash "${HASH:-}" \
+    '{ts:$ts,gid:$gid,verdict:$v,via:$via,reason:$reason,evidence_hash:$hash}' >> "$root/blocker/decisions.jsonl" 2>/dev/null
+  return 0
+}
+trap 'shadow_blocker_row $?' EXIT
+
 # 1. Evidence
 EV_ARGS=(--gid "$GID" --event "$EVENT")
 [ -n "$REASON" ] && EV_ARGS+=(--reason "$REASON")
@@ -71,6 +86,7 @@ if [ -s "$MARKER" ] && . "$H/hooks/lib/operator-directives.sh" 2>/dev/null; then
     printf '{"ts":"%s","gid":"%s","event":"%s","evidence_hash":"%s","nonce":"override","verdict":"override","override":%s,"comment_at":"%s","directive":%s}\n' \
       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GID" "$EVENT" "$HASH" "$(printf '%s' "$hit" | jq -Rs .)" "$c_ts" \
       "$(printf '%s' "$c_text" | head -c 300 | tr '\n' ' ' | jq -Rs .)" >> "$LOG_DIR/$GID.jsonl"
+    JUDGE_PATH=override
     echo "verdict: allow ($EVENT) by OPERATOR OVERRIDE: Asana comment $c_ts orders '$hit' ($(printf '%s' "$c_text" | head -c 160 | tr '\n' ' '))"
     exit 0
   done < <(jq -r '(.segment_comments // .comments // [])[] | select(.authored == "operator") | [.created_at, (.text | gsub("[\t\n]"; " "))] | @tsv' "$MARKER" 2>/dev/null)
@@ -89,6 +105,7 @@ process.exit(v.verdict==="allow"?0:1)' "$1"; }
 # 2. Cached verdict for this exact evidence
 if [ "$FORCE" != 1 ] && [ -s "$VERDICT" ] && [ "$(jq -r '.evidence_hash // empty' "$VERDICT" 2>/dev/null)" = "$HASH" ] \
    && [ "$(jq -r '.event // empty' "$VERDICT" 2>/dev/null)" = "$EVENT" ]; then
+  JUDGE_PATH=cached
   jq '. + {cached: true}' "$VERDICT" > "$VERDICT.tmp" && mv -f "$VERDICT.tmp" "$VERDICT"
   [ "$QUIET" = 1 ] && { [ "$(jq -r .verdict "$VERDICT")" = allow ] && exit 0 || exit 1; }
   print_verdict "$VERDICT"; exit $?
@@ -152,8 +169,8 @@ console.log(JSON.stringify({verdict:out.verdict,fails,cost:out.cost_usd,duration
 mv -f "$VERDICT.tmp" "$VERDICT"
 
 # 5. Provenance
-printf '%s' "$PARSED" | jq -c --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg gid "$GID" --arg event "$EVENT" --arg hash "$HASH" --arg nonce "$NONCE" --arg model "$MODEL" \
-  '{ts:$ts,gid:$gid,event:$event,evidence_hash:$hash,nonce:$nonce,verdict:.verdict,fails:.fails,fail_ids:.fail_ids,summary:.summary,cost_usd:.cost,duration_ms:.duration_ms,model:$model}' >> "$LOG_DIR/$GID.jsonl"
+printf '%s' "$PARSED" | jq -c --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg gid "$GID" --arg event "$EVENT" --arg hash "$HASH" --arg nonce "$NONCE" --arg model "$MODEL" --arg reason "$REASON" \
+  '{ts:$ts,gid:$gid,event:$event,evidence_hash:$hash,nonce:$nonce,verdict:.verdict,fails:.fails,fail_ids:.fail_ids,summary:.summary,cost_usd:.cost,duration_ms:.duration_ms,model:$model} + (if $event == "block" then {reason:$reason} else {} end)' >> "$LOG_DIR/$GID.jsonl"
 
 [ "$QUIET" = 1 ] && { [ "$(jq -r .verdict "$VERDICT")" = allow ] && exit 0 || exit 1; }
 print_verdict "$VERDICT"

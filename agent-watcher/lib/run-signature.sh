@@ -21,5 +21,6 @@
 has_run_signature() { # $1=transcript.jsonl -> 0 iff head carries a /one-shot user message
   local sig_head
   sig_head=$(head -50 "$1" 2>/dev/null || true)
-  grep -qa '"/one-shot --yolo' <<<"$sig_head"
+  # /task-run is the no-PR run shape (agent_deliverable Task / "Task + sim").
+  grep -qaE '"/(one-shot|task-run) --yolo' <<<"$sig_head"
 }

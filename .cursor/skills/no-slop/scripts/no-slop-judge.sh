@@ -165,6 +165,25 @@ if (toJudge.length) {
       judgedCount++
       if (bad) findings.push({ ...c, rule: v.rule })
     }
+    // Jev shadow, log only (~/.config/agent-watcher/lib/jev-shadow.py): each
+    // freshly judged sentence is spooled with the haiku verdict so the drain
+    // can log the Jev pre-clear verdict beside it. Haiku still decides. Only
+    // in orchestrated sessions; detached, so it adds no latency and cannot fail.
+    if (process.env.AGENT_TASK_GID) {
+      const py = (process.env.HOME || "") + "/.config/agent-watcher/lib/jev-shadow.py"
+      for (const v of verdicts) {
+        const c = cap[(v.n | 0) - 1]
+        if (!c) continue
+        const bad = v.violation === true && v.rule && v.rule !== "none"
+        try {
+          const ch = require("child_process").spawn("python3", [py, "enqueue", "prose"], { detached: true, stdio: ["pipe", "ignore", "ignore"] })
+          ch.on("error", () => {})
+          ch.stdin.on("error", () => {})
+          ch.stdin.end(JSON.stringify({ sentence: c.sentence, hint: c.hint, haiku: !!bad, haiku_rule: bad ? v.rule : "none", task: process.env.AGENT_TASK_GID }))
+          ch.unref()
+        } catch {}
+      }
+    }
   } else {
     // Fail open on findings, but never silently: an unauthenticated or broken
     // `claude -p` used to be indistinguishable from a clean pass, which hid a

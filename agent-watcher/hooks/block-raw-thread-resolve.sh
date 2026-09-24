@@ -46,6 +46,8 @@ CWD_IN=$(printf '%s' "${INPUT:-}" | jq -r '.cwd // empty' 2>/dev/null || true)
 gh_target_is_edge "$CMD" "$CWD_IN" || exit 0
 
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+# Jev shadow, log only (lib/jev-shadow.sh): on a raw trigger hit, log execute-vs-quote beside this hook's decision.
+. "$HOME/.config/agent-watcher/lib/jev-shadow.sh" 2>/dev/null && jev_shadow_cmd_trap block-raw-thread-resolve "a gh api graphql resolveReviewThread mutation" 'resolveReviewThread' "$CMD" || true
 # The mutation string itself legitimately sits INSIDE quotes (a graphql -f
 # query argument), so the trigger is: the string anywhere in the raw command
 # AND an actual graphql invocation in the stripped view. A heredoc or echo

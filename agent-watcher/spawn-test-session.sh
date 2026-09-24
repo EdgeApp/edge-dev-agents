@@ -35,6 +35,7 @@ METRO_PORT=""
 WORKTREE_PATH=""
 LABEL=""
 RESUME_ID=""
+DELIVERABLE=""
 POSITIONAL=()
 
 while [[ $# -gt 0 ]]; do
@@ -47,6 +48,7 @@ while [[ $# -gt 0 ]]; do
     --worktree-path)  WORKTREE_PATH="$2";  shift 2 ;;
     --label)          LABEL="$2";          shift 2 ;;
     --resume)         RESUME_ID="$2";      shift 2 ;;
+    --deliverable)    DELIVERABLE="$2";    shift 2 ;;
     *) POSITIONAL+=("$1"); shift ;;
   esac
 done
@@ -225,6 +227,11 @@ if [[ -n "$SLOT_INDEX" ]]; then
   [[ -n "$SIM_UDID" ]]   && ENV_EXPORTS+="export AGENT_SIM_UDID=\"$SIM_UDID\"
 "
   [[ -n "$METRO_PORT" ]] && ENV_EXPORTS+="export AGENT_METRO_PORT=\"$METRO_PORT\"
+"
+  # Run shape for the hooks (inject-run-context, require-skill-read-for-scripts):
+  # PR is the default; the watcher and resume-task pass the task's agent_deliverable.
+  case "$DELIVERABLE" in "Task"|"Task + sim") ;; *) DELIVERABLE="PR" ;; esac
+  ENV_EXPORTS+="export AGENT_DELIVERABLE=\"$DELIVERABLE\"
 "
 fi
 

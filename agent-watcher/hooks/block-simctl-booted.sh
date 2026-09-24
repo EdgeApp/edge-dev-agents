@@ -19,6 +19,8 @@ CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 # argument extraction, where quoted values are load-bearing. Fail-open to the
 # raw command if the helper is unavailable.
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+# Jev shadow, log only (lib/jev-shadow.sh): on a raw trigger hit, log execute-vs-quote beside this hook's decision.
+. "$HOME/.config/agent-watcher/lib/jev-shadow.sh" 2>/dev/null && jev_shadow_cmd_trap block-simctl-booted "a simctl call targeting the device named booted" 'simctl.*booted' "$CMD" || true
 
 if echo "$CMD_M" | grep -qE '\bsimctl\b' && echo "$CMD" | grep -qE '(^|[[:space:]"'"'"'])booted([[:space:]"'"'"']|$)'; then
   echo "BLOCKED: 'simctl ... booted' is ambiguous in this session — multiple sims can be booted concurrently and 'booted' may resolve to ANOTHER slot's sim (installing/launching/logging against another run's device). Your sim is AGENT_SIM_UDID=$AGENT_SIM_UDID — use that UDID explicitly in every simctl call (per slot-sim-is-the-clone). Same rule for the maestro MCP: select the device matching \$AGENT_SIM_UDID before driving." >&2

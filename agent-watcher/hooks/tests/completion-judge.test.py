@@ -43,7 +43,8 @@ os.chmod(fake, os.stat(fake).st_mode | stat.S_IEXEC)
 LOG_DIR = os.path.join(tmp, 'judge-log')
 ENV = dict(os.environ, PATH=fake_bin + ':' + os.environ['PATH'], COMPLETION_JUDGE_OFFLINE='1',
            COMPLETION_JUDGE_LOG_DIR=LOG_DIR, COMPLETION_JUDGE_DEADLINE='2', AGENT_TASK_GID=GID,
-           AGENT_WORKTREE_ROOT=os.path.join(tmp, 'wt'))
+           AGENT_WORKTREE_ROOT=os.path.join(tmp, 'wt'), JEV_SHADOW_ROOT=os.path.join(tmp, 'shadow'))
+SHADOW_BLOCKER = os.path.join(tmp, 'shadow', 'blocker', 'decisions.jsonl')
 LOGF = os.path.join(LOG_DIR, f'{GID}.jsonl')
 
 
@@ -134,6 +135,15 @@ try:
     n = calls(); rc, out, err = judge('--event', 'complete', '--force', verdict='deny')
     check('launcher: agent-authored comment never overrides', rc == 1 and calls() == n + 1, f'rc={rc} calls={calls()} n={n} {err[:120]}')
     marker([ASK])
+    rc, out, err = judge('--event', 'block', '--reason', 'task needs a simulator', '--force', verdict='deny')
+    last = json.loads(open(LOGF).read().strip().splitlines()[-1])
+    rows = [json.loads(l) for l in open(SHADOW_BLOCKER)] if os.path.exists(SHADOW_BLOCKER) else []
+    check('jev shadow: a block event logs its reason beside the verdict, in the provenance line and one blocker row',
+          rc == 1 and last.get('reason') == 'task needs a simulator' and len(rows) == 1
+          and rows[0]['verdict'] == 'deny' and rows[0]['via'] == 'fresh' and rows[0]['reason'] == 'task needs a simulator', f'rc={rc} {last} {rows}')
+    rc, out, err = judge('--event', 'complete', '--force', verdict='deny')
+    check('jev shadow: non-block events write no blocker row and no reason field',
+          len(open(SHADOW_BLOCKER).read().splitlines()) == 1 and 'reason' not in json.loads(open(LOGF).read().strip().splitlines()[-1]))
     p = subprocess.run([f'{AW}/judge-report-section.sh', '--gid', GID], capture_output=True, text=True, env=ENV)
     sec = p.stdout
     check('report section: one row per judge call with failed ids, override and unavailable rows', sec.startswith('## Completion Judge') and '| deny | J1 |' in sec and 'operator override (bypass)' in sec and 'judge unavailable' in sec, sec[:400])

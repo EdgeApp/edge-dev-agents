@@ -67,6 +67,8 @@ CWD_IN=$(printf '%s' "${INPUT:-}" | jq -r '.cwd // empty' 2>/dev/null || true)
 gh_target_is_edge "$CMD" "$CWD_IN" || exit 0
 
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+# Jev shadow, log only (lib/jev-shadow.sh): on a raw trigger hit, log execute-vs-quote beside this hook's decision.
+. "$HOME/.config/agent-watcher/lib/jev-shadow.sh" 2>/dev/null && jev_shadow_cmd_trap block-raw-gh-writes "a raw gh PR write (pr create/comment/review/edit --body, or gh api POST to a comment or review endpoint)" 'gh[[:space:]]+pr[[:space:]]+(create|comment|review|edit)|(issues|pulls)/[0-9]+/(comments|reviews)|(issues|pulls)/comments/[0-9]+' "$CMD" || true
 
 # Sanctioned scripts first — they invoke gh internally (invisible here), so
 # this exempts mixed commands that both run a script and match a trigger.

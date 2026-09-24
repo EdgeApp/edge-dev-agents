@@ -20,7 +20,7 @@ branch: ""
 base: origin/develop
 pr: none                 # PR URL, or "none"
 outcome: complete        # complete | partial | blocked
-verified: not-run        # pass | partial | not-run | fail
+verified: not-run        # pass | partial | not-run | fail | n/a (no runtime surface; Task deliverables only)
 verify_blockers: []      # any of: precondition | harness | code | task-drafting
 started: ""              # ISO 8601
 ended: ""                # ISO 8601
@@ -52,7 +52,9 @@ _None observed._
              reason here and is mentioned NOWHERE else in this report
        - [ ] zero unresolved review threads (bot AND human)
        - [ ] landed or auto-merge armed (per `land-on-approval`) / stopped at PR (say which)
-       - [ ] Build field routing done (cheese pushed / staging noted / none)  -->
+       - [ ] Build field routing done (cheese pushed / staging noted / none)
+     A Task or "Task + sim" deliverable (/task-run) has no PR: this section reads
+     exactly `N/A: no PR deliverable` and nothing else. -->
 _None observed._
 
 ## Completion Judge

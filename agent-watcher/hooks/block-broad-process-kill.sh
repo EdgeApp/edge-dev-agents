@@ -21,6 +21,8 @@ CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 # Mention-stripped view: heredoc bodies and quoted spans are blanked so a report
 # that QUOTES `pkill -f` does not fire. Fail-open to raw.
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+# Jev shadow, log only (lib/jev-shadow.sh): on a raw trigger hit, log execute-vs-quote beside this hook's decision.
+. "$HOME/.config/agent-watcher/lib/jev-shadow.sh" 2>/dev/null && jev_shadow_cmd_trap block-broad-process-kill "pkill, killall, or a kill fed by pgrep" 'pkill|killall|kill.*pgrep|pgrep.*kill' "$CMD" || true
 
 REASON=$(CMD_M="$CMD_M" node -e '
 const cmd = process.env.CMD_M

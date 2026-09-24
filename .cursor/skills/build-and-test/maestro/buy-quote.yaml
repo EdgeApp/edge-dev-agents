@@ -2,7 +2,7 @@
 #
 # Target: the iPhone 16 Pro Max / iOS 18 simulator that holds the pre-provisioned
 # roster account `qa-b` (see ~/.config/edge-secrets/test-accounts.json: region
-# California/USA, BTC wallet). The Edge
+# California/USA). The flow quotes into a BTC wallet, so confirm the logged-in account has one. The Edge
 # app must already be installed (build + install steps are in build-and-test/SKILL.md).
 #
 # Run: maestro test ~/.cursor/skills/build-and-test/maestro/buy-quote.yaml

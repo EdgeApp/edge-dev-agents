@@ -60,10 +60,19 @@
       "rc": "chat-houdini-stealth-sendswap",
       "tmux": "claude-asana-chat-houdini-stealth-sendswap",
       "doneAt": "2026-09-14T18:12:12.313Z"
+    },
+    {
+      "id": "rmu4klekk",
+      "kind": "refresh",
+      "at": "2026-09-16T20:45:35.876Z",
+      "status": "done",
+      "title": "Refresh",
+      "uuid": "",
+      "note": "fleet re-read",
+      "doneAt": "2026-09-24T00:35:25.150Z"
     }
   ],
   "snapshotUuids": [
-    "b6f23ffa-0030-4ad3-912d-453a1113caa2",
     "47feb686-5bd9-4f16-b178-bc51aa563b64",
     "c77f3c8e-956e-4ef3-96f9-83bc5a243b7f",
     "36ff7607-5a6d-4324-917a-566fc621b70f",
@@ -97,7 +106,6 @@
     "e68b8df1-e215-44bb-b750-978cfe66176f",
     "537afed7-62da-4556-88f9-093b31b7639c",
     "8782b0c0-44eb-44ea-bf50-9b3ab4cbb014",
-    "702c076f-e4c3-48fa-817f-74ff771b54a7",
     "42724d6f-71b1-4b9d-b153-c9fabb350f6c",
     "266d085c-a5a3-41e5-8714-e5cd87f680d3",
     "8aaf5113-8fcf-44ad-b749-fb671e1e4042",
@@ -110,8 +118,10 @@
     "7e25e554-e53d-4779-9ee0-48b997501f65",
     "cc40ec2c-6162-4e43-a40f-2fb1069a2247",
     "4d46d864-17e2-44f2-b8df-9cde7fc2a0d5",
-    "fc5c5ba3-d17c-4d43-973a-aa0a5ea0cd10",
     "e659f517-ae27-4c18-ba71-1d7cf0a6b892",
-    "7986059c-8abc-4994-8792-05b697d4fc91"
+    "7986059c-8abc-4994-8792-05b697d4fc91",
+    "3bf20205-9de0-4209-b756-4c4dadf5907b",
+    "130e7c05-02fa-4619-931c-ec63836d1b9b",
+    "a0f8234f-178f-4b5a-8f93-d0d7b9592f79"
   ]
 }

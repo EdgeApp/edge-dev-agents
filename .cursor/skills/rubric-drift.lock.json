@@ -58,13 +58,13 @@
       ]
     },
     "one-shot:report-as-attachment": {
-      "hash": "5942d0414bf8",
+      "hash": "29dc44f7bdc5",
       "dims": [
         "A9"
       ]
     },
     "file:agent-run-report.md": {
-      "hash": "e117df4dabc4",
+      "hash": "f60f75d564d9",
       "dims": [
         "A18",
         "A20",
@@ -246,7 +246,7 @@
       ]
     },
     "file:asana-watcher.js": {
-      "hash": "f56f464c1077",
+      "hash": "a460647a3aa4",
       "dims": [
         "O1"
       ]
@@ -285,7 +285,7 @@
       ]
     },
     "one-shot:ignore-refired-one-shot": {
-      "hash": "d80ea3ed23a2",
+      "hash": "b80174469a3f",
       "dims": [
         "A1"
       ]
@@ -363,7 +363,7 @@
       ]
     },
     "build-and-test:funded-test-accounts": {
-      "hash": "070de24d38c3",
+      "hash": "ae06509676dc",
       "dims": [
         "A27"
       ]
@@ -1541,6 +1541,34 @@
     "build-and-test:create-missing-destination-wallet": {
       "reason": "2026-09-23: graded through the concession-taxonomy deny item (A7 deferral validity); no separate dimension",
       "hash": "c7360bd58918"
+    },
+    "one-shot:run-rules": {
+      "reason": "2026-09-23: pointer rule only: names the ids moved to references/run-rules.md, which inject-run-context.sh injects mechanically at every boundary; the moved rules keep their own anchors",
+      "hash": "1ab26016f669"
+    },
+    "task-run:no-pr-no-worktree": {
+      "reason": "2026-09-24: operator declined a rubric dimension for task-run 2026-09-24",
+      "hash": "8f185d9cafae"
+    },
+    "task-run:status-walk": {
+      "reason": "2026-09-24: operator declined a rubric dimension for task-run 2026-09-24",
+      "hash": "dc229c668ec4"
+    },
+    "task-run:sim-only-when-provisioned": {
+      "reason": "2026-09-24: operator declined a rubric dimension for task-run 2026-09-24",
+      "hash": "2661b1e589f0"
+    },
+    "task-run:findings-comment": {
+      "reason": "2026-09-24: operator declined a rubric dimension for task-run 2026-09-24",
+      "hash": "66336dfcaa7b"
+    },
+    "task-run:artifacts-stay-local-unless-asked": {
+      "reason": "2026-09-24: operator declined a rubric dimension for task-run 2026-09-24",
+      "hash": "a4e21645bdac"
+    },
+    "task-run:report-shape": {
+      "reason": "2026-09-24: operator declined a rubric dimension for task-run 2026-09-24",
+      "hash": "3f62fe4aee13"
     }
   },
   "excluded_skills": {

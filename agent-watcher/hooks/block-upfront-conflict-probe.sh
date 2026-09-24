@@ -25,6 +25,8 @@ CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 # argument extraction, where quoted values are load-bearing. Fail-open to the
 # raw command if the helper is unavailable.
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+# Jev shadow, log only (lib/jev-shadow.sh): on a raw trigger hit, log execute-vs-quote beside this hook's decision.
+. "$HOME/.config/agent-watcher/lib/jev-shadow.sh" 2>/dev/null && jev_shadow_cmd_trap block-upfront-conflict-probe "a gh command that fetches mergeable or mergeStateStatus" 'mergeable|mergeStateStatus' "$CMD" || true
 
 case "$CMD_M" in
   *gh\ *) ;;

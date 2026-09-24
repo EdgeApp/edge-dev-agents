@@ -319,6 +319,31 @@ process.exit(hard > 0 ? 1 : 0)
 ' "$FILE" "$VOCAB" "$FRAGMENT" "$STRINGS")
 MECH_RC=$?
 
+# Jev shadow, log only (~/.config/agent-watcher/lib/jev-shadow.sh): on a
+# regex HARD hit in an orchestrated session, spool the flagged line for a Jev
+# second opinion beside this gate's verdict. Character-exact checks (em dash,
+# bare URL, session link) are skipped: nothing there for a model to judge.
+# Capped at 20 lines per run; backgrounded; never changes output or exit code.
+if [ "$MECH_RC" = 1 ] && [ -n "${AGENT_TASK_GID:-}" ] && . "$HOME/.config/agent-watcher/lib/jev-shadow.sh" 2>/dev/null; then
+  printf '%s\n' "$MECH_OUT" | node -e '
+const fs = require("fs")
+const lines = fs.readFileSync(process.argv[1], "utf8").split("\n")
+const skip = /^(em dash|bare URL|claude session link)/
+let k = 0
+for (const l of fs.readFileSync(0, "utf8").split("\n")) {
+  const m = l.match(/^HARD (\d+): (.*)$/)
+  if (!m || skip.test(m[2]) || k >= 20) continue
+  // Sentence checks report the paragraph start line: send the paragraph.
+  const para = []
+  for (let i = Number(m[1]) - 1; i < lines.length && lines[i].trim() && para.length < 6; i++) para.push(lines[i].trim())
+  const text = para.join(" ").slice(0, 1000)
+  if (!text) continue
+  const rule = m[2].split(/[:"(]/)[0].trim().replace(/\s+/g, "-").toLowerCase()
+  console.log(JSON.stringify({ line: text, rule, msg: m[2], task: process.env.AGENT_TASK_GID }))
+  k++
+}' "$FILE" 2>/dev/null | while IFS= read -r row; do printf '%s' "$row" | jev_shadow_enqueue gates; done
+fi
+
 JUDGE_OUT="" JUDGE_RC=0
 if [ "$SEMANTIC" = 1 ]; then
   JUDGE_OUT=$("$(dirname "$0")/no-slop-judge.sh" "$FILE") || JUDGE_RC=$?

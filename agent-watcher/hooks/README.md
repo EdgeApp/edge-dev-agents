@@ -46,7 +46,7 @@ Most gates no-op unless `AGENT_TASK_GID` is set, which is what confines them to 
 | Script | Event / matcher | What it does | What it prevents |
 |---|---|---|---|
 | `require-skill-for-file.sh` | PreToolUse / Bash and Write, Edit | Matches the target path against a glob-to-skill table and denies with the skill body inlined | Editing an AGENTS.md, CHANGELOG.md, skill, rule, companion script, hook (site-orch's included) or `~/.claude/settings.json` without the owning contract in context |
-| `require-skill-read-for-scripts.sh` | PreToolUse / Bash | Requires the owning skill's read marker (or a one-shot phase slice) before a `skills/<name>/scripts/*.sh` execution, delivering the body on deny | Running one step of a skill's contract bare, without the contract around it |
+| `require-skill-read-for-scripts.sh` | PreToolUse / Bash | Requires the owning skill's read marker (or a one-shot phase slice) before a `skills/<name>/scripts/*.sh` execution, delivering the body on deny; intake and Complete map to `task-run` when `AGENT_DELIVERABLE` is Task or Task + sim | Running one step of a skill's contract bare, without the contract around it |
 | `spec-read-gate.sh` | PreToolUse / Bash | Denies reading a site-orch task spec through command stdout (`gh issue view`, unredirected `gh pr diff`, `cat`/`head`/`sed` on the spec files) | Reasoning from an issue or diff silently truncated at the shell tool's ~20 KB output cap |
 
 ## Prose and output gates
@@ -75,7 +75,7 @@ Most gates no-op unless `AGENT_TASK_GID` is set, which is what confines them to 
 
 | Script | Event / matcher | What it does | What it prevents |
 |---|---|---|---|
-| `inject-run-context.sh` | SessionStart / `*` | Injects live ground truth per session kind: Asana state, comments past the followup watermark, attempt log, PR state, slot env, or an anchor's open-threads ledger | Acting on summary-flattened beliefs in the first turns after a compaction or resume |
+| `inject-run-context.sh` | SessionStart / `*` | Injects live ground truth per session kind: Asana state, comments past the followup watermark, attempt log, PR state, slot env, the shared `one-shot/references/run-rules.md` at every boundary, the planning skills at boot (`task-review` only for a PR deliverable), or an anchor's open-threads ledger | Acting on summary-flattened beliefs in the first turns after a compaction or resume |
 | `compact-ground-truth.sh` | SessionStart / compact | Re-reads task number, PR, branch, and stage live from the board and repo for site-orch runs, reporting "unavailable" on any failed lookup | A compaction summary dropping identifiers, negative instructions, and whether a fact was verified |
 | `inject-no-slop-reminder.sh` | SessionStart / `*` | Prints the full no-slop rule block into session context | Chat prose drifting after compaction drops the skill from context |
 | `inject-no-slop-line.sh` | UserPromptSubmit / `*` | Prints a one-line no-slop reminder at the recency end of context, about 30 tokens per turn | Instruction decay over a long session, where the SessionStart block ages toward the buried end |
@@ -106,6 +106,17 @@ Four registrations point at paths that convention-sync does not mirror. A fresh 
 | `~/.agent-tools/socket-guard.mjs` | PreToolUse / Bash | `~/.agent-tools`, not a synced tree |
 
 The three site-orch hooks no-op without `ORCH_SLUG`, so their absence costs nothing outside site-orch runs. `socket-guard.mjs` fires in every session, so on a machine missing it, bare `npm`/`npx`/`pnpm`/`yarn` runs unsandboxed with no signal.
+
+## Jev shadow logging (log only)
+
+These registered hooks also spool a row for `lib/jev-shadow.sh`, which only logs a Jev verdict beside the hook's own decision and never changes an exit code or adds latency (backgrounded, no-op without `AGENT_TASK_GID` or with `~/.config/jev/shadow/OFF`):
+
+| Hook | What is logged |
+|---|---|
+| `block-sim-wipe.sh`, `block-broad-process-kill.sh`, `block-simctl-booted.sh`, `block-upfront-conflict-probe.sh`, `no-self-respawn.sh`, `block-raw-asana-api.sh`, `block-raw-thread-resolve.sh`, `block-raw-gh-writes.sh` | On a RAW trigger hit (quoted mentions included), an EXIT trap spools "does this command execute X or only quote it" with `live` = block (exit 2) or allow |
+| `operator-hold-prompt.sh` | The prompt with the branch taken (stop, release, hold, steer); Jev may add a hold in the log, never a release |
+
+Outside the hooks: `check-followup-scope.sh` spools each newer tracker comment, `completion-judge.sh` writes one `~/.config/jev/shadow/blocker/` row per block event with its reason, `no-slop-lint.sh` spools HARD regex hits, `no-slop-judge.sh` spools each haiku verdict, and `session-watchdog.js` spools one anchor's pane. The drain is launchd `com.jontz.jev-shadow`.
 
 ## On disk but not registered
 

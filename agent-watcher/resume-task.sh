@@ -150,8 +150,16 @@ fi
 
 # 2. Task name → session label.
 TOKEN="$(jq -r '.asana_token // empty' "$DIR/credentials.json" 2>/dev/null || true)"
-NAME=""
-[[ -n "$TOKEN" ]] && NAME="$(curl -s -H "Authorization: Bearer $TOKEN" "https://app.asana.com/api/1.0/tasks/$TASK_GID?opt_fields=name" 2>/dev/null | jq -r '.data.name // empty' 2>/dev/null || true)"
+NAME=""; DELIVERABLE="PR"
+if [[ -n "$TOKEN" ]]; then
+  _T="$(curl -s -H "Authorization: Bearer $TOKEN" "https://app.asana.com/api/1.0/tasks/$TASK_GID?opt_fields=name,custom_fields.gid,custom_fields.enum_value.name" 2>/dev/null || true)"
+  NAME="$(printf '%s' "$_T" | jq -r '.data.name // empty' 2>/dev/null || true)"
+  # agent_deliverable decides the run shape (see asana-watcher.js getDeliverable):
+  # Task takes no sim; PR (default) and "Task + sim" take one.
+  _DGID="$(jq -r '.custom_fields.agent_deliverable.gid // empty' "$DIR/asana-config.json" 2>/dev/null || true)"
+  _DSEL="$(printf '%s' "$_T" | jq -r --arg g "$_DGID" '.data.custom_fields[]? | select(.gid==$g) | .enum_value.name // empty' 2>/dev/null || true)"
+  case "$_DSEL" in "Task"|"Task + sim") DELIVERABLE="$_DSEL" ;; esac
+fi
 LABEL="Asana: ${NAME:-task $TASK_GID}"
 
 # 3. Tear down any existing session for this gid (old pane + stale resources).
@@ -163,13 +171,16 @@ done
 #    it would return the OLD stale slot for this gid unless we release first.)
 "$DIR/release-pool-entry.sh" --task-gid "$TASK_GID" >/dev/null 2>&1 || true
 node -e 'require(process.env.HOME+"/.config/agent-watcher/lib/slots.js").release(process.argv[1])' "$TASK_GID" 2>/dev/null || true
-"$DIR/ensure-sim-pool.sh" >/dev/null 2>&1 || true
-SIM_UDID="$("$DIR/allocate-from-pool.sh" --task-gid "$TASK_GID" | tail -1)"
-[[ -n "$SIM_UDID" ]] || { echo "resume-task: failed to allocate a pool sim" >&2; exit 1; }
+SIM_UDID=""
+if [[ "$DELIVERABLE" != "Task" ]]; then
+  "$DIR/ensure-sim-pool.sh" >/dev/null 2>&1 || true
+  SIM_UDID="$("$DIR/allocate-from-pool.sh" --task-gid "$TASK_GID" | tail -1)"
+  [[ -n "$SIM_UDID" ]] || { echo "resume-task: failed to allocate a pool sim" >&2; exit 1; }
+fi
 SLOT_JSON="$(node -e 'const s=require(process.env.HOME+"/.config/agent-watcher/lib/slots.js"); console.log(JSON.stringify(s.allocate({task_gid:process.argv[1], worktree_path:process.env.HOME+"/git", sim_udid:process.argv[2]})))' "$TASK_GID" "$SIM_UDID")"
 SLOT_IDX="$(echo "$SLOT_JSON" | jq -r '.slot_index')"
 METRO_PORT="$(echo "$SLOT_JSON" | jq -r '.metro_port')"
-echo ">> resume-task: slot $SLOT_IDX | sim $SIM_UDID | metro $METRO_PORT" >&2
+echo ">> resume-task: slot $SLOT_IDX | sim ${SIM_UDID:-none} | metro $METRO_PORT | deliverable $DELIVERABLE" >&2
 
 # 5. Move status off Complete so the board is honest and the watcher accounts for
 #    it. Also clear `blocked`: a block is a blocked COMPLETION (one-shot
@@ -186,7 +197,8 @@ if [[ -n "$SESSION_ID" ]]; then
   exec "$DIR/spawn-test-session.sh" $YOLO \
     --slot-index "$SLOT_IDX" --task-gid "$TASK_GID" \
     --sim-udid "$SIM_UDID" --metro-port "$METRO_PORT" \
-    --worktree-path "$HOME/git" --resume "$SESSION_ID" --label "$LABEL"
+    --worktree-path "$HOME/git" --resume "$SESSION_ID" --label "$LABEL" \
+    --deliverable "$DELIVERABLE"
 fi
 
 # FRESH-SPAWN FOLLOWUP (transcript past the degradation threshold): boot a new
@@ -198,7 +210,7 @@ echo ">> resume-task: spawning ${SESSION_PREFIX}${TASK_GID} FRESH (artifact-anch
 "$DIR/spawn-test-session.sh" $YOLO \
   --slot-index "$SLOT_IDX" --task-gid "$TASK_GID" \
   --sim-udid "$SIM_UDID" --metro-port "$METRO_PORT" \
-  --worktree-path "$HOME/git" --label "$LABEL"
+  --worktree-path "$HOME/git" --label "$LABEL" --deliverable "$DELIVERABLE"
 
 # Prompt-sending is the CALLER's job, exactly as on the resume path: the
 # watcher sends /one-shot to revisit spawns itself (with its RC-ready wait and
@@ -206,4 +218,4 @@ echo ">> resume-task: spawning ${SESSION_PREFIX}${TASK_GID} FRESH (artifact-anch
 # queued re-fire the run then has to dismiss via ignore-refired-one-shot).
 # A manual operator invocation sends the prompt by hand after attaching.
 PROJECT_GID="$(jq -r '.project_gid // empty' "$DIR/asana-config.json")"
-echo ">> resume-task: fresh conversation booted for $TASK_GID; caller sends the /one-shot prompt (watcher does this automatically; manual runs: /one-shot --yolo https://app.asana.com/0/${PROJECT_GID:-0}/$TASK_GID)" >&2
+echo ">> resume-task: fresh conversation booted for $TASK_GID; caller sends the /one-shot prompt (watcher does this automatically; manual runs: /one-shot --yolo, or /task-run --yolo for a Task deliverable, https://app.asana.com/0/${PROJECT_GID:-0}/$TASK_GID)" >&2

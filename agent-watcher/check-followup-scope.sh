@@ -84,6 +84,14 @@ WATERMARK_GID="$(echo "$ATT" | jq -r --arg re "$REPORT_ATTACH_RE" --arg w "$WATE
 NEWER="$(echo "$STORIES" | jq --arg w "$WATERMARK" \
   '[.data[] | select(.resource_subtype == "comment_added") | select(($w == "") or (.created_at > $w))]')"
 NEWER_COUNT="$(echo "$NEWER" | jq 'length')"
+# Jev shadow, log only (lib/jev-shadow.sh): every newer non-agent comment is scope
+# today; spool each one so the drain can log a per-clause "addressed to the agent?"
+# Noul beside that (deduped by story gid). Never changes this script's output.
+if . "$DIR/lib/jev-shadow.sh" 2>/dev/null; then
+  echo "$NEWER" | jq -c --arg t "$TASK_GID" '.[] | select(((.text // "") | test("^🥋") and test("👊$")) | not)
+    | {story: .gid, text: (.text // ""), created_at, task: $t}' 2>/dev/null \
+    | while IFS= read -r row; do printf '%s' "$row" | jev_shadow_enqueue followup; done || true
+fi
 NEWEST_COMMENT_AT="$(echo "$STORIES" | jq -r '[.data[] | select(.resource_subtype == "comment_added") | .created_at] | sort | last // empty')"
 
 # Watermark ordering: AGENT-authored comments (🥋-marked, mark-agent-authored-asana.sh)

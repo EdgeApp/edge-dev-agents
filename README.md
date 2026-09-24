@@ -214,6 +214,8 @@ the task's own unpublished dep PRs when the deliverable requires them.
   (currently 20 / 5)
 - orphan-Metro reap, idle-dirty-sim reclaim, and operator escalation for
   parked prompts or stuck sessions
+- Jev shadow: spools one named anchor's pane with its own regex state for
+  `lib/jev-shadow.py` (log only, see Jev shadow mode)
 
 It does NOT re-engage finished tasks: that is the watcher's job (Pending
 resumes), so watchdog and watcher stay decoupled.
@@ -254,6 +256,15 @@ just a viewport.
   <live-id>` and the preserved flags, under a per-session cooldown. A
   half-open bridge is left for the operator to reconnect, and the revive
   never adds a second process (the count goes 1 to 0 to 1).
+- **Run shape is decided once, at spawn.** The `agent_deliverable` field on the
+  task (created with `asana-field-ensure.sh`, gids in `asana-config.json`)
+  picks the skill the watcher sends: `PR` (default) spawns `/one-shot` with a
+  pool sim; `Task` spawns `/task-run` with no sim; `Task + sim` spawns
+  `/task-run` with a sim. `spawn-test-session.sh` exports `AGENT_DELIVERABLE`,
+  which is the only thing the hooks branch on (`inject-run-context.sh` injects
+  task-review for PR only; `require-skill-read-for-scripts.sh` maps intake and
+  Complete to the running skill). Every other gate keys on `AGENT_TASK_GID`
+  and applies to both shapes unchanged.
 - **No self-respawn.** A session never kills or relaunches its own pane;
   `resume-task.sh` and `resume-agent.sh` are watcher/operator tools and
   refuse to run from inside their target. The `no-self-respawn.sh` hook
@@ -655,6 +666,26 @@ finding carrying a citation an auditor can open.
   between cohorts (hook blocks, tool errors, builds, compactions, drives,
   attempt walls) straight from manifests.
 
+### Jev shadow mode
+
+`agent-watcher/lib/jev-shadow.py` (shell side `lib/jev-shadow.sh`) logs a Jev
+verdict beside eight live decisions and never acts on one: Master Kanban
+Category/Department, the no-slop haiku judge (pre-clear), the watchdog's pane
+state for one anchor (`watcher.jev_shadow_session`, default
+`claude-asana-jev`), operator prompt intent, follow-up comment clauses,
+command-safety hook trigger hits, no-slop lint HARD hits, and blocker reasons
+(the last is the judge's own reason, no Jev call). Live callers only spool a
+scrubbed row (signing-key lines and long base64 runs dropped) to
+`~/.config/jev/shadow/_spool/` in the background and exit unchanged; shell
+callers no-op without `AGENT_TASK_GID`. The launchd job `launchd/com.jontz.jev-shadow.plist`
+(every 300s, `jev-shadow.py tick`) polls the board for new tasks, reads the
+key from 1Password into memory, asks Jev with a 20s timeout, and writes
+`<path>/decisions.jsonl` rows of hashes, labels and confidences. `jev-shadow.py
+report` prints per-path agreement, coverage and agreement at 0.9 and 0.99, and
+a switch/hold recommendation; `audit-board` writes a Markdown file of board
+disagreements at >= 0.9, never field edits. Kill switch: `touch
+~/.config/jev/shadow/OFF`.
+
 ## Distribution (what syncs)
 
 Beyond cursor skills/rules, this repo mirrors portable trees so a second Mac is
@@ -669,7 +700,7 @@ reproducible from a single clone + `./bootstrap.sh`:
   `watchdog-state.json`, `*.state`, `*.log`, forensics) and session briefs
   (`*-anchor-brief.*`; briefs live in `~/.local/state/agent-watcher/briefs`).
 - **`agent-watcher/launchd/`**: templates for every `com.jontz.*` launchd job
-  (watcher, watchdog, reanchor sweep, checkout refresh, guards) plus
+  (watcher, watchdog, reanchor sweep, checkout refresh, guards, Jev shadow drain) plus
   `install-launchd.sh`, which renders `__HOME__` and `__NODE_BIN__`, writes
   `~/Library/LaunchAgents`, and loads each job, skipping any whose program is
   not on the machine. The templates are the source of truth; the installed
@@ -789,6 +820,7 @@ scripts, not be re-described independently across skills.
 | Skill | Description |
 |------|-------------|
 | [`/one-shot`](.cursor/skills/one-shot/SKILL.md) | End-to-end task flow: plan, implement, test, PR, finalize; the skill orchestrated runs execute |
+| [`/task-run`](.cursor/skills/task-run/SKILL.md) | The no-PR run shape (Asana `agent_deliverable` = Task or Task + sim): ingest, plan, do the work, post one findings comment, attach a run report, Complete. Shares `one-shot/references/run-rules.md` (the run-wide rules) and the report template with `/one-shot`; loads none of the PR phases |
 | [`/asana-plan`](.cursor/skills/asana-plan/SKILL.md) | Build an implementation plan from Asana or ad-hoc requirements |
 | [`/task-review`](.cursor/skills/task-review/SKILL.md) | Fetch Asana task context, summarize, and resolve the target repo by code evidence |
 | [`/im`](.cursor/skills/im/SKILL.md) | Implement with clean, structured commits (lint-warnings, lint-commit, history discipline) |
@@ -899,6 +931,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`asana-field-value.sh`](.cursor/skills/asana-field-value.sh), [`asana-build-field.sh`](.cursor/skills/asana-build-field.sh), [`asana-force-land.sh`](.cursor/skills/asana-force-land.sh) | Live single-field reads the finalize gate consumes |
 | [`sentry-query.sh`](.cursor/skills/sentry-query.sh) | Read-only Sentry queries for the `/sentry` skill (issue, search, tag distributions, event context); token from `~/.config/sentry-edge-token` via a mode-600 curl config, never argv |
 | [`update-status.sh`](agent-watcher/update-status.sh) | The gated `agent_status` write every phase transition goes through |
+| [`set-agent-field.sh`](agent-watcher/set-agent-field.sh) | Set one of the other `agent_*` enum fields (`agent_deliverable`, `agent_model`, ...) by name and option label, gids from `asana-config.json` |
 | [`check-followup-scope.sh`](agent-watcher/check-followup-scope.sh) | The live followup-scope + watermark check backing the Complete gate |
 | [`log-attempt.sh`](agent-watcher/log-attempt.sh) | Append truthful attempt-log entries |
 | [`set-tested.sh`](agent-watcher/set-tested.sh) | Set the task's tested field from run evidence |

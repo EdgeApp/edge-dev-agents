@@ -154,9 +154,15 @@ EOF
   # clear/compact: only while THIS segment still has no plan, so post-planning
   # boundaries don't re-pay the context.
   # Injected bodies count as "read" for the skill-read gate: pre-write markers.
+  # task-review resolves the target REPO from the task text; a non-PR deliverable
+  # (AGENT_DELIVERABLE=Task or "Task + sim", set by spawn-test-session.sh from the
+  # task's agent_deliverable field) has no repo to resolve, so only asana-plan is
+  # injected for it. The default (unset) is the PR shape.
+  local planning_skills="asana-plan task-review"
+  case "${AGENT_DELIVERABLE:-PR}" in "Task"|"Task + sim") planning_skills="asana-plan" ;; esac
   if [[ "$SRC" == "startup" || "$SRC" == "resume" ]] || ! ls /tmp/plan-"$gid"-*.md >/dev/null 2>&1; then
     local sk
-    for sk in asana-plan task-review; do
+    for sk in $planning_skills; do
       if [[ -f "$HOME/.cursor/skills/$sk/SKILL.md" ]]; then
         echo "--- INJECTED SKILL (governs the phase you are in now; follow it, do not re-fetch): ~/.cursor/skills/$sk/SKILL.md ---"
         cat "$HOME/.cursor/skills/$sk/SKILL.md"
@@ -164,6 +170,18 @@ EOF
         touch "/tmp/agent-skill-read-$gid-$sk" 2>/dev/null || true
       fi
     done
+  fi
+
+  # Run-rules injection: the run-wide rules (yolo, true blockers, state file,
+  # operator hold, watchdog pings, no self-respawn) live in one reference shared
+  # by /one-shot and /task-run, so neither skill body has to survive compaction
+  # for them to apply. Injected at EVERY boundary; pre-marked read.
+  local rr="$HOME/.cursor/skills/one-shot/references/run-rules.md"
+  if [[ -f "$rr" ]]; then
+    echo "--- INJECTED CONTRACT (run-wide rules, bind in every phase; follow this, do not re-fetch): ~/.cursor/skills/one-shot/references/run-rules.md ---"
+    cat "$rr"
+    echo
+    touch "/tmp/agent-skill-read-$gid-one-shot:run-rules" 2>/dev/null || true
   fi
 
   # Followup-slice injection (2026-09-16): a task that already carries a

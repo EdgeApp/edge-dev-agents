@@ -80,6 +80,25 @@ try {
   const cfgAnchors = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8'))?.watcher?.persistent_anchors
   if (Array.isArray(cfgAnchors)) PERSISTENT_ANCHORS = cfgAnchors
 } catch { /* keep defaults */ }
+// Jev shadow (Phase 2, log only): each tick, the pane of ONE named anchor session
+// is spooled with this watchdog's own regex state for lib/jev-shadow.py, whose
+// drain logs the Jev pane-state verdict beside it. Config: watcher.jev_shadow_session
+// (default claude-asana-jev; "" disables). Kill switch: ~/.config/jev/shadow/OFF.
+let JEV_SHADOW_SESSION = 'claude-asana-jev'
+try {
+  const v = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8'))?.watcher?.jev_shadow_session
+  if (typeof v === 'string') JEV_SHADOW_SESSION = v
+} catch { /* keep default */ }
+function jevShadowPane(session, content, changed) {
+  if (!JEV_SHADOW_SESSION || session !== JEV_SHADOW_SESSION) return
+  const live = paneSafetyDialog(content) ? 'safety dialog'
+    : paneAwaitingChoice(content) ? 'awaiting choice'
+    : (/esc to interrupt/.test(content) || changed) ? 'working' : 'idle'
+  try {
+    require('node:child_process').spawnSync('python3', [path.join(DIR, 'lib/jev-shadow.py'), 'enqueue', 'watchdog'],
+      { input: JSON.stringify({ pane: content.slice(-4000), live, session }), timeout: 5000, stdio: ['pipe', 'ignore', 'ignore'] })
+  } catch { /* log only; never affects the tick */ }
+}
 // Android emulators are NOT slot resources: nothing tracks their spawn (agents boot
 // them ad hoc via `emulator -avd ...`) and qemu reparents to launchd immediately, so
 // ownership can't come from ancestry or slots.json. Ownership signal instead: a
@@ -1150,6 +1169,7 @@ function main() {
     }
 
     const changed = !prior || prior.lastContent !== content
+    jevShadowPane(session, content, changed)
     let lastChange = changed ? now : prior.lastChange
     // Discussion-session idle reaper (see IDLE_REAP_MS). Runs after the pane
     // capture so `changed` is fresh; RC revive below still applies to chat

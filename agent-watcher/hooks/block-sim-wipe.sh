@@ -18,6 +18,8 @@ CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 # argument extraction, where quoted values are load-bearing. Fail-open to the
 # raw command if the helper is unavailable.
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+# Jev shadow, log only (lib/jev-shadow.sh): on a raw trigger hit, log execute-vs-quote beside this hook's decision.
+. "$HOME/.config/agent-watcher/lib/jev-shadow.sh" 2>/dev/null && jev_shadow_cmd_trap block-sim-wipe "simctl uninstall or simctl erase" 'simctl[[:space:]]+(uninstall|erase)' "$CMD" || true
 
 # Match a real invocation (start of command or after ; & | && ||), not the string
 # appearing inside a grep/cat/echo of some file or message.

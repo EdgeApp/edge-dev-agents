@@ -130,6 +130,21 @@ function getAgentStatus(task, cfg) {
   return field?.enum_value?.name || null
 }
 
+// agent_deliverable decides the run shape at spawn, and nowhere else: PR (the
+// default when the field is unset or unknown) runs /one-shot with a sim; Task
+// runs /task-run with no sim; "Task + sim" runs /task-run with a sim. Every hook
+// downstream keys on AGENT_TASK_GID and applies to both skills unchanged.
+function getDeliverable(task, cfg) {
+  const gid = cfg.custom_fields?.agent_deliverable?.gid
+  const field = gid && task.custom_fields?.find((f) => f.gid === gid)
+  const name = field?.enum_value?.name
+  return name === 'Task' || name === 'Task + sim' ? name : 'PR'
+}
+
+function skillPrompt(deliverable, taskUrl) {
+  return `${deliverable === 'PR' ? '/one-shot' : '/task-run'} --yolo ${taskUrl}`
+}
+
 function setStatusPlanning(taskGid) {
   log(`  setting task ${taskGid} agent_status=Planning`)
   if (DRY_RUN) return
@@ -210,8 +225,10 @@ function spawnForTask(task, cfg) {
   const label = `Asana: ${task.name}`.slice(0, 120)
   const taskUrl = `https://app.asana.com/0/${cfg.project_gid}/${task.gid}`
   const reposRoot = path.join(HOME, 'git')   // spawn cwd: the agent picks/creates the repo worktree(s) itself
+  const deliverable = getDeliverable(task, cfg)
+  const needsSim = deliverable !== 'Task'
 
-  log(`Spawning slot for: ${task.name} (gid=${task.gid}, cwd=${reposRoot})`)
+  log(`Spawning slot for: ${task.name} (gid=${task.gid}, cwd=${reposRoot}, deliverable=${deliverable})`)
 
   if (tmuxSessionExists(sessionName)) {
     log(`  session ${sessionName} already exists — refusing to spawn over it. Skipping.`)
@@ -219,7 +236,7 @@ function spawnForTask(task, cfg) {
   }
 
   if (DRY_RUN) {
-    log(`  (dry-run) would try resume-task first (RESUME if a prior transcript exists → memory + fresh slot; else FRESH /one-shot --yolo ${taskUrl})`)
+    log(`  (dry-run) would try resume-task first (RESUME if a prior transcript exists → memory + fresh slot; else FRESH ${skillPrompt(deliverable, taskUrl)}${needsSim ? '' : ', no sim'})`)
     return true
   }
 
@@ -254,7 +271,7 @@ function spawnForTask(task, cfg) {
     // SAME /one-shot prompt the fresh path sends: the resumed agent has its summarized prior
     // context, re-reads the task, and picks up the followup scope per
     // `followup-scope-is-the-deliverable`. Without this nudge the session sits idle.
-    waitRcReadyAndSendPrompt(`${SESSION_PREFIX}${task.gid}`, `/one-shot --yolo ${taskUrl}`)
+    waitRcReadyAndSendPrompt(`${SESSION_PREFIX}${task.gid}`, skillPrompt(deliverable, taskUrl))
     return true
   }
   if (rt.status !== 2) {
@@ -271,12 +288,17 @@ function spawnForTask(task, cfg) {
   // Allocate resources BEFORE touching agent_status: a Planning task with no
   // session is invisible to every sweep (the watcher only spawns Pending), so a
   // failed allocation must leave the task at Pending for the next tick.
-  let simUdid
-  try {
-    simUdid = shCapture(`${DIR}/allocate-from-pool.sh --task-gid ${task.gid}`).split('\n').pop()
-  } catch (e) {
-    log(`  allocate-from-pool failed (${e.status ?? '?'}) — skipping spawn for ${task.gid}; task stays Pending`)
-    return false
+  // A Task deliverable takes no sim: the slot (concurrency + Metro port) is still
+  // allocated so the session is tracked and torn down like any other, but the
+  // pool entry stays free for a run that drives a device.
+  let simUdid = ''
+  if (needsSim) {
+    try {
+      simUdid = shCapture(`${DIR}/allocate-from-pool.sh --task-gid ${task.gid}`).split('\n').pop()
+    } catch (e) {
+      log(`  allocate-from-pool failed (${e.status ?? '?'}) — skipping spawn for ${task.gid}; task stays Pending`)
+      return false
+    }
   }
 
   let slot
@@ -287,7 +309,7 @@ function spawnForTask(task, cfg) {
     try { execSync(`${DIR}/release-pool-entry.sh --task-gid ${task.gid}`, { stdio: 'inherit' }) } catch { /* best-effort */ }
     return false
   }
-  log(`  slot ${slot.slot_index}: metro ${slot.metro_port}, sim ${simUdid}`)
+  log(`  slot ${slot.slot_index}: metro ${slot.metro_port}, sim ${simUdid || 'none'}`)
 
   setStatusPlanning(task.gid)
 
@@ -299,6 +321,7 @@ function spawnForTask(task, cfg) {
     '--metro-port', String(slot.metro_port),
     '--worktree-path', reposRoot,
     '--label', label,
+    '--deliverable', deliverable,
   ], { stdio: 'inherit' })
   if (r.status !== 0) {
     log(`  spawn helper failed with exit code ${r.status} — rolling back to Pending and releasing resources`)
@@ -308,7 +331,7 @@ function spawnForTask(task, cfg) {
     return false
   }
 
-  waitRcReadyAndSendPrompt(sessionName, `/one-shot --yolo ${taskUrl}`)
+  waitRcReadyAndSendPrompt(sessionName, skillPrompt(deliverable, taskUrl))
   return true
 }
 

@@ -28,6 +28,8 @@ CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 # URL anywhere in the raw command AND an actual HTTP-client invocation in the
 # stripped view. Fail-open to the raw command if the helper is unavailable.
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+# Jev shadow, log only (lib/jev-shadow.sh): on a raw trigger hit, log execute-vs-quote beside this hook's decision.
+. "$HOME/.config/agent-watcher/lib/jev-shadow.sh" 2>/dev/null && jev_shadow_cmd_trap block-raw-asana-api "an HTTP client call (curl, wget) to the Asana API" 'app\.asana\.com/api' "$CMD" || true
 
 echo "$CMD" | grep -q "app.asana.com/api" || exit 0
 printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])(curl|wget|http|xh)([[:space:]]|$)' || exit 0

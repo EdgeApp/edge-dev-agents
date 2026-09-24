@@ -58,7 +58,7 @@ else
   RESP=$(curl -sf --max-time 20 -H "Authorization: Bearer $TOKEN" \
     "$API/tasks/$GID?opt_fields=name,completed,notes,custom_fields.name,custom_fields.display_value" 2>/dev/null || true)
   if [ -n "$RESP" ]; then
-    printf '%s' "$RESP" | jq -r '.data | "name: \(.name)\ncompleted: \(.completed)\nfields: " + ([.custom_fields[]? | select(.name|test("^(agent_status|blocked|tested|TDD\\?|Build \\(staging/cheese\\)|Release \\(4\\.x\\.x\\)|Force Land|agent_lane|Repo)$")) | "\(.name)=\(.display_value // "null")"] | join("; "))' >> "$TMP" 2>/dev/null || line "(task fields unparseable)"
+    printf '%s' "$RESP" | jq -r '.data | "name: \(.name)\ncompleted: \(.completed)\nfields: " + ([.custom_fields[]? | select(.name|test("^(agent_status|blocked|tested|TDD\\?|Build \\(staging/cheese\\)|Release \\(4\\.x\\.x\\)|Force Land|agent_lane|agent_deliverable|Repo)$")) | "\(.name)=\(.display_value // "null")"] | join("; "))' >> "$TMP" 2>/dev/null || line "(task fields unparseable)"
     line ""; line "description:"; line '```'
     printf '%s' "$RESP" | jq -r '.data.notes // ""' | cap 12000 >> "$TMP"
     line ""; line '```'

@@ -52,7 +52,7 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   LOCAL-ONLY file `~/.config/edge-secrets/test-accounts.json`: roles `primary` (the
   heavily-funded swap-execution account; **the default YOLO login**, pinned
   into every worktree env.json by workspace init), `qa-a`, `qa-b` (region
-  California/USA with a BTC wallet), `secondary`, and `agent` (2FA ON; its
+  California/USA), and `agent` (2FA ON; its
   password + OTP key are in the `credsFile` the roster names, so its 2FA is
   never a user-only-credential wall; set `YOLO_OTP_KEY` from that file if a
   login asks for the code). Each entry carries username, PIN, and notes. Refer
