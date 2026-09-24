@@ -9,9 +9,10 @@
       "phase": null,
       "subject": null,
       "hackNote": "restored the pre-fix code in the linked node_modules copy (getCurrentAddress without the unlock span, background refresh catch rethrowing) to reproduce the reported alert; reverted after capture",
-      "batchAt": "2026-09-23T22:15:38Z",
-      "headSha": "60d9ea47d18027be03f3c617565deab91c13ab1a",
-      "addedAt": "2026-09-23T22:15:38Z"
+      "batchAt": "2026-09-24T02:24:21Z",
+      "headSha": "4b9d564b132794e3072169dffec22d318e1cd092",
+      "addedAt": "2026-09-23T22:15:38Z",
+      "carriedFrom": "2026-09-23T22:15:38Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1108/20260923-151538-agent-proof-1218753833235509-02-receive-address-restored.png",
@@ -21,9 +22,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-23T22:15:38Z",
-      "headSha": "60d9ea47d18027be03f3c617565deab91c13ab1a",
-      "addedAt": "2026-09-23T22:15:38Z"
+      "batchAt": "2026-09-24T02:24:21Z",
+      "headSha": "4b9d564b132794e3072169dffec22d318e1cd092",
+      "addedAt": "2026-09-23T22:15:38Z",
+      "carriedFrom": "2026-09-23T22:15:38Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1108/20260923-151538-agent-proof-1218753833235509-03-send-scene-no-alert.png",
@@ -33,9 +35,22 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-23T22:15:38Z",
-      "headSha": "60d9ea47d18027be03f3c617565deab91c13ab1a",
-      "addedAt": "2026-09-23T22:15:38Z"
+      "batchAt": "2026-09-24T02:24:21Z",
+      "headSha": "4b9d564b132794e3072169dffec22d318e1cd092",
+      "addedAt": "2026-09-23T22:15:38Z",
+      "carriedFrom": "2026-09-23T22:15:38Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1108/20260923-192421-agent-proof-1218753833235509-04-post-fix-send-single-row.png",
+      "caption": "post fix send single row",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-24T02:24:21Z",
+      "headSha": "4b9d564b132794e3072169dffec22d318e1cd092",
+      "addedAt": "2026-09-24T02:24:21Z"
     }
   ]
 }
