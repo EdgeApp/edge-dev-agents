@@ -9,10 +9,10 @@
       "phase": null,
       "subject": null,
       "hackNote": "the first broadcastTransaction call ran for real and then threw the reported h2 Internal error, forcing the rebroadcast path; reverted after capture",
-      "batchAt": "2026-09-24T07:18:25Z",
-      "headSha": "e77ccf1618e72f90688f568ba667a3f0a22abf02",
+      "batchAt": "2026-09-24T22:48:49Z",
+      "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
       "addedAt": "2026-09-23T22:15:38Z",
-      "carriedFrom": "2026-09-24T02:24:21Z"
+      "carriedFrom": "2026-09-24T07:18:25Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1108/20260923-151538-agent-proof-1218753833235509-02-receive-address-restored.png",
@@ -22,10 +22,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-24T07:18:25Z",
-      "headSha": "e77ccf1618e72f90688f568ba667a3f0a22abf02",
+      "batchAt": "2026-09-24T22:48:49Z",
+      "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
       "addedAt": "2026-09-23T22:15:38Z",
-      "carriedFrom": "2026-09-24T02:24:21Z"
+      "carriedFrom": "2026-09-24T07:18:25Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1108/20260923-151538-agent-proof-1218753833235509-03-send-scene-no-alert.png",
@@ -35,10 +35,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-24T07:18:25Z",
-      "headSha": "e77ccf1618e72f90688f568ba667a3f0a22abf02",
+      "batchAt": "2026-09-24T22:48:49Z",
+      "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
       "addedAt": "2026-09-23T22:15:38Z",
-      "carriedFrom": "2026-09-24T02:24:21Z"
+      "carriedFrom": "2026-09-24T07:18:25Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1108/20260923-192421-agent-proof-1218753833235509-04-post-fix-send-single-row.png",
@@ -48,10 +48,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-24T07:18:25Z",
-      "headSha": "e77ccf1618e72f90688f568ba667a3f0a22abf02",
+      "batchAt": "2026-09-24T22:48:49Z",
+      "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
       "addedAt": "2026-09-24T02:24:21Z",
-      "carriedFrom": "2026-09-24T02:24:21Z"
+      "carriedFrom": "2026-09-24T07:18:25Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1108/20260924-001825-agent-proof-1218753833235509-08-HACKED-ambiguous-send-confirm.png",
@@ -61,9 +61,10 @@
       "phase": null,
       "subject": null,
       "hackNote": "the first broadcastTransaction call ran for real and then threw the reported h2 Internal error, forcing the rebroadcast path; reverted after capture",
-      "batchAt": "2026-09-24T07:18:25Z",
-      "headSha": "e77ccf1618e72f90688f568ba667a3f0a22abf02",
-      "addedAt": "2026-09-24T07:18:25Z"
+      "batchAt": "2026-09-24T22:48:49Z",
+      "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
+      "addedAt": "2026-09-24T07:18:25Z",
+      "carriedFrom": "2026-09-24T07:18:25Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1108/20260924-001825-agent-proof-1218753833235509-09-HACKED-ambiguous-send-success.png",
@@ -73,9 +74,10 @@
       "phase": null,
       "subject": null,
       "hackNote": "the first broadcastTransaction call ran for real and then threw the reported h2 Internal error, forcing the rebroadcast path; reverted after capture",
-      "batchAt": "2026-09-24T07:18:25Z",
-      "headSha": "e77ccf1618e72f90688f568ba667a3f0a22abf02",
-      "addedAt": "2026-09-24T07:18:25Z"
+      "batchAt": "2026-09-24T22:48:49Z",
+      "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
+      "addedAt": "2026-09-24T07:18:25Z",
+      "carriedFrom": "2026-09-24T07:18:25Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1108/20260924-001825-agent-proof-1218753833235509-10-HACKED-ambiguous-send-txid.png",
@@ -85,9 +87,10 @@
       "phase": null,
       "subject": null,
       "hackNote": "the first broadcastTransaction call ran for real and then threw the reported h2 Internal error, forcing the rebroadcast path; reverted after capture",
-      "batchAt": "2026-09-24T07:18:25Z",
-      "headSha": "e77ccf1618e72f90688f568ba667a3f0a22abf02",
-      "addedAt": "2026-09-24T07:18:25Z"
+      "batchAt": "2026-09-24T22:48:49Z",
+      "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
+      "addedAt": "2026-09-24T07:18:25Z",
+      "carriedFrom": "2026-09-24T07:18:25Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1108/20260924-001825-agent-proof-1218753833235509-11-txid-fix-send-confirm.png",
@@ -97,9 +100,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-24T07:18:25Z",
-      "headSha": "e77ccf1618e72f90688f568ba667a3f0a22abf02",
-      "addedAt": "2026-09-24T07:18:25Z"
+      "batchAt": "2026-09-24T22:48:49Z",
+      "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
+      "addedAt": "2026-09-24T07:18:25Z",
+      "carriedFrom": "2026-09-24T07:18:25Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1108/20260924-001825-agent-proof-1218753833235509-12-txid-fix-send-success.png",
@@ -109,9 +113,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-24T07:18:25Z",
-      "headSha": "e77ccf1618e72f90688f568ba667a3f0a22abf02",
-      "addedAt": "2026-09-24T07:18:25Z"
+      "batchAt": "2026-09-24T22:48:49Z",
+      "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
+      "addedAt": "2026-09-24T07:18:25Z",
+      "carriedFrom": "2026-09-24T07:18:25Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1108/20260924-001825-agent-proof-1218753833235509-13-txid-fix-send-txid.png",
@@ -121,9 +126,46 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-24T07:18:25Z",
-      "headSha": "e77ccf1618e72f90688f568ba667a3f0a22abf02",
-      "addedAt": "2026-09-24T07:18:25Z"
+      "batchAt": "2026-09-24T22:48:49Z",
+      "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
+      "addedAt": "2026-09-24T07:18:25Z",
+      "carriedFrom": "2026-09-24T07:18:25Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1108/20260924-154849-agent-proof-1218753833235509-14-arrr-advanced-details-no-key.png",
+      "caption": "arrr advanced details no key",
+      "index": "14",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-24T22:48:49Z",
+      "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
+      "addedAt": "2026-09-24T22:48:49Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1108/20260924-154849-agent-proof-1218753833235509-15-arrr-export-range.png",
+      "caption": "arrr export range",
+      "index": "15",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-24T22:48:49Z",
+      "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
+      "addedAt": "2026-09-24T22:48:49Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1108/20260924-154849-agent-proof-1218753833235509-16-arrr-export-share.png",
+      "caption": "arrr export share",
+      "index": "16",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-24T22:48:49Z",
+      "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
+      "addedAt": "2026-09-24T22:48:49Z"
     }
   ]
 }
