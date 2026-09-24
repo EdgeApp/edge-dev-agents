@@ -139,7 +139,8 @@ flowchart TD
   operator comment newer than the latest `agent-run-report*.md` watermark,
   diffs the task's fields against the previous segment's snapshot, fetches
   GitHub-side scope across parent AND subtask-attached PRs (unresolved review
-  threads, reviewer-bot completeness on owned ready HEADs, unanswered
+  threads, with a non-owned PR's threads whose last comment is ours collapsed
+  to an "awaiting owner" count, reviewer-bot completeness on owned ready HEADs, unanswered
   top-level review bodies and PR comments), and writes a marker; the
   `require-followup-scope-on-complete.sh` hook blocks `Complete` unless that
   marker exists, still matches the live newest comment, records zero blocking
@@ -890,7 +891,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 |------|-------------|
 | [`pr-create.sh`](.cursor/skills/pr-create/scripts/pr-create.sh) | Create the PR: verify, template body, prose lint (with judge), evidence, Asana attach |
 | [`pr-address.sh`](.cursor/skills/pr-address/scripts/pr-address.sh) | Fetch unresolved feedback (with an obligation trailer so filtered JSON cannot hide review bodies), reply, resolve, mark addressed; outbound bodies linted |
-| [`github-pr-review.sh`](.cursor/skills/pr-review/scripts/github-pr-review.sh) | Fetch PR context and submit reviews; review bodies linted at submit |
+| [`github-pr-review.sh`](.cursor/skills/pr-review/scripts/github-pr-review.sh) | Fetch PR context and submit reviews; review bodies linted and inline anchors checked against the diff at submit (`--check-only` runs the checks without posting) |
 | [`pr-finalize-fixups.sh`](.cursor/skills/pr-finalize-fixups.sh) | Finalize fixup commits before the ready flip |
 | [`git-branch-ops.sh`](.cursor/skills/git-branch-ops.sh) | Shared deterministic history ops: `fold-one` (one fixup into its target), whole-branch `autosquash`, condense, push, and the `fold-mode` oracle that reads the operator rewrite-approval note's `Targets:` scope |
 
@@ -926,7 +927,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 
 | Script | What it does |
 |------|-------------|
-| [`asana-get-context.sh`](.cursor/skills/asana-get-context.sh) | Fetch task details, comments, subtasks, attachments, and the Engineering Board fields (other boards' fields on the task are not printed) |
+| [`asana-get-context.sh`](.cursor/skills/asana-get-context.sh) | Fetch task details, comments, subtasks, attachments (iOS `.ips`/`.crash` reports included), and the Engineering Board fields (other boards' fields on the task are not printed) |
 | [`asana-task-update.sh`](.cursor/skills/asana-task-update/scripts/asana-task-update.sh) | Reusable Asana mutations (the report-attach path is hook-gated) |
 | [`asana-field-value.sh`](.cursor/skills/asana-field-value.sh), [`asana-build-field.sh`](.cursor/skills/asana-build-field.sh), [`asana-force-land.sh`](.cursor/skills/asana-force-land.sh) | Live single-field reads the finalize gate consumes |
 | [`sentry-query.sh`](.cursor/skills/sentry-query.sh) | Read-only Sentry queries for the `/sentry` skill (issue, search, tag distributions, event context); token from `~/.config/sentry-edge-token` via a mode-600 curl config, never argv |

@@ -5,7 +5,9 @@
 #   context  [--pr <number>] [--owner <o>] [--repo <r>]   Fetch PR metadata + files + existing reviews
 #   submit   --pr <n> --owner <o> --repo <r> --sha <sha>  Post review (JSON on stdin; exits 1
 #            without calling GitHub if stdin is empty, not one JSON object, has an event
-#            other than COMMENT/REQUEST_CHANGES/APPROVE, or has malformed comments)
+#            other than COMMENT/REQUEST_CHANGES/APPROVE, has malformed comments, or anchors
+#            an inline comment outside the PR diff). --check-only runs every check, prose lint
+#            included, and exits 0 without posting.
 #
 # The `context` subcommand auto-detects the PR from the current branch if --pr is omitted.
 # Total API calls: 2 (gh pr view + gh api for file patches).
@@ -16,13 +18,14 @@ set -euo pipefail
 CMD="${1:-}"
 shift || true
 
-OWNER="" REPO="" PR="" SHA=""
+OWNER="" REPO="" PR="" SHA="" CHECK_ONLY=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --owner) OWNER="$2"; shift 2 ;;
     --repo) REPO="$2"; shift 2 ;;
     --pr) PR="$2"; shift 2 ;;
     --sha) SHA="$2"; shift 2 ;;
+    --check-only) CHECK_ONLY=1; shift ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -138,6 +141,72 @@ case "$CMD" in
       exit 1
     fi
 
+    # Anchor check: GitHub rejects the WHOLE review with a bare HTTP 422 when
+    # any inline comment sits on a line outside the PR diff (an unchanged line
+    # between hunks, or a path the PR does not touch), so check every anchor
+    # against the file patches first and name each bad one. A RIGHT anchor is
+    # valid on an added or context line of a hunk; a LEFT anchor on a removed
+    # or context line. Files GitHub returns without a patch (binary, or too
+    # large) are not checked. The patches describe the PR head, so the check is
+    # skipped with a warning when --sha is not the head.
+    if [[ "$(printf '%s' "$REVIEW_JSON" | jq '(.comments // []) | length')" -gt 0 ]]; then
+      HEAD_SHA=$(gh api "repos/$OWNER/$REPO/pulls/$PR" --jq '.head.sha') || {
+        echo "Error: failed to read PR $OWNER/$REPO#$PR head for the anchor check" >&2; exit 1
+      }
+      if [[ "$HEAD_SHA" != "$SHA" ]]; then
+        echo "WARN: --sha $SHA is not the PR head $HEAD_SHA; anchor check skipped" >&2
+      else
+        AWORK=$(mktemp -d /tmp/pr-review-anchor.XXXXXX)
+        printf '%s' "$REVIEW_JSON" > "$AWORK/review.json"
+        gh api "repos/$OWNER/$REPO/pulls/$PR/files" --paginate | jq -s 'add // []' > "$AWORK/files.json" || {
+          rm -rf "$AWORK"; echo "Error: failed to fetch PR files for the anchor check" >&2; exit 1
+        }
+        ARC=0
+        node -e '
+          const fs = require("fs")
+          const review = JSON.parse(fs.readFileSync(process.argv[1], "utf8"))
+          const files = JSON.parse(fs.readFileSync(process.argv[2], "utf8"))
+          const sets = new Map()
+          for (const f of files) {
+            if (f.patch == null) { sets.set(f.filename, null); continue }
+            const right = new Set(), left = new Set()
+            let o = 0, n = 0
+            for (const l of f.patch.split("\n")) {
+              const m = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(l)
+              if (m) { o = +m[1]; n = +m[2]; continue }
+              if (l.startsWith("+")) right.add(n++)
+              else if (l.startsWith("-")) left.add(o++)
+              else if (l.startsWith("\\")) continue
+              else { right.add(n++); left.add(o++) }
+            }
+            sets.set(f.filename, { RIGHT: right, LEFT: left })
+          }
+          const bad = []
+          for (const c of review.comments || []) {
+            const side = c.side || "RIGHT"
+            if (!sets.has(c.path)) { bad.push(`${c.path}:${c.line}: path is not in the PR diff`); continue }
+            const s = sets.get(c.path)
+            if (s == null) continue
+            const lines = s[side] || s.RIGHT
+            for (const ln of [c.start_line, c.line]) {
+              if (ln == null || lines.has(ln)) continue
+              let near = null
+              for (const x of lines) if (near == null || Math.abs(x - ln) < Math.abs(near - ln)) near = x
+              bad.push(`${c.path}:${ln} (${side}): outside the diff; nearest diff line ${near}`)
+            }
+          }
+          if (bad.length > 0) { console.log(bad.join("\n")); process.exit(1) }
+        ' "$AWORK/review.json" "$AWORK/files.json" > "$AWORK/out.txt" || ARC=$?
+        BAD=$(cat "$AWORK/out.txt"); rm -rf "$AWORK"
+        if [[ "$ARC" -ne 0 ]]; then
+          echo "Error: refusing to submit: inline comment anchors outside the PR diff (GitHub would reject the whole review with HTTP 422). Move each onto a line inside a diff hunk:" >&2
+          printf '%s\n' "${BAD:-anchor check failed to run}" >&2
+          exit 1
+        fi
+      fi
+    fi
+
+
     # Prose lint on the outbound review (top-level body + every inline comment
     # body), the shared no-slop lint WITH the --semantic haiku judge — a PR
     # review is where the 2026-08-19 courtesy-ender incident shipped, and this
@@ -159,6 +228,11 @@ case "$CMD" in
           exit 1
         fi
       fi
+    fi
+
+    if [[ "$CHECK_ONLY" == "1" ]]; then
+      echo "check-only: payload, anchors and prose lint OK; nothing posted"
+      exit 0
     fi
 
     printf '%s' "$REVIEW_JSON" | jq --arg sha "$SHA" '. + {commit_id: $sha}' | \

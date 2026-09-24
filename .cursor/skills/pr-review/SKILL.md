@@ -99,6 +99,7 @@ Merge 4a + 4b into one findings set, then per `curation-owns-truth` and `no-dupl
 <step id="5" name="Format draft comments">
 <sub-step name="Comment formatting">
 - Single line: use only `line`; multi-line range: `start_line` (first) + `line` (last); `side`: `"RIGHT"` for additions
+- Every anchor (`line`, and `start_line` when set) must sit inside a diff hunk: an added or context line on `RIGHT`, a removed or context line on `LEFT`. For a finding about unchanged code, anchor on the nearest hunk line and cite the real line in the text. `submit` refuses an out-of-diff anchor and names the nearest valid line, since GitHub would otherwise reject the whole review with a 422
 - Keep comments concise, use backtick formatting for code, bold, or italics
 - Ordering/race findings: one mermaid block carries the mechanism (`diagram-escalation`)
 - Convention nits cite the published ruleset (the edge-dev-agents copy), never `~/.cursor/...` paths
@@ -132,6 +133,8 @@ Review JSON format:
 ```
 
 0 findings after curation: no review is submitted (never an empty APPROVE).
+
+Drafts that wait for approval, or go into a run report for later posting, are pre-checked with the same payload plus `submit --check-only`: it runs every submit check (structure, anchors, prose lint) and posts nothing, so the approved draft is the one that posts.
 </step>
 
 <step id="7" name="Summarize">

@@ -292,6 +292,7 @@ if not data:
 
 DOWNLOAD_EXTS = {
     '.md', '.txt', '.json', '.csv', '.log', '.yaml', '.yml',
+    '.ips', '.crash',
     '.pdf',
     '.rtf',
     '.zip',

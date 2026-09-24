@@ -40,7 +40,10 @@
 #      human thread. Scope lives where the reviewer wrote it, not where the
 #      watermark lives. Ownership-aware: unresolved threads BLOCK on a PR the gh
 #      user authors (reply+resolve owed); on a non-owned PR they are surfaced but
-#      non-blocking (reply-only, per pr-address non-owner-reply-only). Draft PRs
+#      non-blocking (reply-only, per pr-address non-owner-reply-only). A non-owned
+#      thread whose LAST comment is ours is collapsed to an "awaiting owner"
+#      count instead of listed: printing only its root read our own addressed
+#      finding as open work on the next round (2026-09-24). Draft PRs
 #      are skipped (finalize-gate excludes draft dep PRs). Best-effort: gh/network
 #      failure degrades to "unavailable", never fails the Asana enumeration.
 #   5. Print them, and write the marker /tmp/agent-followup-scope-<gid>.json recording
@@ -176,12 +179,16 @@ if command -v gh >/dev/null 2>&1; then
       OWNER=$(sed -E 's#https://github.com/([^/]+)/([^/]+)/pull/([0-9]+)#\1#' <<<"$url")
       RNAME=$(sed -E 's#https://github.com/([^/]+)/([^/]+)/pull/([0-9]+)#\2#' <<<"$url")
       NUM=$(sed -E 's#https://github.com/([^/]+)/([^/]+)/pull/([0-9]+)#\3#' <<<"$url")
-      PRJ=$(gh api graphql -f query="query{repository(owner:\"$OWNER\",name:\"$RNAME\"){pullRequest(number:$NUM){state isDraft headRefOid author{login} reviewDecision reviewThreads(first:100){nodes{isResolved comments(first:1){nodes{author{login} createdAt body}}}}}}}" 2>/dev/null \
+      PRJ=$(gh api graphql -f query="query{repository(owner:\"$OWNER\",name:\"$RNAME\"){pullRequest(number:$NUM){state isDraft headRefOid author{login} reviewDecision reviewThreads(first:100){nodes{isResolved comments(first:1){nodes{author{login} createdAt body}} last:comments(last:1){nodes{author{login}}}}}}}}" 2>/dev/null \
         | jq -c --arg me "$GH_USER" --arg url "$url" '.data.repository.pullRequest
           | select(.state == "OPEN" and (.isDraft | not))
-          | {url: $url, owned: (.author.login == $me), head: .headRefOid, review_decision: (.reviewDecision // "none"),
-             unresolved: [.reviewThreads.nodes[] | select(.isResolved | not) | .comments.nodes[0]
-                          | {by: (.author.login // "?"), at: .createdAt, text: (.body // "" | .[0:200])}]}' 2>/dev/null || true)
+          | (.author.login == $me) as $owned
+          | {url: $url, owned: $owned, head: .headRefOid, review_decision: (.reviewDecision // "none"),
+             unresolved: [.reviewThreads.nodes[] | select(.isResolved | not)
+                          | (.last.nodes[0].author.login // "") as $lastBy
+                          | .comments.nodes[0]
+                          | {by: (.author.login // "?"), at: .createdAt, text: (.body // "" | .[0:200]),
+                             awaiting_owner: (($owned | not) and $lastBy == $me)}]}' 2>/dev/null || true)
       if [[ -n "$PRJ" ]]; then
         # Unanswered top-level review bodies + PR comments on OWNED PRs, via
         # pr-address.sh fetch (the ONE implementation of the addressed-marker
@@ -298,7 +305,9 @@ if [[ "$GH_STATUS" == "ok" ]]; then
     echo ">>   github: no open non-draft PRs attached"
   else
     jq -r '.[] | ">>   github: \(.url) [\(if .owned then "OWNED" else "not owned" end), reviewDecision: \(.review_decision)] — \(.unresolved | length) unresolved thread(s)"' <<<"$GH_SCOPE"
-    jq -r '.[] | .unresolved[] | "     [\(.at)] \(.by): \(.text | gsub("\\s+"; " ") | .[0:160])"' <<<"$GH_SCOPE"
+    jq -r '.[] | ([.unresolved[] | select(.awaiting_owner)] | length) as $ao
+      | (if $ao > 0 then "     \($ao) of them await the owner (not our PR, our comment is the last word): no action owed, not listed" else empty end),
+        (.unresolved[] | select(.awaiting_owner | not) | "     [\(.at)] \(.by): \(.text | gsub("\\s+"; " ") | .[0:160])")' <<<"$GH_SCOPE"
     if [[ "${GH_BOTS_INCOMPLETE:-0}" -gt 0 ]]; then
       echo ">>   $GH_BOTS_INCOMPLETE reviewer-bot check(s) missing/incomplete on OWNED ready PR HEAD(s) — Complete is gate-blocked until they run and conclude (flip ready re-triggers them; a genuine bot outage is waived by watch-pr's reviewer-unavailable marker)."
     fi
