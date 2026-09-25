@@ -1,0 +1,101 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6223/20260925-154415-agent-proof-1218848274337303-01-ltc-quote.png",
+      "caption": "ltc quote",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T22:44:15Z",
+      "headSha": "db7931cfd16b15e4d6cdaf0b5008553a8a64f07e",
+      "addedAt": "2026-09-25T22:44:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6223/20260925-154415-agent-proof-1218848274337303-02-approve-pending.png",
+      "caption": "approve pending",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T22:44:15Z",
+      "headSha": "db7931cfd16b15e4d6cdaf0b5008553a8a64f07e",
+      "addedAt": "2026-09-25T22:44:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6223/20260925-154415-agent-proof-1218848274337303-03-approve-failed-slider-reenabled.png",
+      "caption": "approve failed slider reenabled",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T22:44:15Z",
+      "headSha": "db7931cfd16b15e4d6cdaf0b5008553a8a64f07e",
+      "addedAt": "2026-09-25T22:44:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6223/20260925-154415-agent-proof-1218848274337303-04-retry-slide-replaces-scene.png",
+      "caption": "retry slide replaces scene",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T22:44:15Z",
+      "headSha": "db7931cfd16b15e4d6cdaf0b5008553a8a64f07e",
+      "addedAt": "2026-09-25T22:44:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6223/20260925-154415-agent-proof-1218848274337303-05-usdc-quote.png",
+      "caption": "usdc quote",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T22:44:15Z",
+      "headSha": "db7931cfd16b15e4d6cdaf0b5008553a8a64f07e",
+      "addedAt": "2026-09-25T22:44:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6223/20260925-154415-agent-proof-1218848274337303-06-swap-success.png",
+      "caption": "swap success",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T22:44:15Z",
+      "headSha": "db7931cfd16b15e4d6cdaf0b5008553a8a64f07e",
+      "addedAt": "2026-09-25T22:44:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6223/20260925-154415-agent-proof-1218848274337303-07-back-on-used-quote.png",
+      "caption": "back on used quote",
+      "index": "7",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T22:44:15Z",
+      "headSha": "db7931cfd16b15e4d6cdaf0b5008553a8a64f07e",
+      "addedAt": "2026-09-25T22:44:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6223/20260925-154415-agent-proof-1218848274337303-08-back-slide-requotes.png",
+      "caption": "back slide requotes",
+      "index": "8",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T22:44:15Z",
+      "headSha": "db7931cfd16b15e4d6cdaf0b5008553a8a64f07e",
+      "addedAt": "2026-09-25T22:44:15Z"
+    }
+  ]
+}
