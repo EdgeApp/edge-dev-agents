@@ -34,7 +34,7 @@ Write `/tmp/comment-<gid>.txt` per `findings-comment` and post it. Then, when wh
 </step>
 
 <step id="5" name="Report and Complete">
-Re-read the template `~/.cursor/skills/one-shot/templates/agent-run-report.md` immediately before writing the report (never from memory). Fill it per `report-shape`, write `/tmp/agent-run-report-<gid>-<n>.md`, attach it with `--attach-name agent-run-report.md`, then set `Complete`. The completion judge rules on the comment and the report; a failed verdict names the gap, fix it in this turn and retry.
+Re-read the template `~/.cursor/skills/one-shot/templates/agent-run-report.md` immediately before writing the report (never from memory). Fill it per `report-shape`, write `/tmp/agent-run-report-<gid>-<n>.md`, attach it with `--attach-name agent-run-report.md`, then run the operator's last action per one-shot finalize `on-complete-actions` (`~/.cursor/skills/one-shot/scripts/asana-on-complete-actions.sh --task <gid> --pending`, carry out each line, `--mark` the outcomes), then set `Complete`. The completion judge rules on the comment and the report; a failed verdict names the gap, fix it in this turn and retry.
 </step>
 
 <edge-cases>

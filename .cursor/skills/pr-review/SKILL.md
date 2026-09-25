@@ -1,19 +1,19 @@
 ---
 name: pr-review
-description: Unified PR review entry point. Deep multi-agent review by default (code-review-sonnet workflow) plus an Edge-conventions lens, curated into one findings set, with configurable GitHub posting (draft-and-confirm by default). Use for ANY PR review request, including review-only orch tasks.
+description: Unified PR review entry point. Deep multi-agent review by default (code-review-sonnet workflow) plus an independent parent review (general code review and Edge conventions) on the session model, curated into one findings set, with configurable GitHub posting (draft-and-confirm by default). Use for ANY PR review request, including review-only orch tasks.
 compatibility: Requires git, gh.
 metadata:
   author: j0ntz
 ---
 
-<goal>Run the one canonical review path for a PR: deep verified findings plus Edge-conventions findings, curated together, delivered as a structured GitHub review or as drafts, per the posting config.</goal>
+<goal>Run the one canonical review path for a PR: deep verified findings plus the session model's own independent review, curated together, delivered as a structured GitHub review or as drafts, per the posting config.</goal>
 
 <rules description="Non-negotiable constraints.">
 <rule id="unified-entry">This skill IS the review path. Review findings reach GitHub ONLY through step 6's submit (companion script) — never ad-hoc `gh pr comment`/`gh pr review`, and never by substituting another skill's posting. Finder engines (code-review-sonnet, a manual pass) feed step 5; they do not post.</rule>
 <rule id="standards-first">Read review standards BEFORE examining code. Load both `~/.cursor/rules/review-standards.mdc` and `~/.cursor/rules/typescript-standards.mdc` in parallel (skip any already in context).</rule>
 <rule id="use-companion-script">Use `~/.cursor/skills/pr-review/scripts/github-pr-review.sh` for all GitHub API operations. Do not use raw `curl`, `gh`, or MCP tools inline.</rule>
 <rule id="no-script-bypass">If a companion script fails, report the error and STOP. Do NOT fall back to raw `gh`, `curl`, or other workarounds.</rule>
-<rule id="no-duplicate-feedback">Check existing reviews AND `inlineComments` from the context output (inline comments include resolved threads). Do not repeat feedback already given by another reviewer — this dedupe applies to workflow findings and conventions findings alike.</rule>
+<rule id="no-duplicate-feedback">Check existing reviews AND `inlineComments` from the context output (inline comments include resolved threads). Do not repeat feedback already given by another reviewer — this dedupe applies to workflow findings and parent-review findings alike.</rule>
 <rule id="posting-gate">Posting is configured, never assumed. Default (no flag): present the formatted draft comments in chat and submit only after the user approves. `--comment`: submit without the ask. `--no-comment`: never submit; findings go to chat (and the run report in orch) only. In an orchestrated hands-off session the interactive ask is unavailable, so the default degrades to `--no-comment` with drafts delivered in the run report — post only when the task text explicitly directs posting.</rule>
 <rule id="review-event-mapping">A submitted review carries a real verdict, and AUTHORSHIP decides which events are legal. Step 1 resolves it (`gh api user --jq .login` vs `author`).
 
@@ -22,14 +22,15 @@ ON A PR WE DO NOT AUTHOR: `REQUEST_CHANGES` when the review found something that
 ON OUR OWN PR: `COMMENT` only. GitHub rejects a self-review verdict, so `APPROVE` or `REQUEST_CHANGES` there fails the API call instead of posting.
 
 `APPROVE` asserts that the review RAN and found no blocking defect. It is never a way to say "I did not look": a review that could not examine the diff, or whose workflow failed, submits nothing and says so. The mapping applies to every submission, whether `--comment` posted it directly or the user approved the draft first.</rule>
-<rule id="curation-owns-truth">Workflow findings are candidates, not conclusions. Before delivery, judge each against your own read of the diff: reject false positives (state the evidence), downgrade findings whose failure mode pre-exists the PR (say so in the comment), and drop findings that only restate a documented intent of the PR. Rejected findings are reported in chat/report, never posted.</rule>
+<rule id="curation-owns-truth">Workflow findings are candidates, not conclusions. Before delivery, judge each against your own read of the diff: reject false positives (state the evidence), downgrade findings whose failure mode pre-exists the PR (say so in the comment), and drop findings that only restate a documented intent of the PR. Rejected findings are reported in chat/report, never posted. Parent-review findings (step 4b) get no independent verifier, so hold them to the same bar: each carries a concrete `failure_scenario` grounded in code you read, and curation re-judges them as strictly as workflow candidates.</rule>
+<rule id="independent-parent-review">The parent review (step 4b) runs WHILE the workflow runs and is finished before you read the workflow's result. Reading the workflow's candidates first anchors your pass on them and forfeits the independent second look that is the reason the pass exists.</rule>
 <rule id="batch-reads">When reviewing changed files, batch independent Read/Grep calls in a single message.</rule>
 <rule id="script-timeouts">The companion script may take up to 30s. Set `block_until_ms: 60000` when invoking it.</rule>
 <rule id="diagram-escalation">Comments stay concise per the formatting sub-step. EXCEPTION: when a finding explains ordering, a race, or state-machine behavior — anything where the reader would otherwise simulate event interleavings — carry the mechanism in ONE ```mermaid block inside the comment (GitHub renders mermaid natively) and keep the surrounding prose concise. Sequence diagram for cross-component ordering, flowchart for gates. Participant IDs must not be mermaid keywords; tdd's `diagrams-and-signatures` rule owns the pitfall list. Never more than one diagram per comment; a finding that does not involve ordering stays prose-only.</rule>
 </rules>
 
 <flags description="All optional.">
-- `--quick` — skip the deep workflow; conventions lens only (step 4b).
+- `--quick` — skip the deep workflow; parent review only (step 4b).
 - `--level <low|medium|high|xhigh|max>` — depth of the deep workflow (default `high`). The level IS the fan-out agents' reasoning effort; see the model note in step 4a.
 - `angles=N` — override the workflow's correctness-angle count (1-5) independently of level; passed through verbatim.
 - `--comment` / `--no-comment` — posting config per `posting-gate`.
@@ -74,22 +75,23 @@ Invoke the workflow with the level and target:
 Workflow({ name: "code-review-sonnet", args: "<level> [angles=N] [model=X] [effort=X] <pr-url>" })
 ```
 
-It runs in the background; wait for its result (TaskOutput, blocking) before step 5. Its result carries `findings[]` (each with file/line/summary/failure_scenario/category/verdict) and `refuted[]`.
+It runs in the background. Do NOT wait on it yet: go straight to 4b, and read its result (TaskOutput, blocking) only once 4b's findings are written down, per `independent-parent-review`. Its result carries `findings[]` (each with file/line/summary/failure_scenario/category/verdict) and `refuted[]`.
 
 Model allocation, for cost awareness: the workflow's Scope and Synthesize agents inherit the session model; its Find/Verify/Sweep fan-out defaults to Sonnet running at the level's effort (level IS effort, mirroring the official /code-review). Depth, model, and effort are separate dials: pass `model=sonnet|opus|haiku|inherit` and/or `effort=low|medium|high|xhigh|max|inherit` alongside the level, where `inherit` on either drops that key so the fan-out takes the session's own value. Everything else in this skill runs inline on the session model.
 </sub-step>
 
-<sub-step id="4b" name="Conventions lens (always)">
-Review each changed file's patch against the loaded standards, reading full files for context (batch reads):
-- Convention violations from review-standards.mdc and typescript-standards.mdc
-- Efficient memoization where necessary (memo, useHandler, useCallback)
-- Unnecessary code, unnecessary JSX fragments, missed simplifications
+<sub-step id="4b" name="Parent review (always, every level)">
+Your own review of the diff, on the session model, independent of the workflow. Read each changed file's patch and the full file for context (batch reads), then review through these lenses:
+- **General code review**: anything a strong reviewer would catch. Correctness on paths the diff touches, whether the change does what the PR title/body (and linked task) say, design and altitude (a special case bolted onto shared code, logic at the wrong layer), cross-cutting effects that span files, and missing handling for realistic states (error path, empty/cold state, concurrent calls).
+- **Edge conventions**: violations of review-standards.mdc and typescript-standards.mdc; efficient memoization where necessary (memo, useHandler, useCallback); unnecessary code, unnecessary JSX fragments, missed simplifications.
 
-This lens covers what the workflow's finders do not know (Edge-specific standards); do not re-hunt correctness bugs here at deep level — the workflow owns that.
+Record each finding with file, line, summary, and a concrete `failure_scenario` before moving to 4c. Overlap with the workflow is expected and resolved in curation, so do not narrow this pass to avoid it.
+
+This sub-step is the extension point for Edge-specific review machinery (for example a catalog of known review dimensions fanned out to cheaper checkers): add such lenses here, feeding the same findings shape.
 </sub-step>
 
 <sub-step id="4c" name="Curate">
-Merge 4a + 4b into one findings set, then per `curation-owns-truth` and `no-duplicate-feedback`:
+Merge 4a + 4b into one findings set (a finding both passes raised counts once, and independent agreement raises confidence in it), then per `curation-owns-truth` and `no-duplicate-feedback`:
 1. Drop duplicates of feedback already on the PR (`reviews[]`, `inlineComments[]`).
 2. Reject false positives with cited evidence; keep the rejection list for the summary.
 3. Categorize survivors: **Critical** (must fix before merge), **Warning** (should address), **Suggestion** (consider).
@@ -148,9 +150,9 @@ Provide a summary in the chat response:
 <edge-cases>
 <case name="No PR found">Script exits with an error. Ask the user for a PR number or URL.</case>
 <case name="No changed files">Report that the PR has no file changes.</case>
-<case name="Large PR (>20 files)">The deep workflow scopes itself; for the conventions lens, prioritize files with the most additions and note any files skipped due to size (lockfile churn is always skippable).</case>
+<case name="Large PR (>20 files)">The deep workflow scopes itself; for the parent review, prioritize files with the most additions and note any files skipped due to size (lockfile churn is always skippable).</case>
 <case name="Server repo">If the repository name ends in `-server` or context indicates a server project, also review against the Server Conventions section in review-standards.mdc.</case>
-<case name="Workflow unavailable or fails">If the Workflow tool is unavailable or the run errors, report it and continue with the conventions lens plus a manual correctness pass over the diff — say in the summary that depth was degraded. Do not silently claim deep coverage.</case>
+<case name="Workflow unavailable or fails">If the Workflow tool is unavailable or the run errors, report it and continue with the parent review alone and say in the summary that depth was degraded. Do not silently claim deep coverage.</case>
 <case name="Multiple PRs named">Run steps 1-4 per PR (workflows may run in parallel); curate and deliver per PR. One approval ask covers all drafts.</case>
 </edge-cases>
 

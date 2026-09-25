@@ -9,6 +9,10 @@ effort off the level's default. `inherit` on either of the last two drops that k
 entirely, so the fan-out takes the caller's own model or effort the way Scope and
 Synthesize always have.
 
+The workflow is one of two review passes. /pr-review's step 4b runs a parent
+review on the session model in parallel (general code review plus Edge
+conventions, at every level), and step 4c curates both sets together.
+
 ```mermaid
 flowchart LR
     sc["`**Scope**
