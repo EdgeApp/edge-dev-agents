@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/react-native-zcash/pr-75/20260924-182912-agent-proof-1218846025962816-01-zec-wallet-menu-pause-resync-mid-sync.png",
+      "caption": "zec wallet menu pause resync mid sync",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T01:29:12Z",
+      "headSha": "9858cd9f0b584ffa2a88d9dc4a4fe36fc04f1cc9",
+      "addedAt": "2026-09-25T01:29:12Z"
+    },
+    {
+      "path": "assets/react-native-zcash/pr-75/20260924-182912-agent-proof-1218846025962816-02-zec-wallet-alive-after-48-stop-cycles.png",
+      "caption": "zec wallet alive after 48 stop cycles",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T01:29:12Z",
+      "headSha": "9858cd9f0b584ffa2a88d9dc4a4fe36fc04f1cc9",
+      "addedAt": "2026-09-25T01:29:12Z"
+    },
+    {
+      "path": "assets/react-native-zcash/pr-75/20260924-182912-agent-proof-1218846025962816-03-HACKED-zec-wallet-alive-after-forced-race-cycles.png",
+      "caption": "zec wallet alive after forced race cycles",
+      "index": "3",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "added a 50 ms wait in gRPC-Swift PassthroughMessageSource.consumeNextElement before cancellation-handler registration to widen the race window",
+      "batchAt": "2026-09-25T01:29:12Z",
+      "headSha": "9858cd9f0b584ffa2a88d9dc4a4fe36fc04f1cc9",
+      "addedAt": "2026-09-25T01:29:12Z"
+    }
+  ]
+}
