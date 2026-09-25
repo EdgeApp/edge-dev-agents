@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-core-js/pr-740/20260925-145701-agent-proof-1218820584727919-01-settings-locked.png",
+      "caption": "settings locked",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T21:57:01Z",
+      "headSha": "7344e882e09eb696378964b731d2f5f01169deb9",
+      "addedAt": "2026-09-25T21:57:01Z"
+    },
+    {
+      "path": "assets/edge-core-js/pr-740/20260925-145701-agent-proof-1218820584727919-02-confirm-password-modal.png",
+      "caption": "confirm password modal",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T21:57:01Z",
+      "headSha": "7344e882e09eb696378964b731d2f5f01169deb9",
+      "addedAt": "2026-09-25T21:57:01Z"
+    },
+    {
+      "path": "assets/edge-core-js/pr-740/20260925-145701-agent-proof-1218820584727919-03-settings-unlocked.png",
+      "caption": "settings unlocked",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T21:57:01Z",
+      "headSha": "7344e882e09eb696378964b731d2f5f01169deb9",
+      "addedAt": "2026-09-25T21:57:01Z"
+    }
+  ]
+}
