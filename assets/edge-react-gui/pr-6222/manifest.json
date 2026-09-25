@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6222/20260925-124636-agent-proof-1218850363351115-01-wc-connect.png",
+      "caption": "wc connect",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T19:46:36Z",
+      "headSha": "c2f88fa3159f35e0e3a79b355d0552e08d3f053a",
+      "addedAt": "2026-09-25T19:46:36Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6222/20260925-124636-agent-proof-1218850363351115-02-bip322-modal.png",
+      "caption": "bip322 modal",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T19:46:36Z",
+      "headSha": "c2f88fa3159f35e0e3a79b355d0552e08d3f053a",
+      "addedAt": "2026-09-25T19:46:36Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6222/20260925-124636-agent-proof-1218850363351115-03-ecdsa-modal.png",
+      "caption": "ecdsa modal",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T19:46:36Z",
+      "headSha": "c2f88fa3159f35e0e3a79b355d0552e08d3f053a",
+      "addedAt": "2026-09-25T19:46:36Z"
+    }
+  ]
+}
