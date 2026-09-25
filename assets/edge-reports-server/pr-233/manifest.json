@@ -84,6 +84,18 @@
       "batchAt": "2026-09-25T01:44:52Z",
       "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
       "addedAt": "2026-09-25T01:44:52Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-233/20260924-185311-agent-proof-1218846435927569-08-network-table-est-revenue.png",
+      "caption": "network table est revenue",
+      "index": "8",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T01:44:52Z",
+      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
+      "addedAt": "2026-09-25T01:53:11Z"
     }
   ]
 }
