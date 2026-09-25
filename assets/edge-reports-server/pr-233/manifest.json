@@ -9,9 +9,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-25T01:44:52Z",
-      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
-      "addedAt": "2026-09-25T01:44:52Z"
+      "batchAt": "2026-09-25T21:43:31Z",
+      "headSha": "fb292f73a50b2f6cb40635a0f807db5d7e83c2e7",
+      "addedAt": "2026-09-25T01:44:52Z",
+      "carriedFrom": "2026-09-25T01:44:52Z"
     },
     {
       "path": "assets/edge-reports-server/pr-233/20260924-184452-agent-proof-1218846435927569-02-network-dropdown-open.png",
@@ -21,9 +22,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-25T01:44:52Z",
-      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
-      "addedAt": "2026-09-25T01:44:52Z"
+      "batchAt": "2026-09-25T21:43:31Z",
+      "headSha": "fb292f73a50b2f6cb40635a0f807db5d7e83c2e7",
+      "addedAt": "2026-09-25T01:44:52Z",
+      "carriedFrom": "2026-09-25T01:44:52Z"
     },
     {
       "path": "assets/edge-reports-server/pr-233/20260924-184452-agent-proof-1218846435927569-03-90d-auto-weekly-network-trend.png",
@@ -33,9 +35,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-25T01:44:52Z",
-      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
-      "addedAt": "2026-09-25T01:44:52Z"
+      "batchAt": "2026-09-25T21:43:31Z",
+      "headSha": "fb292f73a50b2f6cb40635a0f807db5d7e83c2e7",
+      "addedAt": "2026-09-25T01:44:52Z",
+      "carriedFrom": "2026-09-25T01:44:52Z"
     },
     {
       "path": "assets/edge-reports-server/pr-233/20260924-184452-agent-proof-1218846435927569-04-24m-provider-interval-auto.png",
@@ -45,9 +48,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-25T01:44:52Z",
-      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
-      "addedAt": "2026-09-25T01:44:52Z"
+      "batchAt": "2026-09-25T21:43:31Z",
+      "headSha": "fb292f73a50b2f6cb40635a0f807db5d7e83c2e7",
+      "addedAt": "2026-09-25T01:44:52Z",
+      "carriedFrom": "2026-09-25T01:44:52Z"
     },
     {
       "path": "assets/edge-reports-server/pr-233/20260924-184452-agent-proof-1218846435927569-05-24m-provider-interval-week.png",
@@ -57,9 +61,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-25T01:44:52Z",
-      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
-      "addedAt": "2026-09-25T01:44:52Z"
+      "batchAt": "2026-09-25T21:43:31Z",
+      "headSha": "fb292f73a50b2f6cb40635a0f807db5d7e83c2e7",
+      "addedAt": "2026-09-25T01:44:52Z",
+      "carriedFrom": "2026-09-25T01:44:52Z"
     },
     {
       "path": "assets/edge-reports-server/pr-233/20260924-184452-agent-proof-1218846435927569-06-24m-provider-interval-day.png",
@@ -69,9 +74,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-25T01:44:52Z",
-      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
-      "addedAt": "2026-09-25T01:44:52Z"
+      "batchAt": "2026-09-25T21:43:31Z",
+      "headSha": "fb292f73a50b2f6cb40635a0f807db5d7e83c2e7",
+      "addedAt": "2026-09-25T01:44:52Z",
+      "carriedFrom": "2026-09-25T01:44:52Z"
     },
     {
       "path": "assets/edge-reports-server/pr-233/20260924-184452-agent-proof-1218846435927569-07-pair-share-30d.png",
@@ -81,9 +87,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-25T01:44:52Z",
-      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
-      "addedAt": "2026-09-25T01:44:52Z"
+      "batchAt": "2026-09-25T21:43:31Z",
+      "headSha": "fb292f73a50b2f6cb40635a0f807db5d7e83c2e7",
+      "addedAt": "2026-09-25T01:44:52Z",
+      "carriedFrom": "2026-09-25T01:44:52Z"
     },
     {
       "path": "assets/edge-reports-server/pr-233/20260924-185311-agent-proof-1218846435927569-08-network-table-est-revenue.png",
@@ -93,9 +100,46 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-25T01:44:52Z",
-      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
-      "addedAt": "2026-09-25T01:53:11Z"
+      "batchAt": "2026-09-25T21:43:31Z",
+      "headSha": "fb292f73a50b2f6cb40635a0f807db5d7e83c2e7",
+      "addedAt": "2026-09-25T01:53:11Z",
+      "carriedFrom": "2026-09-25T01:44:52Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-233/20260925-144331-agent-proof-1218846435927569-09-networks-section-30d-robinhood.png",
+      "caption": "networks section 30d robinhood",
+      "index": "9",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T21:43:31Z",
+      "headSha": "fb292f73a50b2f6cb40635a0f807db5d7e83c2e7",
+      "addedAt": "2026-09-25T21:43:31Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-233/20260925-144331-agent-proof-1218846435927569-10-network-dropdown-select-filtered.png",
+      "caption": "network dropdown select filtered",
+      "index": "10",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T21:43:31Z",
+      "headSha": "fb292f73a50b2f6cb40635a0f807db5d7e83c2e7",
+      "addedAt": "2026-09-25T21:43:31Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-233/20260925-144331-agent-proof-1218846435927569-11-networks-filtered-to-robinhood.png",
+      "caption": "networks filtered to robinhood",
+      "index": "11",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T21:43:31Z",
+      "headSha": "fb292f73a50b2f6cb40635a0f807db5d7e83c2e7",
+      "addedAt": "2026-09-25T21:43:31Z"
     }
   ]
 }
