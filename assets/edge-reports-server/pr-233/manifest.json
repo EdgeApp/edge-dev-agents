@@ -1,0 +1,89 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-reports-server/pr-233/20260924-184452-agent-proof-1218846435927569-01-networks-section-30d.png",
+      "caption": "networks section 30d",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T01:44:52Z",
+      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
+      "addedAt": "2026-09-25T01:44:52Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-233/20260924-184452-agent-proof-1218846435927569-02-network-dropdown-open.png",
+      "caption": "network dropdown open",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T01:44:52Z",
+      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
+      "addedAt": "2026-09-25T01:44:52Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-233/20260924-184452-agent-proof-1218846435927569-03-90d-auto-weekly-network-trend.png",
+      "caption": "90d auto weekly network trend",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T01:44:52Z",
+      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
+      "addedAt": "2026-09-25T01:44:52Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-233/20260924-184452-agent-proof-1218846435927569-04-24m-provider-interval-auto.png",
+      "caption": "24m provider interval auto",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T01:44:52Z",
+      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
+      "addedAt": "2026-09-25T01:44:52Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-233/20260924-184452-agent-proof-1218846435927569-05-24m-provider-interval-week.png",
+      "caption": "24m provider interval week",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T01:44:52Z",
+      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
+      "addedAt": "2026-09-25T01:44:52Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-233/20260924-184452-agent-proof-1218846435927569-06-24m-provider-interval-day.png",
+      "caption": "24m provider interval day",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T01:44:52Z",
+      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
+      "addedAt": "2026-09-25T01:44:52Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-233/20260924-184452-agent-proof-1218846435927569-07-pair-share-30d.png",
+      "caption": "pair share 30d",
+      "index": "7",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T01:44:52Z",
+      "headSha": "aebbfe1bfa6ed666237e598f6c177404c49facdc",
+      "addedAt": "2026-09-25T01:44:52Z"
+    }
+  ]
+}
