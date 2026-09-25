@@ -166,6 +166,54 @@
       "batchAt": "2026-09-24T22:48:49Z",
       "headSha": "a432bb171f5f248e64c1273ef3b795d0ad19d71b",
       "addedAt": "2026-09-24T22:48:49Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1108/20260925-110609-agent-proof-1218753833235509-18-arrr-receive-address.png",
+      "caption": "arrr receive address",
+      "index": "18",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T18:06:09Z",
+      "headSha": "49f94840aa3315e32761c9314a783e0537425557",
+      "addedAt": "2026-09-25T18:06:09Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1108/20260925-110609-agent-proof-1218753833235509-20-arrr-send-confirm.png",
+      "caption": "arrr send confirm",
+      "index": "20",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T18:06:09Z",
+      "headSha": "49f94840aa3315e32761c9314a783e0537425557",
+      "addedAt": "2026-09-25T18:06:09Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1108/20260925-110609-agent-proof-1218753833235509-21-arrr-send-success.png",
+      "caption": "arrr send success",
+      "index": "21",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T18:06:09Z",
+      "headSha": "49f94840aa3315e32761c9314a783e0537425557",
+      "addedAt": "2026-09-25T18:06:09Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1108/20260925-110609-agent-proof-1218753833235509-22-arrr-send-txid.png",
+      "caption": "arrr send txid",
+      "index": "22",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T18:06:09Z",
+      "headSha": "49f94840aa3315e32761c9314a783e0537425557",
+      "addedAt": "2026-09-25T18:06:09Z"
     }
   ]
 }
