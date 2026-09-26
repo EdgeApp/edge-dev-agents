@@ -13,13 +13,15 @@ metadata:
 <rule id="standards-first">Read review standards BEFORE examining code. Load both `~/.cursor/rules/review-standards.mdc` and `~/.cursor/rules/typescript-standards.mdc` in parallel (skip any already in context).</rule>
 <rule id="use-companion-script">Use `~/.cursor/skills/pr-review/scripts/github-pr-review.sh` for all GitHub API operations. Do not use raw `curl`, `gh`, or MCP tools inline.</rule>
 <rule id="no-script-bypass">If a companion script fails, report the error and STOP. Do NOT fall back to raw `gh`, `curl`, or other workarounds.</rule>
-<rule id="no-duplicate-feedback">Check existing reviews AND `inlineComments` from the context output (inline comments include resolved threads). Do not repeat feedback already given by another reviewer — this dedupe applies to workflow findings and parent-review findings alike.</rule>
+<rule id="no-duplicate-feedback">Check existing reviews, `threads`, AND `inlineComments` from the context output (resolved threads included). Do not repeat feedback already on the PR from ANY author, your own login included: reviews you wrote by hand and reviews earlier orch runs posted share one account and count the same. This dedupe applies to workflow findings and parent-review findings alike. When a finding matches one of your own unresolved threads and is still present at the head, answer that thread through `replies` ("still present at `<sha>`") instead of opening a new comment.</rule>
 <rule id="posting-gate">Posting is configured, never assumed. Default (no flag): present the formatted draft comments in chat and submit only after the user approves. `--comment`: submit without the ask. `--no-comment`: never submit; findings go to chat (and the run report in orch) only. In an orchestrated hands-off session the interactive ask is unavailable, so the default degrades to `--no-comment` with drafts delivered in the run report — post only when the task text explicitly directs posting.</rule>
 <rule id="review-event-mapping">A submitted review carries a real verdict, and AUTHORSHIP decides which events are legal. Step 1 resolves it (`gh api user --jq .login` vs `author`).
 
 ON A PR WE DO NOT AUTHOR: `REQUEST_CHANGES` when the review found something that must change before merge (a Critical or High finding: a real defect, a dropped guard, a broken caller). `APPROVE` when it found nothing, or nothing beyond nits, style preferences, and optional suggestions. Deliver the nits as inline comments on the approving review rather than withholding the verdict over them.
 
 ON OUR OWN PR: `COMMENT` only. GitHub rejects a self-review verdict, so `APPROVE` or `REQUEST_CHANGES` there fails the API call instead of posting.
+
+YOUR STANDING VERDICT (`myStanding` in the context output) carries over between rounds, since GitHub keeps your latest verdict. When it is `CHANGES_REQUESTED`, check every `myStanding.blockingThreads` entry at the head: a confirmed fix gets a reply with `resolve: true`; one still present gets a "still present" reply and the round stays `REQUEST_CHANGES`. `submit` refuses an APPROVE that leaves any of those threads open. When every blocking thread is confirmed fixed, submit `APPROVE` with those replies even if the round found nothing new.
 
 `APPROVE` asserts that the review RAN and found no blocking defect. It is never a way to say "I did not look": a review that could not examine the diff, or whose workflow failed, submits nothing and says so. The mapping applies to every submission, whether `--comment` posted it directly or the user approved the draft first.</rule>
 <rule id="curation-owns-truth">Workflow findings are candidates, not conclusions. Before delivery, judge each against your own read of the diff: reject false positives (state the evidence), downgrade findings whose failure mode pre-exists the PR (say so in the comment), and drop findings that only restate a documented intent of the PR. Rejected findings are reported in chat/report, never posted. Parent-review findings (step 4b) get no independent verifier, so hold them to the same bar: each carries a concrete `failure_scenario` grounded in code you read, and curation re-judges them as strictly as workflow candidates.</rule>
@@ -47,7 +49,7 @@ If the user provides a PR URL or number, pass `--pr`. If they also specify a rep
 
 If the script exits code 2 with `PROMPT_GH_AUTH`, prompt: "`gh` CLI is not authenticated. Run `gh auth login` first."
 
-Save the output JSON — it contains `number`, `title`, `url`, `author`, `headRef`, `baseRef`, `headSha`, `reviews[]`, `inlineComments[]`, and `files[]` (with patches). Note whether the PR author is us (`gh api user --jq .login` vs `author`) — it decides the `review-event-mapping` rule.
+Save the output JSON — it contains `number`, `title`, `url`, `author`, `me`, `headRef`, `baseRef`, `headSha`, `reviews[]` (with `commit`), `threads[]` (node `id`, `isResolved`, `isOutdated`, root author and review), `myStanding`, `myPendingReview`, `inlineComments[]`, and `files[]` (with patches). `author == me` means our own PR, which decides the `review-event-mapping` rule.
 </step>
 
 <step id="2" name="Checkout PR branch">
@@ -130,11 +132,16 @@ Review JSON format:
   "body": "",
   "comments": [
     { "path": "src/file.ts", "line": 42, "side": "RIGHT", "body": "Comment text" }
+  ],
+  "replies": [
+    { "thread_id": "<threads[].id>", "body": "Fixed at `abc1234`.", "resolve": true }
   ]
 }
 ```
 
-0 findings after curation: no review is submitted (never an empty APPROVE).
+`replies` answer existing threads inside the same review; omit the key when there are none.
+
+0 findings after curation: no review is submitted (never an empty APPROVE), except the confirmed-fix APPROVE under `review-event-mapping`.
 
 Drafts that wait for approval, or go into a run report for later posting, are pre-checked with the same payload plus `submit --check-only`: it runs every submit check (structure, anchors, prose lint) and posts nothing, so the approved draft is the one that posts.
 </step>
@@ -153,6 +160,7 @@ Provide a summary in the chat response:
 <case name="Large PR (>20 files)">The deep workflow scopes itself; for the parent review, prioritize files with the most additions and note any files skipped due to size (lockfile churn is always skippable).</case>
 <case name="Server repo">If the repository name ends in `-server` or context indicates a server project, also review against the Server Conventions section in review-standards.mdc.</case>
 <case name="Workflow unavailable or fails">If the Workflow tool is unavailable or the run errors, report it and continue with the parent review alone and say in the summary that depth was degraded. Do not silently claim deep coverage.</case>
+<case name="Your pending draft on the PR" id="pending-draft-adopted">`myPendingReview` set means the operator left an unsubmitted draft. Do not copy its comments into the payload and do not delete it: `submit` takes it over, publishing it with this review (or ahead of it when it is pinned to an older commit), and prints the draft action, which `--check-only` also shows. Dedupe findings against the draft's comments, and name the draft action in the summary and run report.</case>
 <case name="Multiple PRs named">Run steps 1-4 per PR (workflows may run in parallel); curate and deliver per PR. One approval ask covers all drafts.</case>
 </edge-cases>
 

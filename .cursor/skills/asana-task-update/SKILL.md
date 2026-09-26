@@ -12,7 +12,8 @@ metadata:
 <rule id="use-companion-script">Use `~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh` for all Asana task mutations. Do not call raw Asana APIs directly from skills that can delegate here.</rule>
 <rule id="task-required">Every operation requires `--task <task_gid>`.</rule>
 <rule id="attach-graceful-without-secret">`--attach-pr` uses the Asana ↔ GitHub widget integration. The secret is resolved from `$ASANA_GITHUB_SECRET`, else falls back to `credentials.json` (`.asana_github_secret`) — so it works in spawned agent shells that lack the env var. If it's still unset, or if the integration endpoint returns 401/403/404 (integration disabled at the workspace level), the script warns once and skips the widget call with exit 0 — it does NOT fail the workflow. `ASANA_TOKEN` is resolved the same way (env, else `credentials.json` `.asana_token`).</rule>
-<rule id="create-subtask">`--create-subtask --subtask-name "<name>"` creates a subtask under `--task` and re-points the rest of the invocation at the new subtask, so a SINGLE call can create the per-PR subtask AND `--attach-pr` its PR. Prints `>> subtask created: <gid>`. Used by `/one-shot`'s `multi-repo-subtasks` to give each repo's PR its own subtask under the umbrella task.</rule>
+<rule id="create-subtask">`--create-subtask --subtask-name "<name>"` creates a subtask under `--task` and re-points the rest of the invocation at the new subtask, so a SINGLE call can create the per-PR subtask AND `--attach-pr` its PR. Prints `>> subtask created: <gid>`. Used by `/one-shot`'s `multi-repo-subtasks` to give each repo's PR its own subtask under the umbrella task. `--subtask-notes <file>` sets the new subtask's body verbatim (plain notes; the script refuses a file carrying a CURRENT STATE section, that section is the parent task's).</rule>
+<rule id="qa-subtasks">A subtask titled `QA: <what a human verifies>` is a manual verification item for the QA handoff (pr-land `qa-subtasks-before-handoff`), never scope: `asana-get-context.sh` hides them from every run's ingestion. `--set-board-state "QA Verification"` exits 2 (`QA_SUBTASKS_REQUIRED`) when the task has no open `QA:` subtask; write the items first, or pass `--no-manual-qa "<why nothing needs a human>"`, which the script posts as a comment.</rule>
 <rule id="current-state-owns-the-tail">`--set-current-state <file>` is the ONLY sanctioned way to write a task description. It rewrites the agent-maintained tail and preserves operator prose above the delimiter; the delimiter literal, the strip-and-replace, and the authorship marking all live in the script, so callers supply bullets only. Never assemble a `notes` PUT by hand — raw Asana API calls are hook-blocked in agent sessions, and a hand-rolled write drops the marking and risks clobbering the operator half. The section's content contract (when it is owed, what the bullets say) belongs to one-shot `description-current-state`.</rule>
 <rule id="prompt-codes">If the script exits code 2 with `PROMPT_REVIEWER`, ask the user who to assign and re-run with `--assign <user_gid>`. Hands-off callers may instead pass `--skip-assign-if-missing` to convert missing-reviewer assignment into a non-blocking skip.</rule>
 <rule id="script-timeouts">Asana updates can take time. Use `block_until_ms: 120000` for script calls.</rule>
@@ -37,10 +38,14 @@ metadata:
   --attach-pr --pr-url <url> --pr-title "<title>" --pr-number <num> \
   --assign --skip-assign-if-missing --set-board-state "PR Review"
 
-# Post-merge: set Board State to QA Verification and unassign
+# Post-merge: write the manual QA items (one subtask each), then hand off
+~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
+  --task <task_gid> \
+  --create-subtask --subtask-name "QA: <what a human verifies>" --subtask-notes /tmp/qa-1.md
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
   --task <task_gid> \
   --set-board-state "QA Verification" --unassign
+# (or, when nothing needs a human: --no-manual-qa "server-only change, covered by CI")
 
 # Attach a run-report markdown file to the task. Orch doc names are numbered per
 # task: the run-report attach gate renames reports to <N>-agent-run-report.md, and

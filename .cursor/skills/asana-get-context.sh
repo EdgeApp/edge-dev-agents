@@ -166,6 +166,13 @@ if [[ "$SUBTASK_COUNT" -gt 0 ]]; then
     -H "$AUTH" | python3 -c "
 import sys, json
 rows = json.load(sys.stdin)['data']
+# 'QA: ...' subtasks are manual verification items written at the QA handoff
+# (asana-task-update.sh, pr-land). They are for a human tester, never scope, so
+# a run sees only their count.
+qa = [t for t in rows if (t.get('name') or '').startswith('QA: ')]
+rows = [t for t in rows if t not in qa]
+if qa:
+    print(f'QA SUBTASKS HIDDEN: {len(qa)} (manual verification items for QA; not scope, do not read or complete them)')
 if rows:
     print(f'SUBTASKS: {len(rows)}')
     for t in rows:

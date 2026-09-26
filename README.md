@@ -832,7 +832,7 @@ scripts, not be re-described independently across skills.
 | [`/bugbot`](.cursor/skills/bugbot/SKILL.md) | Address Cursor Bugbot findings until the PR is actually clean |
 | [`/pr-address`](.cursor/skills/pr-address/SKILL.md) | Address PR feedback: fixups, reply-then-resolve, mark-addressed |
 | [`/pr-review`](.cursor/skills/pr-review/SKILL.md) | Review a PR: deep multi-agent pass by default, plus an independent parent review (general code review and the Edge-specific checklist) on the session model at every level |
-| [`/pr-land`](.cursor/skills/pr-land/SKILL.md) | Land approved PRs: prepare, merge, publish, GUI dep bumps, staging cherry-picks, Asana updates |
+| [`/pr-land`](.cursor/skills/pr-land/SKILL.md) | Land approved PRs: prepare, merge, publish, GUI dep bumps, staging cherry-picks, Asana updates; before the QA Verification handoff it writes one `QA: <item>` subtask per manual verification item |
 | [`/develop-staging`](.cursor/skills/develop-staging/SKILL.md) | Cut a staging release: bump the version, merge develop into staging, gate on develop/staging parity |
 | [`/staging-cherry-pick`](.cursor/skills/staging-cherry-pick/SKILL.md) | Cherry-pick landed staging-targeted commits onto staging |
 | [`/cheese`](.cursor/skills/cheese/SKILL.md) | Push a test-branch build, pinning unpublished dep PRs when required |
@@ -930,8 +930,8 @@ scripts live at `skills/` top level. The ones most worth knowing:
 
 | Script | What it does |
 |------|-------------|
-| [`asana-get-context.sh`](.cursor/skills/asana-get-context.sh) | Fetch task details, comments, subtasks, attachments (iOS `.ips`/`.crash` reports included), and the Engineering Board fields (other boards' fields on the task are not printed) |
-| [`asana-task-update.sh`](.cursor/skills/asana-task-update/scripts/asana-task-update.sh) | Reusable Asana mutations (the report-attach path is hook-gated) |
+| [`asana-get-context.sh`](.cursor/skills/asana-get-context.sh) | Fetch task details, comments, subtasks, attachments (iOS `.ips`/`.crash` reports included), and the Engineering Board fields (other boards' fields on the task are not printed); `QA:` subtasks (manual verification items) are hidden from ingestion, only their count shows |
+| [`asana-task-update.sh`](.cursor/skills/asana-task-update/scripts/asana-task-update.sh) | Reusable Asana mutations (the report-attach path is hook-gated); `--subtask-notes` writes a plain subtask body, and `--set-board-state "QA Verification"` refuses (exit 2) until the task carries `QA:` subtasks or `--no-manual-qa "<reason>"` |
 | [`asana-field-value.sh`](.cursor/skills/asana-field-value.sh), [`asana-build-field.sh`](.cursor/skills/asana-build-field.sh), [`asana-force-land.sh`](.cursor/skills/asana-force-land.sh) | Live single-field reads the finalize gate consumes |
 | [`asana-on-complete-actions.sh`](.cursor/skills/one-shot/scripts/asana-on-complete-actions.sh) | Lists the operator's `agent_on_complete` lines (the run's last actions before `Complete`, one-shot and task-run alike) and records each outcome as a marker comment, so a re-engaged run repeats only what is still pending |
 | [`sentry-query.sh`](.cursor/skills/sentry-query.sh) | Read-only Sentry queries for the `/sentry` skill (issue, search, tag distributions, event context); token from `~/.config/sentry-edge-token` via a mode-600 curl config, never argv |

@@ -75,8 +75,26 @@
 set -euo pipefail
 
 
-CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
+HOOK_INPUT=$(cat 2>/dev/null || true)
+CMD=$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
+HOOK_CWD=$(printf '%s' "$HOOK_INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)
+
+# Site-orch tenants are exempt from COMMIT discipline. A tenant repo carries orch.config.json at
+# its root (a worktree included), commits with plain `git commit` by its own CLAUDE.md, and has
+# none of the Edge commit tooling this gate routes to; the 2026-09-25 task-45 verify agent had to
+# reach for lint-commit.sh against its repo's instructions. Matched by directory shape, never by
+# repo name: the command's leading `cd` names the target when present, the hook's cwd otherwise.
+# `--no-verify` stays blocked everywhere.
+in_orch_tenant() {
+  local dir="$1" root
+  root=$(cd "$dir" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) || return 1
+  [ -f "$root/orch.config.json" ]
+}
+CMD_DIR=$(printf '%s' "$CMD" | sed -nE 's/^[[:space:]]*cd[[:space:]]+"?([^"&;|[:space:]]+)"?.*/\1/p' | head -1)
+CMD_DIR="${CMD_DIR/#\~/$HOME}"
+IN_TENANT=0
+in_orch_tenant "${CMD_DIR:-${HOOK_CWD:-$PWD}}" && IN_TENANT=1
 # Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
 # backticked spans blanked): a command that merely QUOTES a trigger string --
 # a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
@@ -106,6 +124,7 @@ if echo "$CMD_M" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+(-[^[:space:]]+[[:
   if echo "$CMD_M" | grep -q -- '--amend'; then
     exit 0
   fi
+  [ "$IN_TENANT" = 1 ] && exit 0
   echo "BLOCKED: raw 'git commit' is forbidden in agent sessions. Use ~/.cursor/skills/lint-commit.sh -m \"...\" [files...] (or --fixup <hash> --for human|auto -m \"<why>\") per ~/.cursor/skills/im/SKILL.md. The only raw-git exception is 'git commit --amend' inside the step-6 watch loop." >&2
   exit 2
 fi

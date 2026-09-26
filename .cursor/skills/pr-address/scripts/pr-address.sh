@@ -12,6 +12,11 @@
 #                                                          Retract a comment YOU authored (review-thread
 #                                                          reply or top-level). Refuses any other author.
 #                                                          No body lint: a delete carries no prose.
+#   delete-pending-review --owner <o> --repo <r> --pr <n>
+#                                                          Delete YOUR unsubmitted (PENDING) review on the
+#                                                          PR, with its draft comments. For an explicit
+#                                                          discard only: github-pr-review.sh submit takes
+#                                                          a leftover draft over instead of deleting it.
 #   edit-comment   --owner <o> --repo <r> --comment-id <id> --body <text>|--body-file <path>
 #                                                          Replace the body of a comment YOU authored, in
 #                                                          place. Refuses any other author, and refuses a
@@ -405,6 +410,31 @@ case "$CMD" in
     echo "deleted: $COMMENT_ID"
     ;;
 
+  delete-pending-review)
+    # A PENDING review is visible only to its author, and its draft comments are
+    # invisible to the pulls/comments/{id} probe delete-comment uses, so a
+    # leftover draft had no sanctioned removal path while block-raw-gh-writes.sh
+    # blocks the raw DELETE. Author-scoped by construction: the lookup keeps only
+    # currentUser's PENDING review, and GitHub's DELETE on a review endpoint
+    # refuses any review that is already submitted. A review submit adopts drafts
+    # (pr-review pending-draft-adopted); this verb is the operator's discard.
+    require_gh
+    if [[ -z "$OWNER" || -z "$REPO" || -z "$PR" ]]; then
+      echo "Error: --owner, --repo, --pr required" >&2; exit 1
+    fi
+    ME=$(gh api user --jq '.login')
+    RID=$(gh api "repos/$OWNER/$REPO/pulls/$PR/reviews" --paginate \
+      --jq ".[] | select(.state == \"PENDING\" and .user.login == \"$ME\") | .id" | head -1)
+    if [[ -z "$RID" ]]; then
+      echo "no pending review by $ME on $OWNER/$REPO#$PR"; exit 0
+    fi
+    echo ">> pending review $RID by $ME; draft comments:"
+    gh api "repos/$OWNER/$REPO/pulls/$PR/reviews/$RID/comments" --paginate \
+      --jq '.[] | "   \(.path):\(.line // .original_line // "?") \(.body | gsub("\n"; " ") | .[0:100])"'
+    gh api "repos/$OWNER/$REPO/pulls/$PR/reviews/$RID" -X DELETE >/dev/null
+    echo "deleted pending review: $RID"
+    ;;
+
   edit-comment)
     # In-place correction of a comment this user posted. block-raw-gh-writes.sh
     # blocks raw PATCH on comment endpoints, so this is the only sanctioned
@@ -769,7 +799,7 @@ case "$CMD" in
     ;;
 
   *)
-    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|delete-comment|edit-comment|edit-review-body|resolve-thread|mark-addressed|comment|resolve-id|headline|fetch-pr-body|ensure-branch|review-mode|autosquash} [args]" >&2
+    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|delete-comment|delete-pending-review|edit-comment|edit-review-body|resolve-thread|mark-addressed|comment|resolve-id|headline|fetch-pr-body|ensure-branch|review-mode|autosquash} [args]" >&2
     exit 1
     ;;
 esac

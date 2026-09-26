@@ -747,8 +747,8 @@
       "hash": "8384f52defa2"
     },
     "asana-task-update:create-subtask": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "035e8ee5a1fb"
+      "reason": "2026-09-26: flag documentation; --subtask-notes CURRENT STATE refusal is enforced in the script",
+      "hash": "c3c7c1ccc612"
     },
     "asana-task-update:prompt-codes": {
       "reason": "2026-09-21: exit-code handshake for an interactive assignee prompt; hands-off callers pass --skip-assign-if-missing, so no run behavior for an eval to grade. Re-acked after PROMPT_IMPLEMENTOR was removed with the other-board fields.",
@@ -1479,8 +1479,8 @@
       "hash": "f41123c345d5"
     },
     "pr-address:retract-your-own-noise": {
-      "reason": "2026-09-03: fires only after an agent mis-posts; the observable is the ABSENCE of stray comments, which agent-eval already reads off live PR state rather than as its own dimension",
-      "hash": "0f0970f03dea"
+      "reason": "2026-09-26: mechanically scoped: delete-pending-review is author-scoped and only for an operator discard; submit adopts drafts; no eval judgment",
+      "hash": "dc073d062e0a"
     },
     "task-review:operator-final-say": {
       "reason": "2026-09-03: graded under A7 as true-blocker condition (e); the gate is mechanical (require-plan-before-developing.sh), no separate dimension",
@@ -1577,6 +1577,14 @@
     "task-run:review-field-routes": {
       "reason": "2026-09-26: graded at completion by completion-judge J1 (rubric.md Task-deliverable agent_review clause); a run that skips the reviews fails the judge",
       "hash": "c7dc9b74daa9"
+    },
+    "asana-task-update:qa-subtasks": {
+      "reason": "2026-09-26: mechanically enforced: asana-task-update.sh QA_SUBTASKS_REQUIRED gate and asana-get-context.sh filter",
+      "hash": "6543c1770bdc"
+    },
+    "pr-land:qa-subtasks-before-handoff": {
+      "reason": "2026-09-26: operator ruling 2026-09-26: existence is gated by asana-task-update.sh; item quality not an eval dimension",
+      "hash": "4cdc34aa5e93"
     }
   },
   "excluded_skills": {

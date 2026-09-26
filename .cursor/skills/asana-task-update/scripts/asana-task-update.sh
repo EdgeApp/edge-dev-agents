@@ -5,8 +5,19 @@
 # Exit codes:
 #   0 = success
 #   1 = error
-#   2 = needs user input (PROMPT_REVIEWER)
+#   2 = needs user input (PROMPT_REVIEWER, or the QA-subtask gate below)
+#
+# Manual QA subtasks: a subtask titled "QA: <what a human verifies>" is a manual
+# verification item for the QA handoff, not scope. asana-get-context.sh hides
+# these from every run's ingestion, so an orchestrated run never plans from
+# them. --create-subtask --subtask-name "QA: ..." --subtask-notes <file> makes
+# one (plain notes, verbatim; the CURRENT STATE section is never written on a
+# subtask). --set-board-state "QA Verification" refuses (exit 2) when the task
+# has no open QA: subtask, unless --no-manual-qa "<why nothing needs a human>"
+# is passed; the reason is posted as a comment so QA sees why the list is empty.
 set -euo pipefail
+
+QA_SUBTASK_PREFIX="QA: "
 
 TASK_GID=""
 DO_ATTACH=false
@@ -30,6 +41,8 @@ SET_DEVELOPER_GID=""
 
 CREATE_SUBTASK=false
 SUBTASK_NAME=""
+SUBTASK_NOTES_FILE=""
+NO_MANUAL_QA=""
 
 SET_CURRENT_STATE_FILE=""
 
@@ -42,6 +55,8 @@ while [[ $# -gt 0 ]]; do
     --task) TASK_GID="$2"; shift 2 ;;
     --create-subtask) CREATE_SUBTASK=true; shift ;;
     --subtask-name) SUBTASK_NAME="$2"; shift 2 ;;
+    --subtask-notes) SUBTASK_NOTES_FILE="$2"; shift 2 ;;
+    --no-manual-qa) NO_MANUAL_QA="$2"; shift 2 ;;
     --attach-pr) DO_ATTACH=true; shift ;;
     --pr-url) PR_URL="$2"; shift 2 ;;
     --pr-title) PR_TITLE="$2"; shift 2 ;;
@@ -170,9 +185,19 @@ CURRENT_STATE_DELIM="===== CURRENT STATE (agent-maintained; supersedes any stale
 # the new subtask (one call: make the per-PR subtask AND attach its PR).
 if $CREATE_SUBTASK; then
   [[ -n "$SUBTASK_NAME" ]] || { echo "Error: --create-subtask requires --subtask-name" >&2; exit 1; }
-  SUB_GID="$(curl -sS -X POST "$ASANA_API/tasks/$TASK_GID/subtasks" \
-    -H "Authorization: Bearer $ASANA_TOKEN" -H "Content-Type: application/json" \
-    -d "{\"data\":{\"name\":$(jq -Rn --arg v "$SUBTASK_NAME" '$v')}}" \
+  SUB_NOTES=""
+  if [[ -n "$SUBTASK_NOTES_FILE" ]]; then
+    [[ -f "$SUBTASK_NOTES_FILE" ]] || { echo "Error: --subtask-notes file not found: $SUBTASK_NOTES_FILE" >&2; exit 1; }
+    SUB_NOTES="$(cat "$SUBTASK_NOTES_FILE")"
+    # A subtask body is plain notes for a human; the agent-maintained CURRENT
+    # STATE section belongs to the parent task only.
+    if grep -qF "CURRENT STATE" "$SUBTASK_NOTES_FILE"; then
+      echo "Error: --subtask-notes must not carry a CURRENT STATE section (write plain steps and expected results)" >&2; exit 1
+    fi
+  fi
+  SUB_GID="$(jq -n --arg n "$SUBTASK_NAME" --arg notes "$SUB_NOTES" '{data: ({name: $n} + (if $notes == "" then {} else {notes: $notes} end))}' \
+    | curl -sS -X POST "$ASANA_API/tasks/$TASK_GID/subtasks" \
+    -H "Authorization: Bearer $ASANA_TOKEN" -H "Content-Type: application/json" -d @- \
     | jq -r '.data.gid // empty')"
   [[ -n "$SUB_GID" ]] || { echo "Error: failed to create subtask under $TASK_GID" >&2; exit 1; }
   echo ">> subtask created: $SUB_GID ($SUBTASK_NAME)"
@@ -531,6 +556,25 @@ if $DO_ASSIGN && [[ -z "$ASSIGN_GID" ]]; then
 fi
 
 CUSTOM_FIELDS_PATCH='{}'
+
+# QA handoff gate: the move to QA Verification is where the manual verification
+# list must already exist as "QA: ..." subtasks (pr-land qa-subtasks-before-handoff).
+if [[ "$SET_BOARD_STATE" == "QA Verification" ]]; then
+  QA_OPEN="$(curl -sS "$ASANA_API/tasks/$TASK_GID/subtasks?opt_fields=name,completed" \
+    -H "Authorization: Bearer $ASANA_TOKEN" \
+    | jq --arg p "$QA_SUBTASK_PREFIX" '[.data[]? | select((.completed | not) and (.name | startswith($p)))] | length')"
+  if [[ "${QA_OPEN:-0}" -eq 0 && -z "$NO_MANUAL_QA" ]]; then
+    echo "QA_SUBTASKS_REQUIRED: task $TASK_GID has no open '${QA_SUBTASK_PREFIX}...' subtask. Create one per manual verification item (--create-subtask --subtask-name \"${QA_SUBTASK_PREFIX}<what a human checks>\" --subtask-notes <file>) before --set-board-state \"QA Verification\", or pass --no-manual-qa \"<why nothing needs a human>\"." >&2
+    exit 2
+  fi
+  if [[ "${QA_OPEN:-0}" -eq 0 && -n "$NO_MANUAL_QA" ]]; then
+    NO_QA_BODY="$(mktemp)"; printf 'No manual QA items: %s\n' "$NO_MANUAL_QA" > "$NO_QA_BODY"
+    [[ -n "$COMMENT_FILE" ]] || COMMENT_FILE="$NO_QA_BODY"
+    echo ">> no manual QA items (reason recorded as a comment)"
+  else
+    echo ">> manual QA items: $QA_OPEN open '${QA_SUBTASK_PREFIX}' subtask(s)"
+  fi
+fi
 
 if [[ -n "$SET_BOARD_STATE" ]]; then
   BOARD_STATE_GID="$(enum_option_gid "$BOARD_STATE_FIELD" "Board State 🤖" "$SET_BOARD_STATE")" || exit 1
