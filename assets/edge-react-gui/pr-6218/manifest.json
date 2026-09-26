@@ -48,6 +48,42 @@
       "batchAt": "2026-09-23T03:48:53Z",
       "headSha": "3481092e4972173ec38e3be614dbf14c7a80eb57",
       "addedAt": "2026-09-23T07:31:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6218/20260925-221504-agent-proof-1218559592688374-05-btc-to-zano-error.png",
+      "caption": "btc to zano error",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-26T05:15:04Z",
+      "headSha": "953e151c58a7cbac9591ee34dfa4d3558688baf6",
+      "addedAt": "2026-09-26T05:15:04Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6218/20260925-221504-agent-proof-1218559592688374-06-btc-to-eth-control-quote.png",
+      "caption": "btc to eth control quote",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-26T05:15:04Z",
+      "headSha": "953e151c58a7cbac9591ee34dfa4d3558688baf6",
+      "addedAt": "2026-09-26T05:15:04Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6218/20260925-221504-agent-proof-1218559592688374-08-zano-to-btc-unfunded.png",
+      "caption": "zano to btc unfunded",
+      "index": "8",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-26T05:15:04Z",
+      "headSha": "953e151c58a7cbac9591ee34dfa4d3558688baf6",
+      "addedAt": "2026-09-26T05:15:04Z"
     }
   ]
 }
