@@ -230,7 +230,7 @@ if [[ -n "$SLOT_INDEX" ]]; then
 "
   # Run shape for the hooks (inject-run-context, require-skill-read-for-scripts):
   # PR is the default; the watcher and resume-task pass the task's agent_deliverable.
-  case "$DELIVERABLE" in "Task"|"Task + sim") ;; *) DELIVERABLE="PR" ;; esac
+  case "$DELIVERABLE" in Task*) DELIVERABLE="Task" ;; *) DELIVERABLE="PR" ;; esac
   ENV_EXPORTS+="export AGENT_DELIVERABLE=\"$DELIVERABLE\"
 "
 fi

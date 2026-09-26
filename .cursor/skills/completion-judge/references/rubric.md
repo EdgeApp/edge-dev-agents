@@ -116,12 +116,15 @@ asks for the run with clauses for others. On a followup, do NOT add the task
 description as an ask. Any `unaddressed` ask on a `complete` event is a `fail`. On `pr-create`, asks that
 concern the PR's content count; asks about testing that happens after the PR are `na`.
 On `block`, an ask the block reason ignores is a `fail` (the block must speak to it).
-On a Task or "Task + sim" deliverable (the task's `agent_deliverable` field; the run
+On a Task deliverable (the task's `agent_deliverable` field; the run
 is `/task-run`, no PR), the deliverable IS the findings comment: an ask is `delivered`
 when that comment (or an artifact it links, present on disk or at the URL) answers it
 with the number or evidence the plan named; a comment that restates the ask, or a
 result claimed with no artifact behind it, is `unaddressed`. No findings comment on
-a `complete` event is a `fail`.
+a `complete` event is a `fail`. An `agent_review` field other than `none`/`off`/unset
+on a Task deliverable is an ask of its own (task-run `review-field-routes`): it is
+`delivered` when the findings comment names, for every open PR attached to the task
+or its subtasks, the review event submitted on GitHub and the findings it carried.
 
 ### J2 testing-depth-and-funding (C, P)
 What this segment's asks required to be exercised was physically exercised. A
@@ -149,10 +152,10 @@ pass` requires a `success` drive in the attempt-log; `outcome: complete` require
 undelivered ask; every CHECKED Finalize Gate box matches the PR/CI state in the git
 section; unchecked boxes carry a reason. The Testing section says what was exercised,
 how, in which environment, with proof frames named and present. `na` on pr-create and
-block when no report exists yet. On a Task or "Task + sim" deliverable: `pr: none`,
+block when no report exists yet. On a Task deliverable: `pr: none`,
 the Finalize Gate section reads `N/A: no PR deliverable`, and `verified: n/a` is
-honest only when the Testing section shows nothing had a runtime surface; a "Task +
-sim" run that drove the sim reports `pass`/`partial`/`not-run` like any other.
+honest only when the Testing section shows nothing had a runtime surface; a Task
+run that drove the sim reports `pass`/`partial`/`not-run` like any other.
 
 ### J4 tested-field-accuracy (C)
 The task's `tested` value matches the evidence: `iOS Sim` only with a pixel-verified

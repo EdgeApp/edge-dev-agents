@@ -26,6 +26,11 @@ set -uo pipefail
 #                              (not on a whoami-preflight pass). The publish
 #                              link can follow many minutes later: a repo's
 #                              prepack (e.g. a native rebuild) runs first.
+#   AUTH_DONE publish <name>@<version>
+#                            — the publish link was tapped and npm accepted
+#                              the upload. PUBLISHED follows once the registry
+#                              serves the version (the GUI bump installs it
+#                              right after, so PUBLISHED must mean installable).
 #   PUBLISHED <name>@<version>
 #   FAILED <phase> <reason>
 #
@@ -50,19 +55,16 @@ set -uo pipefail
 # being ignored. Every attempt's PTY capture is kept as <phase>.<n>.out, and the
 # work dir is preserved on any non-zero exit so the error survives the run.
 #
-# Registry replication lags a successful publish: npm itself says the package
-# "may take a few minutes to become available", and multi-minute waits are
-# normal. published() polls `npm view` for up to REPLICATION_SETTLE seconds
-# before concluding a version is absent, so a completed approval is not mistaken
-# for an expired link.
-#
-# npm's OWN success line is authoritative over the registry poll. When npm exits
-# having printed "+ <name>@<version>", the upload was accepted and the version
-# can never be published again, so a slow read replica must never be reported as
-# a failure that invites a re-publish: npm_accepted() detects that line and the
-# script keeps polling on ACCEPTED_SETTLE before giving any verdict. If the
-# registry still has not served it, that is exit 5 (accepted-not-served), which
-# tells the operator to re-check later and NOT to re-publish. The grep is
+# Accepted vs served: npm is what uploads after the tap, so npm itself knows
+# the outcome. Exit 0, its "+ <name>@<version>" line, or a "cannot publish over
+# the previously published versions" rejection (an earlier attempt's upload
+# landed) all mean the version is taken for good: the script prints
+# AUTH_DONE publish at once, then polls `npm view` for up to SETTLE seconds
+# (registry replication lags the write by minutes) before PUBLISHED. Still not
+# served after SETTLE is exit 5 (accepted-not-served): re-run to re-check, never
+# re-publish. A phase killed at the timeout without any of those signals had no
+# upload, so it gets ONE immediate registry check (a tap in the last seconds
+# before the kill) and then a fresh link, never a long silent poll. The grep is
 # unanchored and uses -a because the PTY capture is binary and npm prefixes the
 # line with spinner escapes.
 #
@@ -70,9 +72,10 @@ set -uo pipefail
 # machines reject bare npm).
 #
 # Usage: npm-publish-web.sh <repo-dir> [--timeout <secs>] [--attempts <n>]
-#          [--settle <secs>] [--accepted-settle <secs>]
+#          [--settle <secs>]
 # Exit: 0 = published, 1 = error, 2 = auth never completed (all attempts
-#       timed out or were declined), 3 = terminal registry rejection,
+#       timed out or were declined), 3 = terminal registry rejection
+#       (permission, payment),
 #       4 = tarball shrank vs the previous release,
 #       5 = npm accepted the publish but the registry has not served it yet
 #           (do NOT re-publish; re-run to re-check)
@@ -83,21 +86,15 @@ PHASE_TIMEOUT=240
 # Each attempt prints a FRESH link; a long remint window costs one idle PTY,
 # an expired link costs a full relay round-trip. Only timeouts consume attempts.
 MAX_ATTEMPTS=20
-# Seconds to poll the registry for a just-published version before deciding
-# it is absent (npm read replicas lag the write). npm warns the package "may
-# take a few minutes"; a window under that turns a normal slow publish into a
-# reported failure.
-REPLICATION_SETTLE=600
-# Longer budget used only once npm has printed its own success line, where the
-# only remaining question is when the registry serves it, not whether it exists.
-ACCEPTED_SETTLE=1800
+# Seconds to wait, AFTER npm accepted the upload, for the registry to serve it.
+# Only the when is open at that point, not the whether.
+SETTLE=1800
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --timeout) PHASE_TIMEOUT="$2"; shift 2 ;;
     --attempts) MAX_ATTEMPTS="$2"; shift 2 ;;
-    --settle) REPLICATION_SETTLE="$2"; shift 2 ;;
-    --accepted-settle) ACCEPTED_SETTLE="$2"; shift 2 ;;
+    --settle) SETTLE="$2"; shift 2 ;;
     *) REPO_DIR="$1"; shift ;;
   esac
 done
@@ -146,7 +143,9 @@ run_phase() {
   local out="$WORK_DIR/$phase.$ATTEMPT.out"
   : > "$out"
   ln -sf "$out" "$WORK_DIR/$phase.out"
-  (cd "$REPO_DIR" && script -q "$out" "$@" < /dev/null > /dev/null 2>&1) &
+  # -t 0: script(1) otherwise flushes the capture every 30s, which delays each
+  # link (and the expiry grep below) by up to 30s of its ~290s life.
+  (cd "$REPO_DIR" && script -q -t 0 "$out" "$@" < /dev/null > /dev/null 2>&1) &
   CHILD_PID=$!
 
   local url_seen=""
@@ -249,21 +248,30 @@ published_now() {
   [ "$v" = "$pkg_version" ]
 }
 
-# Poll the registry for up to $1 (default REPLICATION_SETTLE) seconds before
-# deciding the version is absent.
-published() {
-  local budget="${1:-$REPLICATION_SETTLE}" waited=0
-  while :; do
-    published_now && return 0
-    [ "$waited" -ge "$budget" ] && return 1
-    sleep 10; waited=$((waited + 10))
-  done
+# npm knows the version is taken: it exited 0, printed its own success line, or
+# was refused because an earlier attempt's upload already landed. Unanchored
+# and -a: the PTY capture is binary and npm prefixes lines with spinner escapes.
+npm_accepted() {
+  [ "$2" -eq 0 ] \
+    || grep -qaF "+ $pkg_name@$pkg_version" "$1" 2>/dev/null \
+    || grep -qa "cannot publish over the previously published versions" "$1" 2>/dev/null
 }
 
-# npm's own success line for this exact version. Unanchored and -a: the PTY
-# capture is binary and npm prefixes the line with spinner escape sequences.
-npm_accepted() {
-  grep -qaF "+ $pkg_name@$pkg_version" "$1" 2>/dev/null
+# The upload is accepted: tell the operator now, then wait for the registry to
+# serve the version so PUBLISHED means installable. Never returns.
+finish_accepted() {
+  echo "AUTH_DONE publish $pkg_name@$pkg_version"
+  echo "waiting up to ${SETTLE}s for the registry to serve it" >&2
+  local waited=0
+  until published_now; do
+    if [ "$waited" -ge "$SETTLE" ]; then
+      echo "FAILED publish accepted-not-served: npm accepted $pkg_name@$pkg_version but the registry has not served it after ${SETTLE}s; do NOT re-publish this version, re-run to re-check once replication settles"
+      exit 5
+    fi
+    sleep 10; waited=$((waited + 10))
+  done
+  echo "PUBLISHED $pkg_name@$pkg_version"
+  exit 0
 }
 
 if published_now; then
@@ -276,18 +284,12 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
   echo "publish attempt $attempt/$MAX_ATTEMPTS..." >&2
   run_phase publish $NPM publish
   rc=$?
-  if published; then
-    echo "PUBLISHED $pkg_name@$pkg_version"
-    exit 0
-  fi
   out="$WORK_DIR/publish.out"
+  # Checked before the 403 grep below: a "cannot publish over" refusal is
+  # itself a 403, but it means this version is already ours.
+  npm_accepted "$out" "$rc" && finish_accepted
   # Terminal registry rejections are not auth expiry: re-minting links against
-  # them reads to the operator as their approvals being ignored. -a: the PTY
-  # capture is binary to grep.
-  if grep -qa "cannot publish over the previously published versions" "$out" 2>/dev/null; then
-    echo "FAILED publish version-conflict: registry claims $pkg_version exists but view cannot see it after ${REPLICATION_SETTLE}s; re-run once replication settles"
-    exit 3
-  fi
+  # them reads to the operator as their approvals being ignored.
   if grep -qaE "You do not have permission to publish|403 Forbidden|E403" "$out" 2>/dev/null; then
     echo "FAILED publish permission-denied: $(grep -aoE '403 Forbidden[^"]*' "$out" | head -1)"
     exit 3
@@ -296,19 +298,6 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
     echo "FAILED publish payment-required"
     exit 3
   fi
-  # npm printed its own success line: the version is taken for good. Never
-  # report that as a failure — a failure verdict invites a re-publish that the
-  # registry will refuse. Keep polling on the longer budget, then give a verdict
-  # that distinguishes "served" from "accepted but not served yet".
-  if npm_accepted "$out"; then
-    echo "npm accepted the publish; waiting up to ${ACCEPTED_SETTLE}s for the registry to serve it" >&2
-    if published "$ACCEPTED_SETTLE"; then
-      echo "PUBLISHED $pkg_name@$pkg_version"
-      exit 0
-    fi
-    echo "FAILED publish accepted-not-served: npm printed + $pkg_name@$pkg_version but the registry has not served it after ${ACCEPTED_SETTLE}s; do NOT re-publish this version, re-run to re-check once replication settles"
-    exit 5
-  fi
   if [ "$rc" -ne 124 ]; then
     # npm exited on its own without publishing: a real error, not an expired
     # link. Show its output and stop instead of minting another link.
@@ -316,6 +305,9 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
     echo "FAILED publish npm exited $rc after auth (see stderr tail; capture: $out)"
     exit 1
   fi
+  # Timed out with no upload. One immediate check covers a tap that landed in
+  # the last seconds before the kill; otherwise remint right away.
+  published_now && { echo "PUBLISHED $pkg_name@$pkg_version"; exit 0; }
 done
 
 # Distinguish auth-timeout from a real registry error using the last output.

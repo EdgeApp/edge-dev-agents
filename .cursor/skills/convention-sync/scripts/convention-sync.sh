@@ -1008,6 +1008,23 @@ if [[ "$DO_STAGE" == true ]] && (( total + extra_total > 0 )); then
     extra_total=$(echo "$extra_json" | jq 'length')
 
     if [[ "$DO_COMMIT" == true ]]; then
+      # The commit message is outward prose (it becomes the Slack announcement
+      # verbatim), so it passes the shared no-slop lint BEFORE the commit exists;
+      # the Slack gate downstream would otherwise catch it only after the push.
+      # Mechanical tier only (deterministic, no judge call); findings abort the
+      # commit with the staged tree left in place, exit 3.
+      local_lint="$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh"
+      if [[ -x "$local_lint" ]]; then
+        msg_file=$(mktemp -t sync-commit-msg.XXXXXX)
+        printf '%s\n' "$COMMIT_MSG" > "$msg_file"
+        if ! lint_out=$("$local_lint" "$msg_file" 2>&1); then
+          echo "convention-sync: commit message fails no-slop-lint; nothing committed (tree stays staged):" >&2
+          echo "$lint_out" >&2
+          rm -f "$msg_file"
+          exit 3
+        fi
+        rm -f "$msg_file"
+      fi
       git commit -m "$COMMIT_MSG" >&2   # keep stdout pure JSON
     fi
   else

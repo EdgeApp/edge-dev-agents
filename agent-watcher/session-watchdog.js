@@ -287,13 +287,70 @@ function isArchivedPane(content) {
 // Stop hook then forces continuation for a non-terminal status.
 const API_ERROR_RESUME_BASE_MS = 2 * 60 * 1000
 const API_ERROR_RESUME_MAX = 6
+const QUOTA_RESUME_GRACE_MS = 60 * 1000
 function apiErrorMarkerPath(taskGid) { return `/tmp/agent-apierror-${taskGid}.json` }
+function quotaWaiting(taskGid) {
+  try { return JSON.parse(fs.readFileSync(apiErrorMarkerPath(taskGid), 'utf8')).type === 'quota' } catch { return false }
+}
+
+// Usage pause (usage-hold.sh writes the stamp each watcher tick; this only reads it).
+// Stamp appears → every run session gets <usage-pause> ONCE per pause (keyed on the
+// stamp's `since`); typed into a busy pane it is queued and delivered at the next tool
+// boundary, so the agent checkpoints and ends its turn (run-rules `usage-pause`; the Stop
+// hook allows it). Still mid-turn USAGE_PAUSE_ESC_MS after the ping → one Escape (hard
+// fallback). Stamp clears → <watchdog-revive-ping> to each session that was paused and is
+// idle at the composer. Paused panes are exempt from the idle reaper.
+const USAGE_PAUSE_STAMP = process.env.AGENT_USAGE_PAUSE_STAMP || '/tmp/agent-usage-pause.json'
+const USAGE_PAUSE_ESC_MS = 20 * 60 * 1000
+function usagePause() {
+  try { return JSON.parse(fs.readFileSync(USAGE_PAUSE_STAMP, 'utf8')) } catch { return null }
+}
+function usagePauseTick(session, s, prior) {
+  const pause = usagePause()
+  const busy = /esc to interrupt/.test(s.content)
+  const st = { pauseSince: prior?.pauseSince ?? null, pausePingedAt: prior?.pausePingedAt ?? null, pauseEscSent: prior?.pauseEscSent ?? false, acted: false }
+  if (pause && st.pauseSince !== pause.since) {
+    if (s.awaitingChoice || s.isHeld) return st
+    const msg = `<usage-pause> Claude usage ${pause.window} is at ${pause.pct}% (pause threshold ${pause.threshold}%, resets ${pause.resets_at}). Commit WIP without pushing, leave agent_status unchanged, end your turn; <watchdog-revive-ping> resumes you after usage drops.`
+    if (!busy) sh(`tmux send-keys -t "${session}" C-u`)
+    sh(`tmux send-keys -t "${session}" -l "${msg.replace(/(["$\\`])/g, '\\$1')}"`)
+    sh(`tmux send-keys -t "${session}" Enter`)
+    log(`[${session}] usage pause (${pause.window} ${pause.pct}% >= ${pause.threshold}%) → <usage-pause> sent${busy ? ' (queued behind the running turn)' : ''}.`)
+    return { pauseSince: pause.since, pausePingedAt: s.now, pauseEscSent: false, acted: true }
+  }
+  if (pause && busy && !st.pauseEscSent && s.now - st.pausePingedAt > USAGE_PAUSE_ESC_MS) {
+    sh(`tmux send-keys -t "${session}" Escape`)
+    log(`[${session}] still mid-turn ${Math.round((s.now - st.pausePingedAt) / 60000)}m after <usage-pause> → Escape sent (hard stop).`)
+    return { ...st, pauseEscSent: true, acted: true }
+  }
+  if (!pause && st.pauseSince) {
+    if (s.awaitingChoice || s.isHeld) return st   // retry once the pane is free
+    if (busy) return { pauseSince: null, pausePingedAt: null, pauseEscSent: false, acted: false }   // already working again
+    sh(`tmux send-keys -t "${session}" C-u`)
+    sh(`tmux send-keys -t "${session}" "<watchdog-revive-ping>" Enter`)
+    log(`[${session}] usage pause cleared → <watchdog-revive-ping> sent to resume.`)
+    return { pauseSince: null, pausePingedAt: null, pauseEscSent: false, acted: true }
+  }
+  return st
+}
 function resumeAfterApiError(session, taskGid, s) {
   let m
   try { m = JSON.parse(fs.readFileSync(apiErrorMarkerPath(taskGid), 'utf8')) } catch { return false }
   if (!m || m.pinged_at) return false   // already pinged; a new error or a normal Stop resets
   if (!s.stateOk || s.isBlocked || s.awaitingChoice || s.isHeld || s.archived || s.changed) return false
   if (/esc to interrupt/.test(s.content)) return false
+  // Subscription limit (hooks/record-api-error-stop.sh set type=quota): nothing succeeds
+  // before the window resets, so wait for resets_at and ping ONCE, outside the backoff and
+  // the escalation cap. Still locked at ping time -> the hook records a fresh reset.
+  if (m.type === 'quota' && m.resets_at) {
+    if (s.now < m.resets_at + QUOTA_RESUME_GRACE_MS) return false
+    sh(`tmux send-keys -t "${session}" C-u`)
+    sh(`tmux send-keys -t "${session}" "<watchdog-revive-ping>" Enter`)
+    m.pinged_at = s.now
+    try { fs.writeFileSync(apiErrorMarkerPath(taskGid), JSON.stringify(m)) } catch {}
+    log(`[${session}] turn ended on the usage limit; window reset at ${new Date(m.resets_at).toISOString()} → <watchdog-revive-ping> sent to resume.`)
+    return true
+  }
   const count = Math.max(1, m.count || 1)
   if (count > API_ERROR_RESUME_MAX) {
     if (!m.escalated) {
@@ -1184,7 +1241,10 @@ function main() {
     const isChat = taskGid.startsWith('chat-')
     const anchorName = isChat ? null : session.replace(/^claude-(asana-)?/, '')
     const exempt = anchorName != null && PERSISTENT_ANCHORS.includes(anchorName)
-    if (!exempt && !changed && now - (prior?.lastChange ?? now) > IDLE_REAP_MS()) {
+    // A run parked on the usage limit (pause stamp, or a quota stop awaiting its reset) is
+    // idle by design and may stay so for days on the 7d window: never reap it.
+    const usageParked = /^\d+$/.test(taskGid) && (usagePause() !== null || quotaWaiting(taskGid))
+    if (!exempt && !usageParked && !changed && now - (prior?.lastChange ?? now) > IDLE_REAP_MS()) {
       // A numeric gid here is a RUN session whose task never reached Complete
       // (the completion sweep above would have retired it): it still holds a
       // slot, a pool sim, and a Metro port. Killing the pane alone leaked slot 1
@@ -1249,6 +1309,11 @@ function main() {
     if (isRunSession && resumeAfterApiError(session, taskGid, { content, changed, awaitingChoice, isHeld, isBlocked, stateOk, archived, now })) {
       lastChange = now
     }
+    let pauseSt = { pauseSince: prior?.pauseSince ?? null, pausePingedAt: prior?.pausePingedAt ?? null, pauseEscSent: prior?.pauseEscSent ?? false }
+    if (isRunSession && stateOk && !isBlocked && !archived) {
+      pauseSt = usagePauseTick(session, { content, awaitingChoice, isHeld, now }, prior)
+      if (pauseSt.acted) lastChange = now
+    }
     // Park tracking: a session parked at a human-choice prompt is correctly NOT
     // revived, but the per-tick log used to spam (~60 identical lines for a 2h park).
     // Log ONCE on entering the park, then a SINGLE escalation after PARK_ESCALATE_MS
@@ -1269,7 +1334,9 @@ function main() {
         parkEscalated = true
       }
     }
-    if (stateOk && !isBlocked && !awaitingChoice && !isHeld && !archived && !changed && !rcUp && now - prior.lastChange > IDLE_THRESHOLD_MS) {
+    // A usage-paused run stays parked: the RC respawn ends in a wake ping that would resume it.
+    const pausedRun = isRunSession && usagePause() !== null
+    if (stateOk && !isBlocked && !awaitingChoice && !isHeld && !archived && !pausedRun && !changed && !rcUp && now - prior.lastChange > IDLE_THRESHOLD_MS) {
       // Require stateOk: never revive on an UNCONFIRMED status. A transient Asana
       // fetch failure returns blocked:null (=> isBlocked false); without this gate a
       // blocked/parked session gets pinged on the blip tick (the 2026-06-15 regression).
@@ -1287,7 +1354,7 @@ function main() {
     }
     // On an unconfirmed fetch, preserve the prior heavyFreed rather than letting a
     // null-blocked blip reset it to false and re-free next tick.
-    state.sessions[session] = { lastContent: content, lastChange, heldLogged: isHeld, declinedAt, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated, respawnedAt, heldLogged: isHeld, archivedLogged: archived }
+    state.sessions[session] = { lastContent: content, lastChange, heldLogged: isHeld, declinedAt, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated, respawnedAt, heldLogged: isHeld, archivedLogged: archived, pauseSince: pauseSt.pauseSince, pausePingedAt: pauseSt.pausePingedAt, pauseEscSent: pauseSt.pauseEscSent }
   }
 
   // Cap retired (completed-but-kept-alive) sessions so they don't accumulate in memory.

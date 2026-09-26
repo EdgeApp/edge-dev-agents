@@ -206,14 +206,32 @@ fi
 # `flock`, so use a noclobber lockfile (the pattern the pool scripts use). Reap a
 # stale lock from a crashed build so a refresh is never wedged forever. One EXIT
 # trap removes BOTH locks (the pool-marking step below also takes pool.lock).
+#
+# LAND HANDSHAKE: the rebuild resets and builds in the PRIMARY checkout, which
+# pr-land-prepare.sh also rebases and installs in. The lock body is
+# "<pid> <repo-dir>" so prepare can tell a live refresh of ITS checkout from a
+# stale file (it exits 75 and retries); this side yields when a land lease is
+# held on the repo (checked AFTER taking the lock, prepare checks the lock AFTER
+# taking the lease, so at least one side always sees the other). Liveness is
+# the pid, not the lock's age: a native rebuild under load runs past an hour.
 if [[ -f "$BUILD_LOCK" ]]; then
-  AGE=$(( $(date +%s) - $(stat -f %m "$BUILD_LOCK" 2>/dev/null || echo 0) ))
-  [[ "$AGE" -gt 3600 ]] && { log "stale build lock (${AGE}s) — reclaiming"; rm -f "$BUILD_LOCK"; }
+  LOCK_PID="$(awk '{print $1; exit}' "$BUILD_LOCK" 2>/dev/null || true)"
+  if [[ -n "$LOCK_PID" ]] && ! kill -0 "$LOCK_PID" 2>/dev/null; then
+    log "stale build lock (pid $LOCK_PID gone) — reclaiming"; rm -f "$BUILD_LOCK"
+  elif [[ -z "$LOCK_PID" ]]; then
+    AGE=$(( $(date +%s) - $(stat -f %m "$BUILD_LOCK" 2>/dev/null || echo 0) ))
+    [[ "$AGE" -gt 3600 ]] && { log "stale build lock (${AGE}s, no pid) — reclaiming"; rm -f "$BUILD_LOCK"; }
+  fi
 fi
-if ! ( set -C; : > "$BUILD_LOCK" ) 2>/dev/null; then
+if ! ( set -C; echo "$$ $REPO_DIR" > "$BUILD_LOCK" ) 2>/dev/null; then
   log "another refresh holds the build lock — skipping (it will leave the master current)"; exit 0
 fi
 trap 'rm -f "$BUILD_LOCK" "$POOL_LOCK"' EXIT
+LAND_LEASE="$("$HOME/.cursor/skills/pr-land/scripts/repo-land-lock.sh" status --repo "$REPO" 2>/dev/null || echo free)"
+if [[ "$LAND_LEASE" != "free" ]] && [[ "$(date +%s)" -lt "$(jq -r '.expires // 0' <<<"$LAND_LEASE" 2>/dev/null || echo 0)" ]]; then
+  log "land lease held on $REPO (owner $(jq -r '.owner // "?"' <<<"$LAND_LEASE")) — a land is using $REPO_DIR; skipping, the next sweep retries (no failure memo)"
+  exit 0
+fi
 # Re-read the marker after acquiring the lock: a racing caller may have just finished.
 HAVE_SHA="$(marker_get '.develop_sha')"; HAVE_UDID="$(marker_get '.master_udid')"
 if ! $FORCE && [[ "$HAVE_SHA" == "$TARGET_SHA" && "$HAVE_UDID" == "$MASTER" ]]; then

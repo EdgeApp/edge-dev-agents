@@ -58,13 +58,13 @@
       ]
     },
     "one-shot:report-as-attachment": {
-      "hash": "29dc44f7bdc5",
+      "hash": "fd12479aa5cb",
       "dims": [
         "A9"
       ]
     },
     "file:agent-run-report.md": {
-      "hash": "f60f75d564d9",
+      "hash": "0d7308c4316b",
       "dims": [
         "A18",
         "A20",
@@ -246,7 +246,7 @@
       ]
     },
     "file:asana-watcher.js": {
-      "hash": "a460647a3aa4",
+      "hash": "bb0902bb1d17",
       "dims": [
         "O1"
       ]
@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "fea04b6346ce",
+      "hash": "eae3e38efd29",
       "dims": [
         "O4",
         "O5",
@@ -435,7 +435,7 @@
       ]
     },
     "pr-land:npm-publish-auth": {
-      "hash": "bdbb068d44cc",
+      "hash": "7dba906d0af9",
       "dims": [
         "A15"
       ]
@@ -453,7 +453,7 @@
       ]
     },
     "pr-land:repo-land-mutex": {
-      "hash": "556e474ca289",
+      "hash": "bbd47d6e1030",
       "dims": [
         "A15"
       ]
@@ -1543,20 +1543,20 @@
       "hash": "c7360bd58918"
     },
     "one-shot:run-rules": {
-      "reason": "2026-09-23: pointer rule only: names the ids moved to references/run-rules.md, which inject-run-context.sh injects mechanically at every boundary; the moved rules keep their own anchors",
-      "hash": "1ab26016f669"
+      "reason": "2026-09-25: run-rules is a pointer rule to references/run-rules.md; content change is the added usage-pause rule, covered by orch-eval O4",
+      "hash": "332fd076ba4f"
     },
     "task-run:no-pr-no-worktree": {
       "reason": "2026-09-24: operator declined a rubric dimension for task-run 2026-09-24",
       "hash": "8f185d9cafae"
     },
     "task-run:status-walk": {
-      "reason": "2026-09-24: operator declined a rubric dimension for task-run 2026-09-24",
-      "hash": "dc229c668ec4"
+      "reason": "2026-09-26: status sequencing is gated by update-status.sh and require-plan-before-developing.sh; the added line only exempts the review route from Developing",
+      "hash": "1835fcac5ae5"
     },
     "task-run:sim-only-when-provisioned": {
-      "reason": "2026-09-24: operator declined a rubric dimension for task-run 2026-09-24",
-      "hash": "2661b1e589f0"
+      "reason": "2026-09-26: wording only: sim provisioning now keyed on agent_lane, not a deliverable option; not an eval expectation",
+      "hash": "7c53dc388400"
     },
     "task-run:findings-comment": {
       "reason": "2026-09-24: operator declined a rubric dimension for task-run 2026-09-24",
@@ -1569,6 +1569,14 @@
     "task-run:report-shape": {
       "reason": "2026-09-24: operator declined a rubric dimension for task-run 2026-09-24",
       "hash": "3f62fe4aee13"
+    },
+    "one-shot:usage-pause": {
+      "reason": "2026-09-25: graded by orch-eval O4 (usage-pause followed by turn end is expected; continuing work after it is BAD)",
+      "hash": "1d516f2f48de"
+    },
+    "task-run:review-field-routes": {
+      "reason": "2026-09-26: graded at completion by completion-judge J1 (rubric.md Task-deliverable agent_review clause); a run that skips the reviews fails the judge",
+      "hash": "c7dc9b74daa9"
     }
   },
   "excluded_skills": {
@@ -1592,6 +1600,7 @@
     "kanban-categorize": "2026-08-10: 2026-08-10: operator tooling for Asana board grooming; invoked by a human, not reachable from one-shot or the watcher",
     "develop-staging": "2026-08-26: operator release tooling: a human cuts the staging release with it. one-shot never delegates to it, so no orchestrated run is graded against its rules.",
     "slack": "2026-08-26: operator comms tooling driven from anchors/chats; orch runs draft comms as gists for human review and never invoke /slack",
-    "fleet-panel": "2026-09-10: operator tooling: the fleet anchor's artifact loop; never invoked inside an orchestrated run"
+    "fleet-panel": "2026-09-10: operator tooling: the fleet anchor's artifact loop; never invoked inside an orchestrated run",
+    "claude-usage": "2026-09-25: operator/agent query tool, not part of the orch run workflow; its token rules are enforced by the script itself"
   }
 }

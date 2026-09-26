@@ -701,7 +701,9 @@ reproducible from a single clone + `./bootstrap.sh`:
   `watchdog-state.json`, `*.state`, `*.log`, forensics) and session briefs
   (`*-anchor-brief.*`; briefs live in `~/.local/state/agent-watcher/briefs`).
 - **`agent-watcher/launchd/`**: templates for every `com.jontz.*` launchd job
-  (watcher, watchdog, reanchor sweep, checkout refresh, guards, Jev shadow drain) plus
+  (watcher, watchdog, reanchor sweep, checkout refresh, sim pool refresh
+  `launchd/com.jontz.sim-pool-refresh.plist` which owns the master rebuild and pool
+  refill so no spawn waits on them, guards, Jev shadow drain) plus
   `install-launchd.sh`, which renders `__HOME__` and `__NODE_BIN__`, writes
   `~/Library/LaunchAgents`, and loads each job, skipping any whose program is
   not on the machine. The templates are the source of truth; the installed
@@ -869,6 +871,7 @@ scripts, not be re-described independently across skills.
 | [`/q`](.cursor/skills/q/SKILL.md) | Answer questions before taking action |
 | [`/local-research`](.cursor/skills/local-research/SKILL.md) | Multi-agent research over the local filesystem with citation-backed reports |
 | [`/resume-session`](.cursor/skills/resume-session/SKILL.md) | Find and resume the right past claude session |
+| [`/claude-usage`](.cursor/skills/claude-usage/SKILL.md) | Read the subscription's remaining usage (5h, 7d, per-model) and reset times through one script; the watcher's spawn and pause gates read the same script |
 | [`/debugger`](.cursor/skills/debugger/SKILL.md) | Inspect runtime state in a running React Native app |
 | [`/fix-eslint`](.cursor/skills/fix-eslint/SKILL.md) | Apply documented fixes for recurring ESLint warnings |
 | [`/coinhub`](.cursor/skills/coinhub/SKILL.md) | Maintain the Coinhub white-label build |
@@ -933,11 +936,13 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`asana-on-complete-actions.sh`](.cursor/skills/one-shot/scripts/asana-on-complete-actions.sh) | Lists the operator's `agent_on_complete` lines (the run's last actions before `Complete`, one-shot and task-run alike) and records each outcome as a marker comment, so a re-engaged run repeats only what is still pending |
 | [`sentry-query.sh`](.cursor/skills/sentry-query.sh) | Read-only Sentry queries for the `/sentry` skill (issue, search, tag distributions, event context); token from `~/.config/sentry-edge-token` via a mode-600 curl config, never argv |
 | [`update-status.sh`](agent-watcher/update-status.sh) | The gated `agent_status` write every phase transition goes through |
+| [`claude-usage.sh`](.cursor/skills/claude-usage/scripts/claude-usage.sh) | Live subscription usage as JSON (windows, percentages, reset times, locked-until); the only reader of the OAuth token |
+| [`usage-hold.sh`](agent-watcher/usage-hold.sh) | The watcher's usage oracle, once per tick: a spawn hold at the `watcher.usage_hold.spawn` thresholds, and the pause stamp (`/tmp/agent-usage-pause.json`) at the `pause` thresholds that makes running sessions checkpoint and stop until the window resets |
 | [`set-agent-field.sh`](agent-watcher/set-agent-field.sh) | Set one of the other `agent_*` enum fields (`agent_deliverable`, `agent_model`, ...) by name and option label, gids from `asana-config.json` |
 | [`check-followup-scope.sh`](agent-watcher/check-followup-scope.sh) | The live followup-scope + watermark check backing the Complete gate |
 | [`log-attempt.sh`](agent-watcher/log-attempt.sh) | Append truthful attempt-log entries |
 | [`set-tested.sh`](agent-watcher/set-tested.sh) | Set the task's tested field from run evidence |
-| [`convention-sync.sh`](.cursor/skills/convention-sync/scripts/convention-sync.sh) | Bidirectional sync with cross-machine safety blocks |
+| [`convention-sync.sh`](.cursor/skills/convention-sync/scripts/convention-sync.sh) | Bidirectional sync with cross-machine safety blocks; `--commit` runs the message through `no-slop-lint.sh` first and exits 3 on a finding |
 | [`generate-claude-md.sh`](.cursor/skills/convention-sync/scripts/generate-claude-md.sh) | Regenerate `~/.claude/CLAUDE.md` from always-apply rules |
 
 ## Rules (`.mdc` files)

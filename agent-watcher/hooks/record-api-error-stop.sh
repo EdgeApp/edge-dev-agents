@@ -12,7 +12,8 @@
 # cap. A normal Stop proves the API is back: require-continuation-or-block.sh
 # deletes the marker.
 #
-# Marker: {"first_at":ms,"last_at":ms,"count":n,"error":"...","pinged_at":null}.
+# Marker: {"type":"quota"|"api","resets_at":ms|null,"first_at":ms,"last_at":ms,"count":n,
+# "error":"...","pinged_at":null}.
 # `count` accumulates across consecutive API-error stops (a resume that hits the
 # same outage again); `pinged_at` is cleared on every new error so the watchdog
 # knows the previous ping was answered and failed again.
@@ -29,7 +30,13 @@ if headless_child; then exit 0; fi
 INPUT=$(cat || true)
 MARKER="/tmp/agent-apierror-$GID.json"
 
-INPUT="$INPUT" MARKER="$MARKER" exec node -e '
+# Quota or outage? A subscription limit (5h or 7d window at 100%) ends the turn with an error
+# too, but retrying on a backoff is pointless until the window resets. claude-usage.sh says
+# whether a window is locked and until when; the watchdog then pings once after that reset
+# instead of backing off (session-watchdog.js resumeAfterApiError). Unknown usage -> "api".
+USAGE_JSON=$("$HOME/.cursor/skills/claude-usage/scripts/claude-usage.sh" --max-age 30 2>/dev/null || true)
+
+INPUT="$INPUT" MARKER="$MARKER" USAGE_JSON="$USAGE_JSON" exec node -e '
 const fs = require("fs")
 const marker = process.env.MARKER
 let input = {}
@@ -37,7 +44,12 @@ try { input = JSON.parse(process.env.INPUT || "{}") } catch {}
 let prev = null
 try { prev = JSON.parse(fs.readFileSync(marker, "utf8")) } catch {}
 const now = Date.now()
+let usage = null
+try { usage = JSON.parse(process.env.USAGE_JSON || "null") } catch {}
+const quota = !!(usage && usage.ok && usage.locked && usage.locked_until)
 const next = {
+  type: quota ? "quota" : "api",
+  resets_at: quota ? Date.parse(usage.locked_until) : null,
   first_at: prev?.first_at ?? now,
   last_at: now,
   count: (prev?.count ?? 0) + 1,

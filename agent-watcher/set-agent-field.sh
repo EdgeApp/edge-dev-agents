@@ -9,7 +9,7 @@
 # and asana-task-create.sh blocklists agent_* fields at creation by design).
 #
 # Usage: set-agent-field.sh <task_gid> <field_name> <option_label>
-#   e.g. set-agent-field.sh 1234567890 agent_deliverable "Task + sim"
+#   e.g. set-agent-field.sh 1234567890 agent_deliverable Task
 # Exit: 0 set, 1 API error, 2 usage or unknown field/option.
 set -euo pipefail
 

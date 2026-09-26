@@ -46,7 +46,7 @@ Most gates no-op unless `AGENT_TASK_GID` is set, which is what confines them to 
 | Script | Event / matcher | What it does | What it prevents |
 |---|---|---|---|
 | `require-skill-for-file.sh` | PreToolUse / Bash and Write, Edit | Matches the target path against a glob-to-skill table and denies with the skill body inlined | Editing an AGENTS.md, CHANGELOG.md, skill, rule, companion script, hook (site-orch's included) or `~/.claude/settings.json` without the owning contract in context |
-| `require-skill-read-for-scripts.sh` | PreToolUse / Bash | Requires the owning skill's read marker (or a one-shot phase slice) before a `skills/<name>/scripts/*.sh` execution, delivering the body on deny; intake and Complete map to `task-run` when `AGENT_DELIVERABLE` is Task or Task + sim | Running one step of a skill's contract bare, without the contract around it |
+| `require-skill-read-for-scripts.sh` | PreToolUse / Bash | Requires the owning skill's read marker (or a one-shot phase slice) before a `skills/<name>/scripts/*.sh` execution, delivering the body on deny; intake and Complete map to `task-run` when `AGENT_DELIVERABLE` is Task | Running one step of a skill's contract bare, without the contract around it |
 | `spec-read-gate.sh` | PreToolUse / Bash | Denies reading a site-orch task spec through command stdout (`gh issue view`, unredirected `gh pr diff`, `cat`/`head`/`sed` on the spec files) | Reasoning from an issue or diff silently truncated at the shell tool's ~20 KB output cap |
 
 ## Prose and output gates

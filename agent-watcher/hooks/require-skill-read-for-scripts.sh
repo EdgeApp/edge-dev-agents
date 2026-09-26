@@ -121,12 +121,12 @@ done
 #                            check-followup-scope}.sh
 #   ~/.cursor/skills/{build-and-test,pr-create,one-shot,pr-land,cheese,
 #                     asana-task-update}/scripts/*.sh
-# Run shape: a non-PR deliverable (AGENT_DELIVERABLE=Task or "Task + sim", from
-# the task's agent_deliverable field) runs /task-run, whose body owns intake and
+# Run shape: a non-PR deliverable (AGENT_DELIVERABLE=Task, from the task's
+# agent_deliverable field) runs /task-run, whose body owns intake and
 # completion; the PR shape (default) runs /one-shot with task-review at intake.
 case "${AGENT_DELIVERABLE:-PR}" in
-  "Task"|"Task + sim") INTAKE_UNITS="task-run"; COMPLETE_UNIT="task-run" ;;
-  *)                   INTAKE_UNITS="task-review one-shot:intake"; COMPLETE_UNIT="one-shot:finalize" ;;
+  Task*) INTAKE_UNITS="task-run"; COMPLETE_UNIT="task-run" ;;
+  *)     INTAKE_UNITS="task-review one-shot:intake"; COMPLETE_UNIT="one-shot:finalize" ;;
 esac
 need 'asana-get-context\.sh([[:space:]]|$)'        $INTAKE_UNITS
 need 'setup-task-workspace\.sh([[:space:]]|$)'     one-shot:implementation

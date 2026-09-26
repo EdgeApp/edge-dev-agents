@@ -106,7 +106,7 @@ Then push (HEAD is `main`, enforced by the branch guard):
 cd <repo-dir> && git push origin HEAD
 ```
 
-Write the message per `one-author-outward`: a subject under 50 characters, then a body grouped by subject that says what each change does and why, covering EVERY file in the sync. Pass it from a file (`-m "$(cat <file>)"`), since a long message inline trips command-text hooks.
+Write the message per `one-author-outward`: a subject under 50 characters, then a body grouped by subject that says what each change does and why, covering EVERY file in the sync. Pass it from a file (`-m "$(cat <file>)"`), since a long message inline trips command-text hooks. The script runs the message through `no-slop-lint.sh` before committing and exits 3 with the findings on any hit (the tree stays staged); fix the message and re-run `--commit`.
 
 Do NOT run `gh pr edit`: there is no sync PR anymore, and a bare `gh pr edit` targets whatever PR the current branch happens to have (this overwrote the merged PR #3's body on 2026-08-26).
 

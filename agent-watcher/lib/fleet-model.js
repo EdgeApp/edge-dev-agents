@@ -283,6 +283,7 @@ function collectVitals (cfgAll) {
     load, loads, maxLoad, freeGb, minFree, hogs, memLevel, runaway, fseventsd, holds,
     cores: os.cpus().length,
     maxConcurrent: Number(process.env.AGENT_WATCHER_MAX_CONCURRENT || w.max_concurrent || 2),
+    maxConcurrentNosim: Number(process.env.AGENT_WATCHER_MAX_CONCURRENT_NOSIM || w.max_concurrent_nosim || 3),
     watcherInterval: 120,
     watcherTickAge: tickAge('/tmp/asana-watcher.out', /Watcher tick/),
     watchdogTickAge: tickAge('/tmp/session-watchdog.out', /Watching \d+ session/),
@@ -358,17 +359,28 @@ async function collectAsana (cfgAll) {
   } catch (e) { return { tally: null, pending: [], names: {}, err: String(e.message || e), at: Date.now() } }
 }
 
-// The spawn verdict mirrors asana-watcher.js's tick order (cap, then the load/RAM
-// guardrail, then the sim pool) and lists EVERY blocker, so a full cap is not
-// hidden behind a load spike or vice versa.
+// The spawn verdict mirrors asana-watcher.js's tick order (the two caps, then
+// the load/RAM guardrail, then the sim pool) and lists EVERY blocker, so a full
+// cap is not hidden behind a load spike or vice versa. `runs` is {sim, nosim}:
+// the load cap and the pool block sim spawns only, so a blocker on that side
+// says so when no-sim spawns can still go.
 function spawnVerdict (v, runs, freeSims, pending) {
+  const r = typeof runs === 'number' ? { sim: runs, nosim: 0 } : runs
   const why = []
+  const simWhy = []
   if (v.holds.length) why.push(`hold file ${v.holds[0]}`)
-  if (runs >= v.maxConcurrent) why.push(`runs ${runs}/${v.maxConcurrent} (cap)`)
-  if (v.load > v.maxLoad) why.push(`load ${v.load.toFixed(1)} > max_load_avg ${v.maxLoad}`)
   if (v.freeGb < v.minFree) why.push(`free RAM ${v.freeGb.toFixed(0)}G < min ${v.minFree}G`)
-  if (freeSims === 0) why.push('no free sim in pool')
-  if (why.length) return { ok: false, why: why.join(' · '), reasons: why }
+  if (r.sim >= v.maxConcurrent) simWhy.push(`sim runs ${r.sim}/${v.maxConcurrent} (cap)`)
+  if (v.load > v.maxLoad) simWhy.push(`load ${v.load.toFixed(1)} > max_load_avg ${v.maxLoad}`)
+  if (freeSims === 0) simWhy.push('no free sim in pool')
+  const nosimFull = r.nosim >= v.maxConcurrentNosim
+  if (simWhy.length && nosimFull) why.push(...simWhy, `no-sim runs ${r.nosim}/${v.maxConcurrentNosim} (cap)`)
+  else if (simWhy.length) why.push(`sim spawns held: ${simWhy.join(', ')}; no-sim spawns open (${r.nosim}/${v.maxConcurrentNosim})`)
+  else if (nosimFull) why.push(`no-sim runs ${r.nosim}/${v.maxConcurrentNosim} (cap); sim spawns open (${r.sim}/${v.maxConcurrent})`)
+  const blocked = why.some(w => !w.startsWith('sim spawns held') && !w.startsWith('no-sim runs'))
+    || (simWhy.length > 0 && nosimFull)
+  if (blocked) return { ok: false, why: why.join(' · '), reasons: why }
+  if (why.length) return { ok: true, why: why.join(' · '), partial: true, reasons: why }
   if (pending === 0) return { ok: true, why: 'idle: no Pending task', idle: true }
   return { ok: true, why: `${pending} Pending task(s) will spawn on the next tick` }
 }

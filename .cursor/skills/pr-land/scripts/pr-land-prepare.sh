@@ -433,6 +433,25 @@ for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) {
   process.on(sig, () => { releaseLeases([...leaseRelease.all]); process.exit(130); });
 }
 
+// Master-build refresher handshake (refresh-master-build.sh LAND HANDSHAKE):
+// the refresher resets, installs and builds in the GUI's primary checkout, the
+// same tree prepare rebases and installs in. Its lock body is "<pid> <repo-dir>".
+// Checked AFTER the land lease is taken (the refresher checks the lease after
+// taking its lock), so the two never both proceed. Returns null when no live
+// refresh holds repoDir.
+const MASTER_BUILD_LOCK = path.join(process.env.HOME, ".config/agent-watcher/master-build.lock");
+function liveMasterBuildRefresh(repoDir) {
+  let body;
+  try { body = readFileSync(MASTER_BUILD_LOCK, "utf8").trim(); } catch { return null; }
+  const [pidStr, ...dirParts] = body.split(" ");
+  const pid = Number(pidStr);
+  if (!Number.isInteger(pid) || pid <= 0 || path.resolve(dirParts.join(" ")) !== path.resolve(repoDir)) return null;
+  try { process.kill(pid, 0); } catch (e) { if (e.code !== "EPERM") return null; }
+  let ageSec = 0;
+  try { ageSec = (Date.now() - require("fs").statSync(MASTER_BUILD_LOCK).mtimeMs) / 1000; } catch {}
+  return { pid, ageSec };
+}
+
 const ALLOW_BROKEN_DEVELOP = process.argv.includes("--allow-broken-develop");
 const DEVELOP_BUILDABLE = path.join(process.env.HOME, ".config/agent-watcher/develop-buildable.sh");
 
@@ -453,6 +472,14 @@ async function main() {
     }
     leaseRelease.all.push(repo);
     if (!wasOurs) leaseRelease.fresh.push(repo);
+  }
+  for (const repo of [...new Set(branches.map((b) => b.repo))]) {
+    const refresh = liveMasterBuildRefresh(getRepoDir(repo));
+    if (refresh != null) {
+      console.error(`pr-land-prepare: master-build refresh (pid ${refresh.pid}, running ${Math.round(refresh.ageSec / 60)} min) is building in ${getRepoDir(repo)}; wait for it to finish and retry. Never kill it: a killed build memoizes failed_sha fleet-wide.`);
+      releaseLeases([...leaseRelease.fresh]);
+      process.exit(75);
+    }
   }
   const results = {
     prepared: [],

@@ -41,11 +41,15 @@ task that is blocked-or-in-flight in Asana but whose tmux session has died does
 
 ### Lifecycle
 
-1. **Spawn** (`asana-watcher.js`): pick oldest `(MAX - active)` Pending tasks; for
-   each, set `Planning`, create worktree, clone sim, allocate slot, start the tmux
-   session. The session's wrapper bash exports `$AGENT_SIM_UDID` and
-   `$AGENT_METRO_PORT` so build-and-test and debugger inherit them transparently.
-2. **Run**: the spawned `claude` runs `/one-shot --yolo <task-url>` in its worktree.
+1. **Spawn** (`asana-watcher.js`): split Pending tasks by `agent_lane` (unset or
+   including iOS Sim = sim; None or Android-only = no sim), pick the oldest
+   `(max_concurrent - active sim runs)` sim tasks and `(max_concurrent_nosim - active
+   no-sim runs)` no-sim tasks; for each, set `Planning`, take a pool sim (sim lane
+   only), allocate slot, start the tmux session. The session's wrapper bash exports
+   `$AGENT_SIM_UDID` and `$AGENT_METRO_PORT` so build-and-test and debugger inherit
+   them transparently.
+2. **Run**: the spawned `claude` runs `/one-shot --yolo <task-url>` (`agent_deliverable`
+   PR, the default) or `/task-run --yolo <task-url>` (Task) in its worktree.
 3. **Retire** (`session-watchdog.js`): when Asana shows `agent_status=Complete`, RETIRE the
    session — rename `claude-asana-<gid>` → `done-asana-<gid>` (so it no longer holds a slot)
    while leaving `claude` alive for inspection / remote re-engagement — kill its Metro, delete
@@ -73,10 +77,11 @@ task that is blocked-or-in-flight in Asana but whose tmux session has died does
 
 | key                              | default            | meaning |
 |----------------------------------|--------------------|---------|
-| `max_concurrent`                 | `2`                | Max parallel sessions. Env override `AGENT_WATCHER_MAX_CONCURRENT`. |
+| `max_concurrent`                 | `2`                | Max parallel sessions holding a pool sim. Env override `AGENT_WATCHER_MAX_CONCURRENT`. |
+| `max_concurrent_nosim`           | `3`                | Max parallel sessions without a sim (`agent_lane` None / Android-only), counted apart from `max_concurrent`; the load guardrail holds sim spawns only, the RAM floor holds both. Env override `AGENT_WATCHER_MAX_CONCURRENT_NOSIM`. |
 | `metro_base_port`                | `8081`             | Slot N → port `metro_base_port + N`. |
 | `master_sim.device` / `.runtime` | iPhone 16 Pro Max / iOS 18 | Master sim cloned per slot (holds the test account). |
-| `master_sim.refresh_on_develop`  | `true`             | `refresh-master-build.sh` rebuilds the master when develop's native side changes (blocking). A failed build memoizes `failed_sha` in `master-build.json`; runs keep cloning the last-good master and the SHA is not retried until develop moves. |
+| `master_sim.refresh_on_develop`  | `true`             | `refresh-master-build.sh` rebuilds the master when develop's native side changes. Runs from launchd `com.jontz.sim-pool-refresh` (every 30 min, via the full `ensure-sim-pool.sh`), never from the spawn path, so a develop bump costs no spawn its wait. A failed build memoizes `failed_sha` in `master-build.json`; runs keep cloning the last-good master and the SHA is not retried until develop moves. It shares the primary checkout with `pr-land-prepare.sh`, so the two handshake: the refresh skips (no failure memo) while a land lease is held on the repo, and prepare exits 75 while a live refresh holds `master-build.lock` (body `<pid> <repo-dir>`). |
 | (script) `develop-buildable.sh`   | n/a                | Exit 3 when `origin/develop` HEAD equals the memoized `failed_sha` for the master's repo, 0 otherwise. `pr-land-prepare.sh` calls it before rebasing so PRs do not land onto an unbuildable develop. |
 | `resource_guardrail.max_load_avg`| `12.0`             | Skip the tick if 1-min load avg exceeds this. Env override `AGENT_WATCHER_MAX_LOAD_AVG`. |
 | `resource_guardrail.min_free_ram_gb` | `8.0`          | Skip the tick if free RAM is below this. Env override `AGENT_WATCHER_MIN_FREE_RAM_GB`. |
@@ -157,6 +162,7 @@ name/runtime, Metro defaults to 8081.
 | `setup-task-workspace.sh` / `cleanup-task-workspace.sh` | worktree create / teardown; a fresh edge-react-gui branch is cut from `origin/develop`, or from the last-good `develop_sha` in `master-build.json` while develop HEAD equals its `failed_sha` (so the worktree matches the cloned app image); APFS-clones node_modules from the main checkout; on fresh and reuse paths compares the branch lockfile with the installed tree by normalized hash (`lib/node-modules-freshness.sh`), and on a mismatch writes `.stale-node-modules` and starts `lib/node-modules-reinstall.sh` detached (mv-aside + `sfw npm ci` under a machine-wide install lock; marker cleared on success, previous tree restored on failure). ios-rn-build.sh waits for a running reinstall and blocks while the marker stays |
 | `refresh-main-checkouts.sh` | keep the ~/git main checkouts (the node_modules clone SOURCES) current: fast-forward the default branch + reinstall (`lib/node-modules-reinstall.sh`) when the installed tree differs from the lockfile by normalized hash, ONLY when clean, on the default branch, and no setup is cloning that checkout right now (dirty/feature/detached checkouts are reported and left alone). A failed install is recorded and retried next sweep; the stamp is written only after a sweep with a current repo and nothing retryable. Scheduled: launchd daily 04:15 + every 30min sweep (idle job throttled to one complete sweep per 6h; `--require-idle` is accepted but the per-repo clone handshake replaced the whole-sweep idle skip) |
 | `clone-ios-sim.sh` / `delete-ios-sim.sh` | per-slot sim clone / delete |
+| `ensure-sim-pool.sh` | keep the pre-cloned sim pool (`pool.json`: free / in_use / dirty / cloning) topped up. Two shapes: launchd `com.jontz.sim-pool-refresh` (`launchd/com.jontz.sim-pool-refresh.plist`, 30 min) runs it in full, master refresh included, recloning every dirty slot; the spawn path (`asana-watcher.js`, `resume-task.sh`) runs it with `SKIP_MASTER_REFRESH=1 --min-free <n>` and clones only until `n` slots are free. The pool lock covers `pool.json` writes only; a slot is claimed `cloning` before its clone so the two shapes never take the same slot. Exit 1 = fewer than `--min-free` free (the watcher then skips the tick) |
 | `lib/slots.js` | atomic slot allocator (lib + CLI) |
 | `lib/autocompact-flag.sh` | prints the `--autocompact <window>` flag every claude spawn on the box passes (orch runs, chat sessions, rc-heal anchors, resume-agent resumes; the watchdog's RC respawn carries it over from the old argv), from `watcher.autocompact_window` (default 200k, `auto` = no flag) |
 | `slots.json` | slot state |
@@ -174,6 +180,7 @@ name/runtime, Metro defaults to 8081.
 | `agent-authored-text.sh` | wrap Asana prose in the 🥋/👊 authorship markers, idempotently; wraps ONLY in orch-run context (via `orch-run-context.sh`), operator-context text passes through unmarked |
 | `asana-config.json` | project GIDs + `.watcher.*` knobs |
 | `update-status.sh` | set `agent_status` (+ kanban section move) |
+| `usage-hold.sh` | the watcher's usage oracle, once per tick: prints `{spawn_hold,paused,reason}` from `claude-usage.sh` against `watcher.usage_hold` thresholds, and writes or clears the pause stamp `/tmp/agent-usage-pause.json` that session-watchdog.js and `hooks/require-continuation-or-block.sh` read (paused runs checkpoint and end their turn; the watchdog revives them when the stamp clears). Unknown usage fails open |
 
 ## Asana authorship markers (🥋/👊)
 

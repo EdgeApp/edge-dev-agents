@@ -59,7 +59,7 @@ emit_run() {
       "https://app.asana.com/api/1.0/tasks/$gid?opt_fields=name,completed,custom_fields.name,custom_fields.display_value" 2>/dev/null)
     if [[ -n "$task" ]]; then
       echo "Task: $(jq -r '.data.name // "?"' <<<"$task")"
-      jq -r '.data.custom_fields[]? | select(.name == "agent_status" or (.name | test("block|Board State|Force Land"; "i"))) | "  \(.name): \(.display_value // "unset")"' <<<"$task" 2>/dev/null
+      jq -r '.data.custom_fields[]? | select((.name | test("^agent_(status|review|deliverable|on_complete)$")) or (.name | test("block|Board State|Force Land"; "i"))) | "  \(.name): \(.display_value // "unset")"' <<<"$task" 2>/dev/null
     fi
     # Followup watermark: comments newer than the last agent-run-report attachment.
     local wm stories nreports
@@ -155,11 +155,11 @@ EOF
   # boundaries don't re-pay the context.
   # Injected bodies count as "read" for the skill-read gate: pre-write markers.
   # task-review resolves the target REPO from the task text; a non-PR deliverable
-  # (AGENT_DELIVERABLE=Task or "Task + sim", set by spawn-test-session.sh from the
-  # task's agent_deliverable field) has no repo to resolve, so only asana-plan is
+  # (AGENT_DELIVERABLE=Task, set by spawn-test-session.sh from the task's
+  # agent_deliverable field) has no repo to resolve, so only asana-plan is
   # injected for it. The default (unset) is the PR shape.
   local planning_skills="asana-plan task-review"
-  case "${AGENT_DELIVERABLE:-PR}" in "Task"|"Task + sim") planning_skills="asana-plan" ;; esac
+  case "${AGENT_DELIVERABLE:-PR}" in Task*) planning_skills="asana-plan" ;; esac
   if [[ "$SRC" == "startup" || "$SRC" == "resume" ]] || ! ls /tmp/plan-"$gid"-*.md >/dev/null 2>&1; then
     local sk
     for sk in $planning_skills; do

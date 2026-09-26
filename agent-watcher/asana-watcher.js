@@ -4,14 +4,21 @@
 // cloned iOS simulator, on its own Metro port, behind a resource guardrail.
 //
 // Per-tick flow:
-//   1. MAX_CONCURRENT     — config .watcher.max_concurrent (default 2);
-//                           env override AGENT_WATCHER_MAX_CONCURRENT.
-//   2. active             — count of LIVE `claude-asana-*` tmux sessions.
-//   3. active >= MAX      → log "at cap (active=N max=M)", exit 0.
-//   4. resource guardrail → 1-min load avg > max_load_avg OR free RAM < min_free_ram_gb
-//                           → log "skipped this tick: guardrail (...)", exit 0.
-//   5. fetch tasks; pick the oldest (MAX - active) Pending tasks.
-//   6. per picked task: set Planning, setup worktree, clone sim, allocate slot, spawn.
+//   1. MAX_CONCURRENT     — config .watcher.max_concurrent (default 2), the cap on
+//                           runs holding a pool sim; env AGENT_WATCHER_MAX_CONCURRENT.
+//      MAX_NOSIM          — .watcher.max_concurrent_nosim (default 3), the cap on
+//                           runs without one; env AGENT_WATCHER_MAX_CONCURRENT_NOSIM.
+//   2. active             — LIVE `claude-asana-*` tmux sessions, split sim / nosim
+//                           by whether the slots.json entry carries a sim_udid.
+//   3. both caps full     → log "at cap (...)", exit 0.
+//   4. resource guardrail → free RAM < min_free_ram_gb skips the tick; 1-min load
+//                           avg > max_load_avg holds sim spawns only.
+//      usage hold         → usage-hold.sh reports spawn_hold (watcher.usage_hold thresholds)
+//                           → log "skipped this tick: usage hold (...)", exit 0.
+//   5. fetch tasks; split Pending by agent_lane (unset or "iOS Sim" = sim); pick the
+//                           oldest (cap - active) of each.
+//   6. per picked task: set Planning, allocate a pool sim (sim lane only) + slot, spawn
+//                           /one-shot (agent_deliverable PR) or /task-run (Task).
 //   7. slot allocations persisted to slots.json (via lib/slots.js).
 //
 // SLOT ACCOUNTING IS BY LIVE TMUX SESSIONS, NOT BY ASANA STATE. A task that is
@@ -40,7 +47,10 @@ const HOME = process.env.HOME || ''
 const DIR = path.join(HOME, '.config/agent-watcher')
 const CONFIG_PATH = path.join(DIR, 'asana-config.json')
 const SESSION_PREFIX = 'claude-asana-'
-const RC_READY_MARKER = 'Remote Control active'
+// Footer text the CLI prints once the RC bridge is up. The wording has changed
+// across CLI releases; a marker that stops matching costs every spawn the full
+// RC_READY_TIMEOUT_MS, so keep every wording seen and add new ones here.
+const RC_READY_MARKERS = ['Remote Control active', 'remote-control is active']
 const BYPASS_PROMPT_MARKER = 'Yes, I accept'
 const RC_READY_TIMEOUT_MS = 120 * 1000 // 60s raced CLI readiness twice on 2026-06-12; blind prompt delivery is the fallback, not the norm
 const RC_READY_POLL_MS = 1000
@@ -80,6 +90,12 @@ function maxConcurrent(cfg) {
   return cfg.watcher?.max_concurrent || 2
 }
 
+function maxConcurrentNosim(cfg) {
+  const env = parseInt(process.env.AGENT_WATCHER_MAX_CONCURRENT_NOSIM || '', 10)
+  if (Number.isFinite(env) && env > 0) return env
+  return cfg.watcher?.max_concurrent_nosim || 3
+}
+
 function guardrailThresholds(cfg) {
   const g = cfg.watcher?.resource_guardrail || {}
   const envLoad = parseFloat(process.env.AGENT_WATCHER_MAX_LOAD_AVG || '')
@@ -90,13 +106,20 @@ function guardrailThresholds(cfg) {
   }
 }
 
+// Live task sessions, split by whether the run holds a pool sim. Counts ONLY real
+// task slots: `claude-asana-<numeric-gid>`. Excludes non-task sessions that share
+// the prefix (e.g. an interactive `claude-asana-main`), which would otherwise eat
+// a concurrency slot and block task pickup. A session holds a sim when its slots
+// entry carries a sim_udid; the two counts run against separate caps because a
+// sim drive is the load the guardrail numbers were tuned for and a review or
+// research run is not.
 function countActiveSessions() {
   const out = sh('tmux list-sessions -F "#{session_name}"')
-  if (!out) return 0
-  // Count ONLY real task slots: `claude-asana-<numeric-gid>`. Excludes non-task
-  // sessions that share the prefix (e.g. an interactive `claude-asana-main`),
-  // which would otherwise eat a concurrency slot and block task pickup.
-  return out.split('\n').filter((s) => s.startsWith(SESSION_PREFIX) && /^\d+$/.test(s.slice(SESSION_PREFIX.length))).length
+  if (!out) return { sim: 0, nosim: 0 }
+  const gids = out.split('\n').filter((s) => s.startsWith(SESSION_PREFIX) && /^\d+$/.test(s.slice(SESSION_PREFIX.length))).map((s) => s.slice(SESSION_PREFIX.length))
+  const withSim = new Set(slots.list().filter((s) => s.sim_udid).map((s) => s.task_gid))
+  const sim = gids.filter((g) => withSim.has(g)).length
+  return { sim, nosim: gids.length - sim }
 }
 
 function getLoadAvg() {
@@ -121,7 +144,7 @@ function getFreeRamGb() {
 // ─── Asana ─────────────────────────────────────────────────────────────────────
 
 function listAgentTasks(cfg) {
-  const optFields = 'name,custom_fields.gid,custom_fields.name,custom_fields.enum_value.name,created_at'
+  const optFields = 'name,custom_fields.gid,custom_fields.name,custom_fields.enum_value.name,custom_fields.multi_enum_values.name,created_at'
   return api.listProjectTasks(cfg.project_gid, optFields)
 }
 
@@ -130,15 +153,25 @@ function getAgentStatus(task, cfg) {
   return field?.enum_value?.name || null
 }
 
-// agent_deliverable decides the run shape at spawn, and nowhere else: PR (the
-// default when the field is unset or unknown) runs /one-shot with a sim; Task
-// runs /task-run with no sim; "Task + sim" runs /task-run with a sim. Every hook
-// downstream keys on AGENT_TASK_GID and applies to both skills unchanged.
+// Two fields, two questions, read at spawn and nowhere else:
+//   agent_deliverable: what comes out. PR (the default when unset or unknown)
+//     runs /one-shot; Task runs /task-run. Every hook downstream keys on
+//     AGENT_TASK_GID and applies to both skills unchanged.
+//   agent_lane: what device the run tests on. Unset = allocate an iOS pool sim
+//     and let one-shot's lane-release decide after planning; a selection that
+//     includes "iOS Sim" = sim; any other selection (None, Android) = no sim.
 function getDeliverable(task, cfg) {
   const gid = cfg.custom_fields?.agent_deliverable?.gid
   const field = gid && task.custom_fields?.find((f) => f.gid === gid)
-  const name = field?.enum_value?.name
-  return name === 'Task' || name === 'Task + sim' ? name : 'PR'
+  const name = field?.enum_value?.name || ''
+  return name.startsWith('Task') ? 'Task' : 'PR'
+}
+
+function needsSim(task, cfg) {
+  const gid = cfg.custom_fields?.agent_lane?.gid
+  const field = gid && task.custom_fields?.find((f) => f.gid === gid)
+  const lanes = (field?.multi_enum_values || []).map((v) => v.name)
+  return lanes.length === 0 || lanes.includes('iOS Sim')
 }
 
 function skillPrompt(deliverable, taskUrl) {
@@ -168,7 +201,7 @@ function waitRcReadyAndSendPrompt(sessionName, prompt) {
   let acceptedBypass = false
   while (Date.now() < deadline) {
     const pane = sh(`tmux capture-pane -t "${sessionName}" -p`)
-    if (pane.includes(RC_READY_MARKER)) { ready = true; break }
+    if (RC_READY_MARKERS.some((m) => pane.includes(m))) { ready = true; break }
     if (!acceptedBypass && pane.includes(BYPASS_PROMPT_MARKER)) {
       log(`  bypass-permissions dialog detected; auto-accepting (Down + Enter)`)
       execSync(`tmux send-keys -t "${sessionName}" Down`, { stdio: 'inherit' })
@@ -226,9 +259,9 @@ function spawnForTask(task, cfg) {
   const taskUrl = `https://app.asana.com/0/${cfg.project_gid}/${task.gid}`
   const reposRoot = path.join(HOME, 'git')   // spawn cwd: the agent picks/creates the repo worktree(s) itself
   const deliverable = getDeliverable(task, cfg)
-  const needsSim = deliverable !== 'Task'
+  const withSim = needsSim(task, cfg)
 
-  log(`Spawning slot for: ${task.name} (gid=${task.gid}, cwd=${reposRoot}, deliverable=${deliverable})`)
+  log(`Spawning slot for: ${task.name} (gid=${task.gid}, cwd=${reposRoot}, deliverable=${deliverable}, sim=${withSim ? 'yes' : 'no'})`)
 
   if (tmuxSessionExists(sessionName)) {
     log(`  session ${sessionName} already exists — refusing to spawn over it. Skipping.`)
@@ -236,7 +269,7 @@ function spawnForTask(task, cfg) {
   }
 
   if (DRY_RUN) {
-    log(`  (dry-run) would try resume-task first (RESUME if a prior transcript exists → memory + fresh slot; else FRESH ${skillPrompt(deliverable, taskUrl)}${needsSim ? '' : ', no sim'})`)
+    log(`  (dry-run) would try resume-task first (RESUME if a prior transcript exists → memory + fresh slot; else FRESH ${skillPrompt(deliverable, taskUrl)}${withSim ? '' : ', no sim'})`)
     return true
   }
 
@@ -288,11 +321,12 @@ function spawnForTask(task, cfg) {
   // Allocate resources BEFORE touching agent_status: a Planning task with no
   // session is invisible to every sweep (the watcher only spawns Pending), so a
   // failed allocation must leave the task at Pending for the next tick.
-  // A Task deliverable takes no sim: the slot (concurrency + Metro port) is still
-  // allocated so the session is tracked and torn down like any other, but the
-  // pool entry stays free for a run that drives a device.
+  // A run whose lane needs no sim still takes a slot (Metro port, teardown
+  // bookkeeping) so the session is tracked like any other, but the pool entry
+  // stays free for a run that drives a device, and the session counts against
+  // max_concurrent_nosim instead of max_concurrent.
   let simUdid = ''
-  if (needsSim) {
+  if (withSim) {
     try {
       simUdid = shCapture(`${DIR}/allocate-from-pool.sh --task-gid ${task.gid}`).split('\n').pop()
     } catch (e) {
@@ -335,12 +369,24 @@ function spawnForTask(task, cfg) {
   return true
 }
 
+// Claude usage gates (usage-hold.sh). Null on any failure: the hold fails open.
+function usageHold() {
+  const r = spawnSync(`${DIR}/usage-hold.sh`, [], { encoding: 'utf8', timeout: 120000 })
+  try { return JSON.parse(r.stdout) } catch { log(`usage-hold.sh failed (exit ${r.status}); no usage gate this tick`); return null }
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 function main() {
   const cfg = loadConfig()
   const MAX = maxConcurrent(cfg)
-  log(`Watcher tick — project: ${cfg.project_name} (${cfg.project_gid}), max_concurrent=${MAX}`)
+  const MAX_NOSIM = maxConcurrentNosim(cfg)
+  log(`Watcher tick — project: ${cfg.project_name} (${cfg.project_gid}), max_concurrent=${MAX}, max_concurrent_nosim=${MAX_NOSIM}`)
+
+  // Usage gates (usage-hold.sh owns both, and writes the pause stamp the watchdog reads).
+  // Evaluated every tick, even at cap, so the pause stamp tracks usage while sessions run.
+  const usage = usageHold()
+  if (usage) log(`usage: ${usage.reason}${usage.paused ? ' [PAUSE active]' : ''}`)
 
   const simulatePending = argInt('--simulate-pending')
   const simulating = simulatePending != null
@@ -349,29 +395,37 @@ function main() {
     return
   }
 
-  // Step 2: active = live claude-asana-* sessions (or simulated).
-  const active = simulating ? (argInt('--simulate-active') ?? 0) : countActiveSessions()
-  log(`Active sessions: ${active}`)
+  // Step 2: active = live claude-asana-* sessions (or simulated), by sim / no-sim.
+  const active = simulating ? { sim: argInt('--simulate-active') ?? 0, nosim: 0 } : countActiveSessions()
+  log(`Active sessions: sim=${active.sim}/${MAX} nosim=${active.nosim}/${MAX_NOSIM}`)
 
-  // Step 3: at cap.
-  if (active >= MAX) {
-    log(`at cap (active=${active} max=${MAX}) — nothing to spawn this tick`)
+  // Step 3: both caps full.
+  if (active.sim >= MAX && active.nosim >= MAX_NOSIM) {
+    log(`at cap (sim=${active.sim}/${MAX}, nosim=${active.nosim}/${MAX_NOSIM}) — nothing to spawn this tick`)
     return
   }
 
-  // Step 4: resource guardrail.
+  // Step 4: resource guardrail. The load cap protects sim drives from each
+  // other; a no-sim run only needs the RAM floor.
   const { maxLoad, minFree } = guardrailThresholds(cfg)
   const load = getLoadAvg()
   const freeGb = getFreeRamGb()
-  if (load > maxLoad || freeGb < minFree) {
-    log(`skipped this tick: guardrail (load=${load.toFixed(2)} max=${maxLoad}, free=${freeGb.toFixed(1)}GB min=${minFree}GB)`)
+  if (freeGb < minFree) {
+    log(`skipped this tick: guardrail (free=${freeGb.toFixed(1)}GB min=${minFree}GB)`)
     return
   }
-  log(`guardrail ok (load=${load.toFixed(2)}/${maxLoad}, free=${freeGb.toFixed(1)}GB/${minFree}GB)`)
+  const loadOk = load <= maxLoad
+  log(`guardrail ${loadOk ? 'ok' : 'load high: sim spawns held, no-sim spawns allowed'} (load=${load.toFixed(2)}/${maxLoad}, free=${freeGb.toFixed(1)}GB/${minFree}GB)`)
 
-  const available = MAX - active
+  if (usage?.spawn_hold) {
+    log(`skipped this tick: usage hold (${usage.reason}); Pending tasks wait`)
+    return
+  }
 
-  // Step 5: gather + sort Pending tasks (oldest first).
+  const availableSim = loadOk ? Math.max(0, MAX - active.sim) : 0
+  const availableNosim = Math.max(0, MAX_NOSIM - active.nosim)
+
+  // Step 5: gather + sort Pending tasks (oldest first), split by lane.
   let pending
   if (simulating) {
     pending = Array.from({ length: simulatePending }, (_, i) => ({
@@ -391,18 +445,24 @@ function main() {
     return
   }
 
-  const toSpawn = pending.slice(0, available)
-  const deferred = pending.slice(available)
-  log(`Pending=${pending.length}, free slots=${available} → spawning ${toSpawn.length}, deferring ${deferred.length}`)
+  const pendingSim = pending.filter((t) => simulating || needsSim(t, cfg))
+  const pendingNosim = pending.filter((t) => !simulating && !needsSim(t, cfg))
+  const toSpawnSim = pendingSim.slice(0, availableSim)
+  const toSpawn = [...toSpawnSim, ...pendingNosim.slice(0, availableNosim)]
+  const deferred = [...pendingSim.slice(availableSim), ...pendingNosim.slice(availableNosim)]
+  log(`Pending=${pending.length} (sim ${pendingSim.length}, nosim ${pendingNosim.length}), free sim=${availableSim} nosim=${availableNosim} → spawning ${toSpawn.length}, deferring ${deferred.length}`)
 
-  // Ensure the iOS-sim pool has enough free entries to cover all spawns this
-  // tick. Any dirty entries from prior reaps are refreshed here (delete stale
-  // sim + clone fresh). This is the only place where simctl clone runs;
-  // per-task allocation below is instant.
-  if (toSpawn.length > 0 && !DRY_RUN) {
+  // Ensure the iOS-sim pool has enough free entries to cover THIS tick's sim
+  // spawns (--min-free). Refilling the rest of the pool and refreshing the
+  // master build from develop are off the spawn path: launchd
+  // com.jontz.sim-pool-refresh runs the full ensure-sim-pool.sh every 30 min.
+  if (toSpawnSim.length > 0 && !DRY_RUN) {
     const poolSize = cfg.watcher?.sim_pool?.size || MAX
-    log(`Ensuring iOS sim pool (size=${poolSize})…`)
-    const r = spawnSync(`${DIR}/ensure-sim-pool.sh`, ['--size', String(poolSize)], { stdio: 'inherit' })
+    log(`Ensuring iOS sim pool (size=${poolSize}, min free=${toSpawnSim.length})…`)
+    const r = spawnSync(`${DIR}/ensure-sim-pool.sh`, ['--size', String(poolSize), '--min-free', String(toSpawnSim.length)], {
+      stdio: 'inherit',
+      env: { ...process.env, SKIP_MASTER_REFRESH: '1' },
+    })
     if (r.status !== 0) {
       log(`ensure-sim-pool failed (exit ${r.status}) — skipping spawns this tick`)
       return
@@ -412,9 +472,9 @@ function main() {
   // Step 6 + 7: spawn each picked task (slot persisted inside spawnForTask).
   for (const task of toSpawn) spawnForTask(task, cfg)
 
-  // Anything beyond the cap waits for a future tick.
+  // Anything beyond its cap waits for a future tick.
   for (const task of deferred) {
-    log(`skipped: at cap (max=${MAX} would be exceeded) — "${task.name}" (gid=${task.gid}) deferred to a later tick`)
+    log(`skipped: at cap — "${task.name}" (gid=${task.gid}) deferred to a later tick`)
   }
 }
 

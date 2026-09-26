@@ -43,7 +43,9 @@ function jobsLine (jobs) {
 }
 
 function healthPanel (v, cols) {
-  const runs = M.fleet.live.filter(r => r.kind === 'run' && r.state === 'running').length
+  const running = M.fleet.live.filter(r => r.kind === 'run' && r.state === 'running')
+  const simGids = new Set(M.slots.filter(s => s.sim_udid).map(s => s.task_gid))
+  const runs = { sim: running.filter(r => simGids.has(r.gid)).length, nosim: running.filter(r => !simGids.has(r.gid)).length }
   const freeSlots = Math.max(0, v.maxConcurrent - M.slots.length)
   const freeSims = M.pool.filter(p => p.state === 'free').length
   const pendingTasks = (ASANA.pending || []).filter(p => /^pending$/i.test(p.status))
@@ -63,7 +65,7 @@ function healthPanel (v, cols) {
   L.push(row('ram', `${ramCol}${v.freeGb.toFixed(0)}G free${C.off}  ${C.dim}min ${v.minFree}G${C.off}${mm}`))
   const pendNames = pendingTasks.slice(0, 3).map(p => p.name.replace(/^Asana: /, '').slice(0, 28)).join(', ')
   const pendSeg = ASANA.tally ? `pending ${pendingTasks.length}${pendNames ? ` ${C.dim}(${pendNames}${pendingTasks.length > 3 ? ', …' : ''})${C.off}` : ''}` : `${C.dim}pending ?${C.off}`
-  L.push(row('capacity', `runs ${runs}/${v.maxConcurrent}   slots ${freeSlots} free   sims ${freeSims}/${M.pool.length} free   ${pendSeg}`))
+  L.push(row('capacity', `runs sim ${runs.sim}/${v.maxConcurrent} nosim ${runs.nosim}/${v.maxConcurrentNosim}   slots ${freeSlots} free   sims ${freeSims}/${M.pool.length} free   ${pendSeg}`))
   const fse = v.fseventsd
     ? `fseventsd ${(f => (f.cpu >= 100 ? C.red : f.cpu >= 50 ? C.yel : C.grn) + f.cpu.toFixed(0) + '%' + C.off)(v.fseventsd)} ${v.fseventsd.rssGb.toFixed(1)}G up ${v.fseventsd.etime}${v.fseventsd.lastRestart ? `${C.dim}, guard restarted ${fmtAgo(v.fseventsd.lastRestart / 1000)} ago${C.off}` : ''}`
     : `${C.dim}fseventsd ?${C.off}`

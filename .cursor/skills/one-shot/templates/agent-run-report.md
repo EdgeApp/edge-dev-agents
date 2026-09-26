@@ -53,7 +53,7 @@ _None observed._
        - [ ] zero unresolved review threads (bot AND human)
        - [ ] landed or auto-merge armed (per `land-on-approval`) / stopped at PR (say which)
        - [ ] Build field routing done (cheese pushed / staging noted / none)
-     A Task or "Task + sim" deliverable (/task-run) has no PR: this section reads
+     A Task deliverable (/task-run) has no PR: this section reads
      exactly `N/A: no PR deliverable` and nothing else. -->
 _None observed._
 

@@ -41,6 +41,13 @@ if "$HOME/.config/agent-watcher/operator-hold.sh" status "$GID" >/dev/null 2>&1;
   exit 0
 fi
 
+# ---- Usage pause: the watcher told every run to checkpoint and stop (usage-hold.sh) ----
+# Ending the turn is the requested behavior; session-watchdog.js resumes the run with
+# <watchdog-revive-ping> once the stamp clears.
+if [ -f "${AGENT_USAGE_PAUSE_STAMP:-/tmp/agent-usage-pause.json}" ]; then
+  exit 0
+fi
+
 # ---- Fast path: a FRESH final marker = a legit end the agent JUST set ----
 # update-status.sh drops /tmp/agent-final-<gid> right after a successful PUT of
 # Complete/Archived/blocked=Yes (and removes it on a non-terminal reopen). Trusting a

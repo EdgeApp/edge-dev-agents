@@ -150,15 +150,19 @@ fi
 
 # 2. Task name → session label.
 TOKEN="$(jq -r '.asana_token // empty' "$DIR/credentials.json" 2>/dev/null || true)"
-NAME=""; DELIVERABLE="PR"
+NAME=""; DELIVERABLE="PR"; NEEDS_SIM=1
 if [[ -n "$TOKEN" ]]; then
-  _T="$(curl -s -H "Authorization: Bearer $TOKEN" "https://app.asana.com/api/1.0/tasks/$TASK_GID?opt_fields=name,custom_fields.gid,custom_fields.enum_value.name" 2>/dev/null || true)"
+  _T="$(curl -s -H "Authorization: Bearer $TOKEN" "https://app.asana.com/api/1.0/tasks/$TASK_GID?opt_fields=name,custom_fields.gid,custom_fields.enum_value.name,custom_fields.multi_enum_values.name" 2>/dev/null || true)"
   NAME="$(printf '%s' "$_T" | jq -r '.data.name // empty' 2>/dev/null || true)"
-  # agent_deliverable decides the run shape (see asana-watcher.js getDeliverable):
-  # Task takes no sim; PR (default) and "Task + sim" take one.
+  # Same two reads as asana-watcher.js getDeliverable / needsSim: agent_deliverable
+  # picks the skill (PR default, Task); agent_lane picks the sim (unset or a
+  # selection with "iOS Sim" = sim, anything else = none).
   _DGID="$(jq -r '.custom_fields.agent_deliverable.gid // empty' "$DIR/asana-config.json" 2>/dev/null || true)"
   _DSEL="$(printf '%s' "$_T" | jq -r --arg g "$_DGID" '.data.custom_fields[]? | select(.gid==$g) | .enum_value.name // empty' 2>/dev/null || true)"
-  case "$_DSEL" in "Task"|"Task + sim") DELIVERABLE="$_DSEL" ;; esac
+  case "$_DSEL" in Task*) DELIVERABLE="Task" ;; esac
+  _LGID="$(jq -r '.custom_fields.agent_lane.gid // empty' "$DIR/asana-config.json" 2>/dev/null || true)"
+  _LANES="$(printf '%s' "$_T" | jq -r --arg g "$_LGID" '[.data.custom_fields[]? | select(.gid==$g) | .multi_enum_values[]?.name] | join(",")' 2>/dev/null || true)"
+  if [[ -n "$_LANES" && ",$_LANES," != *",iOS Sim,"* ]]; then NEEDS_SIM=0; fi
 fi
 LABEL="Asana: ${NAME:-task $TASK_GID}"
 
@@ -172,8 +176,10 @@ done
 "$DIR/release-pool-entry.sh" --task-gid "$TASK_GID" >/dev/null 2>&1 || true
 node -e 'require(process.env.HOME+"/.config/agent-watcher/lib/slots.js").release(process.argv[1])' "$TASK_GID" 2>/dev/null || true
 SIM_UDID=""
-if [[ "$DELIVERABLE" != "Task" ]]; then
-  "$DIR/ensure-sim-pool.sh" >/dev/null 2>&1 || true
+if [[ "$NEEDS_SIM" == 1 ]]; then
+  # One free sim is all a resume needs; pool refill + master refresh run on
+  # launchd (com.jontz.sim-pool-refresh), not on the spawn path.
+  SKIP_MASTER_REFRESH=1 "$DIR/ensure-sim-pool.sh" --min-free 1 >/dev/null 2>&1 || true
   SIM_UDID="$("$DIR/allocate-from-pool.sh" --task-gid "$TASK_GID" | tail -1)"
   [[ -n "$SIM_UDID" ]] || { echo "resume-task: failed to allocate a pool sim" >&2; exit 1; }
 fi
