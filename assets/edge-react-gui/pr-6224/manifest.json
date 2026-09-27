@@ -1,0 +1,53 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6224/20260927-133721-agent-proof-1218842435827942-01-fixed-debug-buy-500-quote-under-polling.png",
+      "caption": "fixed debug buy 500 quote under polling",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T20:37:21Z",
+      "headSha": "359f0aa4a69bf8f678df62c1d2be64abe2efb102",
+      "addedAt": "2026-09-27T20:37:21Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6224/20260927-133721-agent-proof-1218842435827942-02-fixed-debug-buy-500-quote-unpolled.png",
+      "caption": "fixed debug buy 500 quote unpolled",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T20:37:21Z",
+      "headSha": "359f0aa4a69bf8f678df62c1d2be64abe2efb102",
+      "addedAt": "2026-09-27T20:37:21Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6224/20260927-133721-agent-proof-1218842435827942-03-unfixed-release-buy-500-no-crash.png",
+      "caption": "unfixed release buy 500 no crash",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T20:37:21Z",
+      "headSha": "359f0aa4a69bf8f678df62c1d2be64abe2efb102",
+      "addedAt": "2026-09-27T20:37:21Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6224/20260927-133721-agent-proof-1218842435827942-04-fixed-debug-buy-500-keyboard-dismissed.png",
+      "caption": "fixed debug buy 500 keyboard dismissed",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T20:37:21Z",
+      "headSha": "359f0aa4a69bf8f678df62c1d2be64abe2efb102",
+      "addedAt": "2026-09-27T20:37:21Z"
+    }
+  ]
+}
