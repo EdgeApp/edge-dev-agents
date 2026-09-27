@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6225/20260927-162027-agent-proof-1218600516821602-01-HACKED-home-spend-tile-bitrefill-footer.png",
+      "caption": "home spend tile bitrefill footer",
+      "index": "1",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "01-03: network.ts injected giftCardInfo={disablePlugins:{phaze:true}} into raw rollup JSON before asInfoRollup; 05: BlurBackground passed blurAmount to skip a pre-existing Android dev-mode NaN invariant; all reverted",
+      "batchAt": "2026-09-27T23:20:27Z",
+      "headSha": "0704ff125789d8e6bb63983f3ded34aca3101891",
+      "addedAt": "2026-09-27T23:20:27Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6225/20260927-162027-agent-proof-1218600516821602-02-HACKED-edgespend-list-readonly.png",
+      "caption": "edgespend list readonly",
+      "index": "2",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "01-03: network.ts injected giftCardInfo={disablePlugins:{phaze:true}} into raw rollup JSON before asInfoRollup; 05: BlurBackground passed blurAmount to skip a pre-existing Android dev-mode NaN invariant; all reverted",
+      "batchAt": "2026-09-27T23:20:27Z",
+      "headSha": "0704ff125789d8e6bb63983f3ded34aca3101891",
+      "addedAt": "2026-09-27T23:20:27Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6225/20260927-162027-agent-proof-1218600516821602-03-HACKED-purchase-new-opens-bitrefill.png",
+      "caption": "purchase new opens bitrefill",
+      "index": "3",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "01-03: network.ts injected giftCardInfo={disablePlugins:{phaze:true}} into raw rollup JSON before asInfoRollup; 05: BlurBackground passed blurAmount to skip a pre-existing Android dev-mode NaN invariant; all reverted",
+      "batchAt": "2026-09-27T23:20:27Z",
+      "headSha": "0704ff125789d8e6bb63983f3ded34aca3101891",
+      "addedAt": "2026-09-27T23:20:27Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6225/20260927-162027-agent-proof-1218600516821602-04-control-no-injection-phaze-footer.png",
+      "caption": "control no injection phaze footer",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T23:20:27Z",
+      "headSha": "0704ff125789d8e6bb63983f3ded34aca3101891",
+      "addedAt": "2026-09-27T23:20:27Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6225/20260927-162027-agent-proof-1218600516821602-05-HACKED-android-home-boots-on-3140.png",
+      "caption": "android home boots on 3140",
+      "index": "5",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "01-03: network.ts injected giftCardInfo={disablePlugins:{phaze:true}} into raw rollup JSON before asInfoRollup; 05: BlurBackground passed blurAmount to skip a pre-existing Android dev-mode NaN invariant; all reverted",
+      "batchAt": "2026-09-27T23:20:27Z",
+      "headSha": "0704ff125789d8e6bb63983f3ded34aca3101891",
+      "addedAt": "2026-09-27T23:20:27Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6225/20260927-162027-agent-proof-1218600516821602-06-ios-home-boots-on-3140.png",
+      "caption": "ios home boots on 3140",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T23:20:27Z",
+      "headSha": "0704ff125789d8e6bb63983f3ded34aca3101891",
+      "addedAt": "2026-09-27T23:20:27Z"
+    }
+  ]
+}
