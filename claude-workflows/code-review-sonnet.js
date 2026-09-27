@@ -213,7 +213,7 @@ const FINDER_PROMPT = f => {
     (isCleanup ? CLEANUP_PRECEDENCE + "\n" : "") +
     "Surface up to " + f.cap + " candidate findings, each with file, line, a one-line summary, and a concrete failure_scenario — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows). " +
     (isCleanup
-      ? "Cover whichever lenses apply — you do not need findings from every lens; prioritize the highest-cost issues across all of them. "
+      ? "Cover whichever lenses apply — you do not need findings from every lens; prioritize the highest-cost issues across all of them, and list candidates highest-cost first: only the first " + f.keep + " are verified. "
       : "") +
     "Pass every candidate with a nameable failure scenario through — do not silently drop half-believed candidates; an independent verifier judges them next. " +
     "If nothing qualifies, return an empty list.\n\nStructured output only."
@@ -311,14 +311,23 @@ const FINDERS = P.singlePass
         label: "cleanup",
         kind: "cleanup",
         cap: 5 * P.perAngle,
+        // Plain pre-verify cap: cleanup ranks below every correctness finding,
+        // so at most maxFindings cleanup candidates can reach the report.
+        // Verifying more is spend with no reportable outcome.
+        keep: P.maxFindings,
         text: CLEANUP_TEXT,
       }])
 
+let cleanupCapped = 0
 const finderOuts = await parallel(FINDERS.map(f => () =>
   agent(P.singlePass ? LOW_PASS_PROMPT : FINDER_PROMPT(f), { label: f.label, phase: "Find", schema: CANDIDATES_SCHEMA, ...FANOUT }).then(r => {
     if (!r) return []
     log(f.label + ": " + r.candidates.length + " candidates")
-    return ingest(r.candidates, f.cap, f.kind)
+    const kept = ingest(r.candidates, f.cap, f.kind)
+    if (f.keep == null || kept.length <= f.keep) return kept
+    cleanupCapped = kept.length - f.keep
+    log(f.label + ": capped to " + f.keep + " before verify (" + cleanupCapped + " dropped)")
+    return kept.slice(0, f.keep)
   })
 ))
 const allCandidates = finderOuts.filter(Boolean).flat()
@@ -366,6 +375,7 @@ const stats = {
   finders: FINDERS.length,
   correctnessAngles: CORRECTNESS_COUNT,
   candidates: candidatesSeen,
+  cleanupCapped,
   verifierAgents,
   verified: P.singlePass ? 0 : verified.length,
   refuted: refuted.length,

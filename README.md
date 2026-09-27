@@ -719,7 +719,11 @@ reproducible from a single clone + `./bootstrap.sh`:
   registrations.
 - **`claude-workflows/`**: multi-agent Workflow scripts installed to
   `~/.claude/workflows` (currently `code-review-sonnet.js`, the deep
-  multi-agent PR review harness `/pr-review` launches).
+  multi-agent PR review harness `/pr-review` launches). The cleanup finder
+  may surface up to 5x the per-angle budget, but only the first
+  `maxFindings` cleanup candidates (8, 10 or 15 by level) go to verify, since
+  cleanup ranks below every correctness finding and no more than that can
+  reach the report; `stats.cleanupCapped` counts the cut.
 - **`bin/link-shared-memory.sh`**: symlinks the cross-cutting Claude memory
   notes in `~/.claude/memory-shared` into each per-project auto-memory dir and
   maintains a managed block in each `MEMORY.md`. The notes themselves are
