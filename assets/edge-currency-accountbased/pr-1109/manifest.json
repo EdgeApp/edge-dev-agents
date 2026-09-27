@@ -1,0 +1,173 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-01-swap-quote.png",
+      "caption": "swap quote",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-02-swap-success.png",
+      "caption": "swap success",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-03-send-deployer.png",
+      "caption": "send deployer",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-04-send-success.png",
+      "caption": "send success",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-05-keyless-balance-after-resync.png",
+      "caption": "keyless balance after resync",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-07-negctl-bogus-checker-stale.png",
+      "caption": "negctl bogus checker stale",
+      "index": "7",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-08-keyless-checker-balance-updated.png",
+      "caption": "keyless checker balance updated",
+      "index": "8",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-09-keyless-arc-before-eurc.png",
+      "caption": "keyless arc before eurc",
+      "index": "9",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-10-keyless-eurc-swap-quote.png",
+      "caption": "keyless eurc swap quote",
+      "index": "10",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-11-keyless-eurc-swap-success.png",
+      "caption": "keyless eurc swap success",
+      "index": "11",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-12-keyless-eurc-loaded-arc2-empty.png",
+      "caption": "keyless eurc loaded arc2 empty",
+      "index": "12",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-13-keyless-eurc-send-to-arc2.png",
+      "caption": "keyless eurc send to arc2",
+      "index": "13",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-14-keyless-eurc-send-success.png",
+      "caption": "keyless eurc send success",
+      "index": "14",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1109/20260927-071454-agent-proof-1218567149157428-15-keyless-eurc-autodetected-arc2.png",
+      "caption": "keyless eurc autodetected arc2",
+      "index": "15",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-27T14:14:54Z",
+      "headSha": "4a5873fa3b27c2a7a9f88db6cf7f5ee535f970cf",
+      "addedAt": "2026-09-27T14:14:54Z"
+    }
+  ]
+}
