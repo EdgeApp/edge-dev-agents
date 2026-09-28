@@ -129,12 +129,26 @@ fi
 
 [ "$FOLLOWUP" = 1 ] && exit 0
 
+# Jev routing at the gate (~/.config/jev/routing/README.md): on an ALLOWED first-plan
+# transition, ask Jev which model can carry the implementation and, when it qualifies,
+# start a Sonnet shadow. Detached in its own session with a delay (a plan written in this
+# same command lands first); it never touches this hook's exit code. The router dedupes
+# per gid, skips Task deliverables, and honors ~/.config/jev/shadow/OFF.
+jev_route_async() {
+  local r="$HOME/.config/jev/routing/jev_route.py"
+  [ -f "$r" ] || return 0
+  perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' /bin/sh -c "sleep 20; exec python3 '$r' gate --gid '$GID'" \
+    </dev/null >/dev/null 2>&1 & disown 2>/dev/null || true
+  return 0
+}
+
 if ls /tmp/plan-"$GID"-*.md >/dev/null 2>&1 || \
    ls "$HOME"/git/.agent-worktrees/"$GID"/*/plan-"$GID"-*.md >/dev/null 2>&1 || \
    ls /private/tmp/claude-*/*/*/scratchpad/plan-"$GID"-*.md >/dev/null 2>&1; then
+  jev_route_async
   exit 0
 fi
-plan_written_in_command && exit 0
+plan_written_in_command && { jev_route_async; exit 0; }
 
 echo "BLOCKED: no plan document exists for task $GID. Before entering Developing, write the plan per asana-plan's create-plan-required: /tmp/plan-$GID-<short-slug>.md with all six sections (Summary; Goal/Definition of Done; Likely relevant files; Findings so far; Numbered implementation steps; Constraints), stamped with \$AGENT_SESSION_UUID. Then attach it to the task: ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh --task $GID --attach-file <plan-path> --attach-name plan-<short-slug>.md. Then retry this status update." >&2
 exit 2

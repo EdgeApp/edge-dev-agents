@@ -478,8 +478,8 @@ check('G3 a different slug stays a different doc',
       p.returncode == 0 and any(x['method'] == 'POST' for x in calls()) and not any(x['method'] == 'DELETE' for x in calls()), p.stdout + p.stderr)
 
 reset()
-p = update(['--attach-file', REPORT_FILE, '--attach-name', '2-agent-run-report.md'],
-           FAKE_ATTACH_JSON=att(('BARE1', 'agent-run-report.md', '2026-09-15T09:00:00.000Z')))
+p = update(['--attach-file', REPORT_FILE, '--attach-name', 'agent-run-report.md'],
+           FAKE_ATTACH_JSON=att(('NUM1', '2-agent-run-report.md', '2026-09-15T09:00:00.000Z')))
 check('G4 a prior segment report is still never replaced',
       p.returncode == 0 and not any(x['method'] in ('POST', 'DELETE') for x in calls()) and 'before this segment started' in p.stdout, p.stdout + p.stderr)
 
@@ -509,6 +509,16 @@ p = update(['--attach-file', REPORT_FILE, '--attach-name', '4-agent-run-report.m
            FAKE_ATTACH_JSON=att(('BARE0', 'agent-run-report.md', '2026-09-15T09:00:00.000Z'),
                                 ('NUM3', '3-agent-run-report.md', '2026-09-15T09:30:00.000Z')))
 check('J1 bare prior report does not block a new ordinal once numbering is in use',
+      p.returncode == 0 and any(x['method'] == 'POST' for x in calls()) and not any(x['method'] == 'DELETE' for x in calls()),
+      p.stdout + p.stderr)
+
+# J2: the task's ONLY report is a bare prior-segment doc (no numbered report yet).
+# The gate stamps the new report 2-agent-run-report.md; the bare doc must neither
+# block the upload nor be deleted.
+reset()
+p = update(['--attach-file', REPORT_FILE, '--attach-name', '2-agent-run-report.md'],
+           FAKE_ATTACH_JSON=att(('BARE0', 'agent-run-report.md', '2026-09-15T09:00:00.000Z')))
+check('J2 lone bare prior-segment report does not block the first numbered report',
       p.returncode == 0 and any(x['method'] == 'POST' for x in calls()) and not any(x['method'] == 'DELETE' for x in calls()),
       p.stdout + p.stderr)
 

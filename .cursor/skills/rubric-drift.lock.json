@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "eae3e38efd29",
+      "hash": "e51653dfdf59",
       "dims": [
         "O4",
         "O5",
@@ -1585,6 +1585,10 @@
     "pr-land:qa-subtasks-before-handoff": {
       "reason": "2026-09-26: operator ruling 2026-09-26: existence is gated by asana-task-update.sh; item quality not an eval dimension",
       "hash": "4cdc34aa5e93"
+    },
+    "one-shot:claude-calls-on-subscription": {
+      "reason": "2026-09-27: operator standing preference 2026-09-27; a missed case surfaces as a blocked completion or an API bill, both visible without an eval dimension",
+      "hash": "0d826fe90f7f"
     }
   },
   "excluded_skills": {

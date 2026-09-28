@@ -35,7 +35,7 @@ Verdicts: `GOOD` | `MINOR` | `BAD` | `NA` | `NOT_CAPTURED`. **GATE** dimensions 
 | memory-monitor.log + mem-trace logs | tick log + 7 days | O3 |
 | watchdog log (`/tmp/session-watchdog.out`) | until reboot/rotation | O4, O5, O6 hints |
 | slots.json / pool.json | seconds after Complete | O1, O6 (live-only) |
-| tmux sessions | ~3 completions (retired cap) | O5, O6 |
-| worktree | ~5 completions (prune cap) | O8 |
+| tmux sessions | ~3 completions (retired cap), or up to 30 min after all the task's PRs merge (merged-work teardown) | O5, O6 |
+| worktree | ~5 completions (prune cap), or up to 30 min after all the task's PRs merge (merged-work teardown) | O8 |
 
 **Policy:** never report GOOD on a dimension whose evidence is gone — that is NOT_CAPTURED. GOOD requires positive evidence. The capture hook (era: release receipt, in `~/.cursor/skills/agent-eval/references/era.md`) has two parts: (1) the watchdog writes a durable **release receipt** to `$XDG_STATE_HOME/agent-watcher/releases/<gid>.json` at retirement (`released:{sim,slot,metro}` + slot identity) — surfaced as `release_receipt` in the /resolve-run manifest; (2) the run-report frontmatter carries `slot_index`/`metro_port`/`sim_udid`. Use the receipt as primary O6 evidence and the frontmatter as primary O1 evidence. Runs retired before the hook (or whose receipt shows `released.slot: false` because the slot was already gone) remain NOT_CAPTURED — say so.

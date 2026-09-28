@@ -3,13 +3,20 @@
 // same model as orch-tui): a health strip, the request ledger, resumable
 // transcripts with a Resume control, and the live sessions grouped by kind.
 //
-// Tap contract: the page declares the `artifact` capability. A tap (Resume or
-// Refresh) publishes a SMALL placeholder document that carries only the state
-// (requests + the transcript uuids this page listed) and a "queued" notice.
-// That wakes the fleet anchor through its watch; fleet-panel.sh apply reads
-// the state, executes, and this renderer republishes the full page. Keeping
-// the tap payload small keeps the anchor's read (and its token cost) small,
-// and the full page never has to serialize itself.
+// Tap contract: the page declares the `artifact` and `comments` capabilities.
+// A republish does NOT wake a watching Claude session (it starts no turn), so a
+// tap does two things, in this order:
+//   1. comments.sendToClaude posts `fleet-request {id,kind,uuid,title}` as a new
+//      comment thread. That is the wake: the fleet anchor's watch (auto-replies
+//      armed) turns it into a turn. It must run first, inside the tap gesture,
+//      because step 2 reloads this view.
+//   2. artifact.publish replaces the page with a SMALL placeholder that carries
+//      the state (requests + the transcript uuids this page listed) and a
+//      "queued" notice, so the viewer sees the tap landed.
+// fleet-panel.sh apply merges the comment's request with the page state (the
+// comment wins the race if the anchor reads before the publish lands), executes,
+// and this renderer republishes the full page. Keeping the tap payload small
+// keeps the anchor's read (and its token cost) small.
 //
 // Usage: fleet-page.js [--state <fleet-state.json>] [--out <file>] [--dump <model.json>]
 'use strict'
@@ -214,22 +221,41 @@ ${jsonScript('state', embedded)}
   function stateScript(s) { return '<script type="application/json" id="state">' + JSON.stringify(s).replace(/<\\//g, '<\\\\/') + '<\\/script>'; }
   // The tap payload: a small placeholder page carrying the state. The fleet
   // anchor reads it, applies the requests, and republishes the full page.
-  function queuedPage(s, label) {
+  function queuedPage(s, label, wakeNote) {
     return '<!doctype html>\\n<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fleet</title>'
       + '<style>body{margin:0;padding:1.2rem;font:15px/1.5 -apple-system,"IBM Plex Sans",sans-serif;background:#f3f2ee;color:#1b1f24}@media(prefers-color-scheme:dark){body{background:#14171b;color:#e7e5df}}h1{font-size:1.05rem;margin:0 0 .6rem}p{margin:.3rem 0;max-width:40rem}small{opacity:.7}</style></head><body>'
       + '<h1>Fleet: ' + label.replace(/</g, '&lt;') + '</h1>'
       + '<p>Queued at ' + new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC. The fleet anchor on eddy picks this up on its next wake and republishes the full page; this view reloads by itself, usually within a minute.</p>'
+      + (wakeNote ? '<p><b>The fleet anchor was not notified (' + wakeNote.replace(/</g, '&lt;') + '). Ask it to sync in Remote Control.</b></p>' : '')
       + '<p><small>If this page has not changed in three minutes, the fleet anchor is down: open any anchor in Remote Control and ask it to resume fleet.</small></p>'
       + stateScript(s) + '</body></html>';
   }
-  var artifactP = (window.claude && window.claude.use) ? window.claude.use('artifact') : Promise.resolve(null);
-  artifactP.then(function (artifact) {
+  var use = (window.claude && window.claude.use) ? function (n) { return window.claude.use(n); } : function () { return Promise.resolve(null); };
+  Promise.all([use('artifact'), use('comments')]).then(function (caps) {
+    var artifact = caps[0], comments = caps[1];
     if (!artifact) { msg.textContent = 'read-only view: publishing is not available here'; return; }
     refresh.disabled = false;
-    function publish(next, label) {
+    // Wake the fleet anchor (see the tap contract in fleet-page.js). Resolves
+    // to '' when the comment went out, else a short reason for the queued page.
+    function wake(btn, req) {
+      if (!comments) return Promise.resolve('comments unavailable in this view');
+      return comments.anchorFor(btn).then(function (anchor) {
+        var text = 'fleet-request ' + JSON.stringify({ id: req.id, kind: req.kind, uuid: req.uuid || '', title: (req.title || '').slice(0, 120) });
+        return comments.sendToClaude({ anchor: anchor, text: text });
+      }).then(function () { return ''; }, function (e) {
+        var code = (e && e.code) || 'error';
+        if (code !== 'claude_unavailable') return code;
+        return comments.canSendToClaude().then(function (c) { return 'claude_unavailable: ' + c; }, function () { return code; });
+      });
+    }
+    function tap(btn, req, label) {
+      var next = JSON.parse(JSON.stringify(state));
+      next.requests.push(req);
       document.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
       msg.textContent = label + '…';
-      artifact.publish(queuedPage(next, label)).catch(function (e) {
+      wake(btn, req).then(function (wakeNote) {
+        return artifact.publish(queuedPage(next, label, wakeNote));
+      }).catch(function (e) {
         var code = (e && e.code) || 'error';
         if (code === 'conflict') { msg.textContent = 'a newer version arrived; reloading'; return; }
         msg.textContent = code === 'rate_limited' ? 'publishing too often right now; wait a minute and tap again' : 'could not publish: ' + code;
@@ -237,15 +263,11 @@ ${jsonScript('state', embedded)}
       });
     }
     refresh.addEventListener('click', function () {
-      var next = JSON.parse(JSON.stringify(state));
-      next.requests.push({ id: 'r' + Date.now().toString(36), kind: 'refresh', title: 'Refresh', at: new Date().toISOString(), status: 'pending' });
-      publish(next, 'refreshing');
+      tap(refresh, { id: 'r' + Date.now().toString(36), kind: 'refresh', title: 'Refresh', at: new Date().toISOString(), status: 'pending' }, 'refreshing');
     });
     document.querySelectorAll('button.act[data-uuid]').forEach(function (b) {
       b.addEventListener('click', function () {
-        var next = JSON.parse(JSON.stringify(state));
-        next.requests.push({ id: 'r' + Date.now().toString(36), kind: 'resume', uuid: b.dataset.uuid, title: b.dataset.title, at: new Date().toISOString(), status: 'pending' });
-        publish(next, 'resuming ' + b.dataset.title);
+        tap(b, { id: 'r' + Date.now().toString(36), kind: 'resume', uuid: b.dataset.uuid, title: b.dataset.title, at: new Date().toISOString(), status: 'pending' }, 'resuming ' + b.dataset.title);
       });
     });
   });

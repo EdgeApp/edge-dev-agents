@@ -213,6 +213,12 @@ the task's own unpublished dep PRs when the deliverable requires them.
   blocks
 - GC: keep newest `keep_completed_sessions` / `keep_completed_worktrees`
   (currently 20 / 5)
+- merged-work teardown (every 30 min): a task with no running session whose
+  worktrees all have a merged PR (none open) loses its retired session and
+  worktrees ahead of those caps
+- Xcode DerivedData: worktree teardown (`cleanup-task-workspace.sh`) deletes the
+  worktree's DerivedData, and a 6-hourly detached `derived-data-reap.sh
+  --orphans` deletes folders whose workspace is gone
 - orphan-Metro reap, idle-dirty-sim reclaim, and operator escalation for
   parked prompts or stuck sessions
 - Jev shadow: spools one named anchor's pane with its own regex state for
@@ -699,7 +705,8 @@ reproducible from a single clone + `./bootstrap.sh`:
   docs, and `credentials.example.json`. **Never committed:** `credentials.json`
   (secret) and machine-local state (`pool.json`, `slots.json`,
   `watchdog-state.json`, `*.state`, `*.log`, forensics) and session briefs
-  (`*-anchor-brief.*`; briefs live in `~/.local/state/agent-watcher/briefs`).
+  (`*-anchor-brief.*` and anything under `agent-watcher/briefs/`, such as a
+  session's watch script; briefs live in `~/.local/state/agent-watcher/briefs`).
 - **`agent-watcher/launchd/`**: templates for every `com.jontz.*` launchd job
   (watcher, watchdog, reanchor sweep, checkout refresh, sim pool refresh
   `launchd/com.jontz.sim-pool-refresh.plist` which owns the master rebuild and pool

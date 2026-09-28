@@ -208,6 +208,11 @@
           "command": "~/.config/agent-watcher/hooks/record-file-writes.sh",
           "timeout": 10,
           "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/block-shadow-writes.sh",
+          "timeout": 10,
+          "type": "command"
         }
       ],
       "matcher": "Bash"
@@ -312,6 +317,16 @@
         }
       ],
       "matcher": "Read"
+    },
+    {
+      "hooks": [
+        {
+          "command": "~/.config/agent-watcher/hooks/block-shadow-writes.sh",
+          "timeout": 10,
+          "type": "command"
+        }
+      ],
+      "matcher": "mcp__claude_ai_.*|mcp__plugin_.*|ScheduleWakeup|CronCreate"
     }
   ],
   "SessionStart": [
@@ -350,6 +365,11 @@
         {
           "command": "~/.config/agent-watcher/hooks/require-continuation-or-block.sh",
           "timeout": 15,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/shadow-continue.sh",
+          "timeout": 10,
           "type": "command"
         }
       ]

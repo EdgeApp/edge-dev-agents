@@ -346,7 +346,15 @@ if [[ $RUN_EXIT -ne 0 ]]; then
   if [[ -n "$WORKSPACE" ]]; then
     status_set phase xcodebuild
     echo ">> ios-rn-build: falling back to direct xcodebuild ($WORKSPACE, scheme $SCHEME)" >&2
-    DD="/tmp/ios-rn-build-dd-$$"
+    # One DerivedData folder per workspace (reused across fallback runs), stamped with
+    # the WorkspacePath key Xcode itself writes so derived-data-reap.sh deletes it with
+    # the worktree. It lives beside Xcode's own folders, not inside the worktree, so
+    # Metro/watchman never crawl the build output.
+    WS_ABS="$(cd "$(dirname "$WORKSPACE")" && pwd -P)/$(basename "$WORKSPACE")"
+    DD="$HOME/Library/Developer/Xcode/DerivedData/ios-rn-build-$(printf '%s' "$WS_ABS" | shasum | cut -c1-16)"
+    mkdir -p "$DD"
+    /usr/libexec/PlistBuddy -c "Add :WorkspacePath string $WS_ABS" "$DD/info.plist" >/dev/null 2>&1 \
+      || /usr/libexec/PlistBuddy -c "Set :WorkspacePath $WS_ABS" "$DD/info.plist" >/dev/null 2>&1 || true
     if xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Debug \
          -destination "id=$UDID" -derivedDataPath "$DD" build > "$RUN_LOG.xcb" 2>&1; then
       APP=$(find "$DD/Build/Products" -maxdepth 2 -name "*.app" -type d | head -1)

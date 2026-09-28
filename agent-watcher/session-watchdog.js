@@ -2,7 +2,8 @@
 // session-watchdog.js — Watchdog tending live claude-asana-* tmux sessions.
 // (Formerly rc-watchdog.js; renamed because it does more than RC.) Jobs:
 // RC-bridge revive, completion sweep (agent_status=Complete → teardown), blocked
-// sweep, worktree-retention GC, orphan-Metro + idle-dirty-sim reclaim, and the two
+// sweep, worktree-retention GC, merged-work teardown (30 min), orphan-DerivedData
+// sweep (6 h), orphan-Metro + idle-dirty-sim reclaim, and the two
 // operator-escalation surfaces (paneAwaitingChoice park, and the Stop-hook stuck flag).
 // RE-ENGAGEMENT IS NOT HERE: re-running/continuing a finished task is the WATCHER's job
 // (set it to Pending → the watcher resumes from the transcript on a fresh slot, or
@@ -1109,6 +1110,70 @@ function pruneRetainedWorktrees(liveSessions) {
   for (const w of toPrune) removeWorktree(w.gid, w.repo)
 }
 
+// Cadenced sweeps ride the 2-min tick but only run when their interval has elapsed;
+// the last-run stamp lives at the top level of the state file (not under sessions,
+// which the end-of-tick GC rewrites).
+const DERIVED_DATA_SWEEP_MS = 6 * 60 * 60 * 1000
+const MERGED_SWEEP_MS = 30 * 60 * 1000
+function sweepDue(state, key, intervalMs, now) {
+  if (now - (state[key] ?? 0) < intervalMs) return false
+  state[key] = now
+  return true
+}
+
+// Delete Xcode DerivedData folders whose workspace no longer exists. Worktree removal
+// already takes its own folder (cleanup-task-workspace.sh); this catches the rest:
+// crashes, hand-removed worktrees, scratch builds outside the worktree root.
+// Detached: deleting several ~5 GB folders takes minutes and would stall the tick.
+const DERIVED_DATA_LOG = '/tmp/derived-data-reap.log'
+function sweepOrphanDerivedData() {
+  sh(`nohup "${DIR}/derived-data-reap.sh" --orphans >> "${DERIVED_DATA_LOG}" 2>&1 &`)
+  log(`[derived-data] orphan sweep started (detached; results in ${DERIVED_DATA_LOG})`)
+}
+
+// Merged PRs for one worktree's branch, or null when the work is not fully merged
+// (no PR, any PR still open, only closed-unmerged PRs, a non-agent branch, or a gh
+// failure). Cross-repo PRs are ignored so a fork's same-named branch cannot match.
+function mergedPrUrls(wt) {
+  const branch = sh(`git -C "${wt}" rev-parse --abbrev-ref HEAD`)
+  const prefix = process.env.GIT_BRANCH_PREFIX || 'jon'
+  if (!branch || branch === 'HEAD' || !(branch.startsWith('agent/') || branch.startsWith(`${prefix}/`))) return null
+  const out = sh(`cd "${wt}" && gh pr list --head "${branch}" --state all --limit 20 --json url,state,isCrossRepository`)
+  let prs
+  try { prs = JSON.parse(out).filter((p) => !p.isCrossRepository) } catch { return null }
+  if (prs.some((p) => p.state === 'OPEN')) return null
+  const merged = prs.filter((p) => p.state === 'MERGED').map((p) => p.url)
+  return merged.length ? merged : null
+}
+
+// Tear down finished work as soon as it merges, regardless of the keep caps: when
+// EVERY repo worktree of a task has a merged PR and none open, kill its retired
+// session (if any) and remove the worktrees (removeWorktree → cleanup-task-workspace,
+// which also deletes their DerivedData). A task with a live claude-asana-<gid>
+// session is in flight and never touched. Transcripts survive; re-engage via Pending.
+function teardownMergedWork(liveSessions, state) {
+  let gidDirs
+  try { gidDirs = fs.readdirSync(WORKTREES_ROOT) } catch { return }
+  const running = new Set(liveSessions.map((s) => s.slice(SESSION_PREFIX.length)))
+  for (const gid of gidDirs) {
+    if (!/^\d+$/.test(gid) || running.has(gid)) continue
+    const gidDir = path.join(WORKTREES_ROOT, gid)
+    let repos
+    try { repos = fs.readdirSync(gidDir).filter((r) => fs.statSync(path.join(gidDir, r)).isDirectory()) } catch { continue }
+    if (repos.length === 0) continue
+    const merged = repos.map((repo) => mergedPrUrls(path.join(gidDir, repo)))
+    if (merged.some((m) => m === null)) continue
+    log(`[${gid}] all PRs merged (${merged.flat().join(', ')}) → tearing down worktree(s) ${repos.join(', ')}`)
+    const retired = `${RETIRED_PREFIX}${gid}`
+    if (sh(`tmux has-session -t "${retired}" 2>/dev/null && echo yes`) === 'yes') {
+      sh(`tmux kill-session -t "${retired}"`)
+      delete state.sessions[retired]
+      log(`[${retired}] killed: work merged (transcript survives)`)
+    }
+    for (const repo of repos) removeWorktree(gid, repo)
+  }
+}
+
 function main() {
   const sessions = listTargetSessions()
   if (sessions.length === 0) {
@@ -1384,8 +1449,14 @@ function main() {
   // Restart a bloated fseventsd when the sudoers rule permits; log otherwise.
   guardFseventsd(state, now)
 
+  // Tear down merged work (worktree + DerivedData + retired session) ahead of the caps.
+  if (sweepDue(state, 'lastMergedSweepAt', MERGED_SWEEP_MS, now)) teardownMergedWork(sessions, state)
+
   // Enforce the worktree retention cap (keep newest N completed/retired worktrees).
   pruneRetainedWorktrees(sessions)
+
+  // Delete DerivedData whose workspace is gone (runs after the prunes above).
+  if (sweepDue(state, 'lastDerivedDataSweepAt', DERIVED_DATA_SWEEP_MS, now)) sweepOrphanDerivedData()
 
   // Surface silent death of the memory gate (detection only).
   checkMonitorHeartbeat()

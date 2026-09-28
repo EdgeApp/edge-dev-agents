@@ -131,8 +131,13 @@ for (const d of dirs) {
       const n = fs.readSync(fd, buf, 0, buf.length, 0); fs.closeSync(fd)
       head = buf.slice(0, n).toString('utf8').split('\n').slice(0, 50).join('\n')
     } catch {}
-    const isRun = /"\/(one-shot|task-run) --yolo/.test(head)
-    const gid = (head.match(/app\.asana\.com[A-Za-z0-9/._-]*/) || [''])[0].match(/[0-9]{12,}/g)?.pop() || null
+    // Same pattern as lib/run-signature.sh RUN_SIGNATURE_RE (raw prompt, or the
+    // newer slash-command message form); keep the two identical.
+    const isRun = /"\/(one-shot|task-run) --yolo|<command-name>\/(one-shot|task-run)<\/command-name>[^"]{0,8}<command-args>--yolo/.test(head)
+    // First asana URL WITH a gid-length digit run (resume-agent first_gid_of rule):
+    // injected run-context can put digit-less asset URLs ahead of the task URL.
+    const taskUrl = [...head.matchAll(/app\.asana\.com[A-Za-z0-9/._-]*/g)].map(m => m[0]).find(u => /[0-9]{12,}/.test(u)) || ''
+    const gid = taskUrl.match(/[0-9]{12,}/g)?.pop() || null
     const kind = isRun ? 'run' : (uuid in forkParent ? 'chat' : 'interactive')
     const entry = {
       uuid, project_dir: d, kind, task_gid: gid, task_name: null,

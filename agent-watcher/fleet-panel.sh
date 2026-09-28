@@ -13,9 +13,12 @@
 # Usage:
 #   fleet-panel.sh render [--out /tmp/fleet-page.html]     render from the current fleet + ledger
 #   fleet-panel.sh extract-state <page.html>                print the page's embedded state JSON
-#   fleet-panel.sh apply <incoming-state.json> [--out /tmp/fleet-page.html]
+#   fleet-panel.sh apply <incoming-state.json> [--request-file <req.json>] [--out /tmp/fleet-page.html]
 #         merge the page's requests into the ledger (new ids only), execute every
-#         pending one in order, then render. A resume request runs
+#         pending one in order, then render. --request-file carries the JSON from
+#         the `fleet-request {...}` comment that woke the anchor; it is merged as
+#         if the page had listed it, because the comment can arrive before the
+#         page's own publish lands. A resume request runs
 #         resume-agent.sh --uuid <uuid> --chat; the uuid must be one the page
 #         itself listed (snapshotUuids), so nothing a viewer types can execute.
 #         Prints APPLIED <id> <status> <rc> per request and RENDERED <path>.
@@ -46,8 +49,22 @@ extract_state() {
 }
 
 apply() {
-  local incoming="$1"
+  local incoming="$1" reqfile="${2:-}"
   [ -r "$incoming" ] || { echo "incoming state not readable: $incoming" >&2; return 1; }
+  if [ -n "$reqfile" ]; then
+    [ -r "$reqfile" ] || { echo "request file not readable: $reqfile" >&2; return 1; }
+    local merged; merged=$(mktemp -t fleet-incoming)
+    node -e '
+      const fs = require("fs");
+      const page = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      const r = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+      if (!r || typeof r.id !== "string" || !/^r[0-9a-z]{4,16}$/.test(r.id)) { console.error("request file: bad id"); process.exit(1) }
+      page.requests = page.requests || [];
+      if (!page.requests.some(x => x && x.id === r.id)) page.requests.push({ id: r.id, kind: r.kind, uuid: r.uuid, title: r.title, at: new Date().toISOString() });
+      fs.writeFileSync(process.argv[3], JSON.stringify(page));
+    ' "$incoming" "$reqfile" "$merged" || return 1
+    incoming="$merged"
+  fi
   # 1. merge: append requests whose id the ledger has not seen; keep the page's snapshotUuids
   node -e '
     const fs = require("fs");
@@ -119,9 +136,9 @@ case "$cmd" in
     render ;;
   extract-state) [ -n "${1:-}" ] || { echo "usage: fleet-panel.sh extract-state <page.html>" >&2; exit 1; }; extract_state "$1" ;;
   apply)
-    incoming="${1:-}"; shift || true
-    while [ $# -gt 0 ]; do case "$1" in --out) OUT="$2"; shift 2 ;; *) shift ;; esac; done
-    [ -n "$incoming" ] || { echo "usage: fleet-panel.sh apply <incoming-state.json> [--out <file>]" >&2; exit 1; }
-    apply "$incoming" ;;
+    incoming="${1:-}"; shift || true; reqfile=""
+    while [ $# -gt 0 ]; do case "$1" in --out) OUT="$2"; shift 2 ;; --request-file) reqfile="$2"; shift 2 ;; *) shift ;; esac; done
+    [ -n "$incoming" ] || { echo "usage: fleet-panel.sh apply <incoming-state.json> [--request-file <req.json>] [--out <file>]" >&2; exit 1; }
+    apply "$incoming" "$reqfile" ;;
   *) echo "usage: fleet-panel.sh render|extract-state|apply ..." >&2; exit 1 ;;
 esac

@@ -35,6 +35,7 @@ SKIP_ASSIGN_IF_MISSING=false
 DO_UNASSIGN=false
 
 SET_BOARD_STATE=""
+MOVE_TO_SECTION=""
 SET_PRIORITY=""
 SET_RELEASE=""
 SET_DEVELOPER_GID=""
@@ -79,6 +80,7 @@ while [[ $# -gt 0 ]]; do
     --skip-assign-if-missing) SKIP_ASSIGN_IF_MISSING=true; shift ;;
     --unassign) DO_UNASSIGN=true; shift ;;
     --set-board-state) SET_BOARD_STATE="$2"; shift 2 ;;
+    --move-to-section) MOVE_TO_SECTION="$2"; shift 2 ;;
     --set-priority) SET_PRIORITY="$2"; shift 2 ;;
     --set-release) SET_RELEASE="$2"; shift 2 ;;
     --set-developer) SET_DEVELOPER_GID="$2"; shift 2 ;;
@@ -91,7 +93,7 @@ if [[ -z "$TASK_GID" ]]; then
   exit 1
 fi
 
-if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$SET_PRIORITY" ]] && [[ -z "$SET_RELEASE" ]] && [[ -z "$SET_DEVELOPER_GID" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$COMMENT_FILE" ]] && [[ -z "$DELETE_COMMENT_GID" ]] && [[ -z "$EDIT_COMMENT_GID" ]]; then
+if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$MOVE_TO_SECTION" ]] && [[ -z "$SET_PRIORITY" ]] && [[ -z "$SET_RELEASE" ]] && [[ -z "$SET_DEVELOPER_GID" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$COMMENT_FILE" ]] && [[ -z "$DELETE_COMMENT_GID" ]] && [[ -z "$EDIT_COMMENT_GID" ]]; then
   echo "Error: No operations specified" >&2
   exit 1
 fi
@@ -476,10 +478,24 @@ if $DO_ATTACH_FILE; then
     HAVE_NUMBERED=$(printf '%s\n' "$ATTACH_NAMES" | grep -E "$REPORT_ATTACH_RE" | while read -r n; do
         if [[ -n "$(report_name_ordinal "$n")" ]]; then echo yes; fi
       done | grep -m1 yes || true)
+    # A bare report whose every copy predates this segment is likewise not a
+    # family member for a numbered request, even when no numbered report exists
+    # yet (the task's first numbered report is this segment's).
+    SEG_START_FAM=""
+    FAM_VERSIONS="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/versions/$TASK_GID.jsonl"
+    [[ -f "$FAM_VERSIONS" ]] && SEG_START_FAM=$(jq -rs '[.[] | .ts // empty] | last // empty' "$FAM_VERSIONS" 2>/dev/null || true)
+    OLDER_ONLY_NAMES=""
+    if [[ -n "$SEG_START_FAM" ]]; then
+      OLDER_ONLY_NAMES=$(printf '%s' "$ATTACH_LIST" | jq -r --arg s "${SEG_START_FAM%%.*}" '
+          def norm: (. // "") | sub("\\.[0-9]+Z$"; "Z");
+          [.data[]? | {name, old: ((.created_at | norm) < (($s | sub("Z$"; "")) + "Z"))}]
+          | group_by(.name) | map(select(all(.[]; .old)) | .[0].name) | .[]' 2>/dev/null || true)
+    fi
     REPORT_FAMILY=$(printf '%s\n' "$ATTACH_NAMES" | grep -E "$REPORT_ATTACH_RE" | while read -r n; do
         [[ "$(report_name_suffix "$n")" == "$WANT_SUFFIX" ]] || continue
         HAVE_ORD=$(report_name_ordinal "$n")
         if [[ -z "$HAVE_ORD" && -n "$WANT_ORD" && -n "$HAVE_NUMBERED" ]]; then continue; fi
+        if [[ -z "$HAVE_ORD" && -n "$WANT_ORD" ]] && printf '%s\n' "$OLDER_ONLY_NAMES" | grep -Fxq -- "$n"; then continue; fi
         [[ -z "$HAVE_ORD" || -z "$WANT_ORD" || "$HAVE_ORD" == "$WANT_ORD" ]] && echo "$n"
       done | grep -v '^$' || true)
     [[ -n "$REPORT_FAMILY" ]] && EXISTING_ATTACH=$(printf '%s\n' "$REPORT_FAMILY" | head -1)
@@ -634,6 +650,25 @@ if [[ -n "$SET_RELEASE" ]]; then
 fi
 if [[ -n "$SET_DEVELOPER_GID" ]]; then
   echo ">> Developer field: set"
+fi
+
+# --move-to-section "<name>": move the task into a section of the jon-claude
+# orchestration board (project_gid in ~/.config/agent-watcher/asana-config.json),
+# resolved by name. For sections that are NOT an agent_status phase (e.g.
+# Refinement); a phase move belongs to update-status.sh, which also sets the
+# field. The task's other board memberships are untouched.
+if [[ -n "$MOVE_TO_SECTION" ]]; then
+  MS_PROJECT="$(jq -r '.project_gid // empty' "$HOME/.config/agent-watcher/asana-config.json" 2>/dev/null)"
+  [[ -n "$MS_PROJECT" ]] || { echo "Error: --move-to-section: no project_gid in asana-config.json" >&2; exit 1; }
+  MS_GID="$(curl -sf "$ASANA_API/projects/$MS_PROJECT/sections?opt_fields=name" -H "Authorization: Bearer $ASANA_TOKEN" \
+    | jq -r --arg n "$MOVE_TO_SECTION" '[.data[]? | select((.name | ascii_downcase) == ($n | ascii_downcase))][0].gid // empty')"
+  [[ -n "$MS_GID" ]] || { echo "Error: --move-to-section: no section named \"$MOVE_TO_SECTION\" on project $MS_PROJECT" >&2; exit 1; }
+  if curl -sf -X POST "$ASANA_API/sections/$MS_GID/addTask" -H "Authorization: Bearer $ASANA_TOKEN" \
+      -H "Content-Type: application/json" -d "$(jq -cn --arg t "$TASK_GID" '{data:{task:$t}}')" > /dev/null; then
+    echo ">> Section: moved to $MOVE_TO_SECTION"
+  else
+    echo ">> Section: FAILED moving to $MOVE_TO_SECTION" >&2; exit 1
+  fi
 fi
 
 # --set-current-state <file>: rewrite ONLY the agent-maintained tail of the task

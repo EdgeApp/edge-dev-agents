@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # run-signature.sh: shared predicate for "is this transcript a genuine orch RUN?"
-# Sourced by resume-task.sh (followup resume) and resolve-run.sh (eval manifest).
+# Sourced by resume-task.sh (followup resume), resolve-run.sh (eval manifest) and
+# resume-agent.sh (candidate list; feeds the Fleet page and session-tui).
 # Single source of truth; do not copy this block back into callers.
 #
 # A genuine run transcript carries an actual `/one-shot --yolo` USER message
@@ -18,9 +19,15 @@
 #     match (grep quits, head SIGPIPEs), which reads as no-match
 #   - grep -a: BSD grep binary-detects transcript heads and silently misses
 
+# ERE shared with session-index.sh (JS regex of the same text); keep them identical.
+RUN_SIGNATURE_RE='"/(one-shot|task-run) --yolo|<command-name>/(one-shot|task-run)</command-name>[^"]{0,8}<command-args>--yolo'
+
 has_run_signature() { # $1=transcript.jsonl -> 0 iff head carries a /one-shot user message
   local sig_head
   sig_head=$(head -50 "$1" 2>/dev/null || true)
-  # /task-run is the no-PR run shape (agent_deliverable Task).
-  grep -qaE '"/(one-shot|task-run) --yolo' <<<"$sig_head"
+  # /task-run is the no-PR run shape (agent_deliverable Task). Two recorded forms:
+  # the raw prompt string, and (newer CLI builds) the slash-command message
+  # `<command-name>/one-shot</command-name>\n<command-args>--yolo ...`, whose raw
+  # form only lands later in a `last-prompt` line, past a short head.
+  grep -qaE "$RUN_SIGNATURE_RE" <<<"$sig_head"
 }

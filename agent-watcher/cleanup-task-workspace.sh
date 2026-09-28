@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # cleanup-task-workspace.sh — Reverse of setup-task-workspace.sh.
 #
-# Removes a per-task worktree, deletes its env.json copy, and deletes the
-# agent branch if it's safe (the branch matches our `agent/<gid>` convention).
+# Removes a per-task worktree, its Xcode DerivedData, deletes its env.json copy,
+# and deletes the agent branch if it's safe (the branch matches our `agent/<gid>` convention).
 # Used by session-watchdog.js during the completion sweep and by gc-worktrees.sh.
 #
 # Usage:
@@ -56,6 +56,11 @@ if [[ -d "$WT" ]]; then
     kill "$pid" 2>/dev/null && echo ">> cleanup-task-workspace: killed dev-server/proc pid $pid rooted in worktree" >&2
   done
 fi
+
+# Delete the Xcode DerivedData this worktree built (~2 GB per iOS build). Xcode keys
+# the folder by workspace path, so once the worktree is gone nothing else maps it
+# back; do it while the path still resolves.
+"$HOME/.config/agent-watcher/derived-data-reap.sh" --under "$WT" >&2 || true
 
 # Delete the env.json copy first so we scrub the plaintext secrets even if the
 # worktree-remove below fails and the dir lingers. (-e: it's now a real file, not

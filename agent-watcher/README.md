@@ -56,6 +56,10 @@ task that is blocked-or-in-flight in Asana but whose tmux session has died does
    the cloned sim, drop the slot, and retain the worktree. The oldest retired sessions beyond
    `keep_completed_sessions` (default 3) and worktrees beyond `keep_completed_worktrees`
    (default 5) are pruned. Set either to 0 for the old hard-kill/destroy behavior.
+   Merged work skips the caps: every 30 min, a task with no running session whose repo
+   worktrees all have a merged PR (none open) loses its retired session and worktrees.
+   Every worktree teardown also deletes the worktree's Xcode DerivedData, and a 6-hourly
+   sweep (`derived-data-reap.sh --orphans`) deletes DerivedData whose workspace is gone.
 4. **Shed-on-block** (`session-watchdog.js`) — LEGACY NET: since 2026-07-30 a block is a
    blocked COMPLETION (agents write `Complete --blocked yes` in one call, per one-shot
    `yolo-true-blockers`), so blocked tasks retire through the normal completion sweep and
@@ -167,6 +171,7 @@ name/runtime, Metro defaults to 8081.
 | `lib/autocompact-flag.sh` | prints the `--autocompact <window>` flag every claude spawn on the box passes (orch runs, chat sessions, rc-heal anchors, resume-agent resumes; the watchdog's RC respawn carries it over from the old argv), from `watcher.autocompact_window` (default 200k, `auto` = no flag) |
 | `slots.json` | slot state |
 | `gc-worktrees.sh` | manual orphan cleanup |
+| `derived-data-reap.sh` | delete Xcode DerivedData by the workspace it built: `--under <dir>` (worktree teardown) or `--orphans` (workspace gone; watchdog, 6 h, detached, log `/tmp/derived-data-reap.log`); never touches `*.noindex` or folders without an `info.plist` WorkspacePath |
 | `session-index.sh` | inventory of live sessions + all transcripts (kind, task, lineage, content search with fork-echo demotion); feeds /resume-session |
 | `resume-agent.sh` | resume a session by task gid/name terms; `--chat` forks it into a watchdog-covered RC discussion session (no slot); `--recover` re-provisions a missing slot; `--list` shows Asana task titles (same "Asana: <name>" string the desktop session list shows, 6h disk cache at `$XDG_STATE_HOME/agent-watcher/asana-task-names.tsv`) plus tmux state per run: `●` running, `◐` retired (attachable), `✗` dead pane, blank = transcript only, with live chat forks annotated by child uuid; `--list --porcelain` emits the same data as TSV (`mtime, uuid, gid, state, rc, fork_child, fork_rc, title` — the session-tui.js contract); `--tui` launches the dashboard |
 | `rc-heal.sh` | pinned-anchor RC healing ONLY (launchd com.jontz.rc-heal, 5min), the healing slice of session-watchdog.js with no Asana/slots/sims/worktrees: per anchor in `rc-heal.json`, (1) tmux session gone -> recreate + start claude, (2) pane alive but claude dead -> revive in place (10min cooldown), (3) claude alive + RC bridge DOWN + pane idle 20min -> kill (verified dead) + respawn (6h cooldown). Bridge UP is never touched; a pane parked at a human-choice prompt is never revived. Transcript identity is a MINTED `--session-id` (no argv scraping, no newest-jsonl guess). Veto /tmp/rc-heal-hold[-<name>]; `--status`, `--dry-run`, `--force <name>`. `RC_HEAL_LIB=1 source` for the detectors; `rc-heal-test.sh` covers them |

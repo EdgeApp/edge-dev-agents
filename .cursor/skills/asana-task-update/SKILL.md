@@ -38,6 +38,11 @@ metadata:
   --attach-pr --pr-url <url> --pr-title "<title>" --pr-number <num> \
   --assign --skip-assign-if-missing --set-board-state "PR Review"
 
+# Move the card to a non-phase section of the jon-claude board (e.g. Refinement);
+# phase sections go through update-status.sh, which also sets agent_status
+~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
+  --task <task_gid> --move-to-section Refinement
+
 # Post-merge: write the manual QA items (one subtask each), then hand off
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
   --task <task_gid> \

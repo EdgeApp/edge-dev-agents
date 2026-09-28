@@ -141,13 +141,15 @@ recover_slot() {
 # Derive the prefix from $HOME so this works under any macOS user (not just "jontz").
 # Both shapes share the enc(~/git) prefix, so one glob catches them all.
 ENC_GIT_PREFIX=$(printf '%s' "$HOME/git" | sed 's#[/.]#-#g')
+# shellcheck source=lib/run-signature.sh
+source "$DIR/lib/run-signature.sh"
 CANDIDATES=()
 shopt -s nullglob
 for d in "$HOME/.claude/projects/$ENC_GIT_PREFIX"*; do
   [[ -d "$d" ]] || continue
   for f in "$d"/*.jsonl; do
     [[ -f "$f" ]] || continue
-    if head -20 "$f" | grep -qE '"/(one-shot|task-run) --yolo' ; then
+    if has_run_signature "$f"; then
       CANDIDATES+=("$f")
     fi
   done
@@ -390,7 +392,7 @@ emit_candidates() {
     # Find the first user `/one-shot ...` line and pull a short preview of the prompt.
     # `grep -m1` closes the pipe early; head/sed upstream die SIGPIPE (141), which
     # `set -eo pipefail` turns into a silent abort mid-listing. Absorb it.
-    preview=$( (head -30 "$f" | grep -m1 -E '"/(one-shot|task-run) --yolo' | sed -E 's/.*"(\/(one-shot|task-run) --yolo [^"]{0,80})[^"]*".*/\1/' | head -c 100) 2>/dev/null || true)
+    preview=$( (head -50 "$f" | grep -m1 -E '"/(one-shot|task-run) --yolo' | sed -E 's/.*"(\/(one-shot|task-run) --yolo [^"]{0,80})[^"]*".*/\1/' | head -c 100) 2>/dev/null || true)
     # "-" placeholder, never an empty field: tab is IFS whitespace, so an empty
     # gid COLLAPSES on `IFS=$'\t' read` and shifts the preview into the gid
     # column (this blanked titles downstream). Consumers normalize "-" back.
