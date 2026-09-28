@@ -1,0 +1,53 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/react-native-zano/pr-21/20260928-152231-agent-proof-1218952981180804-02-my-zano-balance.png",
+      "caption": "my zano balance",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-28T22:22:31Z",
+      "headSha": "5a279d2ee4e5a666f4372e5a3c2c177a3ac01972",
+      "addedAt": "2026-09-28T22:22:31Z"
+    },
+    {
+      "path": "assets/react-native-zano/pr-21/20260928-152231-agent-proof-1218952981180804-03-my-zano-txs.png",
+      "caption": "my zano txs",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-28T22:22:31Z",
+      "headSha": "5a279d2ee4e5a666f4372e5a3c2c177a3ac01972",
+      "addedAt": "2026-09-28T22:22:31Z"
+    },
+    {
+      "path": "assets/react-native-zano/pr-21/20260928-152231-agent-proof-1218952981180804-04-fresh-zano.png",
+      "caption": "fresh zano",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-28T22:22:31Z",
+      "headSha": "5a279d2ee4e5a666f4372e5a3c2c177a3ac01972",
+      "addedAt": "2026-09-28T22:22:31Z"
+    },
+    {
+      "path": "assets/react-native-zano/pr-21/20260928-152231-agent-proof-1218952981180804-05-send-success.png",
+      "caption": "send success",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-28T22:22:31Z",
+      "headSha": "5a279d2ee4e5a666f4372e5a3c2c177a3ac01972",
+      "addedAt": "2026-09-28T22:22:31Z"
+    }
+  ]
+}
