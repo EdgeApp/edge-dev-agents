@@ -1,0 +1,53 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-currency-accountbased/pr-1110/20260928-153245-agent-proof-1218952981180804-02-my-zano-balance.png",
+      "caption": "my zano balance",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-28T22:32:45Z",
+      "headSha": "0974d4e90d5f1808e69d8a4f0ac4c1835e9114fa",
+      "addedAt": "2026-09-28T22:32:45Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1110/20260928-153245-agent-proof-1218952981180804-03-my-zano-txs.png",
+      "caption": "my zano txs",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-28T22:32:45Z",
+      "headSha": "0974d4e90d5f1808e69d8a4f0ac4c1835e9114fa",
+      "addedAt": "2026-09-28T22:32:45Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1110/20260928-153245-agent-proof-1218952981180804-04-fresh-zano.png",
+      "caption": "fresh zano",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-28T22:32:45Z",
+      "headSha": "0974d4e90d5f1808e69d8a4f0ac4c1835e9114fa",
+      "addedAt": "2026-09-28T22:32:45Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1110/20260928-153245-agent-proof-1218952981180804-05-send-success.png",
+      "caption": "send success",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-28T22:32:45Z",
+      "headSha": "0974d4e90d5f1808e69d8a4f0ac4c1835e9114fa",
+      "addedAt": "2026-09-28T22:32:45Z"
+    }
+  ]
+}
