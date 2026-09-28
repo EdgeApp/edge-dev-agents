@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/chrome-auto-close/pr-1/20260928-111119-agent-proof-1218950707685619-01-options-page.png",
+      "caption": "options page",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-28T18:11:19Z",
+      "headSha": "ebcd81f8a1c952f519da9b344dcd9bcf8717190e",
+      "addedAt": "2026-09-28T18:11:19Z"
+    },
+    {
+      "path": "assets/chrome-auto-close/pr-1/20260928-111119-agent-proof-1218950707685619-02-HACKED-popup-countdown.png",
+      "caption": "popup countdown",
+      "index": "2",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "popup opened in its own tab with chrome.tabs.query overridden at runtime to return the pending Slack tab (no source change)",
+      "batchAt": "2026-09-28T18:11:19Z",
+      "headSha": "ebcd81f8a1c952f519da9b344dcd9bcf8717190e",
+      "addedAt": "2026-09-28T18:11:19Z"
+    }
+  ]
+}
