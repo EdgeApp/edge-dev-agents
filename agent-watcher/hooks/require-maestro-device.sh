@@ -12,6 +12,12 @@
 #                    other booted device (the 2026-07-22 swapter wrong-sim
 #                    hour). --driver-host-port (METRO+1000) is also required:
 #                    parallel slots' iOS drivers contend on the default port.
+#                    maestro-runner drives get the same device pin and booted
+#                    guard, but no --driver-host-port (it has none: its WDA
+#                    port is derived from the UDID, 8100 + last-12-hex mod
+#                    1000; a busy port exits with "device in use").
+#                    They need --platform ios instead: without it the runner
+#                    defaults to Android and never reaches the sim.
 #   Android:         CLI drives must pin --device to an adb serial that is
 #                    ATTACHED (adb get-state == device). The iOS slot sim's
 #                    state is irrelevant and the booted guard must NOT fire
@@ -91,9 +97,10 @@ esac
 
 # Drive detection and --device extraction live in lib/maestro-cmd.sh (shared
 # with require-playbook-before-drive.sh): only segments whose command word is
-# maestro with a test/record/studio/hierarchy subcommand gate; `maestro
-# --version`, mcp, and reads of maestro paths pass. Every drive segment in the
-# command is checked, not only the first.
+# maestro with a test/record/studio/hierarchy subcommand, or maestro-runner
+# with a test/hierarchy/screenshot/wda subcommand, gate; `maestro --version`,
+# mcp, `maestro-runner devices|doctor|lint`, and reads of maestro paths pass.
+# Every drive segment in the command is checked, not only the first.
 LIB="$HOME/.config/agent-watcher/hooks/lib"
 [ -f "$LIB/maestro-cmd.sh" ] && [ -f "$LIB/shell-word-resolve.sh" ] || exit 0
 . "$LIB/maestro-cmd.sh"
@@ -102,8 +109,13 @@ SEGS=$(maestro_cmd_segments "$CMD" "$CMD_M" 2>/dev/null | grep '^drive' || true)
 [ -n "$SEGS" ] || exit 0
 
 TAB=$(printf '\t')
-while IFS="$TAB" read -r _ OFF WORD; do
+while IFS="$TAB" read -r _ OFF ENGINE PLAT WORD; do
+  PLAT="${PLAT//[\"\']/}"
   if [ -z "$WORD" ]; then
+    if [ "$ENGINE" = maestro-runner ]; then
+      echo "BLOCKED: maestro-runner run has no --device. Multiple devices can be live on this host (parallel slot sims, Android emulators, physical devices) and an unpinned run attaches to an arbitrary one (\$MAESTRO_DEVICE is not accepted here: the gate must see the target on the command line). iOS slot work: maestro-runner --platform ios --device $AGENT_SIM_UDID test <flow>. Android work: maestro-runner --device <adb-serial> test <flow>." >&2
+      exit 2
+    fi
     echo "BLOCKED: maestro run has no --device. Multiple devices can be live on this host (parallel slot sims, Android emulators, physical devices) and an unpinned run attaches to an arbitrary one, so it may drive ANOTHER slot's app. iOS slot work: maestro --device $AGENT_SIM_UDID --driver-host-port \$((AGENT_METRO_PORT + 1000)) test <flow>. Android work: maestro --device <adb-serial> test <flow> (serial from 'adb devices'; no driver port needed). Note the maestro MCP daemon is bound to the iOS slot sim and ignores per-call device_id, so the CLI is the only Android path." >&2
     exit 2
   fi
@@ -122,6 +134,15 @@ while IFS="$TAB" read -r _ OFF WORD; do
       exit 2
     fi
     booted_guard
+    if [ "$ENGINE" = maestro-runner ]; then
+      # No driver-port flag exists (WDA port is UDID-derived); the platform
+      # flag is what makes the runner target the sim at all.
+      if [ "$PLAT" != ios ]; then
+        echo "BLOCKED: maestro-runner defaults to --platform android, so an iOS UDID without --platform ios never reaches the sim. Use: maestro-runner --platform ios --device $AGENT_SIM_UDID test <flow>." >&2
+        exit 2
+      fi
+      continue
+    fi
     if [ -n "${AGENT_METRO_PORT:-}" ] && ! echo "$CMD_M" | grep -q -- '--driver-host-port'; then
       echo "BLOCKED: iOS maestro run is missing --driver-host-port; parallel slots' iOS drivers contend on the default port. Use: maestro --device $AGENT_SIM_UDID --driver-host-port \$((AGENT_METRO_PORT + 1000)) test <flow>." >&2
       exit 2

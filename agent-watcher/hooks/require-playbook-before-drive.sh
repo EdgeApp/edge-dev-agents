@@ -41,10 +41,10 @@ case "$TOOL" in
     # (a report heredoc, an echo) must not fire this hook.
     CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
     # A drive is what lib/maestro-cmd.sh says it is (shared with
-    # require-maestro-device.sh): maestro EXECUTED with a test/record/studio/
-    # hierarchy subcommand, or capture-buy-quote.sh / maestro-mcp-wrapper.sh
-    # executed. `maestro --version`, `ls .../maestro`, and grep/cat of maestro
-    # paths are not drives.
+    # require-maestro-device.sh): maestro or maestro-runner EXECUTED with a
+    # driving subcommand, or capture-buy-quote.sh / maestro-bench.sh /
+    # maestro-mcp-wrapper.sh executed. `maestro --version`, `ls .../maestro`,
+    # and grep/cat of maestro paths are not drives.
     LIB="$HOME/.config/agent-watcher/hooks/lib"
     [ -f "$LIB/maestro-cmd.sh" ] || exit 0
     . "$LIB/maestro-cmd.sh"
