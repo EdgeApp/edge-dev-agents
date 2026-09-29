@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-exchange-plugins/pr-498/20260928-183522-agent-proof-1218952288907800-07-rango-bnb-to-arb-eth-quote.png",
+      "caption": "rango bnb to arb eth quote",
+      "index": "7",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T01:35:22Z",
+      "headSha": "e451a6b5ea7a6d2d6add79ae8946997148f12338",
+      "addedAt": "2026-09-29T01:35:22Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-498/20260928-183522-agent-proof-1218952288907800-08-rango-swap-success.png",
+      "caption": "rango swap success",
+      "index": "8",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T01:35:22Z",
+      "headSha": "e451a6b5ea7a6d2d6add79ae8946997148f12338",
+      "addedAt": "2026-09-29T01:35:22Z"
+    }
+  ]
+}
