@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-currency-accountbased/pr-1113/20260929-162006-agent-proof-1218963986059771-01-HACKED-before-zero-usdc-row.png",
+      "caption": "before zero usdc row",
+      "index": "1",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Local uncommitted override of the Solana engine address to the reporter's wallet (EGqbvb...), with Hide spam transactions off so the metadata-less 0 row renders; both reverted",
+      "batchAt": "2026-09-29T23:20:06Z",
+      "headSha": "b4729c6f667e3c4054dc5c7b957168fd8c315b27",
+      "addedAt": "2026-09-29T23:20:06Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1113/20260929-162006-agent-proof-1218963986059771-02-HACKED-after-row-gone.png",
+      "caption": "after row gone",
+      "index": "2",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Local uncommitted override of the Solana engine address to the reporter's wallet (EGqbvb...), with Hide spam transactions off so the metadata-less 0 row renders; both reverted",
+      "batchAt": "2026-09-29T23:20:06Z",
+      "headSha": "b4729c6f667e3c4054dc5c7b957168fd8c315b27",
+      "addedAt": "2026-09-29T23:20:06Z"
+    }
+  ]
+}
