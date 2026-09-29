@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-login-ui-rn/pr-295/20260929-130952-agent-proof-1215939017452141-01-password-done-empty.png",
+      "caption": "password done empty",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T20:09:52Z",
+      "headSha": "1f4a7f588bf5e24edec4ed52d805a414ec1448dc",
+      "addedAt": "2026-09-29T20:09:52Z"
+    },
+    {
+      "path": "assets/edge-login-ui-rn/pr-295/20260929-130952-agent-proof-1215939017452141-02-pin-flavor.png",
+      "caption": "pin flavor",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T20:09:52Z",
+      "headSha": "1f4a7f588bf5e24edec4ed52d805a414ec1448dc",
+      "addedAt": "2026-09-29T20:09:52Z"
+    },
+    {
+      "path": "assets/edge-login-ui-rn/pr-295/20260929-130952-agent-proof-1215939017452141-03-pin-login-wallet-list.png",
+      "caption": "pin login wallet list",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T20:09:52Z",
+      "headSha": "1f4a7f588bf5e24edec4ed52d805a414ec1448dc",
+      "addedAt": "2026-09-29T20:09:52Z"
+    }
+  ]
+}
