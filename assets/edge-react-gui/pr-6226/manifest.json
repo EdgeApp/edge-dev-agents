@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6226/20260928-183531-agent-proof-1218952288907800-09-revolut-buy-quote.png",
+      "caption": "revolut buy quote",
+      "index": "9",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T01:35:31Z",
+      "headSha": "7b5cd644632f3109db19c5d261755a4ee594d013",
+      "addedAt": "2026-09-29T01:35:31Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6226/20260928-183531-agent-proof-1218952288907800-10-revolut-checkout-signin-wall.png",
+      "caption": "revolut checkout signin wall",
+      "index": "10",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T01:35:31Z",
+      "headSha": "7b5cd644632f3109db19c5d261755a4ee594d013",
+      "addedAt": "2026-09-29T01:35:31Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6226/20260928-183531-agent-proof-1218952288907800-11-sell-min-amount-wall.png",
+      "caption": "sell min amount wall",
+      "index": "11",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T01:35:31Z",
+      "headSha": "7b5cd644632f3109db19c5d261755a4ee594d013",
+      "addedAt": "2026-09-29T01:35:31Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6226/20260928-183531-agent-proof-1218952288907800-12-HACKED-paybis-sell-quote.png",
+      "caption": "paybis sell quote",
+      "index": "12",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "local uncommitted bypass of the sell balance checks in RampCreateScene, reverted before push",
+      "batchAt": "2026-09-29T01:35:31Z",
+      "headSha": "7b5cd644632f3109db19c5d261755a4ee594d013",
+      "addedAt": "2026-09-29T01:35:31Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6226/20260928-183531-agent-proof-1218952288907800-13-HACKED-paybis-sell-widget.png",
+      "caption": "paybis sell widget",
+      "index": "13",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "local uncommitted bypass of the sell balance checks in RampCreateScene, reverted before push",
+      "batchAt": "2026-09-29T01:35:31Z",
+      "headSha": "7b5cd644632f3109db19c5d261755a4ee594d013",
+      "addedAt": "2026-09-29T01:35:31Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6226/20260928-183531-agent-proof-1218952288907800-14-HACKED-paybis-kyc-address-wall.png",
+      "caption": "paybis kyc address wall",
+      "index": "14",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "local uncommitted bypass of the sell balance checks in RampCreateScene, reverted before push",
+      "batchAt": "2026-09-29T01:35:31Z",
+      "headSha": "7b5cd644632f3109db19c5d261755a4ee594d013",
+      "addedAt": "2026-09-29T01:35:31Z"
+    }
+  ]
+}
