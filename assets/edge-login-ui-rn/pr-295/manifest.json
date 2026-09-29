@@ -9,9 +9,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-29T20:09:52Z",
-      "headSha": "1f4a7f588bf5e24edec4ed52d805a414ec1448dc",
-      "addedAt": "2026-09-29T20:09:52Z"
+      "batchAt": "2026-09-29T20:34:30Z",
+      "headSha": "9c660b1fccf2e00c10174d1f772d6ff8f4d57a7a",
+      "addedAt": "2026-09-29T20:09:52Z",
+      "carriedFrom": "2026-09-29T20:09:52Z"
     },
     {
       "path": "assets/edge-login-ui-rn/pr-295/20260929-130952-agent-proof-1215939017452141-02-pin-flavor.png",
@@ -21,9 +22,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-29T20:09:52Z",
-      "headSha": "1f4a7f588bf5e24edec4ed52d805a414ec1448dc",
-      "addedAt": "2026-09-29T20:09:52Z"
+      "batchAt": "2026-09-29T20:34:30Z",
+      "headSha": "9c660b1fccf2e00c10174d1f772d6ff8f4d57a7a",
+      "addedAt": "2026-09-29T20:09:52Z",
+      "carriedFrom": "2026-09-29T20:09:52Z"
     },
     {
       "path": "assets/edge-login-ui-rn/pr-295/20260929-130952-agent-proof-1215939017452141-03-pin-login-wallet-list.png",
@@ -33,9 +35,34 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-29T20:09:52Z",
-      "headSha": "1f4a7f588bf5e24edec4ed52d805a414ec1448dc",
-      "addedAt": "2026-09-29T20:09:52Z"
+      "batchAt": "2026-09-29T20:34:30Z",
+      "headSha": "9c660b1fccf2e00c10174d1f772d6ff8f4d57a7a",
+      "addedAt": "2026-09-29T20:09:52Z",
+      "carriedFrom": "2026-09-29T20:09:52Z"
+    },
+    {
+      "path": "assets/edge-login-ui-rn/pr-295/20260929-133430-agent-proof-1215939017452141-04-HACKED-forget-selected-dropdown.png",
+      "caption": "forget selected dropdown",
+      "index": "4",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "stubbed context.forgetAccount and pointed nextUser at a guest when one exists, so the forget path runs without deleting an account",
+      "batchAt": "2026-09-29T20:34:30Z",
+      "headSha": "9c660b1fccf2e00c10174d1f772d6ff8f4d57a7a",
+      "addedAt": "2026-09-29T20:34:30Z"
+    },
+    {
+      "path": "assets/edge-login-ui-rn/pr-295/20260929-133430-agent-proof-1215939017452141-05-HACKED-forget-selected-fallback.png",
+      "caption": "forget selected fallback",
+      "index": "5",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "stubbed context.forgetAccount and pointed nextUser at a guest when one exists, so the forget path runs without deleting an account",
+      "batchAt": "2026-09-29T20:34:30Z",
+      "headSha": "9c660b1fccf2e00c10174d1f772d6ff8f4d57a7a",
+      "addedAt": "2026-09-29T20:34:30Z"
     }
   ]
 }
