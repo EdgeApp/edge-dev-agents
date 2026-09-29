@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "entries": [
     {
       "path": "assets/edge-react-gui/pr-6211/20260911-155707-agent-proof-1218408624974487-03-HACKED-slider-before-slide.png",
@@ -48,6 +48,30 @@
       "phase": "after",
       "subject": "Quote Paybis sell max at the wallet max",
       "hackNote": null
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6211/20260928-173129-agent-proof-1218408624974487-01-HACKED-paybis-requote-below-sol-ceiling.png",
+      "caption": "paybis requote below sol ceiling",
+      "index": "1",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Temporarily pinned maxExchangeAmount to 1000000 in RampCreateScene's sell Max handler to force an over-ceiling request; reverted with git checkout.",
+      "batchAt": "2026-09-29T00:31:29Z",
+      "headSha": "0491a8581bc56271c82bacbe3a207119b7cbeefd",
+      "addedAt": "2026-09-29T00:31:29Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6211/20260928-173129-agent-proof-1218408624974487-02-organic-sell-max-wallet-amount.png",
+      "caption": "organic sell max wallet amount",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T00:31:29Z",
+      "headSha": "0491a8581bc56271c82bacbe3a207119b7cbeefd",
+      "addedAt": "2026-09-29T00:31:29Z"
     }
   ]
 }
