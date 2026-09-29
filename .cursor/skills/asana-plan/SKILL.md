@@ -42,6 +42,7 @@ Create a concise actionable implementation plan using Cursor's plan flow. Includ
 - Findings so far
 - Numbered implementation steps
 - Constraints
+- Conflicts: `none`, or each unruled conflict per task-review `operator-final-say` (who said what, the plan's default)
 </step>
 
 <step id="4" name="Handoff and confirmation">

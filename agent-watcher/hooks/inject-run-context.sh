@@ -88,7 +88,7 @@ emit_run() {
                    $r.keep[]
             end' 2>/dev/null)
     if [[ -n "$stories" ]]; then
-      echo "HUMAN COMMENTS NEWER THAN THE LAST RUN REPORT (undischarged followup scope; [other] items need the operator's ruling before Developing, task-review operator-final-say):"
+      echo "HUMAN COMMENTS NEWER THAN THE LAST RUN REPORT (undischarged followup scope; [other] items block only when they would change the deliverable and the operator has not ruled, task-review operator-final-say):"
       echo "$stories"
     else
       echo "No operator comments newer than the last run-report attachment (verified live just now)."

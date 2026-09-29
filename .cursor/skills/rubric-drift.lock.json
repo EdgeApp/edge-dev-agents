@@ -45,7 +45,7 @@
       ]
     },
     "one-shot:yolo-true-blockers": {
-      "hash": "a43dee5e5391",
+      "hash": "1bb2afeed328",
       "dims": [
         "A7",
         "O7"
@@ -1483,8 +1483,8 @@
       "hash": "dc073d062e0a"
     },
     "task-review:operator-final-say": {
-      "reason": "2026-09-03: graded under A7 as true-blocker condition (e); the gate is mechanical (require-plan-before-developing.sh), no separate dimension",
-      "hash": "c7682b76a643"
+      "reason": "2026-09-29: judgment rule; enforced by require-plan-before-developing.sh (Conflicts line) and audited per run by the completion judge J1 (OTHER PEOPLE'S TEXT); A7 covers the blocked completion it can end in",
+      "hash": "86e17bf1906f"
     },
     "changelog:entry-shape": {
       "reason": "2026-09-08: mechanical: write gate (lint-md-on-write.sh, all vectors incl. inline python/node) + lint-commit.sh staged-diff lint; A12 grades commit discipline",

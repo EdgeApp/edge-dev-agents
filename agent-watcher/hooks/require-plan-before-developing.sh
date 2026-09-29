@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PreToolUse hook (matcher: Bash). Blocks the Planning→Developing status
-# transition in agent sessions until the planning artifacts exist and no
-# operator ruling is pending:
+# transition in agent sessions until the planning artifacts exist and the plan
+# names no unruled conflict:
 #
 #   1. INGESTION marker /tmp/asana-task-<gid>/.context-fetched — proof
 #      asana-get-context.sh ran (task-review step 1; it downloads every task
@@ -20,6 +20,11 @@
 #          lib/md-write-target.sh, or cp/mv/install) earlier in the SAME
 #          command as the update-status call ('cat > plan <<EOF ... EOF' then
 #          update-status on the next line).
+#   3. CONFLICTS line in that plan (task-review operator-final-say): `Conflicts:
+#      none`, or a list of other people's text that would change the
+#      deliverable and the operator has not ruled on. A missing line or a
+#      listed conflict blocks. Whether text conflicts is the planner's
+#      judgment; the completion judge audits a `none` written over one.
 #
 # FOLLOWUP SEGMENTS skip planning (one-shot followup-reopens-status: the
 # operator's comments since the last run report ARE the scope). A segment is a
@@ -116,17 +121,6 @@ if [ "$FOLLOWUP" = 0 ] && [ ! -f "/tmp/asana-task-$GID/.context-fetched" ]; then
   exit 2
 fi
 
-# Check 2: operator ruling. asana-get-context.sh writes this marker when a
-# non-operator human's comment or description edit postdates the operator's
-# last word (task-review operator-final-say). Implementation waits for the
-# operator; the marker clears itself on the next ingestion after the operator
-# comments.
-RULING="/tmp/asana-task-$GID/.awaiting-operator-ruling"
-if [ -s "$RULING" ]; then
-  echo "BLOCKED: task $GID has other-human text the operator has not ruled on (task-review operator-final-say): $(tr '\n' ';' < "$RULING"). The operator has final say before implementation. Do NOT enter Developing. Attach the plan, then post ONE agent comment that lists each open proposal by author with the plan's chosen default for it, so the operator can answer in one line; then take the blocked completion per one-shot yolo-true-blockers (e): ~/.config/agent-watcher/update-status.sh $GID Complete --blocked yes --reason \"awaiting operator ruling: <items>\". An operator comment after that ruling re-arms the task with a clear marker." >&2
-  exit 2
-fi
-
 [ "$FOLLOWUP" = 1 ] && exit 0
 
 # Jev routing at the gate (~/.config/jev/routing/README.md): on an ALLOWED first-plan
@@ -142,13 +136,59 @@ jev_route_async() {
   return 0
 }
 
+# Check 3: the plan's Conflicts line. Reads the newest plan on disk; else, for a
+# plan written in this same command, the heredoc text in the command, then the
+# source of a cp/mv/install/ditto into place. A copied plan whose source cannot
+# be read passes (its content is unknowable here; the judge audits it).
+# Prints none | listed | missing.
+plan_conflicts() {
+  local f v src
+  f=$(ls -t /tmp/plan-"$GID"-*.md "$HOME"/git/.agent-worktrees/"$GID"/*/plan-"$GID"-*.md \
+        /private/tmp/claude-*/*/*/scratchpad/plan-"$GID"-*.md 2>/dev/null | head -1 || true)
+  if [ -n "$f" ]; then conflicts_verdict < "$f"; return; fi
+  v=$(printf '%s' "$CMD" | conflicts_verdict)
+  if [ "$v" = missing ] && [[ "$CMD" =~ (^|[[:space:]])(cp|mv|install|ditto)[[:space:]]+(-[^[:space:]]+[[:space:]]+)*\"?([^\"[:space:]]+) ]]; then
+    src="${BASH_REMATCH[4]}"
+    if [ -r "$src" ]; then v=$(conflicts_verdict < "$src"); else v=none; fi
+  fi
+  echo "$v"
+}
+
+conflicts_verdict() {
+  node -e '
+const t = require("fs").readFileSync(0, "utf8");
+// "Conflicts: none", "**Conflicts:** none", or a "## Conflicts" heading whose
+// first non-empty line is the value. Prose that merely uses the word does not
+// match: the inline form needs the colon, the heading form needs the #.
+const h = t.match(/^[ \t]*#+[ \t]*conflicts[ \t]*:?[ \t]*$/im);
+const c = t.match(/^[ \t>*-]*\**conflicts\**[ \t]*:\**[ \t]*(.*)$/im);
+const m = [h, c].filter(Boolean).sort((a, b) => a.index - b.index)[0];
+if (!m) { console.log("missing"); process.exit(0); }
+let v = m === h ? "" : m[1].trim();
+if (!v) v = (t.slice(m.index + m[0].length).split("\n").map(x => x.trim()).find(Boolean) || "");
+console.log(/^[-*\s]*none\b/i.test(v) ? "none" : "listed");
+' 2>/dev/null || echo none
+}
+
+conflicts_gate() {
+  case "$(plan_conflicts)" in
+    none) return 0 ;;
+    missing)
+      echo "BLOCKED: the plan for $GID has no Conflicts line (task-review operator-final-say). Add one: 'Conflicts: none' when no one else's text would change what gets built compared with what the operator said, or 'Conflicts:' followed by each unruled disagreement (who said what, the plan's default). When you cannot tell whether someone's text changes the deliverable, list it. Re-attach the revised plan, then retry." >&2 ;;
+    listed)
+      echo "BLOCKED: the plan for $GID lists conflicts the operator has not ruled on (task-review operator-final-say). Do NOT enter Developing. Attach the plan, post ONE agent comment listing each conflict (who said what, the plan's default) so the operator can rule in one line, then take the blocked completion per one-shot yolo-true-blockers (e): ~/.config/agent-watcher/update-status.sh $GID Complete --blocked yes --reason \"awaiting operator ruling: <conflicts>\"." >&2 ;;
+  esac
+  exit 2
+}
+
 if ls /tmp/plan-"$GID"-*.md >/dev/null 2>&1 || \
    ls "$HOME"/git/.agent-worktrees/"$GID"/*/plan-"$GID"-*.md >/dev/null 2>&1 || \
    ls /private/tmp/claude-*/*/*/scratchpad/plan-"$GID"-*.md >/dev/null 2>&1; then
+  conflicts_gate
   jev_route_async
   exit 0
 fi
-plan_written_in_command && { jev_route_async; exit 0; }
+plan_written_in_command && { conflicts_gate; jev_route_async; exit 0; }
 
-echo "BLOCKED: no plan document exists for task $GID. Before entering Developing, write the plan per asana-plan's create-plan-required: /tmp/plan-$GID-<short-slug>.md with all six sections (Summary; Goal/Definition of Done; Likely relevant files; Findings so far; Numbered implementation steps; Constraints), stamped with \$AGENT_SESSION_UUID. Then attach it to the task: ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh --task $GID --attach-file <plan-path> --attach-name plan-<short-slug>.md. Then retry this status update." >&2
+echo "BLOCKED: no plan document exists for task $GID. Before entering Developing, write the plan per asana-plan's create-plan-required: /tmp/plan-$GID-<short-slug>.md with all seven sections (Summary; Goal/Definition of Done; Likely relevant files; Findings so far; Numbered implementation steps; Constraints; Conflicts), stamped with \$AGENT_SESSION_UUID. Then attach it to the task: ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh --task $GID --attach-file <plan-path> --attach-name plan-<short-slug>.md. Then retry this status update." >&2
 exit 2

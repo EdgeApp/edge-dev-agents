@@ -458,13 +458,21 @@ def plan(tmp):
         run('heredoc writes a non-plan file first', 2, f"cat > /tmp/agent-state-{gid}.md <<'EOF'\nplan-{gid}-x.md\nEOF\n{us}")
         run('status call only quoted in echo', 0, f'echo "{us}"')
         run('heredoc plan write earlier in the same command', 0,
-            f"cat > /var/folders/q/plan-{gid}-coherent-history.md <<'EOF'\n# Plan\n\n## Summary\nx\nEOF\n{us}")
+            f"cat > /var/folders/q/plan-{gid}-coherent-history.md <<'EOF'\n# Plan\n\n## Summary\nx\n\n## Conflicts\nNone.\nEOF\n{us}")
+        run('heredoc plan with no Conflicts line', 2,
+            f"cat > /var/folders/q/plan-{gid}-c.md <<'EOF'\n# Plan\n\n## Summary\nConflicts between the two fee paths are resolved.\nEOF\n{us}", 'no Conflicts line')
+        run('heredoc plan listing a conflict', 2,
+            f"cat > /var/folders/q/plan-{gid}-c.md <<'EOF'\n# Plan\n\nConflicts: Sam proposes a new endpoint; default reuses the old one\nEOF\n{us}", 'lists conflicts')
         run('cp scratchpad plan into place && status', 0,
             f'cp "/private/tmp/claude-501/p/s/scratchpad/plan-{gid}-send.md" /var/folders/q/plan-{gid}-send.md && {us}')
         run('cp to a $VAR destination assigned earlier', 0,
             f'D=/var/folders/q\ncp /x/plan.md "$D/plan-{gid}-v.md" && {us}')
-        open(os.path.join(scratch, f'plan-{gid}-s.md'), 'w').close()
+        with open(os.path.join(scratch, f'plan-{gid}-s.md'), 'w') as fh:
+            fh.write('# Plan\n\n**Conflicts:** none\n')
         run('plan in the harness scratchpad', 0, us)
+        with open(os.path.join(scratch, f'plan-{gid}-s.md'), 'w') as fh:
+            fh.write('# Plan\n\n## Conflicts\n- Sam wants X, the operator said Y; default Y\n')
+        run('scratchpad plan listing a conflict', 2, us, 'lists conflicts')
         reset()
 
         # Followup segments.

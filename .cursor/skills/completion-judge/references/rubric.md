@@ -20,6 +20,12 @@ The bundle's "Segment scope" line decides what the bar is:
   reproduced but unfixed, a feature not shipped) is NOT a fail on a followup segment
   unless one of those comments asks for it; earlier segments already reported on it and
   the operator chose this followup's scope knowing that.
+- OTHER PEOPLE'S TEXT: where the operator is silent, a teammate's text is the task's
+  input, and following it is correct. A run that proceeded on a plan whose `Conflicts`
+  line says `none` while someone else's text, unruled by the operator, would have
+  changed what got built (per task-review `operator-final-say`) is a J1 `fail`; name
+  the conflicting text and author in `evidence`. Added information (a repro, a
+  screenshot, a txid) is never a conflict.
 - WHO A COMMENT IS FOR: an operator comment is an ask for the run only in the parts
   that tell the run what to do or ask the run something. Operators also write to
   people in the same thread (QA, a reviewer, a teammate): a clause that hands work or

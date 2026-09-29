@@ -111,8 +111,8 @@
       "operator_hold_ttl_min": "Minutes a held run waits for the operator before the watchdog releases the hold and sends <operator-hold-expired> (the run resumes its pre-steer plan). Only fires when the pane is idle at the composer. Env override: AGENT_HOLD_TTL_MIN."
     },
     "default_repo": "edge-react-gui",
-    "max_concurrent": 5,
-    "max_concurrent_nosim": 3,
+    "max_concurrent": 7,
+    "max_concurrent_nosim": 5,
     "metro_base_port": 8181,
     "master_sim": {
       "device": "iPhone 16 Pro Max",
@@ -128,7 +128,7 @@
     "worktrees_root": "~/git/.agent-worktrees",
     "repos_root": "~/git",
     "sim_pool": {
-      "size": 5
+      "size": 7
     },
     "keep_completed_worktrees": 5,
     "keep_completed_sessions": 20,
