@@ -36,6 +36,42 @@
       "batchAt": "2026-09-25T21:57:01Z",
       "headSha": "7344e882e09eb696378964b731d2f5f01169deb9",
       "addedAt": "2026-09-25T21:57:01Z"
+    },
+    {
+      "path": "assets/edge-core-js/pr-740/20260929-135956-agent-proof-1218959230370426-01-username-available-no-crash.png",
+      "caption": "username available no crash",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T21:57:01Z",
+      "headSha": "7344e882e09eb696378964b731d2f5f01169deb9",
+      "addedAt": "2026-09-29T20:59:56Z"
+    },
+    {
+      "path": "assets/edge-core-js/pr-740/20260929-135956-agent-proof-1218959230370426-02-set-password-reached.png",
+      "caption": "set password reached",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T21:57:01Z",
+      "headSha": "7344e882e09eb696378964b731d2f5f01169deb9",
+      "addedAt": "2026-09-29T20:59:56Z"
+    },
+    {
+      "path": "assets/edge-core-js/pr-740/20260929-135956-agent-proof-1218959230370426-03-new-account-home.png",
+      "caption": "new account home",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-25T21:57:01Z",
+      "headSha": "7344e882e09eb696378964b731d2f5f01169deb9",
+      "addedAt": "2026-09-29T20:59:56Z"
     }
   ]
 }
