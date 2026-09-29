@@ -137,6 +137,30 @@
       "batchAt": "2026-09-29T21:11:37Z",
       "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
       "addedAt": "2026-09-29T21:11:37Z"
+    },
+    {
+      "path": "assets/edge-login-ui-rn/pr-295/20260929-141647-agent-proof-1215939017452141-12-HACKED-forget-typed-before.png",
+      "caption": "forget typed before",
+      "index": "12",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Temporary edits, all reverted: context.forgetAccount stubbed (04, 05, 10-13); PIN lockout wait forced at mount (06, 07); same-value login navigation from Trouble Signing in (08, 09); guest fixture via forced light-account create (10, 11)",
+      "batchAt": "2026-09-29T21:11:37Z",
+      "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
+      "addedAt": "2026-09-29T21:16:47Z"
+    },
+    {
+      "path": "assets/edge-login-ui-rn/pr-295/20260929-141647-agent-proof-1215939017452141-13-HACKED-forget-typed-after.png",
+      "caption": "forget typed after",
+      "index": "13",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Temporary edits, all reverted: context.forgetAccount stubbed (04, 05, 10-13); PIN lockout wait forced at mount (06, 07); same-value login navigation from Trouble Signing in (08, 09); guest fixture via forced light-account create (10, 11)",
+      "batchAt": "2026-09-29T21:11:37Z",
+      "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
+      "addedAt": "2026-09-29T21:16:47Z"
     }
   ]
 }
