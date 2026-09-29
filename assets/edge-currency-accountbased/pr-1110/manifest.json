@@ -48,6 +48,30 @@
       "batchAt": "2026-09-28T22:32:45Z",
       "headSha": "0974d4e90d5f1808e69d8a4f0ac4c1835e9114fa",
       "addedAt": "2026-09-28T22:32:45Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1110/20260928-173752-agent-proof-1218952981180804-07-seeded-epoch-balance.png",
+      "caption": "seeded epoch balance",
+      "index": "7",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T00:37:52Z",
+      "headSha": "8129442278e79269d329c74f4c1c433abb8ba47a",
+      "addedAt": "2026-09-29T00:37:52Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1110/20260928-173752-agent-proof-1218952981180804-06-seeded-epoch-txs.png",
+      "caption": "seeded epoch txs",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T00:37:52Z",
+      "headSha": "8129442278e79269d329c74f4c1c433abb8ba47a",
+      "addedAt": "2026-09-29T00:37:52Z"
     }
   ]
 }
