@@ -9,10 +9,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-29T20:34:30Z",
-      "headSha": "9c660b1fccf2e00c10174d1f772d6ff8f4d57a7a",
+      "batchAt": "2026-09-29T21:11:37Z",
+      "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
       "addedAt": "2026-09-29T20:09:52Z",
-      "carriedFrom": "2026-09-29T20:09:52Z"
+      "carriedFrom": "2026-09-29T20:34:30Z"
     },
     {
       "path": "assets/edge-login-ui-rn/pr-295/20260929-130952-agent-proof-1215939017452141-02-pin-flavor.png",
@@ -22,10 +22,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-29T20:34:30Z",
-      "headSha": "9c660b1fccf2e00c10174d1f772d6ff8f4d57a7a",
+      "batchAt": "2026-09-29T21:11:37Z",
+      "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
       "addedAt": "2026-09-29T20:09:52Z",
-      "carriedFrom": "2026-09-29T20:09:52Z"
+      "carriedFrom": "2026-09-29T20:34:30Z"
     },
     {
       "path": "assets/edge-login-ui-rn/pr-295/20260929-130952-agent-proof-1215939017452141-03-pin-login-wallet-list.png",
@@ -35,10 +35,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-29T20:34:30Z",
-      "headSha": "9c660b1fccf2e00c10174d1f772d6ff8f4d57a7a",
+      "batchAt": "2026-09-29T21:11:37Z",
+      "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
       "addedAt": "2026-09-29T20:09:52Z",
-      "carriedFrom": "2026-09-29T20:09:52Z"
+      "carriedFrom": "2026-09-29T20:34:30Z"
     },
     {
       "path": "assets/edge-login-ui-rn/pr-295/20260929-133430-agent-proof-1215939017452141-04-HACKED-forget-selected-dropdown.png",
@@ -47,10 +47,11 @@
       "hacked": true,
       "phase": null,
       "subject": null,
-      "hackNote": "stubbed context.forgetAccount and pointed nextUser at a guest when one exists, so the forget path runs without deleting an account",
-      "batchAt": "2026-09-29T20:34:30Z",
-      "headSha": "9c660b1fccf2e00c10174d1f772d6ff8f4d57a7a",
-      "addedAt": "2026-09-29T20:34:30Z"
+      "hackNote": "Temporary uncommitted edits, reverted: PIN lockout forced to 180s at mount (06-07); Trouble Signing in re-dispatches a same-value login NAVIGATE (08-09); forgetAccount stubbed and gui forceLightAccountCreate on to create the guest fixture (10-11)",
+      "batchAt": "2026-09-29T21:11:37Z",
+      "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
+      "addedAt": "2026-09-29T20:34:30Z",
+      "carriedFrom": "2026-09-29T20:34:30Z"
     },
     {
       "path": "assets/edge-login-ui-rn/pr-295/20260929-133430-agent-proof-1215939017452141-05-HACKED-forget-selected-fallback.png",
@@ -59,10 +60,83 @@
       "hacked": true,
       "phase": null,
       "subject": null,
-      "hackNote": "stubbed context.forgetAccount and pointed nextUser at a guest when one exists, so the forget path runs without deleting an account",
-      "batchAt": "2026-09-29T20:34:30Z",
-      "headSha": "9c660b1fccf2e00c10174d1f772d6ff8f4d57a7a",
-      "addedAt": "2026-09-29T20:34:30Z"
+      "hackNote": "Temporary uncommitted edits, reverted: PIN lockout forced to 180s at mount (06-07); Trouble Signing in re-dispatches a same-value login NAVIGATE (08-09); forgetAccount stubbed and gui forceLightAccountCreate on to create the guest fixture (10-11)",
+      "batchAt": "2026-09-29T21:11:37Z",
+      "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
+      "addedAt": "2026-09-29T20:34:30Z",
+      "carriedFrom": "2026-09-29T20:34:30Z"
+    },
+    {
+      "path": "assets/edge-login-ui-rn/pr-295/20260929-141137-agent-proof-1215939017452141-06-HACKED-lockout-before-toggle.png",
+      "caption": "lockout before toggle",
+      "index": "6",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Temporary uncommitted edits, reverted: PIN lockout forced to 180s at mount (06-07); Trouble Signing in re-dispatches a same-value login NAVIGATE (08-09); forgetAccount stubbed and gui forceLightAccountCreate on to create the guest fixture (10-11)",
+      "batchAt": "2026-09-29T21:11:37Z",
+      "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
+      "addedAt": "2026-09-29T21:11:37Z"
+    },
+    {
+      "path": "assets/edge-login-ui-rn/pr-295/20260929-141137-agent-proof-1215939017452141-07-HACKED-lockout-after-toggle.png",
+      "caption": "lockout after toggle",
+      "index": "7",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Temporary uncommitted edits, reverted: PIN lockout forced to 180s at mount (06-07); Trouble Signing in re-dispatches a same-value login NAVIGATE (08-09); forgetAccount stubbed and gui forceLightAccountCreate on to create the guest fixture (10-11)",
+      "batchAt": "2026-09-29T21:11:37Z",
+      "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
+      "addedAt": "2026-09-29T21:11:37Z"
+    },
+    {
+      "path": "assets/edge-login-ui-rn/pr-295/20260929-141137-agent-proof-1215939017452141-08-HACKED-reseed-before.png",
+      "caption": "reseed before",
+      "index": "8",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Temporary uncommitted edits, reverted: PIN lockout forced to 180s at mount (06-07); Trouble Signing in re-dispatches a same-value login NAVIGATE (08-09); forgetAccount stubbed and gui forceLightAccountCreate on to create the guest fixture (10-11)",
+      "batchAt": "2026-09-29T21:11:37Z",
+      "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
+      "addedAt": "2026-09-29T21:11:37Z"
+    },
+    {
+      "path": "assets/edge-login-ui-rn/pr-295/20260929-141137-agent-proof-1215939017452141-09-HACKED-reseed-after.png",
+      "caption": "reseed after",
+      "index": "9",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Temporary uncommitted edits, reverted: PIN lockout forced to 180s at mount (06-07); Trouble Signing in re-dispatches a same-value login NAVIGATE (08-09); forgetAccount stubbed and gui forceLightAccountCreate on to create the guest fixture (10-11)",
+      "batchAt": "2026-09-29T21:11:37Z",
+      "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
+      "addedAt": "2026-09-29T21:11:37Z"
+    },
+    {
+      "path": "assets/edge-login-ui-rn/pr-295/20260929-141137-agent-proof-1215939017452141-10-HACKED-forget-guest-dropdown.png",
+      "caption": "forget guest dropdown",
+      "index": "10",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Temporary uncommitted edits, reverted: PIN lockout forced to 180s at mount (06-07); Trouble Signing in re-dispatches a same-value login NAVIGATE (08-09); forgetAccount stubbed and gui forceLightAccountCreate on to create the guest fixture (10-11)",
+      "batchAt": "2026-09-29T21:11:37Z",
+      "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
+      "addedAt": "2026-09-29T21:11:37Z"
+    },
+    {
+      "path": "assets/edge-login-ui-rn/pr-295/20260929-141137-agent-proof-1215939017452141-11-HACKED-forget-guest-pin.png",
+      "caption": "forget guest pin",
+      "index": "11",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Temporary uncommitted edits, reverted: PIN lockout forced to 180s at mount (06-07); Trouble Signing in re-dispatches a same-value login NAVIGATE (08-09); forgetAccount stubbed and gui forceLightAccountCreate on to create the guest fixture (10-11)",
+      "batchAt": "2026-09-29T21:11:37Z",
+      "headSha": "f82657fe0db378d804198ab04320c40087ead9b0",
+      "addedAt": "2026-09-29T21:11:37Z"
     }
   ]
 }
