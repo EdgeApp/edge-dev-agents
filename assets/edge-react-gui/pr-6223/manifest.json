@@ -96,6 +96,66 @@
       "batchAt": "2026-09-25T22:44:15Z",
       "headSha": "db7931cfd16b15e4d6cdaf0b5008553a8a64f07e",
       "addedAt": "2026-09-25T22:44:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6223/20260928-211152-agent-proof-1218848274337303-09-HACKED-fresh-quote.png",
+      "caption": "fresh quote",
+      "index": "9",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "approve() forced to reject locally to reproduce a failed approve; reverted before push",
+      "batchAt": "2026-09-29T04:11:52Z",
+      "headSha": "26664e4da610ac9582c673eac816202e142ab07d",
+      "addedAt": "2026-09-29T04:11:52Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6223/20260928-211152-agent-proof-1218848274337303-10-HACKED-approve-failed.png",
+      "caption": "approve failed",
+      "index": "10",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "approve() forced to reject locally to reproduce a failed approve; reverted before push",
+      "batchAt": "2026-09-29T04:11:52Z",
+      "headSha": "26664e4da610ac9582c673eac816202e142ab07d",
+      "addedAt": "2026-09-29T04:11:52Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6223/20260928-211152-agent-proof-1218848274337303-11-HACKED-retry-slide.png",
+      "caption": "retry slide",
+      "index": "11",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "approve() forced to reject locally to reproduce a failed approve; reverted before push",
+      "batchAt": "2026-09-29T04:11:52Z",
+      "headSha": "26664e4da610ac9582c673eac816202e142ab07d",
+      "addedAt": "2026-09-29T04:11:52Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6223/20260928-211152-agent-proof-1218848274337303-12-HACKED-toast-over-loading.png",
+      "caption": "toast over loading",
+      "index": "12",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "approve() forced to reject locally to reproduce a failed approve; reverted before push",
+      "batchAt": "2026-09-29T04:11:52Z",
+      "headSha": "26664e4da610ac9582c673eac816202e142ab07d",
+      "addedAt": "2026-09-29T04:11:52Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6223/20260928-211152-agent-proof-1218848274337303-13-HACKED-new-quote.png",
+      "caption": "new quote",
+      "index": "13",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "approve() forced to reject locally to reproduce a failed approve; reverted before push",
+      "batchAt": "2026-09-29T04:11:52Z",
+      "headSha": "26664e4da610ac9582c673eac816202e142ab07d",
+      "addedAt": "2026-09-29T04:11:52Z"
     }
   ]
 }
