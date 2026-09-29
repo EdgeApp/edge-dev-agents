@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-reports-server/pr-235/20260928-183509-agent-proof-1218952288907800-01-campaigns-by-installer.png",
+      "caption": "campaigns by installer",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T01:35:09Z",
+      "headSha": "8015532901eb56c52618dc49444b40fd9e3855bf",
+      "addedAt": "2026-09-29T01:35:09Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-235/20260928-183509-agent-proof-1218952288907800-02-campaigns-by-promotion.png",
+      "caption": "campaigns by promotion",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T01:35:09Z",
+      "headSha": "8015532901eb56c52618dc49444b40fd9e3855bf",
+      "addedAt": "2026-09-29T01:35:09Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-235/20260928-183509-agent-proof-1218952288907800-03-campaign-filter-dropdown.png",
+      "caption": "campaign filter dropdown",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T01:35:09Z",
+      "headSha": "8015532901eb56c52618dc49444b40fd9e3855bf",
+      "addedAt": "2026-09-29T01:35:09Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-235/20260928-183509-agent-proof-1218952288907800-04-organic-hidden.png",
+      "caption": "organic hidden",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T01:35:09Z",
+      "headSha": "8015532901eb56c52618dc49444b40fd9e3855bf",
+      "addedAt": "2026-09-29T01:35:09Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-235/20260928-183509-agent-proof-1218952288907800-05-swap-provider-filter.png",
+      "caption": "swap provider filter",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T01:35:09Z",
+      "headSha": "8015532901eb56c52618dc49444b40fd9e3855bf",
+      "addedAt": "2026-09-29T01:35:09Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-235/20260928-183509-agent-proof-1218952288907800-06-all-campaigns-hidden.png",
+      "caption": "all campaigns hidden",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-29T01:35:09Z",
+      "headSha": "8015532901eb56c52618dc49444b40fd9e3855bf",
+      "addedAt": "2026-09-29T01:35:09Z"
+    }
+  ]
+}
