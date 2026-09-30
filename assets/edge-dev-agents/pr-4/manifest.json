@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-dev-agents/pr-4/20260929-174327-agent-proof-1218959031499097-01-stock-maestro-buy-quote-68s.png",
+      "caption": "stock maestro buy quote 68s",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T00:43:27Z",
+      "headSha": "92b4822e86a8309e9e76643abb2ab80df7fd2a53",
+      "addedAt": "2026-09-30T00:43:27Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-4/20260929-174327-agent-proof-1218959031499097-02-runner-same-flow-stuck-on-home.png",
+      "caption": "runner same flow stuck on home",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T00:43:27Z",
+      "headSha": "92b4822e86a8309e9e76643abb2ab80df7fd2a53",
+      "addedAt": "2026-09-30T00:43:27Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-4/20260929-174327-agent-proof-1218959031499097-03-runner-offscreen-tap-passed-nothing-opened.png",
+      "caption": "runner offscreen tap passed nothing opened",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T00:43:27Z",
+      "headSha": "92b4822e86a8309e9e76643abb2ab80df7fd2a53",
+      "addedAt": "2026-09-30T00:43:27Z"
+    }
+  ]
+}
