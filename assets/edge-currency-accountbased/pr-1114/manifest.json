@@ -1,0 +1,125 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-01-hypercore-in-add-wallet.png",
+      "caption": "hypercore in add wallet",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T10:50:08Z",
+      "headSha": "c3fa377cb86b8cdf95fe116bff6b7d667b238e4d",
+      "addedAt": "2026-09-30T10:50:08Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-02-create-my-hypercore.png",
+      "caption": "create my hypercore",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T10:50:08Z",
+      "headSha": "c3fa377cb86b8cdf95fe116bff6b7d667b238e4d",
+      "addedAt": "2026-09-30T10:50:08Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-06-hypercore-balances-hype-usdc.png",
+      "caption": "hypercore balances hype usdc",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T10:50:08Z",
+      "headSha": "c3fa377cb86b8cdf95fe116bff6b7d667b238e4d",
+      "addedAt": "2026-09-30T10:50:08Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-07-hypercore-received-hype.png",
+      "caption": "hypercore received hype",
+      "index": "7",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T10:50:08Z",
+      "headSha": "c3fa377cb86b8cdf95fe116bff6b7d667b238e4d",
+      "addedAt": "2026-09-30T10:50:08Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-08-hypercore-usdc-send-activation-fee.png",
+      "caption": "hypercore usdc send activation fee",
+      "index": "8",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T10:50:08Z",
+      "headSha": "c3fa377cb86b8cdf95fe116bff6b7d667b238e4d",
+      "addedAt": "2026-09-30T10:50:08Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-09-hypercore-usdc-send-success.png",
+      "caption": "hypercore usdc send success",
+      "index": "9",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T10:50:08Z",
+      "headSha": "c3fa377cb86b8cdf95fe116bff6b7d667b238e4d",
+      "addedAt": "2026-09-30T10:50:08Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-10-hypercore-hype-send-no-fee.png",
+      "caption": "hypercore hype send no fee",
+      "index": "10",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T10:50:08Z",
+      "headSha": "c3fa377cb86b8cdf95fe116bff6b7d667b238e4d",
+      "addedAt": "2026-09-30T10:50:08Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-25-hc-hype-send-modal-fee.png",
+      "caption": "hc hype send modal fee",
+      "index": "25",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T10:50:08Z",
+      "headSha": "c3fa377cb86b8cdf95fe116bff6b7d667b238e4d",
+      "addedAt": "2026-09-30T10:50:08Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-26-hc-hype-send-confirm-fee.png",
+      "caption": "hc hype send confirm fee",
+      "index": "26",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T10:50:08Z",
+      "headSha": "c3fa377cb86b8cdf95fe116bff6b7d667b238e4d",
+      "addedAt": "2026-09-30T10:50:08Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-27-hc-hype-send-balances.png",
+      "caption": "hc hype send balances",
+      "index": "27",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T10:50:08Z",
+      "headSha": "c3fa377cb86b8cdf95fe116bff6b7d667b238e4d",
+      "addedAt": "2026-09-30T10:50:08Z"
+    }
+  ]
+}
