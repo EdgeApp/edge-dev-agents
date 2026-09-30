@@ -62,40 +62,76 @@
       "addedAt": "2026-09-30T21:58:27Z"
     },
     {
-      "path": "assets/edge-react-gui/pr-6231/20260930-145827-agent-proof-1219040192697150-06-HACKED-tx-list-letsexchange.png",
-      "caption": "tx list letsexchange",
-      "index": "6",
-      "hacked": true,
+      "path": "assets/edge-react-gui/pr-6231/20260930-161612-agent-proof-1219040192697150-09-le-quote-selected-plugin-build.png",
+      "caption": "le quote selected plugin build",
+      "index": "9",
+      "hacked": false,
       "phase": null,
       "subject": null,
-      "hackNote": "injected a local-only past LetsExchange swap action onto sent BTC txs, since the agent account has no real LetsExchange history",
+      "hackNote": null,
       "batchAt": "2026-09-30T21:58:27Z",
       "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
-      "addedAt": "2026-09-30T21:58:27Z"
+      "addedAt": "2026-09-30T23:16:12Z"
     },
     {
-      "path": "assets/edge-react-gui/pr-6231/20260930-145827-agent-proof-1219040192697150-07-HACKED-tx-details-letsexchange.png",
-      "caption": "tx details letsexchange",
-      "index": "7",
-      "hacked": true,
+      "path": "assets/edge-react-gui/pr-6231/20260930-161612-agent-proof-1219040192697150-13-real-le-tx-details-status-support-plugin-build.png",
+      "caption": "real le tx details status support plugin build",
+      "index": "13",
+      "hacked": false,
       "phase": null,
       "subject": null,
-      "hackNote": "injected a local-only past LetsExchange swap action onto sent BTC txs, since the agent account has no real LetsExchange history",
+      "hackNote": null,
       "batchAt": "2026-09-30T21:58:27Z",
       "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
-      "addedAt": "2026-09-30T21:58:27Z"
+      "addedAt": "2026-09-30T23:16:12Z"
     },
     {
-      "path": "assets/edge-react-gui/pr-6231/20260930-145827-agent-proof-1219040192697150-08-HACKED-swap-details-card.png",
-      "caption": "swap details card",
-      "index": "8",
-      "hacked": true,
+      "path": "assets/edge-react-gui/pr-6231/20260930-161612-agent-proof-1219040192697150-14-real-le-tx-details-top-plugin-build.png",
+      "caption": "real le tx details top plugin build",
+      "index": "14",
+      "hacked": false,
       "phase": null,
       "subject": null,
-      "hackNote": "injected a local-only past LetsExchange swap action onto sent BTC txs, since the agent account has no real LetsExchange history",
+      "hackNote": null,
       "batchAt": "2026-09-30T21:58:27Z",
       "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
-      "addedAt": "2026-09-30T21:58:27Z"
+      "addedAt": "2026-09-30T23:16:12Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6231/20260930-161612-agent-proof-1219040192697150-15-real-le-tx-list-removal-build.png",
+      "caption": "real le tx list removal build",
+      "index": "15",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T21:58:27Z",
+      "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
+      "addedAt": "2026-09-30T23:16:12Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6231/20260930-161612-agent-proof-1219040192697150-16-real-le-tx-details-removal-build.png",
+      "caption": "real le tx details removal build",
+      "index": "16",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T21:58:27Z",
+      "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
+      "addedAt": "2026-09-30T23:16:12Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6231/20260930-161612-agent-proof-1219040192697150-17-real-le-swap-card-removal-build.png",
+      "caption": "real le swap card removal build",
+      "index": "17",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T21:58:27Z",
+      "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
+      "addedAt": "2026-09-30T23:16:12Z"
     }
   ]
 }
