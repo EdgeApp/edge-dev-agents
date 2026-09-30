@@ -9,10 +9,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T10:50:08Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-02-create-my-hypercore.png",
@@ -22,10 +22,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T10:50:08Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-06-hypercore-balances-hype-usdc.png",
@@ -35,10 +35,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T10:50:08Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-07-hypercore-received-hype.png",
@@ -48,10 +48,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T10:50:08Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-08-hypercore-usdc-send-activation-fee.png",
@@ -61,10 +61,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T10:50:08Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-09-hypercore-usdc-send-success.png",
@@ -74,10 +74,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T10:50:08Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-10-hypercore-hype-send-no-fee.png",
@@ -87,10 +87,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T10:50:08Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-25-hc-hype-send-modal-fee.png",
@@ -100,10 +100,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T10:50:08Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-26-hc-hype-send-confirm-fee.png",
@@ -113,10 +113,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T10:50:08Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-035008-agent-proof-1218959230370429-27-hc-hype-send-balances.png",
@@ -126,10 +126,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T10:50:08Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-051324-lifi-hypercore-sendasset-quote.png",
@@ -139,10 +139,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T12:13:24Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-051324-lifi-hypercore-sendasset-signed-success.png",
@@ -152,10 +152,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T12:13:24Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-062051-agent-proof-1218959230370429-46-lifi-hc-usdc-quote-after-sourcedex-fix.png",
@@ -165,10 +165,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T13:20:51Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-062051-agent-proof-1218959230370429-47-lifi-hc-usdc-success-after-sourcedex-fix.png",
@@ -178,10 +178,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T13:20:51Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-063954-agent-proof-1218959230370429-48-lifi-hc-usdc-quote-after-spendable-fix.png",
@@ -191,10 +191,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T13:39:54Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-063954-agent-proof-1218959230370429-49-lifi-hc-usdc-success-after-spendable-fix.png",
@@ -204,10 +204,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
       "addedAt": "2026-09-30T13:39:54Z",
-      "carriedFrom": "2026-09-30T13:39:54Z"
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-072500-agent-proof-1218959230370429-50-lifi-hc-usdc-quote-after-noncemapping-fix.png",
@@ -217,9 +217,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
-      "addedAt": "2026-09-30T14:25:00Z"
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
+      "addedAt": "2026-09-30T14:25:00Z",
+      "carriedFrom": "2026-09-30T14:25:00Z"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1114/20260930-072500-agent-proof-1218959230370429-51-lifi-hc-usdc-success-after-noncemapping-fix.png",
@@ -229,9 +230,46 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T14:25:00Z",
-      "headSha": "f335e2088d1e40b92c7a45aae97cf2d3fcef4c72",
-      "addedAt": "2026-09-30T14:25:00Z"
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
+      "addedAt": "2026-09-30T14:25:00Z",
+      "carriedFrom": "2026-09-30T14:25:00Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1114/20260930-082232-agent-proof-1218959230370429-52-send-usdc-to-fresh-hypercore-wallet.png",
+      "caption": "send usdc to fresh hypercore wallet",
+      "index": "52",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
+      "addedAt": "2026-09-30T15:22:32Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1114/20260930-082232-agent-proof-1218959230370429-53-send-usdc-to-fresh-wallet-success.png",
+      "caption": "send usdc to fresh wallet success",
+      "index": "53",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
+      "addedAt": "2026-09-30T15:22:32Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1114/20260930-082232-agent-proof-1218959230370429-54-fresh-wallet-detected-usdc-shows-balance.png",
+      "caption": "fresh wallet detected usdc shows balance",
+      "index": "54",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T15:22:32Z",
+      "headSha": "c6fbc3d80d4c7ef6fbd3d7c81289c87954e6b452",
+      "addedAt": "2026-09-30T15:22:32Z"
     }
   ]
 }
