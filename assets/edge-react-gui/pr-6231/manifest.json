@@ -1,0 +1,101 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6231/20260930-145827-agent-proof-1219040192697150-01-exchange-settings.png",
+      "caption": "exchange settings",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T21:58:27Z",
+      "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
+      "addedAt": "2026-09-30T21:58:27Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6231/20260930-145827-agent-proof-1219040192697150-02-exchange-settings-cex.png",
+      "caption": "exchange settings cex",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T21:58:27Z",
+      "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
+      "addedAt": "2026-09-30T21:58:27Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6231/20260930-145827-agent-proof-1219040192697150-03-exchange-settings-cex-end.png",
+      "caption": "exchange settings cex end",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T21:58:27Z",
+      "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
+      "addedAt": "2026-09-30T21:58:27Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6231/20260930-145827-agent-proof-1219040192697150-04-swap-quote.png",
+      "caption": "swap quote",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T21:58:27Z",
+      "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
+      "addedAt": "2026-09-30T21:58:27Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6231/20260930-145827-agent-proof-1219040192697150-05-swap-provider-list.png",
+      "caption": "swap provider list",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T21:58:27Z",
+      "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
+      "addedAt": "2026-09-30T21:58:27Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6231/20260930-145827-agent-proof-1219040192697150-06-HACKED-tx-list-letsexchange.png",
+      "caption": "tx list letsexchange",
+      "index": "6",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "injected a local-only past LetsExchange swap action onto sent BTC txs, since the agent account has no real LetsExchange history",
+      "batchAt": "2026-09-30T21:58:27Z",
+      "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
+      "addedAt": "2026-09-30T21:58:27Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6231/20260930-145827-agent-proof-1219040192697150-07-HACKED-tx-details-letsexchange.png",
+      "caption": "tx details letsexchange",
+      "index": "7",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "injected a local-only past LetsExchange swap action onto sent BTC txs, since the agent account has no real LetsExchange history",
+      "batchAt": "2026-09-30T21:58:27Z",
+      "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
+      "addedAt": "2026-09-30T21:58:27Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6231/20260930-145827-agent-proof-1219040192697150-08-HACKED-swap-details-card.png",
+      "caption": "swap details card",
+      "index": "8",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "injected a local-only past LetsExchange swap action onto sent BTC txs, since the agent account has no real LetsExchange history",
+      "batchAt": "2026-09-30T21:58:27Z",
+      "headSha": "050a223ed2c922aa4734c39b089bab1891078150",
+      "addedAt": "2026-09-30T21:58:27Z"
+    }
+  ]
+}
