@@ -9,9 +9,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T10:51:01Z",
-      "headSha": "99dd7683a00fd246084a9aa48fa161f29263e8cd",
-      "addedAt": "2026-09-30T10:51:01Z"
+      "batchAt": "2026-09-30T11:58:50Z",
+      "headSha": "03783e7062bfb2e26bf964b209653b4562d7dfdd",
+      "addedAt": "2026-09-30T10:51:01Z",
+      "carriedFrom": "2026-09-30T10:51:01Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6229/20260930-035101-agent-proof-1218959230370429-02-create-my-hypercore.png",
@@ -21,9 +22,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T10:51:01Z",
-      "headSha": "99dd7683a00fd246084a9aa48fa161f29263e8cd",
-      "addedAt": "2026-09-30T10:51:01Z"
+      "batchAt": "2026-09-30T11:58:50Z",
+      "headSha": "03783e7062bfb2e26bf964b209653b4562d7dfdd",
+      "addedAt": "2026-09-30T10:51:01Z",
+      "carriedFrom": "2026-09-30T10:51:01Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6229/20260930-035101-agent-proof-1218959230370429-11-usdc-send-fee-label.png",
@@ -33,9 +35,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T10:51:01Z",
-      "headSha": "99dd7683a00fd246084a9aa48fa161f29263e8cd",
-      "addedAt": "2026-09-30T10:51:01Z"
+      "batchAt": "2026-09-30T11:58:50Z",
+      "headSha": "03783e7062bfb2e26bf964b209653b4562d7dfdd",
+      "addedAt": "2026-09-30T10:51:01Z",
+      "carriedFrom": "2026-09-30T10:51:01Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6229/20260930-035101-agent-proof-1218959230370429-23-arb-eth-send-fee.png",
@@ -45,9 +48,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T10:51:01Z",
-      "headSha": "99dd7683a00fd246084a9aa48fa161f29263e8cd",
-      "addedAt": "2026-09-30T10:51:01Z"
+      "batchAt": "2026-09-30T11:58:50Z",
+      "headSha": "03783e7062bfb2e26bf964b209653b4562d7dfdd",
+      "addedAt": "2026-09-30T10:51:01Z",
+      "carriedFrom": "2026-09-30T10:51:01Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6229/20260930-035101-agent-proof-1218959230370429-24-arb-usdc-send-fee.png",
@@ -57,9 +61,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T10:51:01Z",
-      "headSha": "99dd7683a00fd246084a9aa48fa161f29263e8cd",
-      "addedAt": "2026-09-30T10:51:01Z"
+      "batchAt": "2026-09-30T11:58:50Z",
+      "headSha": "03783e7062bfb2e26bf964b209653b4562d7dfdd",
+      "addedAt": "2026-09-30T10:51:01Z",
+      "carriedFrom": "2026-09-30T10:51:01Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6229/20260930-035101-agent-proof-1218959230370429-25-hc-hype-send-modal-fee.png",
@@ -69,9 +74,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T10:51:01Z",
-      "headSha": "99dd7683a00fd246084a9aa48fa161f29263e8cd",
-      "addedAt": "2026-09-30T10:51:01Z"
+      "batchAt": "2026-09-30T11:58:50Z",
+      "headSha": "03783e7062bfb2e26bf964b209653b4562d7dfdd",
+      "addedAt": "2026-09-30T10:51:01Z",
+      "carriedFrom": "2026-09-30T10:51:01Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6229/20260930-035101-agent-proof-1218959230370429-26-hc-hype-send-confirm-fee.png",
@@ -81,9 +87,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T10:51:01Z",
-      "headSha": "99dd7683a00fd246084a9aa48fa161f29263e8cd",
-      "addedAt": "2026-09-30T10:51:01Z"
+      "batchAt": "2026-09-30T11:58:50Z",
+      "headSha": "03783e7062bfb2e26bf964b209653b4562d7dfdd",
+      "addedAt": "2026-09-30T10:51:01Z",
+      "carriedFrom": "2026-09-30T10:51:01Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6229/20260930-035101-agent-proof-1218959230370429-27-hc-hype-send-balances.png",
@@ -93,9 +100,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T10:51:01Z",
-      "headSha": "99dd7683a00fd246084a9aa48fa161f29263e8cd",
-      "addedAt": "2026-09-30T10:51:01Z"
+      "batchAt": "2026-09-30T11:58:50Z",
+      "headSha": "03783e7062bfb2e26bf964b209653b4562d7dfdd",
+      "addedAt": "2026-09-30T10:51:01Z",
+      "carriedFrom": "2026-09-30T10:51:01Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6229/20260930-035101-agent-proof-1218959230370429-31-grs-send-fee.png",
@@ -105,9 +113,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T10:51:01Z",
-      "headSha": "99dd7683a00fd246084a9aa48fa161f29263e8cd",
-      "addedAt": "2026-09-30T10:51:01Z"
+      "batchAt": "2026-09-30T11:58:50Z",
+      "headSha": "03783e7062bfb2e26bf964b209653b4562d7dfdd",
+      "addedAt": "2026-09-30T10:51:01Z",
+      "carriedFrom": "2026-09-30T10:51:01Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6229/20260930-035101-agent-proof-1218959230370429-32-xrp-send-fee.png",
@@ -117,21 +126,34 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T10:51:01Z",
-      "headSha": "99dd7683a00fd246084a9aa48fa161f29263e8cd",
-      "addedAt": "2026-09-30T10:51:01Z"
+      "batchAt": "2026-09-30T11:58:50Z",
+      "headSha": "03783e7062bfb2e26bf964b209653b4562d7dfdd",
+      "addedAt": "2026-09-30T10:51:01Z",
+      "carriedFrom": "2026-09-30T10:51:01Z"
     },
     {
-      "path": "assets/edge-react-gui/pr-6229/20260930-035101-agent-proof-1218959230370429-33-migrate-sol-usdc-fees.png",
-      "caption": "migrate sol usdc fees",
-      "index": "33",
+      "path": "assets/edge-react-gui/pr-6229/20260930-045850-agent-proof-1218959230370429-44-migrate-sol-usdc-fees-after-fix.png",
+      "caption": "migrate sol usdc fees after fix",
+      "index": "44",
       "hacked": false,
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-09-30T10:51:01Z",
-      "headSha": "99dd7683a00fd246084a9aa48fa161f29263e8cd",
-      "addedAt": "2026-09-30T10:51:01Z"
+      "batchAt": "2026-09-30T11:58:50Z",
+      "headSha": "03783e7062bfb2e26bf964b209653b4562d7dfdd",
+      "addedAt": "2026-09-30T11:58:50Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6229/20260930-045850-agent-proof-1218959230370429-45-migrate-hypercore-usdc-activation-fee.png",
+      "caption": "migrate hypercore usdc activation fee",
+      "index": "45",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T11:58:50Z",
+      "headSha": "03783e7062bfb2e26bf964b209653b4562d7dfdd",
+      "addedAt": "2026-09-30T11:58:50Z"
     }
   ]
 }
