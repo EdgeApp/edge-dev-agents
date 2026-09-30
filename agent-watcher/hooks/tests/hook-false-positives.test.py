@@ -377,6 +377,22 @@ def maestro(stub):
     check('maestro --version passes', rc == 0, err[:140])
     rc, err, _ = run("cat > /tmp/f.yaml <<'YAML'\n- runFlow: maestro test x\nYAML\necho written")
     check('heredoc mentioning maestro test passes', rc == 0, err[:140])
+    rc, err, adb = run('maestro-runner --platform ios --device "$AGENT_SIM_UDID" --no-ansi test f.yaml')
+    check('maestro-runner on the slot sim with --platform ios passes without a driver port',
+          rc == 0 and not adb, f'rc={rc} adb={adb} {err[:140]}')
+    rc, err, _ = run('~/.maestro-runner/bin/maestro-runner --platform=ios --udid "$AGENT_SIM_UDID" hierarchy',
+                     {'STUB_SIM_STATE': 'Shutdown'})
+    check('maestro-runner by path with sim down hits the iOS booted guard', rc == 2 and 'NOT booted' in err, err[:140])
+    rc, err, _ = run('maestro-runner --device "$AGENT_SIM_UDID" test f.yaml')
+    check('maestro-runner iOS UDID without --platform ios blocks', rc == 2 and '--platform ios' in err, err[:140])
+    rc, err, _ = run(f'timeout 600 maestro-runner --platform ios --device {OTHER_UDID} test f.yaml')
+    check('maestro-runner neighbor slot UDID blocks', rc == 2 and 'NOT this session' in err, err[:140])
+    rc, err, _ = run('MAESTRO_DEVICE=$AGENT_SIM_UDID maestro-runner --platform ios test f.yaml')
+    check('maestro-runner without --device blocks even with MAESTRO_DEVICE', rc == 2 and 'maestro-runner run has no --device' in err, err[:140])
+    rc, err, adb = run(f'maestro-runner --device {SERIAL} test f.yaml', {'STUB_ADB_SERIAL': SERIAL})
+    check('maestro-runner Android serial passes when attached', rc == 0 and adb, f'rc={rc} {err[:140]}')
+    rc, err, _ = run('maestro-runner devices; maestro-runner --version; maestro-runner doctor')
+    check('maestro-runner devices/--version/doctor pass', rc == 0, err[:140])
     rc, err, _ = run(None, {'STUB_SIM_STATE': 'Shutdown'}, 'mcp__maestro__list_devices', {})
     check('mcp list_devices skips the booted guard', rc == 0, err[:140])
     rc, err, _ = run(None, {'STUB_SIM_STATE': 'Shutdown'}, 'mcp__maestro__take_screenshot', {})
@@ -404,6 +420,9 @@ def playbook():
     run('mcp tap_on', 2, tool='mcp__maestro__tap_on', tool_input={'text': 'x'})
     run('maestro --version then grep package.json', 0,
         'export PATH="$HOME/.maestro/bin:$PATH"; maestro --version 2>&1 | head -2; echo "=== npm:"; grep -n \'"maestro"\' package.json')
+    run('maestro-runner test drive', 2, 'maestro-runner --platform ios --device "$AGENT_SIM_UDID" test f.yaml')
+    run('maestro-runner devices', 0, 'maestro-runner devices')
+    run('maestro-bench.sh wrapper', 2, '~/.cursor/skills/build-and-test/scripts/maestro-bench.sh --flow f.yaml --runs 3')
     run('ls of maestro dirs', 0,
         'ls ~/.cursor/skills/build-and-test/flows/ 2>/dev/null | head -20; ls /x/git/maestro/ 2>/dev/null | head -20')
     run('ls maestro + find -iname maestro', 0,

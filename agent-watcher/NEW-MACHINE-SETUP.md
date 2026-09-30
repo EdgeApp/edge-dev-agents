@@ -93,6 +93,15 @@ Everything below this line is for Claude, not you.
 >    `RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"`
 >    Set `git config --global user.name "Jonathan Tzeng"` and `user.email jnthntzng@gmail.com`.
 >    Verify `jq gh tmux watchman`, `node -v` (== v24.15.0), `maestro -v`.
+>    Optional, only if a slot will run `AGENT_MAESTRO_ENGINE=maestro-runner`: download the
+>    maestro-runner release tarball from github.com/devicelab-dev/maestro-runner, check it
+>    against the release's sha256, and unpack it to `~/.maestro-runner/bin` (no shell
+>    profile edits; the scripts prepend that path). Its first iOS run builds WebDriverAgent
+>    into a shared cache with no lock, so run one flow on one sim per iOS runtime before
+>    parallel slots use it. The Edge fork (EdgeApp/maestro-runner `jon/wda-request-perf`)
+>    is faster than 1.1.27 on Edge (118s against 137s of flow time) but still slower
+>    than maestro (84s), so this setup stays on the upstream release; the fork builds from
+>    source into `~/.maestro-runner-fork` for slots that need `--wda-port`.
 > 3. **iOS sims.** Install the iOS 18 runtime (`xcodebuild -downloadPlatform iOS`; if it
 >    needs Apple ID, tell me). Create the master sim matching
 >    `~/.config/agent-watcher/asana-config.json` → `.watcher.master_sim` (iPhone 16 Pro Max,
@@ -196,6 +205,8 @@ through pr-address/bugbot companion scripts, which reply in-thread first.
 
 require-maestro-device: maestro test/record without --device is blocked in slot
 sessions (multiple booted sims make the default driver attachment ambiguous).
+maestro-runner drives need `--device` and, for an iOS UDID, `--platform ios`
+(runner defaults to android).
     { "type": "command", "command": "~/.config/agent-watcher/hooks/lint-md-on-write.sh", "timeout": 30 },
 
 lint-md-on-write: registered under BOTH matcher `Bash` and matcher `Write|Edit`.
