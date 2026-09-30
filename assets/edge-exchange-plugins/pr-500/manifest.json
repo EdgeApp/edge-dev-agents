@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-exchange-plugins/pr-500/20260929-185835-agent-proof-1219006143254537-01-HACKED-exchange-status-page-row-real-order.png",
+      "caption": "exchange status page row real order",
+      "index": "1",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "injected a real MoonPay Trade order id as the swap orderUri in the gui (SwapDetailsCard/TransactionDetailsScene); reverted",
+      "batchAt": "2026-09-30T01:58:35Z",
+      "headSha": "0bf14f90e80ed9fac760c19b572e7c7ac6456433",
+      "addedAt": "2026-09-30T01:58:35Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-500/20260929-185835-agent-proof-1219006143254537-02-HACKED-scanner-resolves-real-order.png",
+      "caption": "scanner resolves real order",
+      "index": "2",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "injected a real MoonPay Trade order id as the swap orderUri in the gui (SwapDetailsCard/TransactionDetailsScene); reverted",
+      "batchAt": "2026-09-30T01:58:35Z",
+      "headSha": "0bf14f90e80ed9fac760c19b572e7c7ac6456433",
+      "addedAt": "2026-09-30T01:58:35Z"
+    }
+  ]
+}
