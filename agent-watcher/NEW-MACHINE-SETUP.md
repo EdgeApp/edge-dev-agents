@@ -98,7 +98,10 @@ Everything below this line is for Claude, not you.
 >    against the release's sha256, and unpack it to `~/.maestro-runner/bin` (no shell
 >    profile edits; the scripts prepend that path). Its first iOS run builds WebDriverAgent
 >    into a shared cache with no lock, so run one flow on one sim per iOS runtime before
->    parallel slots use it.
+>    parallel slots use it. The Edge fork (EdgeApp/maestro-runner `jon/wda-request-perf`)
+>    is faster than 1.1.27 on Edge (118s against 137s of flow time) but still slower
+>    than maestro (84s), so this setup stays on the upstream release; the fork builds from
+>    source into `~/.maestro-runner-fork` for slots that need `--wda-port`.
 > 3. **iOS sims.** Install the iOS 18 runtime (`xcodebuild -downloadPlatform iOS`; if it
 >    needs Apple ID, tell me). Create the master sim matching
 >    `~/.config/agent-watcher/asana-config.json` → `.watcher.master_sim` (iPhone 16 Pro Max,

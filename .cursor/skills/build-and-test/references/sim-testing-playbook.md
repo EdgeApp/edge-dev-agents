@@ -507,7 +507,17 @@ debugging screenshots of the wrong device.
   the RN tree (each `when: visible` check included), so condition-heavy flows
   like `dismiss-startup-modals` cost it ~19s; its idle wait is not the cause.
   Its first run per iOS runtime also builds WDA (~90s, ~3.8 GB transient RSS).
-  Pick runner when host CPU/RAM across slots matters more than wall time.
+  The Edge fork (EdgeApp/maestro-runner `jon/wda-request-perf`, installed at
+  `~/.maestro-runner-fork`) cuts that WDA cost but does not close the gap.
+  Measured 2026-09-30, one run each on the same flow and a loaded host: maestro
+  84.0s flow, 24.8s host CPU, 812 MB; runner 1.1.27 136.7s, 9.1s, 312 MB; fork
+  118.2s, 2.9s, 279 MB (summed WDA time 214s to 120s). The fork also adds
+  `--wda-port` (pass a per-slot port; the derived 8100-9099 port can collide
+  with another sim or a Metro port) and a WDA build lock with per-device
+  xctestrun files, so parallel slots on one iOS runtime are safe under it.
+  Native XCUITest ran the same flow in 16.4s, so WDA request patterns, not the
+  device, set runner's floor. Pick runner when host CPU/RAM across slots
+  matters more than wall time.
   Semantics differ, so a flow passing under one engine is not proof under the
   other: runner treats an OFF-SCREEN element as visible (assert passes without
   scrolling, useful to read an off-screen wallet or tx state, useless as
