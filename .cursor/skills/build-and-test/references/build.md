@@ -40,7 +40,7 @@ A real on-simulator UI test that logs into the pre-provisioned test account, nav
 ### 0a. Prerequisites (check, install if missing)
 
 - `xcrun -version` → Xcode CLT
-- `maestro --version` → install with `curl -Ls "https://get.maestro.mobile.dev" | bash`, then add `$HOME/.maestro/bin` to PATH. maestro needs JDK 11+; Temurin 17 works.
+- `maestro --version` (Android, or a flow the XCUITest interpreter rejects) → install with `curl -Ls "https://get.maestro.mobile.dev" | bash`, then add `$HOME/.maestro/bin` to PATH. maestro needs JDK 11+; Temurin 17 works.
 
 ### 0b. Resolve + boot the simulator
 

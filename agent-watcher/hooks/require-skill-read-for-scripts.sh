@@ -145,9 +145,9 @@ need '(pr-land-automerge|pr-merge-watch|pr-land-merge|force-land-rationale)\.sh(
 need '(pr-land-publish|npm-publish-web|npm-auth-wait|upgrade-dep)\.sh([[:space:]]|$)' pr-land:publish
 need '(pr-bot-findings-sweep|pr-land-extract-asana-task)\.sh([[:space:]]|$)' pr-land:post-merge
 # /build-and-test phase slices, every session. All four build scripts and the
-# capture script live in build-and-test/scripts, so the core is already required.
+# two drive scripts live in build-and-test/scripts, so the core is already required.
 need '(slot-preflight|select-ios-sim|ios-rn-build|ios-rn-build-wait)\.sh([[:space:]]|$)' build-and-test:build
-need 'capture-buy-quote\.sh([[:space:]]|$)'                       build-and-test:drive build-and-test:evidence
+need '(capture-buy-quote|xcuitest-run)\.sh([[:space:]]|$)'        build-and-test:drive build-and-test:evidence
 [ "$ORCH" = 1 ] || return 0
 
 # Shared top-level scripts with one governing skill, and the /one-shot phase
@@ -171,7 +171,7 @@ need 'set-tested\.sh([[:space:]]|$)'               one-shot:testing
 # build-and-test's scripts that build or drive the app on the sim start the
 # /one-shot testing phase (select-ios-sim.sh / slot-preflight.sh only pick and
 # check a slot, so they pull build-and-test:build above and nothing here).
-need '(capture-buy-quote|ios-rn-build|ios-rn-build-wait)\.sh([[:space:]]|$)' one-shot:testing
+need '(capture-buy-quote|xcuitest-run|ios-rn-build|ios-rn-build-wait)\.sh([[:space:]]|$)' one-shot:testing
 need 'asana-review-field\.sh([[:space:]]|$)'       one-shot:review
 need 'pr-create\.sh([[:space:]]|$)'                one-shot:pr
 need 'watch-pr\.sh([[:space:]]|$)'                 one-shot:watch

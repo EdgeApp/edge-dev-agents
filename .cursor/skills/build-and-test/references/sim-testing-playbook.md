@@ -7,7 +7,9 @@ entry (the human audits and prunes it periodically — keep entries dense).
 
 ## Flow library — compose these, never re-derive them
 Parameterized subflows in `~/.cursor/skills/build-and-test/maestro/common/`
-(compose via `runFlow` with `env:`; copy next to your task flow). Re-deriving
+(compose via `runFlow` with `env:`; copy next to your task flow). Every flow
+here runs on the iOS XCUITest interpreter (`scripts/xcuitest-run.sh`) and on the
+maestro CLI. Re-deriving
 any of these inline is wasted derivation — two 2026-07 sessions independently
 rebuilt the entire swap-pair sequence tap-by-tap that `select-swap-pair`
 already encodes, params and gotchas included.
@@ -486,18 +488,27 @@ debugging screenshots of the wrong device.
   you explored through the MCP, kill that slot's daemon and its
   `xcodebuild test-without-building` child (match both on YOUR udid, never
   another slot's), then run the CLI. (Promoted 2026-08-06, run 1216251688512498.)
+  `scripts/xcuitest-run.sh` does this itself: it kills the daemon PIDs matched
+  on `--udid` and terminates the maestro driver app before its own drive. The
+  MCP server does not come back after that kill: the session loses its maestro
+  MCP tools, so finish MCP exploration before the first interpreter run.
 - **Maestro `visible:` matches the WHOLE text node.** "Powered by Maya
   Protocol" renders inside a node whose text is
   `Powered by Maya ProtocolTap to Change Provider`, so the exact match never
   hits while `"Powered by .*"` does. Anchor quote-ready waits on
   `Slide to Confirm` instead — it appears only once a quote resolves.
   (Promoted 2026-07-29, run 1216518039073159.)
-- **Maestro economics:** each `maestro test` invocation pays ~2 min driver
+- **Driver economics:** each `maestro test` invocation pays ~2 min driver
   startup. For EXPLORATION (finding selectors, poking screens) use the **maestro
-  MCP tools** (persistent driver, per-command tap/swipe/hierarchy/screenshot —
+  MCP tools** (persistent driver, per-command tap/swipe/hierarchy/screenshot;
   select the device matching `$AGENT_SIM_UDID` first). For the REPEATABLE PROOF
-  run, compose ONE yaml flow and run it once — that run produces the evidence
-  screenshots for the PR.
+  run, compose ONE yaml flow and run it once: that run produces the evidence
+  screenshots for the PR. On iOS the proof run goes through
+  `scripts/xcuitest-run.sh --flow <yaml>` (the XCUITest interpreter, see
+  `references/xcuitest-interpreter.md`): same YAML, a cached runner, no Maestro
+  driver startup, and quiescence waits capped at 1s. The maestro CLI runs iOS
+  flows only when the task asks for Maestro or the interpreter's preflight
+  rejects a command the flow needs. Android stays on the maestro CLI.
 - Modal gauntlet, eraseText-before-inputText, spaced PIN taps: all encoded in the
   `common/` flows — use them instead of remembering.
 - **Fixed-port debug dev-servers are NOT slot-safe — use `updot` instead.** The
