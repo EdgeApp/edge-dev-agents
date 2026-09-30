@@ -1,0 +1,89 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6228/20260929-200838-agent-proof-1218959230370441-01-baseline-fil-btc-changenow.png",
+      "caption": "baseline fil btc changenow",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T03:08:38Z",
+      "headSha": "cafb5cb2fa62ee5bbd9b571610fb25efb6641c90",
+      "addedAt": "2026-09-30T03:08:38Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6228/20260929-200838-agent-proof-1218959230370441-02-baseline-provider-sheet.png",
+      "caption": "baseline provider sheet",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T03:08:38Z",
+      "headSha": "cafb5cb2fa62ee5bbd9b571610fb25efb6641c90",
+      "addedAt": "2026-09-30T03:08:38Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6228/20260929-200838-agent-proof-1218959230370441-03-banned-fil-btc-no-changenow.png",
+      "caption": "banned fil btc no changenow",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T03:08:38Z",
+      "headSha": "cafb5cb2fa62ee5bbd9b571610fb25efb6641c90",
+      "addedAt": "2026-09-30T03:08:38Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6228/20260929-200838-agent-proof-1218959230370441-04-banned-fil-ltc-changenow-quote.png",
+      "caption": "banned fil ltc changenow quote",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T03:08:38Z",
+      "headSha": "cafb5cb2fa62ee5bbd9b571610fb25efb6641c90",
+      "addedAt": "2026-09-30T03:08:38Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6228/20260929-200838-agent-proof-1218959230370441-05-swap-success.png",
+      "caption": "swap success",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T03:08:38Z",
+      "headSha": "cafb5cb2fa62ee5bbd9b571610fb25efb6641c90",
+      "addedAt": "2026-09-30T03:08:38Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6228/20260929-200838-agent-proof-1218959230370441-06-noban-xlm-btc-changenow.png",
+      "caption": "noban xlm btc changenow",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T03:08:38Z",
+      "headSha": "cafb5cb2fa62ee5bbd9b571610fb25efb6641c90",
+      "addedAt": "2026-09-30T03:08:38Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6228/20260929-200838-agent-proof-1218959230370441-07-banned-xlm-btc-no-changenow.png",
+      "caption": "banned xlm btc no changenow",
+      "index": "7",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T03:08:38Z",
+      "headSha": "cafb5cb2fa62ee5bbd9b571610fb25efb6641c90",
+      "addedAt": "2026-09-30T03:08:38Z"
+    }
+  ]
+}
