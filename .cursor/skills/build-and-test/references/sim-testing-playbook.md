@@ -497,6 +497,30 @@ debugging screenshots of the wrong device.
   select the device matching `$AGENT_SIM_UDID` first). For the REPEATABLE PROOF
   run, compose ONE yaml flow and run it once — that run produces the evidence
   screenshots for the PR.
+- **Proof engine: stock maestro by default; maestro-runner is opt-in and slower
+  on Edge.** `AGENT_MAESTRO_ENGINE=maestro-runner` (or `capture-buy-quote.sh
+  --engine maestro-runner`) runs the proof flow on devicelab's Go runner over
+  WebDriverAgent. Measured 2026-09-29 with `maestro-bench.sh` (iOS 18.6, Edge
+  debug build, a 6-step nav flow, 4 passing runs per engine, agent account):
+  maestro 34-40s wall, ~19s host CPU, ~800 MB host RSS; maestro-runner 62-64s
+  wall, ~3s host CPU, ~270 MB host RSS. Runner pays ~4-5s per selector query on
+  the RN tree (each `when: visible` check included), so condition-heavy flows
+  like `dismiss-startup-modals` cost it ~19s; its idle wait is not the cause.
+  Its first run per iOS runtime also builds WDA (~90s, ~3.8 GB transient RSS).
+  Pick runner when host CPU/RAM across slots matters more than wall time.
+  Semantics differ, so a flow passing under one engine is not proof under the
+  other: runner treats an OFF-SCREEN element as visible (assert passes without
+  scrolling, useful to read an off-screen wallet or tx state, useless as
+  on-screen proof), a `tapOn` of an off-screen element reports PASSED while
+  tapping nothing, and a `text:` regex also matches an input's typed value
+  (`common/find-wallet.yaml` taps its own search field under runner). Its text
+  match is CONTAINS over each element's combined label, so a short selector
+  resolves to a whole container: under YOLO auto-login `buy-quote-input.yaml`
+  "found" `Exit PIN` on the home screen and tapped the balance card center for
+  each PIN digit, all steps passed, ~52s per tap. Library flows also need
+  `-e APP_ID=co.edgesecure.app` (runner ignores the flow's own env: for the
+  `appId: ${APP_ID}` header). Scroll to the element before any proof tap or
+  screenshot on either engine.
 - Modal gauntlet, eraseText-before-inputText, spaced PIN taps: all encoded in the
   `common/` flows — use them instead of remembering.
 - **Fixed-port debug dev-servers are NOT slot-safe — use `updot` instead.** The
