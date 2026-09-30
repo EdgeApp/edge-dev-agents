@@ -18,7 +18,11 @@
 #                 the copy, so a scratchpad brief outlives its scratchpad. A brief
 #                 is this box's prompt to one session, never distributed config:
 #                 a source inside a tree convention-sync carries is refused.
-#   --model       claude model id (default: the CLI default)
+#   --model       a family alias (sonnet, opus, haiku, fable; [1m] suffix ok),
+#                 which the CLI resolves to the newest model in that family.
+#                 A full id (claude-sonnet-5) stays pinned to that exact model
+#                 and goes stale when the family ships a new one. Default: the
+#                 CLI default.
 #   --pointer     optional one-sentence summary appended to the pointer prompt
 #   --no-chrome   omit --chrome (default: Chrome bridge on)
 #   --anchor      name the session claude-asana-<slug> with RC <slug> (a named

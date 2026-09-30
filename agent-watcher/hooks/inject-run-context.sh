@@ -15,7 +15,8 @@
 #     re-read pointers for contract files.
 #   ANCHOR (tmux claude-asana-<name> with <name> in persistent_anchors):
 #     identity line + the anchor's open-threads ledger.
-#   Anything else: exits silently.
+#   Anything else: injects nothing. Outside orch runs a compact/clear boundary
+#     also expires this session's skill-read markers (sess-<session_id>).
 #
 # Every fetch is best-effort with a short timeout; a dead network yields a
 # partial block, never a blocked session start. Exit 0 always.
@@ -29,7 +30,8 @@ CRED="$DIR/credentials.json"
 # SessionStart source drives segment semantics: startup/resume = a NEW run
 # segment (fresh obligations); clear/compact = a context boundary INSIDE the
 # same segment (artifacts from earlier in the segment stay valid).
-SRC=$(jq -r '.source // empty' 2>/dev/null || true)
+INPUT=$(cat 2>/dev/null || true)
+SRC=$(printf '%s' "$INPUT" | jq -r '.source // empty' 2>/dev/null || true)
 
 # Headless-child guard (2026-08-28): scripts running INSIDE a run shell out to
 # `claude -p` (the no-slop semantic judge via pr-address.sh, ad-hoc helpers).
@@ -59,7 +61,7 @@ emit_run() {
       "https://app.asana.com/api/1.0/tasks/$gid?opt_fields=name,completed,custom_fields.name,custom_fields.display_value" 2>/dev/null)
     if [[ -n "$task" ]]; then
       echo "Task: $(jq -r '.data.name // "?"' <<<"$task")"
-      jq -r '.data.custom_fields[]? | select((.name | test("^agent_(status|review|deliverable|on_complete)$")) or (.name | test("block|Board State|Force Land"; "i"))) | "  \(.name): \(.display_value // "unset")"' <<<"$task" 2>/dev/null
+      jq -r '.data.custom_fields[]? | select((.name | test("^agent_(status|review|deliverable)$")) or (.name | test("block|Board State|Force Land"; "i"))) | "  \(.name): \(.display_value // "unset")"' <<<"$task" 2>/dev/null
     fi
     # Followup watermark: comments newer than the last agent-run-report attachment.
     local wm stories nreports
@@ -221,6 +223,14 @@ emit_anchor() {
   fi
   echo "Treat summarized/remembered session claims as stale; the ledger, MEMORY.md, and live fetches are the truth."
 }
+
+# Outside orch runs, skill-read markers are keyed sess-<session_id>
+# (mark-skill-read.sh). Compaction drops the bodies they vouch for, so they
+# expire here as a run's do; /clear starts a new session id anyway.
+if [[ -z "${AGENT_TASK_GID:-}" && ( "$SRC" == "compact" || "$SRC" == "clear" ) ]]; then
+  SID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)
+  [[ -n "$SID" ]] && rm -f /tmp/agent-skill-read-sess-"$SID"-* 2>/dev/null
+fi
 
 if [[ -n "${AGENT_TASK_GID:-}" ]]; then
   emit_run "$AGENT_TASK_GID" 2>/dev/null

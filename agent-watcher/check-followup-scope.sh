@@ -134,11 +134,13 @@ elif [[ -f "$VERSIONS_FILE" ]]; then
   BASELINE=$(echo "$SNAPS" | jq -c 'last // empty')
   if [[ -n "$BASELINE" ]]; then
     BASELINE_TS=$(echo "$BASELINE" | jq -r '.ts')
+    # agent_on_complete is never scope: finalize's on-complete step is its only
+    # reader, so a change to it is not reported here.
     FIELD_DELTAS=$(jq -nc \
       --argjson old "$(echo "$BASELINE" | jq -c '.fields')" \
       --argjson new "$LIVE_FIELDS" \
       '[ (($old | keys) + ($new | keys) | unique)[]
-         | select($old[.] != $new[.])
+         | select(. != "agent_on_complete" and $old[.] != $new[.])
          | {field: ., was: $old[.], now: $new[.]} ]' 2>/dev/null || echo "[]")
     DELTA_STATUS="ok"
   fi

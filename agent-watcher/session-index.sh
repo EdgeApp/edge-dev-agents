@@ -78,7 +78,10 @@ exec node -e "$NODE_CODE"
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
-const { execSync } = require('child_process')
+const { execFileSync } = require('child_process')
+const AW = path.join(os.homedir(), '.config/agent-watcher')
+const { headFacts } = require(path.join(AW, 'lib/transcript-heads.js'))
+const TASK_NAMES = path.join(AW, 'lib/task-names.js')
 
 const HOME = os.homedir()
 const PROJECTS = path.join(HOME, '.claude/projects')
@@ -116,28 +119,21 @@ for (const row of (process.env.TMUX_TSV || '').split('\\n')) {
 const transcripts = []
 let dirs = []
 try { dirs = fs.readdirSync(PROJECTS).filter(d => { try { return fs.statSync(path.join(PROJECTS, d)).isDirectory() } catch { return false } }) } catch {}
+const files = []
 for (const d of dirs) {
   if (d === 'subagents') continue
-  let files = []
-  try { files = fs.readdirSync(path.join(PROJECTS, d)).filter(f => f.endsWith('.jsonl')) } catch { continue }
-  for (const f of files) {
-    const p = path.join(PROJECTS, d, f)
+  try { for (const f of fs.readdirSync(path.join(PROJECTS, d))) if (f.endsWith('.jsonl')) files.push({ d, f, p: path.join(PROJECTS, d, f) }) } catch {}
+}
+// Head classification (run signature, task gid) from lib/transcript-heads.js,
+// the same cached facts resume-agent, resume-task and resolve-run use.
+const heads = headFacts(files.map(x => x.p))
+{
+  for (const { d, f, p } of files) {
     let st; try { st = fs.statSync(p) } catch { continue }
     const uuid = f.replace(/\.jsonl$/, '')
-    // head-based classification (50 lines, bounded read)
-    let head = ''
-    try {
-      const fd = fs.openSync(p, 'r'); const buf = Buffer.alloc(1024 * 1024)
-      const n = fs.readSync(fd, buf, 0, buf.length, 0); fs.closeSync(fd)
-      head = buf.slice(0, n).toString('utf8').split('\n').slice(0, 50).join('\n')
-    } catch {}
-    // Same pattern as lib/run-signature.sh RUN_SIGNATURE_RE (raw prompt, or the
-    // newer slash-command message form); keep the two identical.
-    const isRun = /"\/(one-shot|task-run) --yolo|<command-name>\/(one-shot|task-run)<\/command-name>[^"]{0,8}<command-args>--yolo/.test(head)
-    // First asana URL WITH a gid-length digit run (resume-agent first_gid_of rule):
-    // injected run-context can put digit-less asset URLs ahead of the task URL.
-    const taskUrl = [...head.matchAll(/app\.asana\.com[A-Za-z0-9/._-]*/g)].map(m => m[0]).find(u => /[0-9]{12,}/.test(u)) || ''
-    const gid = taskUrl.match(/[0-9]{12,}/g)?.pop() || null
+    const h = heads.get(p) || { sig: 0, gid: '' }
+    const isRun = !!h.sig
+    const gid = h.gid || null
     const kind = isRun ? 'run' : (uuid in forkParent ? 'chat' : 'interactive')
     const entry = {
       uuid, project_dir: d, kind, task_gid: gid, task_name: null,
@@ -176,21 +172,21 @@ for (const d of dirs) {
   }
 }
 
-// task names: ONE batch call for the agent project (only gids get names; best-effort)
-const gids = new Set(transcripts.map(t => t.task_gid).filter(Boolean))
-if (gids.size > 0) {
-  try {
-    const cred = JSON.parse(fs.readFileSync(path.join(HOME, '.config/agent-watcher/credentials.json'), 'utf8'))
-    const cfg = JSON.parse(fs.readFileSync(path.join(HOME, '.config/agent-watcher/asana-config.json'), 'utf8'))
-    if (cred.asana_token && cfg.project_gid) {
-      const out = execSync(
-        `curl -sf --max-time 20 "https://app.asana.com/api/1.0/projects/${cfg.project_gid}/tasks?opt_fields=name&limit=100" -H "Authorization: Bearer ${cred.asana_token}"`,
-        { encoding: 'utf8' })
-      const map = {}
-      for (const t of JSON.parse(out).data || []) map[t.gid] = t.name
-      for (const t of transcripts) if (t.task_gid && map[t.task_gid]) t.task_name = map[t.task_gid]
-    }
-  } catch {}
+// task names: the shared cache (lib/task-names.js); its CLI refreshes a stale
+// cache and looks up the rest, remembering failures. Best-effort.
+const gids = [...new Set(transcripts.map(t => t.task_gid).filter(Boolean))]
+if (gids.length > 0) {
+  const names = require(TASK_NAMES).load()
+  const missing = gids.filter(g => !names.has(g))
+  if (missing.length) {
+    try {
+      for (const line of execFileSync('node', [TASK_NAMES, ...missing], { encoding: 'utf8', timeout: 60000 }).split('\n')) {
+        const [g, n] = line.split('\t')
+        if (g && n) names.set(g, n)
+      }
+    } catch {}
+  }
+  for (const t of transcripts) if (t.task_gid && names.get(t.task_gid)) t.task_name = names.get(t.task_gid)
 }
 
 // Fresh-spawn linkage: a pane launched WITHOUT --resume (fresh-conversation

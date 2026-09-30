@@ -10,7 +10,8 @@
 //               title, claude-process liveness, remote-control name + bridge
 //               state, idle time, and reap exposure
 //   TRANSCRIPTS recent watcher-spawned transcripts with NO live tmux session
-//               (resumable; source = `resume-agent.sh --list --porcelain`)
+//               (resumable; source = lib/transcript-list.js, the rows behind
+//               `resume-agent.sh --list`)
 //
 // Keys (context-sensitive, shown in the footer):
 //   up/down/j/k  move       Enter/a  attach (switch-client inside tmux)
@@ -29,6 +30,7 @@ const { execFileSync, spawnSync } = require('child_process')
 const os = require('os')
 const AW = `${os.homedir()}/.config/agent-watcher`
 const { buildSessions, fmtAgo, fmtDate, sh } = require(`${AW}/lib/fleet-model.js`)
+const { paint } = require(`${AW}/lib/frame.js`)
 const RESUME = `${AW}/resume-agent.sh`
 
 const ESC = '\x1b['
@@ -40,7 +42,7 @@ function pad (s, w) {
   return s + ' '.repeat(w - len)
 }
 
-// createSessionsView(host): host = { suspend(), resume(), quit(), footerHint }
+// createSessionsView(host): host = { suspend(), resume(), quit(), footerHint, reload?(cb) }
 // Returns { name, render(), onKey(k) -> handled, refresh(msg), setModel(fleet) }.
 function createSessionsView (host) {
   let model = { live: [], dead: [], cfg: {} }
@@ -110,22 +112,22 @@ function createSessionsView (host) {
   function render () {
     const cols = process.stdout.columns || 120
     const rows = process.stdout.rows || 40
-    let out = `${ESC}H${ESC}2J`
-    out += `${clr.bold} SESSIONS${clr.off}  ${clr.dim}${host.footerHint || ''}  ${new Date().toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour12: true })}  anchors never reap: ${(model.cfg.anchors || []).join(', ')}  retired kept: ${model.cfg.keepCompleted}${clr.off}\n\n`
+    const L = []
+    L.push(`${clr.bold} SESSIONS${clr.off}  ${clr.dim}${host.footerHint || ''}  ${new Date().toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour12: true })}  anchors never reap: ${(model.cfg.anchors || []).join(', ')}  retired kept: ${model.cfg.keepCompleted}${clr.off}`, '')
     const titleW = Math.min(58, cols - 52)
     let line = 0
     const maxLines = rows - 7
     const startIdx = Math.max(0, sel - maxLines + 4)
     let printedLive = false; let printedDead = false
     if (search) {
-      out += `${clr.bold} SEARCH '${search.q}' — ${search.rows.length} transcript match(es), all kinds — sort: ${search.sort}${clr.off}\n`
-      out += `${clr.dim}   ${pad('LAST ACTIVITY', 15)}${pad('IDLE', 9)}${pad('SPAWNED', 15)}TITLE${clr.off}\n`
+      L.push(`${clr.bold} SEARCH '${search.q}' — ${search.rows.length} transcript match(es), all kinds — sort: ${search.sort}${clr.off}`)
+      L.push(`${clr.dim}   ${pad('LAST ACTIVITY', 15)}${pad('IDLE', 9)}${pad('SPAWNED', 15)}TITLE${clr.off}`)
       line += 2
     }
     items.forEach((r, i) => {
       if (i < startIdx || line >= maxLines) return
-      if (!search && i < model.live.length && !printedLive) { out += `${clr.bold} LIVE (tmux)${clr.off}\n`; printedLive = true; line++ }
-      if (!search && i >= model.live.length && !printedDead) { out += `\n${clr.bold} TRANSCRIPTS (no live session — resumable)${clr.off}\n`; printedDead = true; line += 2 }
+      if (!search && i < model.live.length && !printedLive) { L.push(`${clr.bold} LIVE (tmux)${clr.off}`); printedLive = true; line++ }
+      if (!search && i >= model.live.length && !printedDead) { L.push('', `${clr.bold} TRANSCRIPTS (no live session — resumable)${clr.off}`); printedDead = true; line += 2 }
       let l
       if (r.kind === 'transcript') {
         const fork = r.isForkOfLive ? `${clr.dim} → has live fork${clr.off}` : ''
@@ -138,7 +140,7 @@ function createSessionsView (host) {
         l = ` ${glyph(r)} ${pad(r.kind === 'run' ? r.state : r.kind, 8)}${pad(r.title, titleW)} ${pad(rcCell(r), 26)}${pad(idle, 14)}${reap}`
       }
       if (i === sel) l = `${clr.inv}${pad(stripAnsi(l), cols - 2)}${clr.off}`
-      out += l + '\n'
+      L.push(l)
       line++
     })
     const r = items[sel]
@@ -153,10 +155,10 @@ function createSessionsView (host) {
     acts.push('/ search')
     if (search) acts.push('o sort', 'Esc clear')
     acts.push('r refresh', 'Tab health', 'q quit')
-    out += `\n${ESC}${rows - 1};1H${clr.dim} ${acts.join('  ·  ')}${clr.off}`
-    if (searchInput !== null) out += `${ESC}${rows};1H${clr.cyn} search: ${searchInput}▌${clr.off}`
-    else if (status) out += `${ESC}${rows};1H${clr.yel} ${status.slice(0, cols - 2)}${clr.off}`
-    process.stdout.write(out)
+    L[rows - 2] = `${clr.dim} ${acts.join('  ·  ')}${clr.off}`
+    if (searchInput !== null) L[rows - 1] = `${clr.cyn} search: ${searchInput}▌${clr.off}`
+    else if (status) L[rows - 1] = `${clr.yel} ${status.slice(0, cols - 2)}${clr.off}`
+    paint(L)
   }
 
   // ── actions ──
@@ -219,13 +221,19 @@ function createSessionsView (host) {
     render()
   }
 
+  // host.reload(cb), when the host has one, collects off the main thread and
+  // calls cb(fleet); otherwise the model is rebuilt inline.
   function refresh (msg) {
     status = 'loading…'; render()
-    model = buildSessions()
-    search = null
-    flatten()
-    status = msg || ''
-    render()
+    const apply = (fleet) => {
+      model = fleet
+      search = null
+      flatten()
+      status = msg || ''
+      render()
+    }
+    if (host.reload) host.reload(apply)
+    else apply(buildSessions())
   }
 
   // Host-driven model updates (auto-refresh): keep selection and search; only

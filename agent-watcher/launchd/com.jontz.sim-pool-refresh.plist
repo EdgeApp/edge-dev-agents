@@ -12,7 +12,6 @@
   <key>RunAtLoad</key><true/>
   <key>StandardOutPath</key><string>/tmp/sim-pool-refresh.out</string>
   <key>StandardErrorPath</key><string>/tmp/sim-pool-refresh.err</string>
-  <key>ProcessType</key><string>Background</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>

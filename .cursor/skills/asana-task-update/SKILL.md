@@ -14,7 +14,8 @@ metadata:
 <rule id="attach-graceful-without-secret">`--attach-pr` uses the Asana ↔ GitHub widget integration. The secret is resolved from `$ASANA_GITHUB_SECRET`, else falls back to `credentials.json` (`.asana_github_secret`) — so it works in spawned agent shells that lack the env var. If it's still unset, or if the integration endpoint returns 401/403/404 (integration disabled at the workspace level), the script warns once and skips the widget call with exit 0 — it does NOT fail the workflow. `ASANA_TOKEN` is resolved the same way (env, else `credentials.json` `.asana_token`).</rule>
 <rule id="create-subtask">`--create-subtask --subtask-name "<name>"` creates a subtask under `--task` and re-points the rest of the invocation at the new subtask, so a SINGLE call can create the per-PR subtask AND `--attach-pr` its PR. Prints `>> subtask created: <gid>`. Used by `/one-shot`'s `multi-repo-subtasks` to give each repo's PR its own subtask under the umbrella task. `--subtask-notes <file>` sets the new subtask's body verbatim (plain notes; the script refuses a file carrying a CURRENT STATE section, that section is the parent task's).</rule>
 <rule id="qa-subtasks">A subtask titled `QA: <what a human verifies>` is a manual verification item for the QA handoff (pr-land `qa-subtasks-before-handoff`), never scope: `asana-get-context.sh` hides them from every run's ingestion. `--set-board-state "QA Verification"` exits 2 (`QA_SUBTASKS_REQUIRED`) when the task has no open `QA:` subtask; write the items first, or pass `--no-manual-qa "<why nothing needs a human>"`, which the script posts as a comment.</rule>
-<rule id="current-state-owns-the-tail">`--set-current-state <file>` is the ONLY sanctioned way to write a task description. It rewrites the agent-maintained tail and preserves operator prose above the delimiter; the delimiter literal, the strip-and-replace, and the authorship marking all live in the script, so callers supply bullets only. Never assemble a `notes` PUT by hand — raw Asana API calls are hook-blocked in agent sessions, and a hand-rolled write drops the marking and risks clobbering the operator half. The section's content contract (when it is owed, what the bullets say) belongs to one-shot `description-current-state`.</rule>
+<rule id="current-state-owns-the-tail">`--set-current-state <file>` is the ONLY sanctioned way to write the description of a task a run has touched. It rewrites the agent-maintained tail and preserves operator prose above the delimiter; the delimiter literal, the strip-and-replace, and the authorship marking all live in the script, so callers supply bullets only. Never assemble a `notes` PUT by hand — raw Asana API calls are hook-blocked in agent sessions, and a hand-rolled write drops the marking and risks clobbering the operator half. The section's content contract (when it is owed, what the bullets say) belongs to one-shot `description-current-state`.</rule>
+<rule id="set-notes-before-first-run">`--set-notes <file>` replaces the WHOLE description, for revising a task that no run has touched yet (a Refinement draft). The script refuses it once `agent_status` is set or a CURRENT STATE section exists, and applies the same comms gate as asana-task-create (`--comms-authorized "<the operator's words>"` only when you can quote the operator asking for the comms step).</rule>
 <rule id="prompt-codes">If the script exits code 2 with `PROMPT_REVIEWER`, ask the user who to assign and re-run with `--assign <user_gid>`. Hands-off callers may instead pass `--skip-assign-if-missing` to convert missing-reviewer assignment into a non-blocking skip.</rule>
 <rule id="script-timeouts">Asana updates can take time. Use `block_until_ms: 120000` for script calls.</rule>
 </rules>
@@ -82,6 +83,10 @@ metadata:
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
   --task <task_gid> --set-current-state /tmp/current-state-<task_gid>.md
 
+# Replace the whole description of a task no run has touched (a Refinement draft).
+~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
+  --task <task_gid> --set-notes /tmp/asana-task-notes.txt
+
 # Multi-repo: create a per-PR SUBTASK under the main task AND attach its PR (one call).
 # --create-subtask makes the subtask under --task, then re-points the attach at it.
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
@@ -108,6 +113,7 @@ Determine which updates are needed by the caller and build one command with all 
   ```
 - `--set-developer <user_gid>` (🤖 - Developer people field)
 - `--set-current-state <file>` (rewrite the description's agent-maintained tail; body file carries the bullets only)
+- `--set-notes <file> [--comms-authorized "<words>"]` (replace the whole description of a task no run has touched, per `set-notes-before-first-run`)
 </step>
 
 <step id="2" name="Run update script">

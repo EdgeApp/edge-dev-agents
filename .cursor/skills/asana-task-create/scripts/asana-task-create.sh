@@ -24,12 +24,9 @@
 #     [--jon-claude-section Refinement] [--dry-run] \
 #     [--comms-authorized "<the operator's words authorizing it>"]
 #
-# Comms gate: notes that tell the implementing agent to message anyone (Slack,
-# thread, channel, DM, email, reporter/partner) exit 1 with the matching lines
-# unless --comms-authorized carries the operator's explicit authorization. A task
-# description is read downstream as authority: the orch agent and the completion
-# judge both act on it, so an unrequested "reply in the thread" step turns into
-# messages sent under the operator's name.
+# Comms gate (../../asana-notes-comms-gate.sh): notes that tell the implementing
+# agent to message anyone exit 1 with the matching lines unless
+# --comms-authorized carries the operator's explicit authorization.
 #
 # Output (one per line):
 #   TASK_GID: / TASK_URL: / ADDED: / FIELD: / CREATED_OPTION: / ATTACHED:
@@ -186,17 +183,7 @@ fi
 [[ -n "$NOTES_FILE" ]] || { echo "ERROR: --notes-file is required" >&2; exit 1; }
 [[ -f "$NOTES_FILE" ]] || { echo "ERROR: notes file not found: $NOTES_FILE" >&2; exit 1; }
 
-COMMS_TARGET='(slack|thread|channel|e-?mail|dm|discord|telegram|reporter|partner)'
-COMMS_HITS=$(grep -inE \
-  "\b(post|reply|respond|message|dm|ping|notify|send|tell|announce|follow[- ]up|ask)\b[^.]{0,60}\b${COMMS_TARGET}\b|\breport\b[^.]{0,40}\b(back|in|to|on)\b[^.]{0,30}\b${COMMS_TARGET}\b|\b(email|e-mail|dm|ping)\s+(the|a|an|them|him|her|back)\b" \
-  "$NOTES_FILE" | grep -viE 'thread[- ]?(pool|safe|id|local)|main thread|ui thread|js thread' || true)
-if [[ -n "$COMMS_HITS" && -z "$COMMS_AUTH" ]]; then
-  echo "ERROR: the notes direct outbound comms, which needs the operator's explicit authorization:" >&2
-  printf '%s\n' "$COMMS_HITS" | sed 's/^/  line /' >&2
-  echo "Remove those steps, or re-run with --comms-authorized \"<the operator's words>\" if they asked for it." >&2
-  exit 1
-fi
-[[ -n "$COMMS_AUTH" ]] && echo "COMMS_AUTHORIZED: $COMMS_AUTH"
+"$HOME/.cursor/skills/asana-notes-comms-gate.sh" "$NOTES_FILE" "$COMMS_AUTH" || exit 1
 
 # Agent-authored description: mark it (🥋 / 👊) so a human scanning the task can
 # tell orch prose from operator prose. Idempotent, so a pre-marked notes file is

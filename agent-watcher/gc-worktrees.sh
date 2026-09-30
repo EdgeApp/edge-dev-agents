@@ -7,12 +7,11 @@
 #   - the task no longer exists (deleted in Asana).
 # In-flight tasks (Planning/Developing/Reviewing/Testing) are always left alone.
 #
-# RETENTION CAP: orphan candidates are NOT all reaped. The newest --keep of them
-# (by worktree mtime) are retained for inspection/resume; only the older ones are
-# reaped. This mirrors the session-watchdog retention policy so a manual run won't
-# silently destroy worktrees the watchdog is deliberately keeping. --keep defaults
-# to .watcher.keep_completed_worktrees from asana-config.json (fallback 5). Pass
-# --all to reap every orphan (keep=0, the pre-retention behavior).
+# SPARED even when orphaned (the same policy as session-watchdog.js
+# pruneSessionlessWorktrees(), so a manual run never removes what the watchdog keeps):
+#   - the task still has a tmux session (claude-asana-<gid> or retired done-asana-<gid>);
+#   - any of the task's worktrees holds unsaved work (lib/worktree-unsaved.sh). The
+#     whole task is spared, because cleanup of one repo can take its gid dir with it.
 #
 # Teardown reuses cleanup-task-workspace.sh (worktree+branch) and, when slots.json
 # still holds the slot, delete-ios-sim.sh (sim) + slots.js release (slot entry).
@@ -21,7 +20,7 @@
 # (e.g. after a crash or reboot left sessions half-cleaned).
 #
 # Usage:
-#   gc-worktrees.sh [--dry-run] [--keep N | --all]
+#   gc-worktrees.sh [--dry-run]
 #
 # Exit codes:
 #   0 = scan complete (orphans removed, or none found)
@@ -36,12 +35,9 @@ CONFIG="$DIR/asana-config.json"
 CRED="$DIR/credentials.json"
 
 DRY_RUN=false
-KEEP=""   # empty → resolve from config below; --keep N overrides; --all sets 0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=true; shift ;;
-    --keep)    KEEP="$2";    shift 2 ;;
-    --all)     KEEP=0;       shift ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -57,12 +53,6 @@ fi
 TOKEN=$(jq -r .asana_token "$CRED")
 FIELD_GID=$(jq -r .custom_fields.agent_status.gid "$CONFIG")
 
-# Resolve the retention cap (newest N orphans kept). Default from config, fallback 5.
-if [[ -z "$KEEP" ]]; then
-  KEEP=$(jq -r '.watcher.keep_completed_worktrees // 5' "$CONFIG")
-fi
-[[ "$KEEP" =~ ^[0-9]+$ ]] || { echo "Invalid --keep value: $KEEP" >&2; exit 2; }
-
 # Returns the agent_status name, or "__MISSING__" if the task 404s, or "" on error.
 fetch_status() {
   local gid="$1"
@@ -76,53 +66,70 @@ fetch_status() {
   echo "$resp" | jq -r --arg f "$FIELD_GID" '.data.custom_fields[]? | select(.gid==$f) | .enum_value.name // ""'
 }
 
-# Pass 1: classify every worktree. In-flight ones are left alone immediately.
-# Complete/missing ones are orphan candidates, collected with their mtime so we
-# can retain the newest $KEEP and reap only the rest.
-ORPHANS=()   # entries: "<mtime>\t<gid>\t<repo>\t<reason>"
+has_session() {
+  tmux has-session -t "claude-asana-$1" 2>/dev/null || tmux has-session -t "done-asana-$1" 2>/dev/null
+}
+
+# lib/remove-task-worktrees.sh holds this marker (its pid) while it runs.
+removal_in_progress() {
+  local marker="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/removing/$1" pid
+  [[ -f "$marker" ]] || return 1
+  pid="$(tr -dc '0-9' < "$marker" 2>/dev/null || true)"
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
+}
+
+removed=0
+spared=0
 kept_inflight=0
 for giddir in "$WORKTREES_ROOT"/*/; do
   [[ -d "$giddir" ]] || continue
   gid=$(basename "$giddir")
+  repos=()
   for repodir in "$giddir"*/; do
-    [[ -d "$repodir" ]] || continue
-    repo=$(basename "$repodir")
-    status=$(fetch_status "$gid")
+    [[ -d "$repodir" ]] && repos+=("$(basename "$repodir")")
+  done
+  [[ ${#repos[@]} -gt 0 ]] || continue
 
-    if [[ "$status" == "Complete" || "$status" == "__MISSING__" ]]; then
-      reason=$([[ "$status" == "__MISSING__" ]] && echo "task-deleted" || echo "Complete")
-      mtime=$(stat -f "%m" "$repodir")
-      ORPHANS+=("${mtime}"$'\t'"${gid}"$'\t'"${repo}"$'\t'"${reason}")
-    else
-      echo ">> gc-worktrees: keep $gid/$repo (in-flight: agent_status=${status:-unknown})"
-      kept_inflight=$((kept_inflight + 1))
+  status=$(fetch_status "$gid")
+  if [[ "$status" != "Complete" && "$status" != "__MISSING__" ]]; then
+    echo ">> gc-worktrees: keep $gid (in-flight: agent_status=${status:-unknown})"
+    kept_inflight=$((kept_inflight + 1))
+    continue
+  fi
+  reason=$([[ "$status" == "__MISSING__" ]] && echo "task-deleted" || echo "Complete")
+
+  if has_session "$gid"; then
+    echo ">> gc-worktrees: spare $gid ($reason; session still alive)"
+    spared=$((spared + 1))
+    continue
+  fi
+  if removal_in_progress "$gid"; then
+    echo ">> gc-worktrees: skip $gid ($reason; the watchdog's removal is already running)"
+    continue
+  fi
+  unsaved=""
+  for repo in "${repos[@]}"; do
+    verdict=$("$DIR/lib/worktree-unsaved.sh" "$giddir$repo")
+    [[ "$verdict" == unsaved* ]] && unsaved+="$repo: ${verdict#unsaved }; "
+  done
+  if [[ -n "$unsaved" ]]; then
+    echo ">> gc-worktrees: spare $gid ($reason; unsaved work: ${unsaved%; })"
+    spared=$((spared + 1))
+    continue
+  fi
+
+  for repo in "${repos[@]}"; do
+    echo ">> gc-worktrees: REAP $gid/$repo ($reason)"
+    if ! $DRY_RUN; then
+      # Tear down sim from the slot record (if any) before dropping the slot.
+      sim_udid=$(node "$DIR/lib/slots.js" get --task-gid "$gid" 2>/dev/null | jq -r '.sim_udid // empty' 2>/dev/null || true)
+      [[ -n "$sim_udid" ]] && "$DIR/delete-ios-sim.sh" --udid "$sim_udid" || true
+      "$DIR/cleanup-task-workspace.sh" --task-gid "$gid" --repo "$repo" || true
+      node "$DIR/lib/slots.js" release --task-gid "$gid" >/dev/null 2>&1 || true
     fi
+    removed=$((removed + 1))
   done
 done
 
-# Pass 2: newest $KEEP orphans are retained; the rest are reaped (oldest first).
-removed=0
-retained=0
-if [[ ${#ORPHANS[@]} -gt 0 ]]; then
-  idx=0
-  while IFS=$'\t' read -r _mtime gid repo reason; do
-    if [[ $idx -lt $KEEP ]]; then
-      echo ">> gc-worktrees: retain $gid/$repo ($reason; within keep=$KEEP)"
-      retained=$((retained + 1))
-    else
-      echo ">> gc-worktrees: REAP $gid/$repo ($reason; beyond keep=$KEEP)"
-      if ! $DRY_RUN; then
-        # Tear down sim from the slot record (if any) before dropping the slot.
-        sim_udid=$(node "$DIR/lib/slots.js" get --task-gid "$gid" 2>/dev/null | jq -r '.sim_udid // empty' 2>/dev/null || true)
-        [[ -n "$sim_udid" ]] && "$DIR/delete-ios-sim.sh" --udid "$sim_udid" || true
-        "$DIR/cleanup-task-workspace.sh" --task-gid "$gid" --repo "$repo" || true
-        node "$DIR/lib/slots.js" release --task-gid "$gid" >/dev/null 2>&1 || true
-      fi
-      removed=$((removed + 1))
-    fi
-    idx=$((idx + 1))
-  done < <(printf '%s\n' "${ORPHANS[@]}" | sort -rn -t$'\t' -k1,1)
-fi
-
-echo ">> gc-worktrees: done — keep=$KEEP, ${retained} completed worktree(s) retained, ${removed} $([[ $DRY_RUN == true ]] && echo "would be reaped" || echo "reaped"), ${kept_inflight} in-flight kept"
+echo ">> gc-worktrees: done — ${removed} worktree(s) $([[ $DRY_RUN == true ]] && echo "would be reaped" || echo "reaped"), ${spared} task(s) spared, ${kept_inflight} in-flight kept"
 exit 0

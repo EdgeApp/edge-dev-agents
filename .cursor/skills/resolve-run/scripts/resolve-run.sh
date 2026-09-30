@@ -25,13 +25,13 @@ STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"
 WORKTREES_ROOT="$HOME/git/.agent-worktrees"
 PROJECTS_DIR="${PROJECTS_DIR:-$HOME/.claude/projects}"
 
-# Shared run-signature predicate (also used by resume-task.sh). resolve-run
+# Shared run-signature check: agent-watcher's lib/transcript-heads.js (cached
+# head facts; also used by resume-task.sh and resume-agent.sh). resolve-run
 # already requires the agent-watcher deployment (pool/slots/worktree state), so
-# depending on its lib is coherent; fail loudly rather than degrade to grading
-# chat forks as runs.
-RUN_SIG_LIB="$HOME/.config/agent-watcher/lib/run-signature.sh"
-[ -r "$RUN_SIG_LIB" ] || { echo "resolve-run: missing $RUN_SIG_LIB (agent-watcher not deployed?)" >&2; exit 1; }
-. "$RUN_SIG_LIB"
+# depending on its lib is coherent; exit 1 when it is missing rather than
+# degrade to grading chat forks as runs.
+HEADS_JS="$HOME/.config/agent-watcher/lib/transcript-heads.js"
+[ -r "$HEADS_JS" ] || { echo "resolve-run: missing $HEADS_JS (agent-watcher not deployed?)" >&2; exit 1; }
 CONFIG="$HOME/.config/agent-watcher/asana-config.json"
 CRED="$HOME/.config/agent-watcher/credentials.json"
 
@@ -150,7 +150,7 @@ asana_pr_attachments() { # $1=gid $2=followup JSON (for subtask gids) → JSON a
 #     have graded month-old work as this run's.
 # Ordering is therefore by the timestamp of the LAST record (the segment that ran
 # most recently wins); identity is the anchored gid; and the run signature (shared
-# lib, also used by resume-task.sh) still decides run vs chat fork; without it an
+# lib/transcript-heads.js) still decides run vs chat fork; without it an
 # active `--chat` fork is graded as the run, with the discussion's friction counts
 # and a misaligned eval window.
 TRANSCRIPT_INDEX=""
@@ -201,14 +201,15 @@ build_transcript_index() {
   ' "$PROJECTS_DIR" "$TRANSCRIPT_HEAD_RECORDS" > "$TRANSCRIPT_INDEX" 2>/dev/null || true
 }
 find_transcript() { # $1=gid → the gid's newest RUN transcript segment, or ""
-  local gid="$1" f
+  local gid="$1" cands
   [ -n "$TRANSCRIPT_INDEX" ] || build_transcript_index
   [ -r "${TRANSCRIPT_INDEX:-/nonexistent}" ] || { echo ""; return 0; }
-  while IFS= read -r f; do
-    [ -n "$f" ] || continue
-    has_run_signature "$f" && { echo "$f"; return 0; }
-  done < <(awk -F'\t' -v g=" $gid " 'index($2, g) > 0 { print $3 "\t" $1 }' "$TRANSCRIPT_INDEX" | sort -r | cut -f2)
-  echo ""
+  cands=$(awk -F'\t' -v g=" $gid " 'index($2, g) > 0 { print $3 "\t" $1 }' "$TRANSCRIPT_INDEX" | sort -r | cut -f2)
+  [ -n "$cands" ] || { echo ""; return 0; }
+  # Newest last record first; the first candidate carrying the run signature
+  # wins (heads rows keep input order: path \t mtime \t sig \t gid \t preview).
+  printf '%s\n' "$cands" | tr '\n' '\0' | xargs -0 node "$HEADS_JS" 2>/dev/null \
+    | awk -F'\t' '$3 == 1 { print $1; exit }' || true
 }
 
 resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on stdout

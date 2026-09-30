@@ -68,40 +68,27 @@ fi
 #    resuming it drops the session into a bare shell. So resolve only within the
 #    resumable namespace, and fail clearly when the sole match is worktree-bound.
 if [[ -z "$SESSION_ID" ]]; then
-  # Match the session whose OWN one-shot is for this task: the FIRST asana URL in
-  # the transcript is the /one-shot invocation. (A mere later mention of the gid —
-  # cross-task references, watcher output — must NOT match.)
-  first_gid_of() { grep -oE "asana\.com/0/[0-9]+/[0-9]+" "$1" 2>/dev/null | head -1 | grep -oE '[0-9]+$' || true; }
-
-  # RUN SIGNATURE required: without this gate a `resume-agent --chat` discussion
-  # fork (which inherits the run's first asana URL and is always newer) would be
-  # resumed as the run. Rationale and implementation scars live in the lib.
-  . "$DIR/lib/run-signature.sh"
-
+  # Match the session whose OWN run is for this task: the task gid of the URL in
+  # its /one-shot (or /task-run) prompt. A mere mention of the gid (cross-task
+  # references, links in injected Asana comments, watcher output) must NOT match.
+  # RUN SIGNATURE required too: a `resume-agent --chat` discussion fork inherits
+  # the run's head (and is always newer) but never receives a /one-shot, so
+  # without the gate it would be resumed as the run.
+  # Both come from lib/transcript-heads.js (cached head facts), one row per file:
+  # path \t mtime \t sig \t gid \t preview.
+  HEADS="$DIR/lib/transcript-heads.js"
   RESUMABLE_DIR="$PROJECTS/-Users-eddy-git"
-  NEWEST=""; NEWEST_MT=0
+  NEWEST=""
   if [[ -d "$RESUMABLE_DIR" ]]; then
-    for f in "$RESUMABLE_DIR"/*.jsonl; do
-      [[ -f "$f" ]] || continue
-      has_run_signature "$f" || continue
-      if [[ "$(first_gid_of "$f")" == "$TASK_GID" ]]; then
-        MT=$(stat -f %m "$f" 2>/dev/null || echo 0)
-        if [[ "$MT" -gt "$NEWEST_MT" ]]; then NEWEST_MT="$MT"; NEWEST="$f"; fi
-      fi
-    done
+    NEWEST=$(node "$HEADS" "$RESUMABLE_DIR"/*.jsonl 2>/dev/null \
+      | awk -F'\t' -v g="$TASK_GID" '$3 == 1 && $4 == g && $2 > m { m = $2; f = $1 } END { print f }' || true)
   fi
 
   if [[ -z "$NEWEST" ]]; then
     # No resumable match. Distinguish "only a worktree-cwd session exists" (which
     # cannot be resumed from ~/git — needs a fresh run) from "nothing at all".
-    WT_MATCH=""
-    for d in "$PROJECTS"/*"$TASK_GID"*; do
-      [[ -d "$d" ]] || continue
-      for f in "$d"/*.jsonl; do
-        [[ -f "$f" ]] || continue
-        [[ "$(first_gid_of "$f")" == "$TASK_GID" ]] && { WT_MATCH="$f"; break 2; }
-      done
-    done
+    WT_MATCH=$(node "$HEADS" "$PROJECTS"/*"$TASK_GID"*/*.jsonl 2>/dev/null \
+      | awk -F'\t' -v g="$TASK_GID" '$4 == g { print $1; exit }' || true)
     if [[ -n "$WT_MATCH" ]]; then
       echo "resume-task: task $TASK_GID has only a WORKTREE-cwd session ($(basename "$WT_MATCH" .jsonl)), which 'claude --resume' cannot load from ~/git. Start a FRESH session for this task instead of resuming (or pass --session-id to force)." >&2
       exit 2

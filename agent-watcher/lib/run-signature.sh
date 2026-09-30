@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# run-signature.sh: shared predicate for "is this transcript a genuine orch RUN?"
-# Sourced by resume-task.sh (followup resume), resolve-run.sh (eval manifest) and
-# resume-agent.sh (candidate list; feeds the Fleet page and session-tui).
-# Single source of truth; do not copy this block back into callers.
+# run-signature.sh: the pattern that marks a transcript as a genuine orch RUN.
+# lib/transcript-heads.js reads RUN_SIGNATURE_RE from this file and applies it
+# to a transcript's first 50 lines (cached per transcript); resume-agent.sh,
+# resume-task.sh, resolve-run.sh and session-index.sh all go through it.
+# Single source of truth; do not copy the pattern into callers.
 #
 # A genuine run transcript carries an actual `/one-shot --yolo` USER message
 # (a JSON string starting with it) in its head: fresh spawns open with it, and
@@ -12,22 +13,11 @@
 # without this gate a chat fork (newest mtime) is mistaken for the run: followups
 # resume the chat, evals grade discussion as the run.
 #
-# Implementation scars (each was a real failure; keep all three):
-#   - line-based head, NOT `head -c`: a compaction/resume summary is one huge
-#     line, so a byte-based head truncates before the /one-shot message
-#   - captured to a var first: under pipefail, `head | grep -q` returns 141 on a
-#     match (grep quits, head SIGPIPEs), which reads as no-match
-#   - grep -a: BSD grep binary-detects transcript heads and silently misses
-
-# ERE shared with session-index.sh (JS regex of the same text); keep them identical.
+# The head is LINE-based, not byte-based: a compaction/resume summary is one
+# huge line, so a byte-based head truncates before the /one-shot message.
+#
+# /task-run is the no-PR run shape (agent_deliverable Task). Two recorded forms:
+# the raw prompt string, and (newer CLI builds) the slash-command message
+# `<command-name>/one-shot</command-name>\n<command-args>--yolo ...`, whose raw
+# form only lands later in a `last-prompt` line, past a short head.
 RUN_SIGNATURE_RE='"/(one-shot|task-run) --yolo|<command-name>/(one-shot|task-run)</command-name>[^"]{0,8}<command-args>--yolo'
-
-has_run_signature() { # $1=transcript.jsonl -> 0 iff head carries a /one-shot user message
-  local sig_head
-  sig_head=$(head -50 "$1" 2>/dev/null || true)
-  # /task-run is the no-PR run shape (agent_deliverable Task). Two recorded forms:
-  # the raw prompt string, and (newer CLI builds) the slash-command message
-  # `<command-name>/one-shot</command-name>\n<command-args>--yolo ...`, whose raw
-  # form only lands later in a `last-prompt` line, past a short head.
-  grep -qaE "$RUN_SIGNATURE_RE" <<<"$sig_head"
-}

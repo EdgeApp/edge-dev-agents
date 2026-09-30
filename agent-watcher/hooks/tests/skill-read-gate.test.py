@@ -256,6 +256,23 @@ try:
     r = run(MARK, {'tool_name': 'Skill', 'tool_input': {'skill': 'alpha'}}, gid=False)
     check('no AGENT_TASK_GID and no session_id: mark no-op', r.returncode == 0 and not os.path.exists('/tmp/agent-skill-read--alpha') and not os.path.exists('/tmp/agent-skill-read-sess--alpha'))
 
+    # Interactive session (no gid, session_id present): keyed sess-<sid>, and
+    # only the skill-directory rule applies.
+    smark = lambda sk: os.path.exists(f'/tmp/agent-skill-read-sess-{SID}-{sk}')
+    sgate = lambda cmd: run(GATE, {'tool_name': 'Bash', 'session_id': SID, 'tool_input': {'command': cmd}}, gid=False)
+    clear()
+    r = sgate(A_CMD)
+    check('interactive: skill script denied with body', r.returncode == 2 and '/alpha contract' in r.stderr and smark('alpha') and not marker('alpha'), r.stderr[:200])
+    r = sgate(A_CMD)
+    check('interactive: allowed once delivered', r.returncode == 0, r.stderr[:200])
+    clear()
+    run(MARK, {'tool_name': 'Skill', 'session_id': SID, 'tool_input': {'skill': 'alpha'}}, gid=False)
+    r = sgate(A_CMD)
+    check('interactive: Skill-tool marker credits the script', r.returncode == 0 and smark('alpha'), r.stderr[:200])
+    clear()
+    r = sgate('cd /x && ~/.cursor/lint-commit.sh -m "msg"')
+    check('interactive: shared orch-map script not gated', r.returncode == 0 and not r.stderr, r.stderr[:200])
+
     # ---- 3. mark-skill-read.sh ----
     def mread(name, text, start=None, count=None, capped=False, fp=None):
         ls = lines_of(text)

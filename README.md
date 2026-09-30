@@ -211,11 +211,18 @@ the task's own unpublished dep PRs when the deliverable requires them.
 - blocked = blocked COMPLETION (`Complete --blocked yes`): retires via the
   completion sweep; the shed-on-block branch is a legacy net for stray mid-run
   blocks
-- GC: keep newest `keep_completed_sessions` / `keep_completed_worktrees`
-  (currently 20 / 5)
+- GC: retired sessions go after `idle_reap_hours` idle or beyond
+  `keep_completed_sessions` (currently 72 / 20). A worktree lives as long as its
+  task's session; once none remains it is removed, unless any of the task's
+  worktrees holds unsaved work (`lib/worktree-unsaved.sh`: unpushed commits,
+  uncommitted or untracked files), which keeps the whole task dir
 - merged-work teardown (every 30 min): a task with no running session whose
   worktrees all have a merged PR (none open) loses its retired session and
-  worktrees ahead of those caps
+  worktrees ahead of the session caps
+- removals never hold the tick: `lib/remove-task-worktrees.sh` runs detached in
+  its own session (launchd kills the watchdog's process group when a tick ends)
+  and holds `removing/<gid>`, which later ticks skip and `setup-task-workspace.sh`
+  waits on
 - Xcode DerivedData: worktree teardown (`cleanup-task-workspace.sh`) deletes the
   worktree's DerivedData, and a 6-hourly detached `derived-data-reap.sh
   --orphans` deletes folders whose workspace is gone
@@ -290,6 +297,16 @@ just a viewport.
   resume-agent resumes; the watchdog's RC respawn carries the flag over from the
   old argv. Left at `auto` a long session re-sends its whole history on every
   call, so the cap is what keeps a long run's cost linear.
+- **The orch TUI repaints by row.** `orch-tui.js` and `session-tui.js` paint
+  through `lib/frame.js`, which rewrites only the rows that changed since the
+  last paint. A clear-and-redraw on every refresh tick made Terminal.app leak
+  heap over a long-lived session.
+- **The orch TUI refreshes in about a second.** Its data comes from
+  `lib/collect-worker.js`, a worker thread, so keys never wait on a refresh.
+  The transcript list is `lib/transcript-list.js`, shared with
+  `resume-agent.sh --list`: `lib/transcript-heads.js` caches each transcript's
+  write-once head, so a scan reads only new files, and `lib/task-names.js`
+  remembers failed Asana name lookups instead of repeating them every refresh.
 - **Healing without the orch.** A box that hosts a pinned anchor but runs no Asana
   watcher (an operator laptop while the orch host is down) runs `rc-heal.sh`
   instead of `session-watchdog.js`: the watchdog's healing slice only, per
@@ -944,7 +961,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`asana-get-context.sh`](.cursor/skills/asana-get-context.sh) | Fetch task details, comments, subtasks, attachments (iOS `.ips`/`.crash` reports included), and the Engineering Board fields (other boards' fields on the task are not printed); `QA:` subtasks (manual verification items) are hidden from ingestion, only their count shows |
 | [`asana-task-update.sh`](.cursor/skills/asana-task-update/scripts/asana-task-update.sh) | Reusable Asana mutations (the report-attach path is hook-gated); `--subtask-notes` writes a plain subtask body, and `--set-board-state "QA Verification"` refuses (exit 2) until the task carries `QA:` subtasks or `--no-manual-qa "<reason>"` |
 | [`asana-field-value.sh`](.cursor/skills/asana-field-value.sh), [`asana-build-field.sh`](.cursor/skills/asana-build-field.sh), [`asana-force-land.sh`](.cursor/skills/asana-force-land.sh) | Live single-field reads the finalize gate consumes |
-| [`asana-on-complete-actions.sh`](.cursor/skills/one-shot/scripts/asana-on-complete-actions.sh) | Lists the operator's `agent_on_complete` lines (the run's last actions before `Complete`, one-shot and task-run alike) and records each outcome as a marker comment, so a re-engaged run repeats only what is still pending |
+| [`asana-on-complete-actions.sh`](.cursor/skills/one-shot/scripts/asana-on-complete-actions.sh) | Lists the operator's `agent_on_complete` lines (the run's last actions before `Complete`, one-shot and task-run alike) and records each outcome as a marker comment, so a re-engaged run repeats only what is still pending. It is the field's only reader: session-start context and `check-followup-scope.sh` leave the field out, so it never reaches a run as scope |
 | [`sentry-query.sh`](.cursor/skills/sentry-query.sh) | Read-only Sentry queries for the `/sentry` skill (issue, search, tag distributions, event context); token from `~/.config/sentry-edge-token` via a mode-600 curl config, never argv |
 | [`update-status.sh`](agent-watcher/update-status.sh) | The gated `agent_status` write every phase transition goes through |
 | [`claude-usage.sh`](.cursor/skills/claude-usage/scripts/claude-usage.sh) | Live subscription usage as JSON (windows, percentages, reset times, locked-until); the only reader of the OAuth token |

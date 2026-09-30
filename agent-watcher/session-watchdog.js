@@ -2,7 +2,7 @@
 // session-watchdog.js — Watchdog tending live claude-asana-* tmux sessions.
 // (Formerly rc-watchdog.js; renamed because it does more than RC.) Jobs:
 // RC-bridge revive, completion sweep (agent_status=Complete → teardown), blocked
-// sweep, worktree-retention GC, merged-work teardown (30 min), orphan-DerivedData
+// sweep, session-less worktree prune, merged-work teardown (30 min), orphan-DerivedData
 // sweep (6 h), orphan-Metro + idle-dirty-sim reclaim, and the two
 // operator-escalation surfaces (paneAwaitingChoice park, and the Stop-hook stuck flag).
 // RE-ENGAGEMENT IS NOT HERE: re-running/continuing a finished task is the WATCHER's job
@@ -40,7 +40,7 @@
 //     "bash -c 'cd ~/git && claude --rc \"<prompt>\" ; echo \"[claude exited at $(date)]\" ; exec bash'"
 // The `exec bash` keeps the pane alive after claude exits.
 
-const { execSync } = require('node:child_process')
+const { execSync, spawn } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
 const slots = require('./lib/slots.js')
@@ -163,13 +163,11 @@ const SESSION_PREFIX = 'claude-asana-'
 // inspection / remote re-engagement. pruneRetiredSessions() caps how many linger.
 const RETIRED_PREFIX = 'done-asana-'
 const WORKTREES_ROOT = path.join(HOME, 'git/.agent-worktrees')
-const DEFAULT_KEEP_COMPLETED = 5
 const DEFAULT_KEEP_COMPLETED_SESSIONS = 3
 
-// Cache: token + status field GID + retention cap read once per process run.
+// Cache: token + status field GID read once per process run.
 let _token = null
 let _statusFieldGid = null
-let _keepCompleted = null
 function getAsanaToken() {
   if (_token !== null) return _token
   try {
@@ -194,16 +192,6 @@ function getBlockedFieldGid() {
     _blockedFieldGid = cfg.custom_fields?.blocked?.gid || ''
   } catch { _blockedFieldGid = '' }
   return _blockedFieldGid
-}
-// How many completed worktrees to retain on disk before pruning the oldest.
-function getKeepCompletedWorktrees() {
-  if (_keepCompleted !== null) return _keepCompleted
-  try {
-    const cfg = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8'))
-    const n = cfg.watcher?.keep_completed_worktrees
-    _keepCompleted = Number.isFinite(n) && n >= 0 ? n : DEFAULT_KEEP_COMPLETED
-  } catch { _keepCompleted = DEFAULT_KEEP_COMPLETED }
-  return _keepCompleted
 }
 // How many retired (completed-but-kept-alive) sessions to keep before killing the
 // oldest. Each holds a live claude, so this bounds memory.
@@ -574,11 +562,11 @@ function log(msg) {
   console.log(`[${ts}] ${msg}`)
 }
 
-// On completion we KEEP the worktree on disk (up to keep_completed_worktrees, default 5)
-// so it can be inspected or resumed afterward. We still immediately free the scarce
-// concurrency resources: the cloned sim (released back to the pool, marked dirty for
-// refresh) and the slot record. Worktree pruning to the cap happens in
-// pruneRetainedWorktrees(). Best-effort; a partial failure must not wedge the sweep.
+// On completion the worktree stays on disk while the retired session lives, so it can
+// be inspected or resumed. We still immediately free the scarce concurrency resources:
+// the cloned sim (released back to the pool, marked dirty for refresh) and the slot
+// record. The worktree goes once its session does, in pruneSessionlessWorktrees().
+// Best-effort; a partial failure must not wedge the sweep.
 function releaseSimAndSlot(taskGid) {
   let slot = null
   try { slot = slots.get(taskGid) } catch { /* slots.json unreadable */ }
@@ -689,8 +677,8 @@ function reclaimIdlePoolSims() {
 // Reap orphan Metro bundlers, two orphan shapes: (a) cwd is an .agent-worktrees/<gid>
 // dir that no longer exists (the slot was torn down but its Metro lingered, squatting
 // a port the next slot reuses → the "foreign Metro on my port" failures); (b) the
-// worktree still exists (retention keeps up to keep_completed_worktrees on disk) but
-// the gid has NO tmux session left in either prefix — nothing can be using that Metro.
+// worktree still exists (pruneSessionlessWorktrees() spares one holding unsaved work)
+// but the gid has NO tmux session left in either prefix — nothing can be using that Metro.
 // Only touches Metros whose cwd is under the worktrees root; spares live-session
 // Metros and any Metro outside the worktrees root (e.g. a manual one in ~/git/<repo>).
 function reapOrphanMetros(liveSessions) {
@@ -861,9 +849,38 @@ function reapOrphanAndroid(state, now) {
   state.android_emus = next
 }
 
-// Full teardown of one retained worktree: remove the worktree + branch (and any
-// lingering sim/slot, though those were freed at completion). Used only by the prune.
-function removeWorktree(taskGid, repo) {
+// Start a command in its own session (setsid via detached) with output appended to
+// logPath, and return at once. A plain `nohup … &` child is in the watchdog's process
+// group, which launchd kills when the watchdog exits at the end of the tick.
+function spawnDetached(cmd, args, logPath) {
+  let fd = 'ignore'
+  try { fd = fs.openSync(logPath, 'a') } catch { /* log unwritable: run without it */ }
+  try {
+    spawn(cmd, args, { detached: true, stdio: ['ignore', fd, fd] }).unref()
+    return true
+  } catch (e) {
+    log(`spawnDetached ${cmd} failed: ${e.message}`)
+    return false
+  } finally {
+    if (typeof fd === 'number') fs.closeSync(fd)
+  }
+}
+
+// A removal worker (lib/remove-task-worktrees.sh) is still running for this gid:
+// its marker exists and names a live pid. A stale marker reads as not in progress.
+const REMOVING_DIR = path.join(slots.STATE_DIR, 'removing')
+const WORKTREE_REMOVAL_LOG = '/tmp/worktree-removal.log'
+function removalInProgress(taskGid) {
+  let pid
+  try { pid = parseInt(fs.readFileSync(path.join(REMOVING_DIR, taskGid), 'utf8'), 10) } catch { return false }
+  if (!Number.isFinite(pid)) return false
+  try { process.kill(pid, 0); return true } catch { return false }
+}
+
+// Full teardown of one task's worktrees (+ branches + DerivedData, and any lingering
+// sim/slot, though those were freed at completion). The sim/slot release is quick and
+// happens here; the slow filesystem removal runs detached so it never holds the tick.
+function removeTaskWorktrees(taskGid, repos) {
   // Re-check session liveness at PRUNE TIME, under BOTH prefixes. The caller's
   // sparing logic uses lists captured earlier in the tick; an un-retire renames
   // done-asana → claude-asana mid-tick, leaving the gid in neither stale list —
@@ -874,18 +891,11 @@ function removeWorktree(taskGid, repo) {
     log(`  [${taskGid}] prune SKIPPED: a session exists for this gid (re-checked live)`)
     return
   }
-  log(`  [${taskGid}] pruning retained worktree (repo ${repo})`)
+  if (removalInProgress(taskGid)) return
   try { const s = slots.get(taskGid); if (s?.sim_udid) sh(`"${DIR}/release-pool-entry.sh" --task-gid "${taskGid}"`) } catch { /* none */ }
-  sh(`"${DIR}/cleanup-task-workspace.sh" --task-gid "${taskGid}" --repo "${repo}"`)
   try { slots.release(taskGid) } catch { /* already gone */ }
-  // cleanup-task-workspace is best-effort and exits 0 even when removal fails
-  // (e.g. a non-git dir), which previously made the prune retry the same gid
-  // every tick forever. Escalate: force-remove what the gated cleanup left.
-  const dir = path.join(WORKTREES_ROOT, taskGid)
-  if (fs.existsSync(dir)) {
-    log(`  [${taskGid}] cleanup left the worktree dir behind — force-removing ${dir}`)
-    try { fs.rmSync(dir, { recursive: true, force: true }) }
-    catch (e) { log(`  [${taskGid}] force-remove failed: ${e.message}`) }
+  if (spawnDetached(path.join(DIR, 'lib/remove-task-worktrees.sh'), [taskGid, ...repos], WORKTREE_REMOVAL_LOG)) {
+    log(`  [${taskGid}] worktree removal started (detached; log ${WORKTREE_REMOVAL_LOG}): ${repos.join(', ')}`)
   }
 }
 
@@ -1070,44 +1080,56 @@ function pruneRetiredSessions(state) {
   }
 }
 
-// Enforce the retention cap. A worktree whose task still has a LIVE tmux session —
-// including a RETIRED (kept-alive) one — is never touched (and does not count
-// against the cap). Among the rest — "retired" worktrees: completed with the
-// session already gone — keep the newest keep_completed_worktrees by directory
-// mtime and prune the older ones.
-function pruneRetainedWorktrees(liveSessions) {
-  const keep = getKeepCompletedWorktrees()
+// A worktree lives exactly as long as its task's tmux session (live OR retired).
+// Once no session remains, the task's worktrees are removed, except when any of
+// them holds unsaved work (lib/worktree-unsaved.sh: unpushed commits, uncommitted
+// or untracked files): then the whole task dir is kept, because the removal worker
+// force-removes the gid dir and would take the unsaved sibling with it. A gid whose
+// removal is already running is skipped (its half-deleted tree reads as unsaved).
+// Kept dirs are logged only when the kept set changes. Empty gid dirs are removed.
+// No tmux sessions at all (server down or unreachable) skips the tick: the anchors
+// are always up, so an empty list means "can't tell", not "every task is done".
+function pruneSessionlessWorktrees(liveSessions, state) {
+  if (!sh('tmux list-sessions -F "#{session_name}"')) {
+    log('Worktree prune skipped: tmux reports no sessions')
+    return
+  }
   let gidDirs
   try { gidDirs = fs.readdirSync(WORKTREES_ROOT) } catch { return } // no worktrees root yet
   const activeGids = new Set([
     ...liveSessions.map((s) => s.slice(SESSION_PREFIX.length)),
     ...listRetiredSessions().map((s) => s.gid), // retired-but-alive sessions keep their worktree
   ])
-  const retired = []
+  const kept = []
   for (const gid of gidDirs) {
-    if (activeGids.has(gid)) continue // task still running → keep, don't count
+    if (activeGids.has(gid) || removalInProgress(gid)) continue
     const gidDir = path.join(WORKTREES_ROOT, gid)
     let repos
     try {
       if (!fs.statSync(gidDir).isDirectory()) continue
-      repos = fs.readdirSync(gidDir)
+      repos = fs.readdirSync(gidDir).filter((r) => fs.statSync(path.join(gidDir, r)).isDirectory())
     } catch { continue }
-    for (const repo of repos) {
-      const wt = path.join(gidDir, repo)
-      try {
-        const st = fs.statSync(wt)
-        if (st.isDirectory()) retired.push({ gid, repo, mtimeMs: st.mtimeMs })
-      } catch { /* skip unreadable */ }
+    if (repos.length === 0) {
+      try { fs.rmdirSync(gidDir); log(`[${gid}] removed empty worktree dir`) } catch { /* not empty after all */ }
+      continue
     }
+    const unsaved = repos
+      .map((repo) => ({ repo, verdict: sh(`"${DIR}/lib/worktree-unsaved.sh" "${path.join(gidDir, repo)}"`) }))
+      .filter((r) => r.verdict.startsWith('unsaved'))
+    if (unsaved.length > 0) {
+      kept.push(`${gid} (${unsaved.map((r) => `${r.repo}: ${r.verdict.slice('unsaved '.length)}`).join('; ')})`)
+      continue
+    }
+    log(`[${gid}] no session, no unsaved work → removing worktree(s) ${repos.join(', ')}`)
+    removeTaskWorktrees(gid, repos)
   }
-  if (retired.length <= keep) {
-    if (retired.length > 0) log(`Worktree retention: ${retired.length}/${keep} retained; none pruned`)
-    return
+  const keptKey = kept.join('\n')
+  if (keptKey !== (state.keptUnsavedWorktrees ?? '')) {
+    log(kept.length > 0
+      ? `Worktrees kept with no session (unsaved work): ${kept.join(', ')}`
+      : 'No session-less worktrees held for unsaved work')
+    state.keptUnsavedWorktrees = keptKey
   }
-  retired.sort((a, b) => b.mtimeMs - a.mtimeMs) // newest first
-  const toPrune = retired.slice(keep)
-  log(`Worktree retention: ${retired.length} retired > cap ${keep} → pruning ${toPrune.length} oldest`)
-  for (const w of toPrune) removeWorktree(w.gid, w.repo)
 }
 
 // Cadenced sweeps ride the 2-min tick but only run when their interval has elapsed;
@@ -1127,8 +1149,9 @@ function sweepDue(state, key, intervalMs, now) {
 // Detached: deleting several ~5 GB folders takes minutes and would stall the tick.
 const DERIVED_DATA_LOG = '/tmp/derived-data-reap.log'
 function sweepOrphanDerivedData() {
-  sh(`nohup "${DIR}/derived-data-reap.sh" --orphans >> "${DERIVED_DATA_LOG}" 2>&1 &`)
-  log(`[derived-data] orphan sweep started (detached; results in ${DERIVED_DATA_LOG})`)
+  if (spawnDetached(path.join(DIR, 'derived-data-reap.sh'), ['--orphans'], DERIVED_DATA_LOG)) {
+    log(`[derived-data] orphan sweep started (detached; results in ${DERIVED_DATA_LOG})`)
+  }
 }
 
 // Merged PRs for one worktree's branch, or null when the work is not fully merged
@@ -1146,17 +1169,18 @@ function mergedPrUrls(wt) {
   return merged.length ? merged : null
 }
 
-// Tear down finished work as soon as it merges, regardless of the keep caps: when
-// EVERY repo worktree of a task has a merged PR and none open, kill its retired
-// session (if any) and remove the worktrees (removeWorktree → cleanup-task-workspace,
-// which also deletes their DerivedData). A task with a live claude-asana-<gid>
-// session is in flight and never touched. Transcripts survive; re-engage via Pending.
+// Tear down finished work as soon as it merges, regardless of the retired-session
+// caps: when EVERY repo worktree of a task has a merged PR and none open, kill its
+// retired session (if any) and remove the worktrees (removeTaskWorktrees → detached
+// cleanup-task-workspace, which also deletes their DerivedData). A task with a live
+// claude-asana-<gid> session is in flight and never touched. Transcripts survive;
+// re-engage via Pending.
 function teardownMergedWork(liveSessions, state) {
   let gidDirs
   try { gidDirs = fs.readdirSync(WORKTREES_ROOT) } catch { return }
   const running = new Set(liveSessions.map((s) => s.slice(SESSION_PREFIX.length)))
   for (const gid of gidDirs) {
-    if (!/^\d+$/.test(gid) || running.has(gid)) continue
+    if (!/^\d+$/.test(gid) || running.has(gid) || removalInProgress(gid)) continue
     const gidDir = path.join(WORKTREES_ROOT, gid)
     let repos
     try { repos = fs.readdirSync(gidDir).filter((r) => fs.statSync(path.join(gidDir, r)).isDirectory()) } catch { continue }
@@ -1170,15 +1194,15 @@ function teardownMergedWork(liveSessions, state) {
       delete state.sessions[retired]
       log(`[${retired}] killed: work merged (transcript survives)`)
     }
-    for (const repo of repos) removeWorktree(gid, repo)
+    removeTaskWorktrees(gid, repos)
   }
 }
 
 function main() {
   const sessions = listTargetSessions()
   if (sessions.length === 0) {
-    // No live sessions, but still run the retention prune below (completed worktrees
-    // linger after their sessions are gone and must be capped even when idle).
+    // No live sessions, but still run the sweeps below (merged teardown, orphan
+    // DerivedData); the worktree prune itself skips a tick with no tmux sessions.
     log(`No ${SESSION_PREFIX}* tmux sessions found.`)
   } else {
     log(`Watching ${sessions.length} session(s): ${sessions.join(', ')}`)
@@ -1452,8 +1476,8 @@ function main() {
   // Tear down merged work (worktree + DerivedData + retired session) ahead of the caps.
   if (sweepDue(state, 'lastMergedSweepAt', MERGED_SWEEP_MS, now)) teardownMergedWork(sessions, state)
 
-  // Enforce the worktree retention cap (keep newest N completed/retired worktrees).
-  pruneRetainedWorktrees(sessions)
+  // Remove worktrees whose task has no session left, sparing unsaved work.
+  pruneSessionlessWorktrees(sessions, state)
 
   // Delete DerivedData whose workspace is gone (runs after the prunes above).
   if (sweepDue(state, 'lastDerivedDataSweepAt', DERIVED_DATA_SWEEP_MS, now)) sweepOrphanDerivedData()

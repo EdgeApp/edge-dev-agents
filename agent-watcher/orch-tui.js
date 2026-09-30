@@ -14,8 +14,10 @@
 // uses, so the terminal and the phone never disagree.
 //
 // Launch: `orch-tui` (Health first) or `agent-tui` / `resume-agent --tui` /
-// `session-tui.js` (Sessions first). Keys: Tab switch view, r refresh, q quit,
-// plus the Sessions view's own keys. Local model refreshes every 10s; the
+// `session-tui.js` (Sessions first). Keys: Tab switch view, r refresh, q quit;
+// Health scrolls its ACTIVITY log (↑↓/j k, PgUp/PgDn, g newest, G oldest) and
+// jumps to a time with t (14:30, 2:30p, 45m, 2h); plus the Sessions view's keys. Local model refreshes every 10s on a
+// worker thread (lib/collect-worker.js), so keys never wait on a refresh; the
 // Asana tally every 60s (never while a Sessions prompt is open).
 // `--once` prints one Health frame (no TTY). `--dump` prints the full model
 // as JSON, Asana tally included. `--view sessions` opens on Sessions.
@@ -25,14 +27,85 @@ const AW = `${os.homedir()}/.config/agent-watcher`
 const M0 = require(`${AW}/lib/fleet-model.js`)
 const { collect, collectAsana, spawnVerdict, fmtAgo, retitle } = M0
 const { createSessionsView } = require(`${AW}/session-tui.js`)
+const { paint, invalidate } = require(`${AW}/lib/frame.js`)
+const { Worker } = require('worker_threads')
 
 const ESC = '\x1b['
-const C = { inv: `${ESC}7m`, dim: `${ESC}2m`, bold: `${ESC}1m`, red: `${ESC}31m`, grn: `${ESC}32m`, yel: `${ESC}33m`, cyn: `${ESC}36m`, off: `${ESC}0m` }
+const C = { inv: `${ESC}7m`, dim: `${ESC}2m`, bold: `${ESC}1m`, red: `${ESC}31m`, grn: `${ESC}32m`, yel: `${ESC}33m`, mag: `${ESC}35m`, cyn: `${ESC}36m`, off: `${ESC}0m` }
 const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '')
 const pad = (s, w) => { const l = strip(s).length; return l >= w ? strip(s).slice(0, w - 1) + '…' : s + ' '.repeat(w - l) }
 
 let M = null
 let ASANA = { tally: null, pending: [], err: '', at: 0 }
+
+// ─── activity log: color, scroll, jump to a time ─────────────────────────────
+// M.activity is newest first. actAnchor pins the top visible row by timestamp
+// (null = follow the newest), so a refresh that adds rows does not move a view
+// the operator scrolled back to. actInput is the open time prompt (null = closed).
+let actAnchor = null
+let actInput = null
+let actStatus = ''
+let actPage = 10
+
+function actTime (ts) {
+  const t = new Date(ts)
+  const p = (n) => String(n).padStart(2, '0')
+  const hm = `${p(t.getHours())}:${p(t.getMinutes())}`
+  return t.toDateString() === new Date().toDateString() ? hm : `${t.getMonth() + 1}/${t.getDate()} ${hm}`
+}
+
+// Failures red, watchdog revives magenta, routine cleanup cyan (checked before
+// "killed" so killing a retired session's JVM reads as cleanup), holds and
+// warnings yellow, spawns green.
+function actColor (msg) {
+  if (/\bERROR\b|failed|\bFAIL|crash|\bOOM\b|runaway|died/.test(msg)) return C.red
+  if (/[Rr]evive/.test(msg)) return C.mag
+  if (/Retired|retire|reap|[Pp]rune|teardown/.test(msg)) return C.cyn
+  if (/killed/.test(msg)) return C.red
+  if (/WARN|deferred|held|guardrail|[Bb]locked|drift|skipped/.test(msg)) return C.yel
+  if (/[Ss]pawn|resumed/.test(msg)) return C.grn
+  return ''
+}
+
+function actOffset () {
+  if (actAnchor == null || !M) return 0
+  const i = M.activity.findIndex(a => a.ts <= actAnchor)
+  return i < 0 ? Math.max(0, M.activity.length - actPage) : i
+}
+
+function actSetOffset (off) {
+  const max = Math.max(0, M.activity.length - actPage)
+  const o = Math.min(max, Math.max(0, off))
+  actAnchor = o === 0 ? null : M.activity[o].ts
+}
+
+// "14:30" / "2:30p" (local, the latest past occurrence) or "45m" / "2h" ago.
+function actJump (q) {
+  if (!M || !M.activity.length) return
+  let target
+  let m
+  if ((m = q.match(/^(\d+)\s*([mh])$/i))) {
+    target = Date.now() - Number(m[1]) * (m[2].toLowerCase() === 'h' ? 3600e3 : 60e3)
+  } else if ((m = q.match(/^(\d{1,2}):?(\d{2})\s*([ap])?m?$/i))) {
+    let h = Number(m[1])
+    if (m[3]) h = (h % 12) + (m[3].toLowerCase() === 'p' ? 12 : 0)
+    const d = new Date()
+    d.setHours(h, Number(m[2]), 0, 0)
+    if (d.getTime() > Date.now()) d.setDate(d.getDate() - 1)
+    target = d.getTime()
+  } else {
+    actStatus = `can't read "${q}": use 14:30, 2:30p, 45m or 2h`
+    return
+  }
+  const i = M.activity.findIndex(a => a.ts <= target)
+  if (i < 0) {
+    actSetOffset(Infinity)
+    actStatus = `the log goes back to ${actTime(M.activity[M.activity.length - 1].ts)}; showing the oldest lines`
+    return
+  }
+  actSetOffset(i)
+  actStatus = `jumped to ${actTime(M.activity[i].ts)}`
+}
 
 function jobsLine (jobs) {
   return jobs.map(j => {
@@ -73,7 +146,7 @@ function healthPanel (v, cols) {
   const holds = v.holds.length ? `   ${C.red}holds: ${v.holds.join(' ')}${C.off}` : `   ${C.dim}holds: none${C.off}`
   L.push(row('guards', `${fse}${rg}${holds}`))
   L.push(row('jobs', `${jobsLine(v.jobs)}   ${C.dim}watcher tick ${v.watcherTickAge == null ? '?' : fmtAgo(Date.now() / 1000 - v.watcherTickAge) + ' ago'} · watchdog ${v.watchdogTickAge == null ? '?' : fmtAgo(Date.now() / 1000 - v.watchdogTickAge) + ' ago'}${C.off}`))
-  const lw = v.lastWatcherLine ? `${/skipped/.test(v.lastWatcherLine) ? C.yel : C.dim}${v.lastWatcherLine.slice(0, cols - 14)}${C.off}` : `${C.dim}(no watcher line)${C.off}`
+  const lw = v.lastWatcherLine ? `${/skipped|deferred|held/.test(v.lastWatcherLine) ? C.yel : C.dim}${v.lastWatcherLine.slice(0, cols - 14)}${C.off}` : `${C.dim}(no watcher line)${C.off}`
   L.push(row('watcher', lw))
   let asanaSeg = `${C.dim}loading…${C.off}`
   if (ASANA.err) asanaSeg = `${C.yel}${ASANA.err}${C.off}`
@@ -98,7 +171,7 @@ function census () {
 }
 
 function renderHealth () {
-  if (!M) return
+  if (!M) { paint([`${C.bold} ORCH HEALTH${C.off} ${C.dim}loading…${C.off}`]); return }
   const cols = process.stdout.columns || 140
   const rows = process.stdout.rows || 45
   const v = M.vitals
@@ -130,14 +203,25 @@ function renderHealth () {
     L.push(`  ${pad(w.title || w.gid, titleW)} ${w.live ? `${C.grn}live${C.off}` : `${C.dim}idle${C.off}`}  ${C.dim}touched ${fmtAgo(w.mtime)} ago${C.off}`)
   }
   L.push('')
-  L.push(`${C.bold} ACTIVITY${C.off} ${C.dim}(watcher + watchdog, interesting lines)${C.off}`)
-  for (const a of M.activity) {
-    const t = new Date(a.ts); const hh = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`
-    L.push(`  ${C.dim}${hh} ${pad(a.src, 9)}${C.off}${a.msg.slice(0, cols - 16)}`)
+  // The activity window takes whatever rows remain above the footer.
+  actPage = Math.max(1, rows - 2 - L.length - 1)
+  const off = actOffset()
+  const shown = M.activity.slice(off, off + actPage)
+  const pos = off === 0
+    ? `${C.dim}(watcher + watchdog, newest first, live)${C.off}`
+    : `${C.yel}paused at ${actTime(M.activity[off].ts)}${C.off} ${C.dim}(lines ${off + 1}-${off + shown.length} of ${M.activity.length}; g returns to live)${C.off}`
+  L.push(`${C.bold} ACTIVITY${C.off} ${pos}`)
+  for (const a of shown) {
+    const col = actColor(a.msg)
+    L.push(`  ${C.dim}${pad(actTime(a.ts), 11)}${pad(a.src, 9)}${C.off}${col}${a.msg.slice(0, cols - 23)}${col ? C.off : ''}`)
   }
-  let out = `${ESC}H${ESC}2J` + L.slice(0, rows - 2).join('\n')
-  out += `${ESC}${rows};1H${C.dim} Tab sessions · r refresh (local 10s / asana 60s auto) · q quit${C.off}`
-  process.stdout.write(out)
+  const frame = L.slice(0, rows - 2)
+  frame[rows - 1] = actInput !== null
+    ? `${C.cyn} jump to time (14:30, 2:30p, 45m, 2h; Enter go, Esc cancel): ${actInput}▌${C.off}`
+    : actStatus
+      ? `${C.yel} ${actStatus}${C.off}`
+      : `${C.dim} Tab sessions · ↑↓ PgUp PgDn scroll activity · g newest · G oldest · t jump to time · r refresh · q quit${C.off}`
+  paint(frame)
 }
 
 // ─── entry points ────────────────────────────────────────────────────────────
@@ -155,33 +239,83 @@ if (process.argv.includes('--once')) {
   if (!process.stdin.isTTY) { console.error('orch-tui: needs a TTY (run from a terminal)'); process.exit(1) }
 
   const suspend = () => { process.stdin.setRawMode(false); process.stdout.write(`${ESC}?1049l${ESC}?25h`) }
-  const resume = () => { process.stdout.write(`${ESC}?1049h${ESC}?25l`); process.stdin.setRawMode(true) }
+  const resume = () => { process.stdout.write(`${ESC}?1049h${ESC}?25l`); invalidate(); process.stdin.setRawMode(true) }
   const quit = () => { suspend(); process.exit(0) }
-  const sessions = createSessionsView({ suspend, resume, quit, footerHint: 'Tab health' })
+  // One collect in flight at a time; a request made meanwhile runs once after it.
+  const worker = new Worker(`${AW}/lib/collect-worker.js`)
+  let collecting = false
+  let again = false
+  const reloads = []
+  const collectAll = (onModel) => {
+    if (onModel) reloads.push(onModel)
+    if (collecting) { again = true; return }
+    collecting = true
+    worker.postMessage('collect')
+  }
+  const sessions = createSessionsView({ suspend, resume, quit, footerHint: 'Tab health', reload: (cb) => collectAll(cb) })
   let view = process.argv.includes('--view') && process.argv[process.argv.indexOf('--view') + 1] === 'sessions' ? 'sessions' : 'health'
 
   const render = () => (view === 'health' ? renderHealth() : sessions.render())
-  const collectAll = () => { M = collect(); retitle(M.fleet, ASANA.names); sessions.setModel(M.fleet) }
-  const refreshAsana = () => collectAsana(M.cfgAll).then(a => { ASANA = a; retitle(M.fleet, a.names); sessions.setModel(M.fleet); render() })
+  const refreshAsana = () => M && collectAsana(M.cfgAll).then(a => { ASANA = a; retitle(M.fleet, a.names); sessions.setModel(M.fleet); render() })
+  worker.on('message', (r) => {
+    collecting = false
+    const first = !M
+    if (r.model) {
+      M = r.model
+      retitle(M.fleet, ASANA.names)
+      for (const cb of reloads.splice(0)) cb(M.fleet)
+      if (!sessions.busy()) sessions.setModel(M.fleet)
+      render()
+      if (first) refreshAsana()
+    }
+    if (again) { again = false; collectAll() }
+  })
+  worker.on('error', (e) => { collecting = false; suspend(); console.error(`orch-tui: collector failed: ${e.message || e}`); process.exit(1) })
 
   process.stdout.write(`${ESC}?1049h${ESC}?25l`)
+  invalidate()
   process.stdin.setRawMode(true)
   process.stdin.resume()
   process.on('exit', () => process.stdout.write(`${ESC}?1049l${ESC}?25h`))
   process.on('SIGINT', quit)
-  process.stdout.on('resize', render)
+  process.stdout.on('resize', () => { invalidate(); render() })
 
-  collectAll(); render()
-  refreshAsana()
-  setInterval(() => { if (sessions.busy()) return; collectAll(); render() }, 10000)
+  render()
+  collectAll()
+  setInterval(() => { if (!sessions.busy()) collectAll() }, 10000)
   setInterval(() => { if (!sessions.busy()) refreshAsana() }, 60000)
 
   process.stdin.on('data', (b) => {
     const k = b.toString()
     if (view === 'sessions' && sessions.busy()) { sessions.onKey(k); return }
+    if (view === 'health' && actInput !== null) {
+      // A chunk can carry several keys (fast typing, paste), Enter included.
+      if (k === '\x1b' || k === '\x03') actInput = null
+      else if (k === '\x7f' || k === '\b') actInput = actInput.slice(0, -1)
+      else {
+        const [typed, ...rest] = k.split('\r')
+        actInput += typed.replace(/[^0-9:hmapHMAP ]/g, '')
+        if (rest.length) { const q = actInput.trim(); actInput = null; if (q) actJump(q) }
+      }
+      render(); return
+    }
+    if (view === 'health' && M) {
+      const was = actStatus
+      actStatus = ''
+      let hit = true
+      if (k === `${ESC}A` || k === 'k') actSetOffset(actOffset() - 1)
+      else if (k === `${ESC}B` || k === 'j') actSetOffset(actOffset() + 1)
+      else if (k === `${ESC}5~`) actSetOffset(actOffset() - actPage)
+      else if (k === `${ESC}6~`) actSetOffset(actOffset() + actPage)
+      else if (k === 'g' || k === `${ESC}H` || k === `${ESC}1~`) actAnchor = null
+      else if (k === 'G' || k === `${ESC}F` || k === `${ESC}4~`) actSetOffset(Infinity)
+      else if (k === 't') actInput = ''
+      else { hit = false; actStatus = was }
+      if (hit) { render(); return }
+    }
     if (k === '\t') { view = view === 'health' ? 'sessions' : 'health'; render(); return }
     if (k === 'q' || k === '\x03') quit()
     if (view === 'sessions') { if (sessions.onKey(k)) return }
-    if (k === 'r') { collectAll(); render(); refreshAsana() }
+    if (k === 'r') { collectAll(); refreshAsana() }
   })
 }

@@ -42,14 +42,27 @@
 # cancelled too: re-running only the gated call then fails on the missing file,
 # which is how one block turns into two.
 #
-# Scope: no-ops unless AGENT_TASK_GID is set. Exit 0 allow, exit 2 block.
+# Scope: every session. Orch runs (AGENT_TASK_GID set) key markers by the gid
+# and get the whole map; any other session keys them sess-<session_id> (what
+# mark-skill-read.sh writes there) and gets only the skill-directory rule,
+# because the shared-script entries below are /one-shot phase slices and
+# orch-only intake/completion steps. No session_id: no-op. Exit 0 allow, exit 2
+# block.
 set -uo pipefail
-
-[ -n "${AGENT_TASK_GID:-}" ] || exit 0
 
 INPUT=$(cat 2>/dev/null || true)
 CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
+
+if [ -n "${AGENT_TASK_GID:-}" ]; then
+  ORCH=1
+  export SKILL_READ_KEY="$AGENT_TASK_GID"
+else
+  ORCH=0
+  SID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)
+  [ -n "$SID" ] || exit 0
+  export SKILL_READ_KEY="sess-$SID"
+fi
 
 # Mention-stripped view: a heredoc/echo that merely quotes a script path must
 # not fire. Fail-open to raw if the helper is unavailable.
@@ -113,6 +126,7 @@ segment_units() {
 for sk in $(invocations 'skills/[a-z0-9-]+/scripts/[^[:space:]]+\.sh' | grep -oE 'skills/[a-z0-9-]+/scripts' | sed -E 's|skills/([a-z0-9-]+)/scripts|\1|' | sort -u); do
   SEG_NEEDED="$SEG_NEEDED $sk"
 done
+[ "$ORCH" = 1 ] || return 0
 
 # Shared top-level scripts with one governing skill, and the /one-shot phase
 # slice each script's step belongs to. Verified against the real paths:

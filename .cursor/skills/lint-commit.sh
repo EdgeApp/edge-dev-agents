@@ -46,7 +46,9 @@
 # Any additional non-generated files are reported before commit.
 # If no files are given, all staged + unstaged + untracked changes are used.
 # The script will:
-#   1. Run eslint --fix on .ts/.tsx files
+#   1. Run eslint --fix on .ts/.tsx files (steps 1-2b are skipped with a
+#      notice in a repo with no eslint binary, config or dependency; a repo
+#      that declares eslint without installing it exits 1)
 #   2. Run eslint --quiet to verify no remaining errors (exits 1 if any)
 #   2b. Check for new warnings on changed lines (exits 1 if any)
 #   3. Run the localize script via the repo's package manager (npm if
@@ -180,8 +182,35 @@ for f in "${FILES[@]}"; do
   fi
 done
 
+# A repo with no eslint at all (no binary, no config, no package.json entry;
+# e.g. a Rust workspace carrying a few hand-written .d.ts bindings) skips the
+# eslint steps instead of exiting 127 on a missing binary. A repo that DOES
+# declare eslint but has no binary exits 1 (missing install), so an absent
+# node_modules can never turn into a silent lint bypass.
+ESLINT_SKIPPED=false
+if [[ ${#LINT_FILES[@]} -gt 0 && ! -x ./node_modules/.bin/eslint ]]; then
+  ESLINT_DECLARED=false
+  for cfg in eslint.config.js eslint.config.mjs eslint.config.cjs eslint.config.ts \
+    .eslintrc .eslintrc.js .eslintrc.cjs .eslintrc.json .eslintrc.yml .eslintrc.yaml; do
+    if [[ -f "$cfg" ]]; then ESLINT_DECLARED=true; fi
+  done
+  if [[ -f package.json ]] && node -e '
+const p = require("./package.json")
+const deps = { ...p.dependencies, ...p.devDependencies }
+process.exit(deps.eslint != null || p.eslintConfig != null ? 0 : 1)
+' 2>/dev/null; then
+    ESLINT_DECLARED=true
+  fi
+  if [[ "$ESLINT_DECLARED" == "true" ]]; then
+    echo "Error: this repo declares eslint but ./node_modules/.bin/eslint is missing. Install dependencies, then retry." >&2
+    exit 1
+  fi
+  echo ">> eslint: not configured in this repo; skipping lint of ${#LINT_FILES[@]} .ts/.tsx file(s)"
+  ESLINT_SKIPPED=true
+fi
+
 # Step 1: eslint --fix
-if [[ ${#LINT_FILES[@]} -gt 0 ]]; then
+if [[ ${#LINT_FILES[@]} -gt 0 && "$ESLINT_SKIPPED" != "true" ]]; then
   echo ">> eslint --fix (${#LINT_FILES[@]} files)"
   ./node_modules/.bin/eslint --fix "${LINT_FILES[@]}" || true
 
@@ -338,7 +367,7 @@ if node -e "process.exit(require('./package.json').scripts?.['update-eslint-warn
   # graduating a file off a warning-override list when the file still has
   # demoted rule violations. Re-validate; if eslint now fails, restore
   # eslint.config.mjs so the bad config can't ride into a commit.
-  if [[ ${#LINT_FILES[@]} -gt 0 ]] && ! ./node_modules/.bin/eslint --quiet "${LINT_FILES[@]}" 2>/dev/null; then
+  if [[ ${#LINT_FILES[@]} -gt 0 && "$ESLINT_SKIPPED" != "true" ]] && ! ./node_modules/.bin/eslint --quiet "${LINT_FILES[@]}" 2>/dev/null; then
     echo "Error: post-graduation lint failed. Restoring eslint.config.mjs and aborting." >&2
     git checkout HEAD -- eslint.config.mjs 2>/dev/null || true
     git reset HEAD -- eslint.config.mjs 2>/dev/null || true

@@ -49,20 +49,21 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   cycles trying to swap $2; fund to >$10 first. (DEX-style providers vary; the
   $10 floor is the safe default assumption.)
 - **Test-account ROSTER (exhaustive — search no further)** lives in the
-  LOCAL-ONLY file `~/.config/edge-secrets/test-accounts.json`: roles `primary` (the
-  heavily-funded swap-execution account; **the default YOLO login**, pinned
-  into every worktree env.json by workspace init), `qa-a`, `qa-b` (region
-  California/USA), and `agent` (2FA ON; its
-  password + OTP key are in the `credsFile` the roster names, so its 2FA is
-  never a user-only-credential wall; set `YOLO_OTP_KEY` from that file if a
-  login asks for the code). Each entry carries username, PIN, and notes. Refer
-  to accounts BY ROLE in anything synced, committed, or posted (skills, PRs,
+  LOCAL-ONLY file `~/.config/edge-secrets/test-accounts.json`: roles `agent`
+  (**the default YOLO login**, pinned into every worktree env.json by workspace
+  init; 2FA ON, its password + OTP key are in the `credsFile` the roster names,
+  so its 2FA is never a user-only-credential wall; set `YOLO_OTP_KEY` from that
+  file if a login asks for the code), `primary` (heavily funded, cluttered with
+  leftover assets), `qa-a`, and `qa-b` (region California/USA). Each entry carries username, PIN, and notes. Refer to
+  accounts BY ROLE in anything synced, committed, or posted (skills, PRs,
   reports, Asana): usernames and PINs never leave that file. The sim image also
   contains many junk/leftover accounts — they are NOT test accounts; never trawl
-  beyond the roster. **Switching among roster accounts
-  mid-test is normal and expected** — check them for the asset you need before
-  acquiring it, and BEFORE creating a new wallet ("no account holds X" is not a
-  valid conclusion until each ROSTER account was actually checked).
+  beyond the roster. **Tests run on the agent account, which acquires assets
+  only by swapping** (build-and-test `funded-test-accounts` owns the order and
+  the all-providers requote); no sends into it from other roster accounts.
+  The test moves off the agent account only when it holds nothing that clears
+  a provider floor for a route to the asset, or needs another account's own
+  state.
 - **THROWAWAY accounts for tests that dirty SYNCED state.** `activePromotions`,
   affiliate attribution (`installerId` / `CreationReason.json`), Exchange
   Settings and mixnet toggles all sync to the account, so exercising them on a
@@ -310,7 +311,7 @@ Promoted from the 3-way login-perf run (2026-07-21, Samsung Galaxy S9, task
 ## Navigation
 - **Gift Card Marketplace (EdgeSpend):** reachable in-app from Home → 'Spend
   Crypto' tile → the EdgeSpend list → 'Purchase New'. Requires a non-light account
-  (the primary account qualifies) and `ENV.PLUGIN_API_KEYS.phaze.apiKey` set. Real Phaze
+  (the agent and primary accounts qualify) and `ENV.PLUGIN_API_KEYS.phaze.apiKey` set. Real Phaze
   productIds for a per-brand test come from `GET <phaze baseUrl>/gift-cards/full/US`
   with header `API-Key: <key>` (the on-disk `brands-us.json` cache is encrypted and
   unreadable, so hit the API for live ids).
@@ -393,7 +394,7 @@ debugging screenshots of the wrong device.
   `src/util/corePlugins.ts` `swapPlugins` map and set every OTHER provider to
   `false`, leaving only the target's `*_INIT` — local, uncommitted (per
   `force-swap-provider-locally`). Exchange Settings are ACCOUNT-SYNCED: toggling
-  them on the primary account thrashes against every other parallel session on the same
+  them on a roster account thrashes against every other parallel session on the same
   account (and persists to the next run / a human), so it is parallel-UNSAFE and
   forbidden as the forcing lever. The corePlugins edit is worktree-local, so
   parallel sessions never collide. (Preferred/preferPluginId do NOT pin — the
@@ -533,7 +534,7 @@ debugging screenshots of the wrong device.
   quotes reliably and exercises the same source-side token-spend code.
 - **Create-wallet entry points.** The Wallets bottom tab is labeled **"Assets"**;
   the create-wallet entry is the header `addButton` (testID) — use it instead of
-  scrolling a long wallet list. YOLO auto-login (primary roster account) lands logged-in
+  scrolling a long wallet list. YOLO auto-login (agent roster account) lands logged-in
   a few seconds after launch.
 - **EVM send-flow drive recipe:** search "Ethereum" in Assets to filter ETH
   wallets → wallet "Send" → address tile "Enter" (regex `.*Enter.*`) → type a

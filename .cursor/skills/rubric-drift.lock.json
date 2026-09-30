@@ -234,7 +234,7 @@
       ]
     },
     "build-and-test:gui-dependency-integration": {
-      "hash": "a556107af308",
+      "hash": "92eba5e3ec81",
       "dims": [
         "A21"
       ]
@@ -246,7 +246,7 @@
       ]
     },
     "file:asana-watcher.js": {
-      "hash": "bb0902bb1d17",
+      "hash": "b38b72fd851f",
       "dims": [
         "O1"
       ]
@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "e51653dfdf59",
+      "hash": "f7cd8fa8fdd2",
       "dims": [
         "O4",
         "O5",
@@ -273,7 +273,7 @@
       ]
     },
     "file:setup-task-workspace.sh": {
-      "hash": "447c2e49a248",
+      "hash": "6299fa11dd1f",
       "dims": [
         "O8"
       ]
@@ -363,7 +363,7 @@
       ]
     },
     "build-and-test:funded-test-accounts": {
-      "hash": "ae06509676dc",
+      "hash": "c3ac1457b713",
       "dims": [
         "A27"
       ]
@@ -1475,8 +1475,8 @@
       "hash": "371607070274"
     },
     "asana-task-update:current-state-owns-the-tail": {
-      "reason": "2026-08-28: 2026-08-28: mechanics-only rule (which flag writes the description tail); the graded OUTCOME — section refreshed when delivered scope diverges, operator prose above the delimiter untouched — is already covered by one-shot:description-current-state, so a second dimension would double-count the same evidence",
-      "hash": "f41123c345d5"
+      "reason": "2026-09-30: scope wording only: now names the tail writer for tasks a run has touched; orch behavior unchanged",
+      "hash": "c837b554c078"
     },
     "pr-address:retract-your-own-noise": {
       "reason": "2026-09-26: mechanically scoped: delete-pending-review is author-scoped and only for an operator discard; submit adopts drafts; no eval judgment",
@@ -1589,6 +1589,10 @@
     "one-shot:claude-calls-on-subscription": {
       "reason": "2026-09-27: operator standing preference 2026-09-27; a missed case surfaces as a blocked completion or an API bill, both visible without an eval dimension",
       "hash": "0d826fe90f7f"
+    },
+    "asana-task-update:set-notes-before-first-run": {
+      "reason": "2026-09-30: mechanically enforced by asana-task-update.sh: refused once agent_status is set, so orch runs can never use it",
+      "hash": "57d04822b25f"
     }
   },
   "excluded_skills": {

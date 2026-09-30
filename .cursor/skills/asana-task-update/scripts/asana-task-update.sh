@@ -15,6 +15,9 @@
 # subtask). --set-board-state "QA Verification" refuses (exit 2) when the task
 # has no open QA: subtask, unless --no-manual-qa "<why nothing needs a human>"
 # is passed; the reason is posted as a comment so QA sees why the list is empty.
+#
+# Description writes: --set-current-state rewrites the agent-maintained tail;
+# --set-notes replaces the whole description only before any run touches the task.
 set -euo pipefail
 
 QA_SUBTASK_PREFIX="QA: "
@@ -46,6 +49,8 @@ SUBTASK_NOTES_FILE=""
 NO_MANUAL_QA=""
 
 SET_CURRENT_STATE_FILE=""
+SET_NOTES_FILE=""
+COMMS_AUTH=""
 
 COMMENT_FILE=""
 EDIT_COMMENT_GID=""
@@ -64,6 +69,8 @@ while [[ $# -gt 0 ]]; do
     --pr-number) PR_NUMBER="$2"; shift 2 ;;
     --attach-file) DO_ATTACH_FILE=true; ATTACH_FILE_PATH="$2"; shift 2 ;;
     --set-current-state) SET_CURRENT_STATE_FILE="$2"; shift 2 ;;
+    --set-notes) SET_NOTES_FILE="$2"; shift 2 ;;
+    --comms-authorized) COMMS_AUTH="$2"; shift 2 ;;
     --comment-file) COMMENT_FILE="$2"; shift 2 ;;
     --edit-comment) EDIT_COMMENT_GID="$2"; shift 2 ;;
     --delete-comment) DELETE_COMMENT_GID="$2"; shift 2 ;;
@@ -93,7 +100,7 @@ if [[ -z "$TASK_GID" ]]; then
   exit 1
 fi
 
-if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$MOVE_TO_SECTION" ]] && [[ -z "$SET_PRIORITY" ]] && [[ -z "$SET_RELEASE" ]] && [[ -z "$SET_DEVELOPER_GID" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$COMMENT_FILE" ]] && [[ -z "$DELETE_COMMENT_GID" ]] && [[ -z "$EDIT_COMMENT_GID" ]]; then
+if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$MOVE_TO_SECTION" ]] && [[ -z "$SET_PRIORITY" ]] && [[ -z "$SET_RELEASE" ]] && [[ -z "$SET_DEVELOPER_GID" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$SET_NOTES_FILE" ]] && [[ -z "$COMMENT_FILE" ]] && [[ -z "$DELETE_COMMENT_GID" ]] && [[ -z "$EDIT_COMMENT_GID" ]]; then
   echo "Error: No operations specified" >&2
   exit 1
 fi
@@ -108,6 +115,17 @@ if [[ -n "$EDIT_COMMENT_GID" && -n "$DELETE_COMMENT_GID" ]]; then
 fi
 if [[ -n "$EDIT_COMMENT_GID" && -z "$COMMENT_FILE" ]]; then
   echo "Error: --edit-comment <story_gid> requires --comment-file <path> (the replacement body)" >&2
+  exit 1
+fi
+
+# --set-notes writes the whole description and --set-current-state writes its
+# tail from what is there now, so one call does one or the other.
+if [[ -n "$SET_NOTES_FILE" && -n "$SET_CURRENT_STATE_FILE" ]]; then
+  echo "Error: --set-notes and --set-current-state are mutually exclusive" >&2
+  exit 1
+fi
+if [[ -n "$COMMS_AUTH" && -z "$SET_NOTES_FILE" ]]; then
+  echo "Error: --comms-authorized only applies to --set-notes" >&2
   exit 1
 fi
 
@@ -669,6 +687,42 @@ if [[ -n "$MOVE_TO_SECTION" ]]; then
   else
     echo ">> Section: FAILED moving to $MOVE_TO_SECTION" >&2; exit 1
   fi
+fi
+
+# --set-notes <file>: replace the WHOLE description of a task no run has touched
+# yet (a Refinement draft being revised). Refused once agent_status is set or the
+# notes carry a CURRENT STATE section: from then on the description is the
+# operator's spec plus the orch's tail, and only --set-current-state writes it.
+# Same comms gate and authorship marking as asana-task-create.sh.
+if [[ -n "$SET_NOTES_FILE" ]]; then
+  [[ -f "$SET_NOTES_FILE" ]] || { echo "Error: --set-notes file not found: $SET_NOTES_FILE" >&2; exit 1; }
+  [[ -n "$(tr -d '[:space:]' < "$SET_NOTES_FILE")" ]] || { echo "Error: --set-notes file is empty: $SET_NOTES_FILE" >&2; exit 1; }
+
+  SN_STATUS="$("$HOME/.cursor/skills/asana-field-value.sh" "$TASK_GID" "agent_status")" || {
+    echo ">> NOTES: FAILED (could not read agent_status for task $TASK_GID)" >&2; exit 1; }
+  if [[ "$SN_STATUS" != "none" ]]; then
+    echo "Error: --set-notes refused: task $TASK_GID has agent_status=$SN_STATUS (a run has touched it; use --set-current-state for the tail)" >&2
+    exit 1
+  fi
+  asana_request "NOTES" "$ASANA_API/tasks/$TASK_GID?opt_fields=notes" \
+    -H "Authorization: Bearer $ASANA_TOKEN" || exit 1
+  if printf '%s' "$ASANA_RESPONSE" | jq -r '.data.notes // ""' | grep -qF "$CURRENT_STATE_DELIM"; then
+    echo "Error: --set-notes refused: task $TASK_GID has a CURRENT STATE section (use --set-current-state for the tail)" >&2
+    exit 1
+  fi
+
+  "$HOME/.cursor/skills/asana-notes-comms-gate.sh" "$SET_NOTES_FILE" "$COMMS_AUTH" || exit 1
+
+  SN_BODY="$(cat "$SET_NOTES_FILE")"
+  SN_MARKER="$HOME/.config/agent-watcher/agent-authored-text.sh"
+  if [[ -x "$SN_MARKER" ]]; then
+    SN_BODY="$(printf '%s' "$SN_BODY" | "$SN_MARKER")"
+  fi
+  asana_request "NOTES" -X PUT "$ASANA_API/tasks/$TASK_GID" \
+    -H "Authorization: Bearer $ASANA_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$(jq -n --arg n "$SN_BODY" '{data:{notes:$n}}')" || exit 1
+  echo ">> NOTES: description replaced on task $TASK_GID"
 fi
 
 # --set-current-state <file>: rewrite ONLY the agent-maintained tail of the task

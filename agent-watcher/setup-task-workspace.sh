@@ -287,7 +287,7 @@ ensure_env_json() {
     cp "$MAIN_REPO/env.json" "$WT/env.json"
     echo ">> setup-task-workspace: copied env.json ← $MAIN_REPO/env.json" >&2
     # Enforce the standard agent login: every new run starts on the roster's
-    # default role (the funded `primary` account), regardless of master env.json
+    # default role (the `agent` account), regardless of master env.json
     # drift. YOLO auto-login re-asserts this account on every app relaunch. The
     # roster is local-only (~/.config/edge-secrets/test-accounts.json) so account
     # names never land in the synced tree.
@@ -330,6 +330,31 @@ link_shared_memory() {
     "$helper" "$WT" >&2 || echo ">> setup-task-workspace: WARN — link-shared-memory failed (non-fatal)" >&2
   fi
 }
+
+# ── Wait out an in-flight removal of this task's worktrees ─────────────────────
+# The watchdog removes a session-less task's worktrees in a detached worker
+# (lib/remove-task-worktrees.sh) that holds $STATE_DIR/removing/<gid> with its pid.
+# A followup respawning meanwhile would reuse a half-deleted tree, or have its new
+# worktree force-removed by the worker's final sweep. Wait for the worker to exit
+# ($SETUP_REMOVAL_WAIT seconds, default 900), then continue: the dir is gone and a
+# fresh worktree gets created. A marker with a dead pid is stale and ignored.
+wait_for_worktree_removal() {
+  local marker pid waited=0 limit="${SETUP_REMOVAL_WAIT:-900}"
+  marker="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/removing/$TASK_GID"
+  [[ -f "$marker" ]] || return 0
+  pid="$(tr -dc '0-9' < "$marker" 2>/dev/null || true)"
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null || return 0
+  echo ">> setup-task-workspace: worktree removal for $TASK_GID in progress (pid $pid); waiting up to ${limit}s" >&2
+  while kill -0 "$pid" 2>/dev/null; do
+    if [[ "$waited" -ge "$limit" ]]; then
+      echo ">> setup-task-workspace: FAIL: worktree removal (pid $pid) still running after ${limit}s" >&2
+      exit 1
+    fi
+    sleep 5; waited=$((waited + 5))
+  done
+  echo ">> setup-task-workspace: worktree removal finished after ${waited}s" >&2
+}
+wait_for_worktree_removal
 
 # ── Idempotent reuse ──────────────────────────────────────────────────────────
 # Clear stale registrations first: a worktree dir GC'd after completion can leave

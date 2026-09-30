@@ -12,6 +12,11 @@
 //   collectAsana(cfgAll)     async {tally: Map, pending: [], err, at}
 //   spawnVerdict(...)        the watcher's tick gate, first blocker named
 //   dump()                   async: collect() + asana, JSON-safe (tally as entries)
+//   warmNames()              async: refresh the task-name cache and look up the
+//                            gids the last buildSessions() could not name (the
+//                            next collect() shows them; collect itself stays sync
+//                            and offline)
+//   loadTmux({rcState})      claude-asana-* / done-asana-* sessions
 //   nameOf(gid), fmtAgo(epoch), fmtDate(epoch), sh(cmd)
 const { execSync } = require('child_process')
 const fs = require('fs')
@@ -20,26 +25,26 @@ const os = require('os')
 const HOME = os.homedir()
 const AW = `${HOME}/.config/agent-watcher`
 const ST = `${process.env.XDG_STATE_HOME || HOME + '/.local/state'}/agent-watcher`
-const RESUME = `${AW}/resume-agent.sh`
 const FORKS = `${ST}/chat-forks.jsonl`
 const chatSpawns = require('./chat-spawns.js')
+const transcriptList = require('./transcript-list.js')
+const taskNames = require('./task-names.js')
 
 const sh = (cmd) => { try { return execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) } catch { return '' } }
 const jread = (p, fb) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')) } catch { return fb } }
 
-// ─── task-name cache (shared with resume-agent) ──────────────────────────────
+// ─── task-name cache (lib/task-names.js) ─────────────────────────────────────
 let NAMES = new Map()
 function loadNames () {
-  NAMES = new Map()
-  try {
-    for (const line of fs.readFileSync(`${ST}/asana-task-names.tsv`, 'utf8').split('\n')) {
-      const [gid, name] = line.split('\t')
-      if (gid && name && !NAMES.has(gid)) NAMES.set(gid, name)
-    }
-  } catch {}
+  NAMES = taskNames.load()
   return NAMES
 }
 const nameOf = (gid) => NAMES.get(gid) || ''
+let lastGids = []
+async function warmNames () {
+  await taskNames.refreshIfStale()
+  await taskNames.resolve(lastGids.filter(g => !NAMES.has(g)))
+}
 
 // ─── sessions (formerly session-tui.js data gathering) ───────────────────────
 function loadConfig () {
@@ -70,17 +75,11 @@ function loadForks () {
   return { bySlug, byChild }
 }
 
-// resume-agent --list --porcelain →
-//   mtime \t uuid \t gid \t state \t rc \t fork_child \t fork_rc \t title
-function loadTranscripts () {
-  const rows = []
-  const out = sh(`${RESUME} --list --porcelain 2>/dev/null`)
-  for (const line of out.split('\n')) {
-    if (!line.trim()) continue
-    const [mtime, uuid, gid, state, rc, forkChild, forkRc, title] = line.split('\t')
-    rows.push({ mtime: Number(mtime), uuid, gid, state, rc, forkChild, forkRc, title: title || '(untitled)' })
-  }
-  return rows
+// The resume-agent --list rows (lib/transcript-list.js), cached names only.
+function loadTranscripts (tmux) {
+  const cands = transcriptList.candidates({ withSpawns: true })
+  lastGids = [...new Set(cands.map(c => c.gid).filter(Boolean))]
+  return transcriptList.rows(cands, { names: NAMES, tmux }).map(r => ({ ...r, title: r.title || '(untitled)' }))
 }
 
 // RC "bridge up": the ONE shared check with session-watchdog.js (the actor;
@@ -88,7 +87,7 @@ function loadTranscripts () {
 // bridge id (>= 2.1.268 can hide the pill while connected). lib/rc-state.js.
 const { rcBridgeUp } = require('./rc-state.js')
 
-function loadTmux () {
+function loadTmux ({ rcState = true } = {}) {
   const sessions = []
   // One ps pass → child map. NOT pgrep -P: macOS pgrep silently excludes the
   // caller's own ancestors, so a claude session inspecting itself (or --list
@@ -102,12 +101,21 @@ function loadTmux () {
   }
   // '|' delimiter, NOT \t: tmux 3.6+ sanitizes control chars in format output
   // to '_', which glued "_<activity>_<created>" onto every session name.
+  // One list-panes pass for every session's pane pids (all windows).
+  const panes = new Map()
+  for (const line of sh(`tmux list-panes -a -F '#{session_name}|#{pane_pid}' 2>/dev/null`).split('\n')) {
+    const i = line.lastIndexOf('|')
+    if (i < 0) continue
+    const n = line.slice(0, i)
+    if (!panes.has(n)) panes.set(n, [])
+    panes.get(n).push(line.slice(i + 1))
+  }
   const out = sh(`tmux list-sessions -F '#{session_name}|#{session_activity}|#{session_created}' 2>/dev/null`)
   for (const line of out.split('\n')) {
     if (!line.trim()) continue
     const [name, activity, created] = line.split('|')
     if (!/^(claude|done)-asana-/.test(name)) continue
-    const pids = sh(`tmux list-panes -s -t '${name}' -F '#{pane_pid}' 2>/dev/null`).split('\n').filter(Boolean)
+    const pids = panes.get(name) || []
     let claudeArgs = ''
     let claudePid = ''
     for (const pid of pids) {
@@ -120,9 +128,10 @@ function loadTmux () {
     const resumeUuid = (claudeArgs.match(/--resume\s+([0-9a-f-]{36})/) || [])[1] || ''
     // Bridge state is checked (pill, else session record) for EVERY live claude, not
     // just argv-named ones: RC can be armed app-side with no flag in argv.
+    const fork = /--fork-session/.test(claudeArgs)
     let rcUp = false
-    if (claudeArgs) rcUp = rcBridgeUp(sh(`tmux capture-pane -p -t '${name}' 2>/dev/null`), claudePid)
-    sessions.push({ name, activity: Number(activity) || 0, created: Number(created) || 0, claudeAlive: !!claudeArgs, rc, rcUp, resumeUuid })
+    if (claudeArgs && rcState) rcUp = rcBridgeUp(sh(`tmux capture-pane -p -t '${name}' 2>/dev/null`), claudePid)
+    sessions.push({ name, activity: Number(activity) || 0, created: Number(created) || 0, claudeAlive: !!claudeArgs, rc, rcUp, resumeUuid, fork })
   }
   return sessions
 }
@@ -172,11 +181,12 @@ function resolveTitle (title, gid) {
 }
 
 function buildSessions () {
+  loadNames()
   const cfg = loadConfig()
   const forks = loadForks()
   const spawns = chatSpawns.load()
-  const transcripts = loadTranscripts()
   const tmux = loadTmux()
+  const transcripts = loadTranscripts(tmux)
 
   const newestByGid = new Map()
   for (const t of transcripts) if (t.gid && !newestByGid.has(t.gid)) newestByGid.set(t.gid, t)
@@ -321,16 +331,20 @@ function collectWorktrees (liveGids) {
   return out.sort((a, b) => b.mtime - a.mtime)
 }
 
-const INTERESTING = /Spawn|spawn|Retired|retire|reap|killed|revive|Revive|guardrail|Blocked|blocked|ERROR|WARN|prune|Prune|drift/
+// A healthy tick's "guardrail ok" line is excluded: it lands every 2 min and
+// would bury the rest once the TUI scrolls back through hours of history.
+const INTERESTING = /Spawn|spawn|Retired|retire|reap|killed|revive|Revive|guardrail (?!ok)|Blocked|blocked|deferred|ERROR|WARN|prune|Prune|drift/
+// Newest first; orch-tui's Health view scrolls and time-jumps through all of it.
+const ACTIVITY_ROWS = 500
 function collectActivity () {
   const rows = []
   for (const [src, p] of [['watcher', '/tmp/asana-watcher.out'], ['watchdog', '/tmp/session-watchdog.out']]) {
-    for (const line of sh(`tail -80 '${p}' 2>/dev/null`).split('\n')) {
+    for (const line of sh(`tail -4000 '${p}' 2>/dev/null`).split('\n')) {
       const m = line.match(/^\[([0-9T:.Z-]+)\]\s*(.*)$/)
       if (m && INTERESTING.test(m[2])) rows.push({ ts: Date.parse(m[1]), src, msg: m[2] })
     }
   }
-  return rows.sort((a, b) => b.ts - a.ts).slice(0, 10)
+  return rows.sort((a, b) => b.ts - a.ts).slice(0, ACTIVITY_ROWS)
 }
 
 // ─── Asana agent_status tally (async; callers cache) ─────────────────────────
@@ -386,7 +400,6 @@ function spawnVerdict (v, runs, freeSims, pending) {
 }
 
 function collect () {
-  loadNames()
   const cfgAll = jread(`${AW}/asana-config.json`, {})
   const fleet = buildSessions()
   const liveGids = new Set(fleet.live.filter(r => r.gid).map(r => r.gid))
@@ -404,6 +417,8 @@ function collect () {
 
 async function dump () {
   const m = collect()
+  await warmNames()
+  retitle(m.fleet, Object.fromEntries(taskNames.load()))
   const asana = await collectAsana(m.cfgAll)
   retitle(m.fleet, asana.names)
   return { ...m, asana: { ...asana, tally: asana.tally ? [...asana.tally] : null } }
@@ -425,4 +440,4 @@ function retitle (fleet, names) {
   return fleet
 }
 
-module.exports = { retitle, buildSessions, buildModel: buildSessions, collect, collectAsana, dump, spawnVerdict, loadNames, nameOf, fmtAgo, fmtDate, sh, jread, AW, ST }
+module.exports = { retitle, buildSessions, buildModel: buildSessions, collect, collectAsana, dump, spawnVerdict, loadNames, warmNames, loadTmux, nameOf, fmtAgo, fmtDate, sh, jread, AW, ST }

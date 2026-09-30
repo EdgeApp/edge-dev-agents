@@ -450,7 +450,8 @@ function main() {
   const toSpawnSim = pendingSim.slice(0, availableSim)
   const toSpawn = [...toSpawnSim, ...pendingNosim.slice(0, availableNosim)]
   const deferred = [...pendingSim.slice(availableSim), ...pendingNosim.slice(availableNosim)]
-  log(`Pending=${pending.length} (sim ${pendingSim.length}, nosim ${pendingNosim.length}), free sim=${availableSim} nosim=${availableNosim} → spawning ${toSpawn.length}, deferring ${deferred.length}`)
+  const simHeld = loadOk ? '' : ` (held: load ${load.toFixed(1)} > max_load_avg ${maxLoad})`
+  log(`Pending=${pending.length} (sim ${pendingSim.length}, nosim ${pendingNosim.length}), open sim=${availableSim}${simHeld} nosim=${availableNosim} → spawning ${toSpawn.length}, deferring ${deferred.length}`)
 
   // Ensure the iOS-sim pool has enough free entries to cover THIS tick's sim
   // spawns (--min-free). Refilling the rest of the pool and refreshing the
@@ -472,9 +473,14 @@ function main() {
   // Step 6 + 7: spawn each picked task (slot persisted inside spawnForTask).
   for (const task of toSpawn) spawnForTask(task, cfg)
 
-  // Anything beyond its cap waits for a future tick.
+  // Anything not picked waits for a future tick. Name the actual reason: a
+  // sim task can be held by the load guardrail with slots still open.
+  const deferredSim = new Set(pendingSim.slice(availableSim))
   for (const task of deferred) {
-    log(`skipped: at cap — "${task.name}" (gid=${task.gid}) deferred to a later tick`)
+    const why = !deferredSim.has(task) ? `no-sim cap ${active.nosim + (toSpawn.length - toSpawnSim.length)}/${MAX_NOSIM}`
+      : !loadOk ? `load ${load.toFixed(1)} > max_load_avg ${maxLoad} (sim runs ${active.sim}/${MAX})`
+      : `sim cap ${active.sim + toSpawnSim.length}/${MAX}`
+    log(`deferred: "${task.name}" (gid=${task.gid}), ${why}; retrying next tick`)
   }
 }
 

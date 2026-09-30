@@ -32,8 +32,10 @@
 # Markers: /tmp/agent-skill-read-<key>-<skill>. <key> is AGENT_TASK_GID in
 # orch runs and sess-<session_id> in interactive sessions, so the file gates
 # that cover interactive editing (require-skill-for-file.sh, all-sessions
-# entries) can credit a skill loaded ahead of the write. The orch gates only
-# ever look up the gid key. Always exit 0 (PostToolUse; never blocks).
+# entries, and require-skill-read-for-scripts.sh outside orch runs) can credit
+# a skill loaded ahead of the write or the script call. inject-run-context.sh
+# expires the sess- markers at compaction. Always exit 0 (PostToolUse; never
+# blocks).
 set -uo pipefail
 
 INPUT=$(cat 2>/dev/null || true)
