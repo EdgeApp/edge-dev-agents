@@ -5,6 +5,9 @@
 # Engines:
 #   maestro         ~/.maestro/bin/maestro (JVM CLI + XCTest driver on the sim)
 #   maestro-runner  ~/.maestro-runner/bin/maestro-runner (Go binary + WebDriverAgent)
+#   <label>=<path>  another maestro-runner build, e.g.
+#                   fork=$HOME/.maestro-runner-fork/bin/maestro-runner, to
+#                   compare builds in one alternating run
 #
 # Per run it records:
 #   wall_s       end-to-end seconds of the `test` invocation
@@ -13,7 +16,15 @@
 #   host_rss_mb  peak summed RSS of the engine's live process tree (sampled)
 #   sim_rss_mb   peak RSS of the on-sim XCTest runner app (the engine's driver:
 #                maestro-driver-iosUITests-Runner or WebDriverAgentRunner-Runner)
+#   flow_s       the flow's own duration as the engine reports it (runner:
+#                report.json; maestro: first command start to last command
+#                end in its debug output), i.e. wall minus startup/teardown
 #   pass         the flow's exit status (0 = pass)
+#
+# For runner engines it also writes wda.csv: every WDA request in the run's
+# maestro-runner.log, grouped by method and endpoint (element ids and session
+# ids folded), with count and total ms. The summary prints each engine's
+# per-run average of those groups, which is where runner step time goes.
 #
 # Runs alternate engines (A B A B ...) so drift in sim or host load does not
 # favor one engine. The first run of each engine is reported separately as
@@ -59,25 +70,70 @@ done
 xcrun simctl list devices | grep "$DEVICE" | grep -q "(Booted)" ||
   { echo "device $DEVICE is not booted" >&2; exit 1; }
 export PATH="$HOME/.maestro/bin:$HOME/.maestro-runner/bin:$PATH"
-IFS=, read -ra ENGINE_LIST <<< "$ENGINES"
-for e in "${ENGINE_LIST[@]}"; do
-  case "$e" in maestro|maestro-runner) ;; *) echo "unknown engine: $e" >&2; exit 1 ;; esac
-  command -v "$e" >/dev/null 2>&1 || { echo "$e not found in PATH" >&2; exit 1; }
+IFS=, read -ra ENGINE_SPECS <<< "$ENGINES"
+ENGINE_LIST=()
+ENGINE_BINS=() # parallel to ENGINE_LIST (bash 3.2 has no associative arrays)
+for spec in "${ENGINE_SPECS[@]}"; do
+  case "$spec" in
+    maestro|maestro-runner) e=$spec; bin=$(command -v "$spec" || true) ;;
+    *=*) e=${spec%%=*}; bin=${spec#*=} ;;
+    *) echo "unknown engine: $spec (maestro, maestro-runner or <label>=<runner path>)" >&2; exit 1 ;;
+  esac
+  [[ -x "$bin" ]] || { echo "$e: no executable at '${bin}'" >&2; exit 1; }
+  ENGINE_LIST+=("$e"); ENGINE_BINS+=("$bin")
 done
+engine_bin() { # $1 engine label
+  local i
+  for i in "${!ENGINE_LIST[@]}"; do
+    [[ "${ENGINE_LIST[$i]}" = "$1" ]] && { echo "${ENGINE_BINS[$i]}"; return; }
+  done
+}
 [[ -n "$OUT" ]] || OUT=$(mktemp -d /tmp/maestro-bench.XXXXXX)
 mkdir -p "$OUT"
 CSV="$OUT/runs.csv"
-echo "engine,run,wall_s,cpu_s,host_rss_mb,sim_rss_mb,pass" > "$CSV"
+echo "engine,run,wall_s,flow_s,cpu_s,host_rss_mb,sim_rss_mb,pass" > "$CSV"
+WDA_CSV="$OUT/wda.csv"
+echo "engine,run,method,endpoint,count,total_ms" > "$WDA_CSV"
 
 engine_cmd() { # $1 engine, $2 run dir
   if [[ "$1" = maestro ]]; then
-    local a=(maestro --device "$DEVICE")
+    local a=("$(engine_bin maestro)" --device "$DEVICE")
     [[ -n "$DRIVER_PORT" ]] && a+=(--driver-host-port "$DRIVER_PORT")
-    printf '%s\0' "${a[@]}" test "$FLOW"
+    printf '%s\0' "${a[@]}" test --debug-output "$2/debug" --flatten-debug-output "$FLOW"
   else
-    printf '%s\0' maestro-runner --platform ios --device "$DEVICE" --no-ansi \
+    printf '%s\0' "$(engine_bin "$1")" --platform ios --device "$DEVICE" --no-ansi \
       --output "$2/report" test "$FLOW"
   fi
+}
+
+# The flow's own duration in seconds, as the engine reports it (0 if absent).
+flow_seconds() { # $1 engine, $2 run dir
+  node -e '
+const fs = require("fs"), path = require("path"), [engine, d] = process.argv.slice(1);
+const files = (dir, re) => { try { return fs.readdirSync(dir).filter(f => re.test(f)).map(f => path.join(dir, f)) } catch { return [] } };
+let s = 0;
+try {
+  if (engine === "maestro") {
+    const m = files(d + "/debug", /^commands-.*\.json$/).flatMap(f => JSON.parse(fs.readFileSync(f))).map(c => c.metadata).filter(m => m && m.timestamp);
+    if (m.length) s = (Math.max(...m.map(x => x.timestamp + (x.duration || 0))) - Math.min(...m.map(x => x.timestamp))) / 1000;
+  } else {
+    for (const r of files(d + "/report", /./)) for (const f of files(r, /^report\.json$/))
+      s += JSON.parse(fs.readFileSync(f)).flows.reduce((a, x) => a + (x.duration || 0), 0) / 1000;
+  }
+} catch {}
+console.log(s.toFixed(1));
+' "$1" "$2"
+}
+
+# WDA requests in a runner run's log, grouped by method and endpoint.
+wda_requests() { # $1 engine, $2 run index, $3 run dir
+  local log
+  log=$(ls "$3"/report/*/maestro-runner.log 2>/dev/null | head -1)
+  [[ -n "$log" ]] || return 0
+  sed -nE 's/.*WDA (GET|POST|DELETE) ([^ ]+) completed \(([0-9]+)ms.*/\1 \2 \3/p' "$log" |
+    sed -E 's#/session/[^/ ]+##; s#/element/[^/ ]+/#/element/:id/#; s#\?[^ ]*##' |
+    awk -v e="$1" -v r="$2" '{ k=$1","$2; n[k]++; ms[k]+=$3 } END { for (k in n) print e","r","k","n[k]","ms[k] }' \
+    >> "$WDA_CSV"
 }
 
 # Peak summed RSS (KB) of $1's process tree and of the on-sim XCTest runner,
@@ -119,8 +175,9 @@ run_one() { # $1 engine, $2 run index
   local cpu host sim
   cpu=$(awk '/ real .* user .* sys/ { print $3 + $5 }' "$dir/time.log" | tail -1)
   read -r host sim < "$dir/peaks"
-  printf '%s,%s,%.1f,%.1f,%d,%d,%s\n' "$e" "$i" "$(echo "$t1 - $t0" | bc)" "${cpu:-0}" \
-    $((host / 1024)) $((sim / 1024)) "$rc" | tee -a "$CSV"
+  [[ "$e" = maestro ]] || wda_requests "$e" "$i" "$dir"
+  printf '%s,%s,%.1f,%s,%.1f,%d,%d,%s\n' "$e" "$i" "$(echo "$t1 - $t0" | bc)" "$(flow_seconds "$e" "$dir")" \
+    "${cpu:-0}" $((host / 1024)) $((sim / 1024)) "$rc" | tee -a "$CSV"
 }
 
 for ((i = 1; i <= RUNS; i++)); do
@@ -134,15 +191,28 @@ echo
 echo "per-run CSV: $CSV"
 node -e '
 const rows = require("fs").readFileSync(process.argv[1], "utf8").trim().split("\n").slice(1)
-  .map(l => l.split(",")).map(([engine, run, wall, cpu, host, sim, pass]) =>
-    ({ engine, run: +run, wall: +wall, cpu: +cpu, host: +host, sim: +sim, pass: pass === "0" }));
+  .map(l => l.split(",")).map(([engine, run, wall, flow, cpu, host, sim, pass]) =>
+    ({ engine, run: +run, wall: +wall, flow: +flow, cpu: +cpu, host: +host, sim: +sim, pass: pass === "0" }));
 const med = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1;
   return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : NaN; };
-console.log("| engine | cold wall s | warm wall s (median) | warm CPU s | peak host RSS MB | peak sim driver RSS MB | passed |");
-console.log("|---|---|---|---|---|---|---|");
+console.log("| engine | cold wall s | warm wall s (median) | warm flow s | warm CPU s | peak host RSS MB | peak sim driver RSS MB | passed |");
+console.log("|---|---|---|---|---|---|---|---|");
 for (const e of [...new Set(rows.map(r => r.engine))]) {
   const all = rows.filter(r => r.engine === e), cold = all.find(r => r.run === 1), warm = all.filter(r => r.run > 1);
   const w = warm.length ? warm : all;
-  console.log(`| ${e} | ${cold.wall.toFixed(1)} | ${med(w.map(r => r.wall)).toFixed(1)} | ${med(w.map(r => r.cpu)).toFixed(1)} | ${Math.max(...all.map(r => r.host))} | ${Math.max(...all.map(r => r.sim))} | ${all.filter(r => r.pass).length}/${all.length} |`);
+  console.log(`| ${e} | ${cold.wall.toFixed(1)} | ${med(w.map(r => r.wall)).toFixed(1)} | ${med(w.map(r => r.flow)).toFixed(1)} | ${med(w.map(r => r.cpu)).toFixed(1)} | ${Math.max(...all.map(r => r.host))} | ${Math.max(...all.map(r => r.sim))} | ${all.filter(r => r.pass).length}/${all.length} |`);
 }
-' "$CSV"
+const wda = require("fs").readFileSync(process.argv[2], "utf8").trim().split("\n").slice(1)
+  .map(l => l.split(",")).map(([engine, run, method, endpoint, count, ms]) => ({ engine, run: +run, key: method + " " + endpoint, count: +count, ms: +ms }));
+for (const e of [...new Set(wda.map(r => r.engine))]) {
+  const rs = wda.filter(r => r.engine === e && r.run > 1), runs = new Set(rs.map(r => r.run)).size;
+  if (!runs) continue;
+  const g = {};
+  for (const r of rs) { g[r.key] ??= { count: 0, ms: 0 }; g[r.key].count += r.count; g[r.key].ms += r.ms; }
+  console.log(`\nWDA requests per warm run, ${e} (average of ${runs}):\n`);
+  console.log("| request | count | total s | ms each |");
+  console.log("|---|---|---|---|");
+  for (const [k, v] of Object.entries(g).sort((a, b) => b[1].ms - a[1].ms).slice(0, 12))
+    console.log(`| ${k} | ${(v.count / runs).toFixed(1)} | ${(v.ms / runs / 1000).toFixed(1)} | ${Math.round(v.ms / v.count)} |`);
+}
+' "$CSV" "$WDA_CSV"
