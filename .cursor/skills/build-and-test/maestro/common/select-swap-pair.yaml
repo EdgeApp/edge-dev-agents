@@ -2,8 +2,8 @@
 # enter fiat amount → Next → wait for a quote → optionally force a provider.
 # Assumes logged-in app (compose login-if-needed + dismiss-startup-modals first).
 # PARAMS:
-#   SRC_WALLET / DST_WALLET — text typed into "Search Wallets" AND the regex
-#                             matched against the filtered result (e.g. ".*Bitcoin.*")
+#   SRC_WALLET / DST_WALLET — plain text typed into "Search Wallets" (e.g.
+#                             "My Bitcoin"); the first filtered row is picked
 #   FIAT_AMOUNT             — fiat number typed into the amount field
 #   PROVIDER                — exact provider name to force (e.g. "Maya Protocol").
 #                             Forcing works by SELECTING it in the provider sheet;
@@ -23,15 +23,24 @@
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
-  SRC_WALLET: ".*Bitcoin.*"
-  DST_WALLET: ".*Ethereum.*"
-  FIAT_AMOUNT: "16"
-  PROVIDER: ""
+  # `${KEY || default}` so a caller's runFlow env wins over the default.
+  SRC_WALLET: ${SRC_WALLET || "Bitcoin"}
+  DST_WALLET: ${DST_WALLET || "Ethereum"}
+  FIAT_AMOUNT: ${FIAT_AMOUNT || "16"}
+  PROVIDER: ${PROVIDER || ""}
 ---
 - extendedWaitUntil:
     visible: "Exchange"
     timeout: 30000
-- tapOn: "Exchange"
+# The tab bar stays hidden for up to ~20s after login while "Exchange" is
+# already in the hierarchy, so retry the tap until the Exchange scene shows.
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn: "Exchange"
+      - extendedWaitUntil:
+          visible: "Select Source Wallet|I have"
+          timeout: 10000
 - runFlow:
     when:
       visible: "Select Source Wallet"
@@ -44,12 +53,16 @@ env:
             visible: "Not Now"
           commands:
             - tapOn: "Not Now"
+      # The search field holds the typed text, so it is always match 0; the
+      # rows' labels contain the wallet name, so match 1 is the first row.
       - extendedWaitUntil:
-          visible: ${SRC_WALLET}
+          visible:
+            text: ".*${SRC_WALLET}.*"
+            index: 1
           timeout: 15000
       - tapOn:
-          text: ${SRC_WALLET}
-          index: 0
+          text: ".*${SRC_WALLET}.*"
+          index: 1
 - runFlow:
     when:
       visible: "Select Receiving Wallet"
@@ -62,12 +75,16 @@ env:
             visible: "Not Now"
           commands:
             - tapOn: "Not Now"
+      # The search field holds the typed text, so it is always match 0; the
+      # rows' labels contain the wallet name, so match 1 is the first row.
       - extendedWaitUntil:
-          visible: ${DST_WALLET}
+          visible:
+            text: ".*${DST_WALLET}.*"
+            index: 1
           timeout: 15000
       - tapOn:
-          text: ${DST_WALLET}
-          index: 0
+          text: ".*${DST_WALLET}.*"
+          index: 1
 - extendedWaitUntil:
     visible: "Tap to edit"
     timeout: 15000
