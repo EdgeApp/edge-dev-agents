@@ -24,6 +24,54 @@
       "batchAt": "2026-09-30T01:58:35Z",
       "headSha": "0bf14f90e80ed9fac760c19b572e7c7ac6456433",
       "addedAt": "2026-09-30T01:58:35Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-500/20260929-193220-agent-proof-1219006143254537-03-mptrade-quote-fil-to-eth.png",
+      "caption": "mptrade quote fil to eth",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T01:58:35Z",
+      "headSha": "0bf14f90e80ed9fac760c19b572e7c7ac6456433",
+      "addedAt": "2026-09-30T02:32:20Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-500/20260929-193220-agent-proof-1219006143254537-04-mptrade-swap-success.png",
+      "caption": "mptrade swap success",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T01:58:35Z",
+      "headSha": "0bf14f90e80ed9fac760c19b572e7c7ac6456433",
+      "addedAt": "2026-09-30T02:32:20Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-500/20260929-193220-agent-proof-1219006143254537-05-swap-details-status-page-row.png",
+      "caption": "swap details status page row",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T01:58:35Z",
+      "headSha": "0bf14f90e80ed9fac760c19b572e7c7ac6456433",
+      "addedAt": "2026-09-30T02:32:20Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-500/20260929-193220-agent-proof-1219006143254537-06-scanner-resolves-real-swap-order.png",
+      "caption": "scanner resolves real swap order",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T01:58:35Z",
+      "headSha": "0bf14f90e80ed9fac760c19b572e7c7ac6456433",
+      "addedAt": "2026-09-30T02:32:20Z"
     }
   ]
 }
