@@ -59,10 +59,16 @@ env:
     commands: [{ tapOn: "Not Now" }]
 
 # --- navigate to the Buy (Buy Crypto) scene ---
-- tapOn: "Buy"
-- extendedWaitUntil:
-    visible: "Amount USD"
-    timeout: 15000
+# The tab bar stays hidden for up to ~20s after login while "Buy" is already
+# in the hierarchy, so a single tap can land on nothing. Retry until the Buy
+# scene shows.
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn: "Buy"
+      - extendedWaitUntil:
+          visible: "Amount USD"
+          timeout: 10000
 
 # --- enter the $500 fiat amount ---
 # NOTE: do NOT call `hideKeyboard` here — on this debug build it forces a re-layout
