@@ -96,7 +96,10 @@ for a, e in cuts:
 ' 2>/dev/null) || SEGS=""
 [ -n "$SEGS" ] || SEGS="$(printf '%s' "$CMD_M" | base64 | tr -d '\n') $(printf '%s' "$CMD" | base64 | tr -d '\n') 0"
 
-EXEC_POS='(^|[;&|(]|\$\(|\b(bash|sh|source)[[:space:]]+)[[:space:]]*[^[:space:]]*'
+# An interpreter word must stand alone: `\b` also matched the `.sh ` ending one
+# path, so `a.sh <dir>/skills/x/scripts/y.sh` (two paths passed to git or stat)
+# read as `sh <script>`.
+EXEC_POS='(^|[;&|(]|\$\(|(^|[[:space:];&|(])(bash|sh|source)[[:space:]]+)[[:space:]]*[^[:space:]]*'
 # Arguments up to the next command separator; help-only when nothing but
 # --help/-h (plus stderr/stdout redirections) follows the script path.
 ARGS_TAIL='[^;&|)]*'
