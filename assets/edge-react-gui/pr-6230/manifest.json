@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6230/20260930-121847-agent-proof-1219037321325615-01-android-arrr-wallets-disabled.png",
+      "caption": "android arrr wallets disabled",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T19:18:47Z",
+      "headSha": "b69dba3a0c7d3cb6ae9d61976c57de344720ae4d",
+      "addedAt": "2026-09-30T19:18:47Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6230/20260930-121847-agent-proof-1219037321325615-02-android-arrr-wallet-menu-keys.png",
+      "caption": "android arrr wallet menu keys",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T19:18:47Z",
+      "headSha": "b69dba3a0c7d3cb6ae9d61976c57de344720ae4d",
+      "addedAt": "2026-09-30T19:18:47Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6230/20260930-121847-agent-proof-1219037321325615-03-android-arrr-view-key-empty.png",
+      "caption": "android arrr view key empty",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-09-30T19:18:47Z",
+      "headSha": "b69dba3a0c7d3cb6ae9d61976c57de344720ae4d",
+      "addedAt": "2026-09-30T19:18:47Z"
+    }
+  ]
+}
