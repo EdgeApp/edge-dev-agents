@@ -1,30 +1,65 @@
 # common/send-to-address.yaml
-# Assets -> search wallet -> Send -> address -> amount -> confirm slider.
-# Params: WALLET_SEARCH, ADDRESS, AMOUNT. Promoted 2026-08-06 (run 1217135300337949);
-# proof-frame tail steps intentionally dropped for reuse.
+# Open a Send scene with address and amount filled in -> confirm slider.
+# With CURRENCY_CODE set, one payment-redirect deep link does it from any scene:
+# `https://edge.app/redirect/payment/?baseCurrencyCode=..&depositWalletAddress=..&baseCurrencyAmount=..`.
+# Params:
+#   CURRENCY_CODE  currency code for the link (`btc`, `usdc`). Unset, the flow
+#                  takes the manual path.
+#   ADDRESS, AMOUNT  recipient and amount (on the link, in units of the currency).
+#   WALLET_SEARCH  text typed into Search Wallets to find the sending wallet:
+#                  always on the manual path, and on the link when the account
+#                  holds several wallets for the code and the app asks which.
+#   MANUAL_PATH    "true" forces Assets -> wallet -> Send -> address -> amount,
+#                  for a task whose change is on the wallet scene, the address
+#                  modal or the amount entry.
+# Promoted 2026-08-06 (run 1217135300337949); proof-frame tail steps
+# intentionally dropped for reuse.
 appId: co.edgesecure.app
+env:
+  CURRENCY_CODE: ${CURRENCY_CODE || ""}
+  MANUAL_PATH: ${MANUAL_PATH || ""}
+  WALLET_SEARCH: ${WALLET_SEARCH || ""}
 ---
-- extendedWaitUntil: {visible: "Assets", timeout: 90000}
-- runFlow: {when: {visible: "Not Now"}, commands: [{tapOn: "Not Now"}]}
-- runFlow: {when: {visible: {id: "modal-close-button"}}, commands: [{tapOn: {id: "modal-close-button"}}]}
-- tapOn: "Assets"
-- extendedWaitUntil: {visible: "Search Wallets", timeout: 20000}
-- tapOn: "Search Wallets"
-# The search text survives navigation; clear it or inputText appends.
-- eraseText: 40
-- inputText: ${WALLET_SEARCH}
-- extendedWaitUntil: {visible: ".*${WALLET_SEARCH}.*", timeout: 15000}
-- tapOn: {text: ".*${WALLET_SEARCH}.*", index: 0}
-- extendedWaitUntil: {visible: "Send", timeout: 15000}
-- tapOn: "Send"
-- extendedWaitUntil: {visible: ".*Enter.*", timeout: 15000}
-- tapOn: {text: ".*Enter.*"}
-- tapOn: "Address"
-- inputText: ${ADDRESS}
-- tapOn: "Next"
-- extendedWaitUntil: {visible: "Enter Value", timeout: 15000}
-- tapOn: "Enter Value"
-- inputText: ${AMOUNT}
-- tapOn: "Done"
+- runFlow:
+    when:
+      true: ${MANUAL_PATH != 'true' && CURRENCY_CODE != ''}
+    commands:
+      - openLink: "https://edge.app/redirect/payment/?baseCurrencyCode=${CURRENCY_CODE}&depositWalletAddress=${ADDRESS}&baseCurrencyAmount=${AMOUNT}"
+      - extendedWaitUntil: {visible: "Slide to Confirm|Select Wallet", timeout: 30000}
+      # Several wallets hold the code (ETH on each L2): the app asks which.
+      - runFlow:
+          when: {visible: "Select Wallet"}
+          commands:
+            - tapOn: "Search Wallets"
+            - inputText: ${WALLET_SEARCH}
+            # The search field holds the typed text, so it is match 0.
+            - extendedWaitUntil: {visible: {text: ".*${WALLET_SEARCH}.*", index: 1}, timeout: 15000}
+            - tapOn: {text: ".*${WALLET_SEARCH}.*", index: 1}
+- runFlow:
+    when:
+      true: ${MANUAL_PATH == 'true' || CURRENCY_CODE == ''}
+    commands:
+      - extendedWaitUntil: {visible: "Assets", timeout: 90000}
+      - runFlow: {when: {visible: "Not Now"}, commands: [{tapOn: "Not Now"}]}
+      - runFlow: {when: {visible: {id: "modal-close-button"}}, commands: [{tapOn: {id: "modal-close-button"}}]}
+      - tapOn: "Assets"
+      - extendedWaitUntil: {visible: "Search Wallets", timeout: 20000}
+      - tapOn: "Search Wallets"
+      # The search text survives navigation; clear it or inputText appends.
+      - eraseText: 40
+      - inputText: ${WALLET_SEARCH}
+      - extendedWaitUntil: {visible: ".*${WALLET_SEARCH}.*", timeout: 15000}
+      - tapOn: {text: ".*${WALLET_SEARCH}.*", index: 0}
+      - extendedWaitUntil: {visible: "Send", timeout: 15000}
+      - tapOn: "Send"
+      - extendedWaitUntil: {visible: ".*Enter.*", timeout: 15000}
+      - tapOn: {text: ".*Enter.*"}
+      - tapOn: "Address"
+      - inputText: ${ADDRESS}
+      - tapOn: "Next"
+      - extendedWaitUntil: {visible: "Enter Value", timeout: 15000}
+      - tapOn: "Enter Value"
+      - inputText: ${AMOUNT}
+      - tapOn: "Done"
 - extendedWaitUntil: {visible: "Slide to Confirm", timeout: 15000}
 - swipe: {from: {id: "confirmSliderThumb"}, direction: LEFT, duration: 1500}
