@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "entries": [
     {
       "path": "assets/edge-currency-accountbased/pr-1106/20260916-155913-agent-proof-1218563157181138-01-arc-in-create-wallet.png",
@@ -8,7 +8,10 @@
       "phase": null,
       "subject": "Add Arc support",
       "hackNote": null,
-      "addedAt": "2026-09-16T22:59:24.628Z"
+      "addedAt": "2026-09-16T22:59:24.628Z",
+      "batchAt": "2026-10-01T17:32:41Z",
+      "headSha": "9defa8cab58f826f59f5654891215074c8625a7e",
+      "carriedFrom": "(earlier)"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1106/20260916-155913-agent-proof-1218563157181138-04-arc-balance-after-funding.png",
@@ -17,7 +20,10 @@
       "phase": null,
       "subject": "Add Arc support",
       "hackNote": null,
-      "addedAt": "2026-09-16T22:59:24.629Z"
+      "addedAt": "2026-09-16T22:59:24.629Z",
+      "batchAt": "2026-10-01T17:32:41Z",
+      "headSha": "9defa8cab58f826f59f5654891215074c8625a7e",
+      "carriedFrom": "(earlier)"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1106/20260916-155913-agent-proof-1218563157181138-08-arc-history-send-swap-approval-receive.png",
@@ -26,7 +32,10 @@
       "phase": null,
       "subject": "Add Arc support",
       "hackNote": null,
-      "addedAt": "2026-09-16T22:59:24.629Z"
+      "addedAt": "2026-09-16T22:59:24.629Z",
+      "batchAt": "2026-10-01T17:32:41Z",
+      "headSha": "9defa8cab58f826f59f5654891215074c8625a7e",
+      "carriedFrom": "(earlier)"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1106/20260916-155913-agent-proof-1218563157181138-09-arc-wallet-usdc-symbol.png",
@@ -35,7 +44,10 @@
       "phase": null,
       "subject": "Add Arc support",
       "hackNote": null,
-      "addedAt": "2026-09-16T22:59:24.629Z"
+      "addedAt": "2026-09-16T22:59:24.629Z",
+      "batchAt": "2026-10-01T17:32:41Z",
+      "headSha": "9defa8cab58f826f59f5654891215074c8625a7e",
+      "carriedFrom": "(earlier)"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1106/20260916-155913-agent-proof-1218563157181138-10-arc-send-confirm.png",
@@ -44,7 +56,10 @@
       "phase": null,
       "subject": "Add Arc support",
       "hackNote": null,
-      "addedAt": "2026-09-16T22:59:24.629Z"
+      "addedAt": "2026-09-16T22:59:24.629Z",
+      "batchAt": "2026-10-01T17:32:41Z",
+      "headSha": "9defa8cab58f826f59f5654891215074c8625a7e",
+      "carriedFrom": "(earlier)"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1106/20260916-155913-agent-proof-1218563157181138-11-arc-send-result.png",
@@ -53,7 +68,10 @@
       "phase": null,
       "subject": "Add Arc support",
       "hackNote": null,
-      "addedAt": "2026-09-16T22:59:24.629Z"
+      "addedAt": "2026-09-16T22:59:24.629Z",
+      "batchAt": "2026-10-01T17:32:41Z",
+      "headSha": "9defa8cab58f826f59f5654891215074c8625a7e",
+      "carriedFrom": "(earlier)"
     },
     {
       "path": "assets/edge-currency-accountbased/pr-1106/20260916-165038-agent-proof-1218563157181138-12-arc-history-after-keyless-resync.png",
@@ -62,7 +80,70 @@
       "phase": null,
       "subject": "Add Arc support",
       "hackNote": null,
-      "addedAt": "2026-09-16T23:50:42.089Z"
+      "addedAt": "2026-09-16T23:50:42.089Z",
+      "batchAt": "2026-10-01T17:32:41Z",
+      "headSha": "9defa8cab58f826f59f5654891215074c8625a7e",
+      "carriedFrom": "(earlier)"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20261001-103241-agent-proof-1218563157181138-07-arc-history-after-resync.png",
+      "caption": "arc history after resync",
+      "index": "7",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T17:32:41Z",
+      "headSha": "9defa8cab58f826f59f5654891215074c8625a7e",
+      "addedAt": "2026-10-01T17:32:41Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20261001-103241-agent-proof-1218563157181138-08-arc-swap-details-fee.png",
+      "caption": "arc swap details fee",
+      "index": "8",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T17:32:41Z",
+      "headSha": "9defa8cab58f826f59f5654891215074c8625a7e",
+      "addedAt": "2026-10-01T17:32:41Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20261001-103241-agent-proof-1218563157181138-09-arc-swap-fee-used-21-gwei.png",
+      "caption": "arc swap fee used 21 gwei",
+      "index": "9",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T17:32:41Z",
+      "headSha": "9defa8cab58f826f59f5654891215074c8625a7e",
+      "addedAt": "2026-10-01T17:32:41Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20261001-103241-agent-proof-1218563157181138-10-arc-interface-receive-details.png",
+      "caption": "arc interface receive details",
+      "index": "10",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T17:32:41Z",
+      "headSha": "9defa8cab58f826f59f5654891215074c8625a7e",
+      "addedAt": "2026-10-01T17:32:41Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20261001-103241-agent-proof-1218563157181138-11-arc-interface-receive-no-fee-used.png",
+      "caption": "arc interface receive no fee used",
+      "index": "11",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T17:32:41Z",
+      "headSha": "9defa8cab58f826f59f5654891215074c8625a7e",
+      "addedAt": "2026-10-01T17:32:41Z"
     }
   ]
 }
