@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6216/20261001-101415-agent-proof-1218563157181138-01-eth-wallet-menu-split.png",
+      "caption": "eth wallet menu split",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T17:14:15Z",
+      "headSha": "850b45d77c9b96d2a41a2cfd133998f534357632",
+      "addedAt": "2026-10-01T17:14:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6216/20261001-101415-agent-proof-1218563157181138-02-split-list-arc.png",
+      "caption": "split list arc",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T17:14:15Z",
+      "headSha": "850b45d77c9b96d2a41a2cfd133998f534357632",
+      "addedAt": "2026-10-01T17:14:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6216/20261001-101415-agent-proof-1218563157181138-03-split-confirm-arc.png",
+      "caption": "split confirm arc",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T17:14:15Z",
+      "headSha": "850b45d77c9b96d2a41a2cfd133998f534357632",
+      "addedAt": "2026-10-01T17:14:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6216/20261001-101415-agent-proof-1218563157181138-04-arc-split-wallet-in-list.png",
+      "caption": "arc split wallet in list",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T17:14:15Z",
+      "headSha": "850b45d77c9b96d2a41a2cfd133998f534357632",
+      "addedAt": "2026-10-01T17:14:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6216/20261001-101415-agent-proof-1218563157181138-05-arc-split-receive-address.png",
+      "caption": "arc split receive address",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T17:14:15Z",
+      "headSha": "850b45d77c9b96d2a41a2cfd133998f534357632",
+      "addedAt": "2026-10-01T17:14:15Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6216/20261001-101415-agent-proof-1218563157181138-06-eth-source-receive-address.png",
+      "caption": "eth source receive address",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T17:14:15Z",
+      "headSha": "850b45d77c9b96d2a41a2cfd133998f534357632",
+      "addedAt": "2026-10-01T17:14:15Z"
+    }
+  ]
+}
