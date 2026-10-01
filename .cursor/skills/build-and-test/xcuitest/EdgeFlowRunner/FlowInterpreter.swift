@@ -156,6 +156,21 @@ final class FlowInterpreter {
       if let appId = map["appId"] as? String { selectApp(try script.interpolate(appId)) }
       app.terminate()
       interacted()
+    case "openLink":
+      // XCUIApplication.open hands the URL to the app under test itself, so
+      // custom schemes and https links both arrive without the system's
+      // "Open in <app>?" prompt and without an associated-domains lookup.
+      // autoVerify and browser are Android-only and ignored.
+      let link = try script.interpolate(stringArg(args, key: "link"))
+      guard let url = URL(string: link), url.scheme != nil else {
+        throw FlowError("not a URL: \(link)")
+      }
+      guard #available(iOS 16.4, *) else {
+        throw FlowError("openLink needs iOS 16.4 or later")
+      }
+      app.open(url)
+      screenBounds = nil
+      interacted()
     case "tapOn", "longPressOn":
       let long = name == "longPressOn"
       let target: XCUICoordinate

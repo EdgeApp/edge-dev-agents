@@ -24,6 +24,7 @@ and source hash (`scripts/xcuitest-build.sh`, cached under
 |---|---|
 | `launchApp` | `appId`, `stopApp: false` (activate if running). `clearState: true` is rejected because it wipes the roster accounts. Passes `-EdgeTestAnimations <mode>` unless `--animations on`. |
 | `stopApp` | |
+| `openLink` | Scalar URL or `link:`. Hands the URL straight to the app under test (`XCUIApplication.open`), with no "Open in Edge?" system dialog, for custom-scheme (`edge://`) and `https://` links alike. Returns before the app navigates, so follow it with an `extendedWaitUntil` on the target scene. The Android-only keys `autoVerify` and `browser` are accepted and ignored. |
 | `tapOn` / `longPressOn` | `text`, `id`, `index`, `enabled`, `point`, `waitToSettleTimeoutMs`, `retryTapIfNoChange`. `point` alone is a screen position: `"50%,80%"` (whole percentages of the screen) or `"120,640"` (points). `point` next to `text` or `id` is relative to the matched element. `longPressOn` holds for 3s, as Maestro does on iOS |
 | `assertVisible` / `assertNotVisible` | `enabled: true/false` narrows the match to enabled or disabled elements. Maestro timeouts: 17s (7s when `optional`), minus time since the last interaction |
 | `extendedWaitUntil` | `visible` / `notVisible`, `timeout` |

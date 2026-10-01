@@ -15,6 +15,7 @@ enum FlowPreflight {
   static let commandKeys: [String: Set<String>] = [
     "launchApp": ["appId", "clearState", "stopApp"],
     "stopApp": ["appId"],
+    "openLink": ["link", "autoVerify", "browser"],
     "tapOn": selectorKeys.union(tapKeys),
     "longPressOn": selectorKeys.union(tapKeys),
     "copyTextFrom": selectorKeys,
@@ -41,7 +42,7 @@ enum FlowPreflight {
 
   /// Commands that may be written as a bare name or with a scalar argument.
   static let scalarForms: Set<String> = [
-    "launchApp", "stopApp", "tapOn", "assertVisible", "assertNotVisible", "inputText", "eraseText",
+    "launchApp", "stopApp", "openLink", "tapOn", "assertVisible", "assertNotVisible", "inputText", "eraseText",
     "pressKey", "scroll", "evalScript", "waitForAnimationToEnd", "takeScreenshot", "longPressOn",
     "copyTextFrom", "pasteText", "inputRandomText", "hideKeyboard", "back"
   ]
@@ -89,6 +90,7 @@ enum FlowPreflight {
         if !scalarForms.contains(name) {
           found.append("\(at): '\(name)' needs a map argument")
         }
+        if name == "openLink", args == nil { found.append("\(at): openLink needs a link") }
         if name == "pressKey", let key = args as? String {
           checkKey(key, at: at, into: &found)
         }
@@ -107,6 +109,8 @@ enum FlowPreflight {
       if let clear = map["clearState"] as? Bool, clear {
         found.append("\(at): launchApp clearState: true is unsupported (it would wipe the sim's roster accounts)")
       }
+    case "openLink":
+      if map["link"] == nil { found.append("\(at): openLink needs link") }
     case "tapOn", "longPressOn":
       if let point = map["point"] { checkPoint("\(point)", at: at, into: &found) }
       if map["point"] == nil, map["text"] == nil, map["id"] == nil {
