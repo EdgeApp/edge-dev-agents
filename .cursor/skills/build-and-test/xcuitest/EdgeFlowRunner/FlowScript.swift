@@ -16,7 +16,7 @@ final class FlowScript {
     context.exceptionHandler = { [weak self] _, exception in
       self?.lastException = exception?.toString() ?? "unknown JavaScript error"
     }
-    context.evaluateScript("var output = {};")
+    context.evaluateScript("var output = {}; var maestro = { platform: 'ios' };")
   }
 
   /// Evaluates one JavaScript expression or statement.
@@ -75,6 +75,11 @@ final class FlowScript {
       if index < text.endIndex { index = text.index(after: index) }
     }
     throw FlowError("unterminated ${ in `\(text)`")
+  }
+
+  /// `maestro.copiedText`, which Maestro sets on copyTextFrom.
+  func setCopiedText(_ text: String) {
+    context.globalObject.forProperty("maestro").setValue(text, forProperty: "copiedText")
   }
 
   func isDefined(_ name: String) -> Bool {

@@ -24,12 +24,16 @@ and source hash (`scripts/xcuitest-build.sh`, cached under
 |---|---|
 | `launchApp` | `appId`, `stopApp: false` (activate if running). `clearState: true` is rejected because it wipes the roster accounts. Passes `-EdgeTestAnimations <mode>` unless `--animations on`. |
 | `stopApp` | |
-| `tapOn` | `text`, `id`, `index`, `waitToSettleTimeoutMs`, `retryTapIfNoChange` |
-| `assertVisible` / `assertNotVisible` | Maestro timeouts: 17s (7s when `optional`), minus time since the last interaction |
+| `tapOn` / `longPressOn` | `text`, `id`, `index`, `enabled`, `point`, `waitToSettleTimeoutMs`, `retryTapIfNoChange`. `point` alone is a screen position: `"50%,80%"` (whole percentages of the screen) or `"120,640"` (points). `point` next to `text` or `id` is relative to the matched element. `longPressOn` holds for 3s, as Maestro does on iOS |
+| `assertVisible` / `assertNotVisible` | `enabled: true/false` narrows the match to enabled or disabled elements. Maestro timeouts: 17s (7s when `optional`), minus time since the last interaction |
 | `extendedWaitUntil` | `visible` / `notVisible`, `timeout` |
 | `runFlow` | `file`, inline `commands`, `env`, `when` (`visible`, `notVisible`, `true`, `platform`) |
-| `inputText` / `eraseText` / `pressKey` | `pressKey`: Enter, Backspace, Home. `eraseText` defaults to 50 characters. When no element has keyboard focus (a hidden input, such as the PIN entry) the runner taps the on-screen keys instead, so only characters with their own key (digits, the current letter case, space) can be typed |
-| `scroll` / `scrollUntilVisible` / `swipe` | `scrollUntilVisible`: `element`, `direction`, `timeout`, `visibilityPercentage`, `waitToSettleTimeoutMs`. `swipe`: `from` + `direction`, or `start` / `end` points (`"50%,80%"`), `duration` |
+| `inputText` / `eraseText` / `pressKey` | `pressKey`: Enter, Backspace, Home, and Back (does nothing, as on Maestro iOS). `eraseText` defaults to 50 characters. When no element has keyboard focus (a hidden input, such as the PIN entry) the runner taps the on-screen keys instead, so only characters with their own key (digits, the current letter case, space) can be typed |
+| `inputRandomText` | `length` (default 8). Types random lowercase letters |
+| `copyTextFrom` / `pasteText` | `copyTextFrom` takes a selector and stores the element's text (title, else value, else placeholder, else label), also as `maestro.copiedText` for `evalScript` and `${}`. `pasteText` types it, and types nothing when nothing was copied |
+| `hideKeyboard` | Maestro's iOS behavior: nothing when no keyboard is up, else a short swipe up from the screen center, then a short swipe left if the keyboard is still there. Fails when the keyboard survives both, which Maestro also does; tap a non-interactive element in that case |
+| `back` | Accepted and does nothing, the same as Maestro on iOS |
+| `scroll` / `scrollUntilVisible` / `swipe` | `scrollUntilVisible`: `element`, `direction`, `timeout`, `visibilityPercentage`, `centerElement`, `waitToSettleTimeoutMs`. With `centerElement`, an element that is on screen but outside the center band is dragged by its own distance from the screen center (Maestro repeats the full swipe, which can carry the element past the band and off screen). `swipe`: `from` + `direction`, or `start` / `end` points (`"50%,80%"`), `duration` |
 | `repeat` / `retry` | `repeat`: `times`, `while`. `retry`: `maxRetries`, `file` or `commands` |
 | `evalScript` | Full JavaScript (JavaScriptCore). `output.*` persists for the whole run |
 | `waitForAnimationToEnd` | Two consecutive identical screenshots, `timeout` default 15s |
@@ -72,8 +76,6 @@ Spinners do not hold the quiescence wait in any mode.
 
 ## Not supported (preflight rejects)
 
-`inputRandomText`, `copyTextFrom`, `pasteText`, `longPressOn`, `hideKeyboard`,
-`assertVisible enabled:`, `scrollUntilVisible centerElement:`, `tapOn point:`,
-`launchApp clearState: true`, and any command missing from the table above.
+`launchApp clearState: true` and any command missing from the table above.
 To drive a flow that needs one, rewrite the step or run that flow on the
 maestro CLI and name it in the run report.

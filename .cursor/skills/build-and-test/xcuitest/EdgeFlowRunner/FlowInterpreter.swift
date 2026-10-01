@@ -23,6 +23,14 @@ struct RunOptions {
   }
 }
 
+/// One on-screen element a selector matched. `text` is what Maestro's iOS
+/// driver calls the element's text: title, else value, else placeholder, else
+/// label.
+struct Match {
+  var frame: CGRect
+  var text: String?
+}
+
 /// Element selector: Maestro `text` and `id` are case-insensitive regexes
 /// (dot matches newline) that must match the whole attribute, or equal it
 /// literally. `text` is checked against label, value and placeholderValue.
@@ -30,12 +38,14 @@ struct Selector: CustomStringConvertible {
   var text: String?
   var id: String?
   var index: Int?
+  var enabled: Bool?
 
   var description: String {
     var parts: [String] = []
     if let text = text { parts.append("text=\"\(text)\"") }
     if let id = id { parts.append("id=\"\(id)\"") }
     if let index = index { parts.append("index=\(index)") }
+    if let enabled = enabled { parts.append("enabled=\(enabled)") }
     return parts.joined(separator: " ")
   }
 }
@@ -46,6 +56,7 @@ final class FlowInterpreter {
   private var appId = "co.edgesecure.app"
   private var app = XCUIApplication(bundleIdentifier: "co.edgesecure.app")
   private var screenBounds: CGRect?
+  private var copiedText: String?
   private var lastInteraction = Date()
   private let started = Date()
 
@@ -145,15 +156,24 @@ final class FlowInterpreter {
       if let appId = map["appId"] as? String { selectApp(try script.interpolate(appId)) }
       app.terminate()
       interacted()
-    case "tapOn":
-      let selector = try parseSelector(args)
-      let timeout = optional ? options.optionalLookupTimeout : options.lookupTimeout
-      guard let frame = try waitForElement(selector, timeout: timeout) else {
-        throw FlowError("element not found: \(selector)")
+    case "tapOn", "longPressOn":
+      let long = name == "longPressOn"
+      let target: XCUICoordinate
+      if let point = map["point"], map["text"] == nil, map["id"] == nil {
+        target = try screenCoordinate(point)
+      } else {
+        let selector = try parseSelector(args)
+        let timeout = optional ? options.optionalLookupTimeout : options.lookupTimeout
+        guard let frame = try waitForElement(selector, timeout: timeout) else {
+          throw FlowError("element not found: \(selector)")
+        }
+        // A point next to a selector is relative to the element's frame.
+        let offset = try map["point"].map { try point($0, in: frame) } ?? CGPoint(x: frame.width / 2, y: frame.height / 2)
+        target = coordinate(CGPoint(x: frame.minX + offset.x, y: frame.minY + offset.y))
       }
       let before = map["retryTapIfNoChange"] as? Bool == true ? screenPixels() : nil
-      tap(frame)
-      if let before = before, screenPixels() == before { tap(frame) }
+      press(target, long: long)
+      if let before = before, screenPixels() == before { press(target, long: long) }
       if let ms = try optionalNumber(map["waitToSettleTimeoutMs"]) { waitForSettle(timeout: ms / 1000) }
     case "assertVisible":
       let selector = try parseSelector(args)
@@ -192,6 +212,28 @@ final class FlowInterpreter {
     case "inputText":
       let text = try script.interpolate(stringArg(args, key: "text"))
       try typeKeys(text)
+    case "inputRandomText":
+      let length = Int(try optionalNumber(map.isEmpty ? args : map["length"]) ?? 8)
+      let letters = "abcdefghijklmnopqrstuvwxyz"
+      try typeKeys(String((0..<(length > 0 ? length : 8)).compactMap { _ in letters.randomElement() }))
+    case "copyTextFrom":
+      let selector = try parseSelector(args)
+      let timeout = optional ? options.optionalLookupTimeout : options.lookupTimeout
+      guard let match = try waitForMatch(selector, timeout: timeout) else {
+        throw FlowError("element not found: \(selector)")
+      }
+      guard let text = match.text else { throw FlowError("\(selector) has no text to copy") }
+      copiedText = text
+      script.setCopiedText(text)
+      return "copied \"\(text)\""
+    case "pasteText":
+      guard let text = copiedText else { return "nothing copied, typed nothing" }
+      try typeKeys(text)
+    case "hideKeyboard":
+      return try hideKeyboard()
+    case "back":
+      // Maestro's iOS driver implements back as an empty function.
+      return "no-op on iOS"
     case "eraseText":
       let count = Int(try optionalNumber(map.isEmpty ? args : map["charactersToErase"]) ?? 50)
       try typeKeys(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count))
@@ -203,6 +245,8 @@ final class FlowInterpreter {
       case "home":
         XCUIDevice.shared.press(.home)
         interacted()
+      // Maestro's iOS driver has no back key and ignores it.
+      case "back": return "no-op on iOS"
       default: throw FlowError("unsupported pressKey '\(key)'")
       }
     case "scroll":
@@ -260,6 +304,29 @@ final class FlowInterpreter {
     return nil
   }
 
+  /// Maestro's iOS hideKeyboard: nothing when no keyboard is up, else a 3%
+  /// swipe up from the screen center, then a 3% swipe left if the keyboard
+  /// survived the first. Fails when the keyboard is still up afterwards.
+  private func hideKeyboard() throws -> String? {
+    if keyboardGone(within: 0) { return "no keyboard showing" }
+    let bounds = screen()
+    let center = CGPoint(x: bounds.width * 0.5, y: bounds.height * 0.5)
+    drag(from: center, to: CGPoint(x: center.x, y: bounds.height * 0.47), duration: 0.05)
+    if keyboardGone(within: 2) { return nil }
+    drag(from: center, to: CGPoint(x: bounds.width * 0.47, y: center.y), duration: 0.05)
+    if keyboardGone(within: 2) { return nil }
+    throw FlowError("keyboard still showing after hideKeyboard; tap a non-interactive element instead")
+  }
+
+  private func keyboardGone(within timeout: TimeInterval) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    while app.keyboards.firstMatch.exists {
+      if Date() >= deadline { return false }
+      Thread.sleep(forTimeInterval: 0.15)
+    }
+    return true
+  }
+
   private func scrollUntilVisible(_ map: [String: Any]) throws -> String? {
     guard let element = map["element"] else { throw FlowError("scrollUntilVisible needs element") }
     let selector = try parseSelector(element)
@@ -267,24 +334,64 @@ final class FlowInterpreter {
     let timeout = (try optionalNumber(map["timeout"]) ?? 20000) / 1000
     let percent = (try optionalNumber(map["visibilityPercentage"]) ?? 100) / 100
     let settle = (try optionalNumber(map["waitToSettleTimeoutMs"])).map { $0 / 1000 }
+    let center = map["centerElement"] as? Bool ?? false
     let deadline = Date().addingTimeInterval(timeout)
     var swipes = 0
+    // Maestro gives up centering after 5 tries: the element may sit at the
+    // end of a list that cannot scroll further.
+    var centerTries = 0
     while true {
-      if let frame = try findElement(selector), visibleFraction(frame) >= percent {
-        return swipes == 0 ? nil : "visible after \(swipes) swipe(s)"
+      // Set while the element is on screen but short of the center band.
+      var centering: CGRect?
+      if let frame = try findElement(selector) {
+        let visible = visibleFraction(frame)
+        let done: Bool
+        if center, visible > 0.1, centerTries <= 4 {
+          done = nearCenter(frame, scrolling: direction)
+          centerTries += 1
+          if !done { centering = frame }
+        } else {
+          done = visible >= percent
+        }
+        if done { return swipes == 0 ? nil : "visible after \(swipes) swipe(s)" }
       }
       if Date() >= deadline { throw FlowError("\(selector) not visible after scrolling \(timeout)s") }
       let bounds = screen()
+      let vertical = direction != "LEFT" && direction != "RIGHT"
       let (from, to): (CGPoint, CGPoint)
       switch direction {
+      // Maestro repeats its full swipe here, which can carry an on-screen
+      // element clean past the band. Dragging by the element's own distance
+      // from the center lands it there instead.
+      case _ where centering != nil && vertical:
+        let offset = max(-bounds.height * 0.4, min(bounds.height * 0.4, centering!.midY - bounds.midY))
+        (from, to) = (CGPoint(x: bounds.midX, y: bounds.midY + offset / 2), CGPoint(x: bounds.midX, y: bounds.midY - offset / 2))
+      case _ where centering != nil:
+        let offset = max(-bounds.width * 0.4, min(bounds.width * 0.4, centering!.midX - bounds.midX))
+        (from, to) = (CGPoint(x: bounds.midX + offset / 2, y: bounds.midY), CGPoint(x: bounds.midX - offset / 2, y: bounds.midY))
       case "UP": (from, to) = (CGPoint(x: bounds.midX, y: bounds.height * 0.3), CGPoint(x: bounds.midX, y: bounds.height * 0.7))
       case "LEFT": (from, to) = (CGPoint(x: bounds.width * 0.3, y: bounds.midY), CGPoint(x: bounds.width * 0.7, y: bounds.midY))
       case "RIGHT": (from, to) = (CGPoint(x: bounds.width * 0.7, y: bounds.midY), CGPoint(x: bounds.width * 0.3, y: bounds.midY))
       default: (from, to) = (CGPoint(x: bounds.midX, y: bounds.height * 0.7), CGPoint(x: bounds.midX, y: bounds.height * 0.3))
       }
-      drag(from: from, to: to, duration: 0.4)
+      // A centering swipe holds at its end so the list stops under the
+      // finger: a fling would carry the element past the center band.
+      drag(from: from, to: to, duration: 0.4, hold: center ? 0.3 : 0.05)
       swipes += 1
-      if let settle = settle { waitForSettle(timeout: settle) }
+      if let settle = settle ?? (center ? 2 : nil) { waitForSettle(timeout: settle) }
+    }
+  }
+
+  /// Maestro's isElementNearScreenCenter: the element's center has reached
+  /// the middle of the screen, give or take a fifth of it, coming from the
+  /// side the scroll brings it in from.
+  private func nearCenter(_ frame: CGRect, scrolling direction: String) -> Bool {
+    let bounds = screen()
+    switch direction {
+    case "UP": return frame.midY > bounds.midY - bounds.height / 5
+    case "LEFT": return frame.midX > bounds.midX - bounds.width / 5
+    case "RIGHT": return frame.midX < bounds.midX + bounds.width / 5
+    default: return frame.midY < bounds.midY + bounds.height / 5
     }
   }
 
@@ -354,6 +461,10 @@ final class FlowInterpreter {
       if let text = map["text"] { selector.text = try script.interpolate("\(text)") }
       if let id = map["id"] { selector.id = try script.interpolate("\(id)") }
       if let index = try optionalNumber(map["index"]) { selector.index = Int(index) }
+      if let enabled = map["enabled"] {
+        // JSON booleans arrive as NSNumber, which prints as 1 or 0.
+        selector.enabled = try (enabled as? Bool) ?? (script.interpolate("\(enabled)").lowercased() == "true")
+      }
       if selector.text == nil, selector.id == nil { throw FlowError("selector needs text or id") }
       return selector
     }
@@ -365,6 +476,19 @@ final class FlowInterpreter {
     let deadline = Date().addingTimeInterval(timeout)
     while true {
       if let frame = try findElement(selector) { return frame }
+      if Date() >= deadline { return nil }
+      Thread.sleep(forTimeInterval: 0.15)
+    }
+  }
+
+  /// Like waitForElement, but always walks a snapshot so the match carries
+  /// its text.
+  private func waitForMatch(_ selector: Selector, timeout: TimeInterval) throws -> Match? {
+    let deadline = Date().addingTimeInterval(timeout)
+    while true {
+      let matches = try snapshotMatches(selector)
+      let index = selector.index ?? 0
+      if index < matches.count { return matches[index] }
       if Date() >= deadline { return nil }
       Thread.sleep(forTimeInterval: 0.15)
     }
@@ -388,19 +512,21 @@ final class FlowInterpreter {
   private func findElement(_ selector: Selector) throws -> CGRect? {
     if selector.index == nil {
       let first = query(selector).firstMatch
-      guard first.exists else { return nil }
-      let frame = first.frame
+      // The frame comes from a throwing snapshot: reading `frame` of an
+      // element that left between the two calls records a test failure.
+      guard first.exists, let frame = try? first.snapshot().frame else { return nil }
       if visibleFraction(frame) > 0, !query(selector, in: first).firstMatch.exists { return frame }
     }
     let matches = try snapshotMatches(selector)
     let index = selector.index ?? 0
-    return index < matches.count ? matches[index] : nil
+    return index < matches.count ? matches[index].frame : nil
   }
 
   private func query(_ selector: Selector, in root: XCUIElement? = nil) -> XCUIElementQuery {
     var query = (root ?? app).descendants(matching: .any)
     if let id = selector.id { query = query.matching(predicate(fields: ["identifier"], pattern: id)) }
     if let text = selector.text { query = query.matching(predicate(fields: ["label", "value", "placeholderValue"], pattern: text)) }
+    if let enabled = selector.enabled { query = query.matching(NSPredicate(format: "enabled == %@", NSNumber(value: enabled))) }
     return query
   }
 
@@ -427,7 +553,7 @@ final class FlowInterpreter {
     try? NSRegularExpression(pattern: "(?ism)" + pattern)
   }
 
-  private func snapshotMatches(_ selector: Selector) throws -> [CGRect] {
+  private func snapshotMatches(_ selector: Selector) throws -> [Match] {
     let textRegex = selector.text.flatMap(matchRegex)
     let idRegex = selector.id.flatMap(matchRegex)
     func fullMatch(_ regex: NSRegularExpression?, _ pattern: String, _ value: String?) -> Bool {
@@ -442,6 +568,7 @@ final class FlowInterpreter {
       return false
     }
     func matches(_ node: XCUIElementSnapshot) -> Bool {
+      if let enabled = selector.enabled, node.isEnabled != enabled { return false }
       if let id = selector.id, !fullMatch(idRegex, id, node.identifier) { return false }
       if let text = selector.text {
         let values = [node.label, node.value as? String, node.placeholderValue]
@@ -449,18 +576,21 @@ final class FlowInterpreter {
       }
       return true
     }
-    var found: [CGRect] = []
+    func text(_ node: XCUIElementSnapshot) -> String? {
+      [node.title, node.value as? String, node.placeholderValue, node.label].compactMap { $0 }.first { !$0.isEmpty }
+    }
+    var found: [Match] = []
     // Returns whether the subtree holds a match; a node only counts when no
     // descendant matches (Maestro's deepestMatchingElement).
     func walk(_ node: XCUIElementSnapshot) -> Bool {
       var childMatched = false
       for child in node.children where walk(child) { childMatched = true }
       let isMatch = matches(node)
-      if isMatch, !childMatched, visibleFraction(node.frame) > 0 { found.append(node.frame) }
+      if isMatch, !childMatched, visibleFraction(node.frame) > 0 { found.append(Match(frame: node.frame, text: text(node))) }
       return isMatch || childMatched
     }
     _ = walk(try app.snapshot())
-    return found.sorted { $0.minY != $1.minY ? $0.minY < $1.minY : $0.minX < $1.minX }
+    return found.sorted { $0.frame.minY != $1.frame.minY ? $0.frame.minY < $1.frame.minY : $0.frame.minX < $1.frame.minX }
   }
 
   private func visibleFraction(_ frame: CGRect) -> CGFloat {
@@ -489,19 +619,30 @@ final class FlowInterpreter {
     app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: point.x, dy: point.y))
   }
 
-  private func tap(_ frame: CGRect) {
-    coordinate(CGPoint(x: frame.midX, y: frame.midY)).tap()
+  /// A screen point as Maestro writes it: "x%,y%" becomes a normalized
+  /// offset on the app, "x,y" an offset in points from its origin.
+  private func screenCoordinate(_ raw: Any) throws -> XCUICoordinate {
+    let text = try script.interpolate("\(raw)")
+    guard text.contains("%") else { return coordinate(try point(text, in: screen())) }
+    let unit = try point(text, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+    guard (0...1).contains(unit.x), (0...1).contains(unit.y) else { throw FlowError("bad point '\(text)'") }
+    return app.coordinate(withNormalizedOffset: CGVector(dx: unit.x, dy: unit.y))
+  }
+
+  /// Maestro holds a long press for 3 seconds on iOS.
+  private func press(_ target: XCUICoordinate, long: Bool) {
+    if long { target.press(forDuration: 3) } else { target.tap() }
     interacted()
   }
 
-  private func drag(from: CGPoint, to: CGPoint, duration: TimeInterval) {
+  private func drag(from: CGPoint, to: CGPoint, duration: TimeInterval, hold: TimeInterval = 0.05) {
     let distance = hypot(to.x - from.x, to.y - from.y)
     let velocity = XCUIGestureVelocity(rawValue: distance / CGFloat(max(duration, 0.05)))
-    coordinate(from).press(forDuration: 0.05, thenDragTo: coordinate(to), withVelocity: velocity, thenHoldForDuration: 0.05)
+    coordinate(from).press(forDuration: 0.05, thenDragTo: coordinate(to), withVelocity: velocity, thenHoldForDuration: hold)
     interacted()
   }
 
-  /// Accepts "x%,y%" (screen-relative) or "x,y" (points).
+  /// Accepts "x%,y%" (relative to `bounds`) or "x,y" (points).
   private func point(_ raw: Any, in bounds: CGRect) throws -> CGPoint {
     let text = try script.interpolate("\(raw)")
     let parts = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }

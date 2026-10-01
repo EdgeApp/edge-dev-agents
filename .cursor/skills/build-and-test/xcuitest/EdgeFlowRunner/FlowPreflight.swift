@@ -5,16 +5,23 @@ import Foundation
 /// implement. The run fails on any report: there is no Maestro fallback.
 enum FlowPreflight {
   static let common: Set<String> = ["label", "optional"]
-  static let selectorKeys: Set<String> = ["text", "id", "index"]
+  static let selectorKeys: Set<String> = ["text", "id", "index", "enabled"]
   static let conditionKeys: Set<String> = ["visible", "notVisible", "true", "platform"]
   static let configKeys: Set<String> = ["appId", "env", "name", "tags", "jsEngine"]
-  static let pressKeys: Set<String> = ["enter", "backspace", "home"]
+  static let tapKeys: Set<String> = ["point", "waitToSettleTimeoutMs", "retryTapIfNoChange"]
+  static let pressKeys: Set<String> = ["enter", "backspace", "home", "back"]
 
   /// Argument keys each command accepts in map form (plus `common`).
   static let commandKeys: [String: Set<String>] = [
     "launchApp": ["appId", "clearState", "stopApp"],
     "stopApp": ["appId"],
-    "tapOn": selectorKeys.union(["waitToSettleTimeoutMs", "retryTapIfNoChange"]),
+    "tapOn": selectorKeys.union(tapKeys),
+    "longPressOn": selectorKeys.union(tapKeys),
+    "copyTextFrom": selectorKeys,
+    "pasteText": [],
+    "inputRandomText": ["length"],
+    "hideKeyboard": [],
+    "back": [],
     "assertVisible": selectorKeys,
     "assertNotVisible": selectorKeys,
     "extendedWaitUntil": ["visible", "notVisible", "timeout"],
@@ -23,7 +30,7 @@ enum FlowPreflight {
     "eraseText": ["charactersToErase"],
     "pressKey": ["key"],
     "scroll": [],
-    "scrollUntilVisible": ["element", "direction", "timeout", "visibilityPercentage", "speed", "waitToSettleTimeoutMs"],
+    "scrollUntilVisible": ["element", "direction", "timeout", "visibilityPercentage", "centerElement", "speed", "waitToSettleTimeoutMs"],
     "swipe": ["from", "direction", "duration", "start", "end", "waitToSettleTimeoutMs"],
     "repeat": ["times", "while", "commands"],
     "retry": ["maxRetries", "commands", "file", "_flow"],
@@ -35,7 +42,8 @@ enum FlowPreflight {
   /// Commands that may be written as a bare name or with a scalar argument.
   static let scalarForms: Set<String> = [
     "launchApp", "stopApp", "tapOn", "assertVisible", "assertNotVisible", "inputText", "eraseText",
-    "pressKey", "scroll", "evalScript", "waitForAnimationToEnd", "takeScreenshot"
+    "pressKey", "scroll", "evalScript", "waitForAnimationToEnd", "takeScreenshot", "longPressOn",
+    "copyTextFrom", "pasteText", "inputRandomText", "hideKeyboard", "back"
   ]
 
   static func problems(in flow: [String: Any]) -> [String] {
@@ -99,6 +107,11 @@ enum FlowPreflight {
       if let clear = map["clearState"] as? Bool, clear {
         found.append("\(at): launchApp clearState: true is unsupported (it would wipe the sim's roster accounts)")
       }
+    case "tapOn", "longPressOn":
+      if let point = map["point"] { checkPoint("\(point)", at: at, into: &found) }
+      if map["point"] == nil, map["text"] == nil, map["id"] == nil {
+        found.append("\(at): \(name) needs text, id or point")
+      }
     case "extendedWaitUntil":
       for key in ["visible", "notVisible"] {
         if let selector = map[key] { checkSelector(selector, at: "\(at) \(key)", into: &found) }
@@ -137,6 +150,18 @@ enum FlowPreflight {
     for key in ["visible", "notVisible"] {
       if let selector = map[key] { checkSelector(selector, at: "\(at) \(key)", into: &found) }
     }
+  }
+
+  /// "x%,y%" with both in 0...100, or "x,y" in points.
+  private static func checkPoint(_ point: String, at: String, into found: inout [String]) {
+    if point.contains("${") { return }
+    let parts = point.split(separator: ",", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+    let percent = point.contains("%")
+    let valid = parts.count == 2 && parts.allSatisfy { part in
+      guard part.hasSuffix("%") == percent, let value = Double(percent ? String(part.dropLast()) : part) else { return false }
+      return value >= 0 && (!percent || value <= 100)
+    }
+    if !valid { found.append("\(at): bad point '\(point)' (want \"50%,80%\" or \"120,640\")") }
   }
 
   private static func checkKey(_ key: String, at: String, into found: inout [String]) {
