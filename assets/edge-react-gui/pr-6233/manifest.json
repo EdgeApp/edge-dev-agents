@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6233/20260930-235249-agent-proof-1218817842268942-01-HACKED-large-wallet-card.png",
+      "caption": "large wallet card",
+      "index": "1",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Forced isLargeUtxoWallet to isUtxoWallet in TransactionListTop so the card renders on a small testnet wallet; the real Learn More handler and URL were untouched; reverted before commit",
+      "batchAt": "2026-10-01T06:52:49Z",
+      "headSha": "405e75172ecb4889443492daa75beab51cfb5501",
+      "addedAt": "2026-10-01T06:52:49Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6233/20260930-235249-agent-proof-1218817842268942-02-learn-more-opens-article.png",
+      "caption": "learn more opens article",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T06:52:49Z",
+      "headSha": "405e75172ecb4889443492daa75beab51cfb5501",
+      "addedAt": "2026-10-01T06:52:49Z"
+    }
+  ]
+}
