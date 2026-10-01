@@ -1,0 +1,65 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-reports-server/pr-237/20261001-150426-agent-proof-1219083963031186-01-before-range-after-apply.png",
+      "caption": "before range after apply",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T22:04:26Z",
+      "headSha": "971edf1d3948f2132ef463fdd815cb87ddbfad86",
+      "addedAt": "2026-10-01T22:04:26Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-237/20261001-150426-agent-proof-1219083963031186-02-after-range-after-apply.png",
+      "caption": "after range after apply",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T22:04:26Z",
+      "headSha": "971edf1d3948f2132ef463fdd815cb87ddbfad86",
+      "addedAt": "2026-10-01T22:04:26Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-237/20261001-150426-agent-proof-1219083963031186-03-after-range-preset-7d.png",
+      "caption": "after range preset 7d",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T22:04:26Z",
+      "headSha": "971edf1d3948f2132ef463fdd815cb87ddbfad86",
+      "addedAt": "2026-10-01T22:04:26Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-237/20261001-150426-agent-proof-1219083963031186-04-before-share-bars.png",
+      "caption": "before share bars",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T22:04:26Z",
+      "headSha": "971edf1d3948f2132ef463fdd815cb87ddbfad86",
+      "addedAt": "2026-10-01T22:04:26Z"
+    },
+    {
+      "path": "assets/edge-reports-server/pr-237/20261001-150426-agent-proof-1219083963031186-05-after-share-bars.png",
+      "caption": "after share bars",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T22:04:26Z",
+      "headSha": "971edf1d3948f2132ef463fdd815cb87ddbfad86",
+      "addedAt": "2026-10-01T22:04:26Z"
+    }
+  ]
+}
