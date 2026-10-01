@@ -28,21 +28,12 @@ env:
 - extendedWaitUntil:
     visible: "Exit PIN"
     timeout: 40000
-# make sure the whole keypad is rendered & interactive before tapping
-- assertVisible: "1"
-- assertVisible: "0"
-- tapOn:
-    text: ${PIN_DIGIT}
-    waitToSettleTimeoutMs: 900
-- tapOn:
-    text: ${PIN_DIGIT}
-    waitToSettleTimeoutMs: 900
-- tapOn:
-    text: ${PIN_DIGIT}
-    waitToSettleTimeoutMs: 900
-- tapOn:
-    text: ${PIN_DIGIT}
-    waitToSettleTimeoutMs: 1500
+# YOLO auto-login can finish mid-entry, so the taps go through the gated
+# login-if-needed flow instead of four unconditional taps.
+- runFlow:
+    file: common/login-if-needed.yaml
+    env:
+      PIN_DIGIT: ${PIN_DIGIT}
 
 # --- wait for the main tab bar, then dismiss optional post-login modals ---
 - extendedWaitUntil:
@@ -75,6 +66,8 @@ env:
 # that reliably triggers the RN Fabric text-measure SIGABRT. The USD + converted-BTC
 # fields and the exchange-rate line are all above the keyboard, so leave it up.
 - tapOn: "Amount USD"
+# The Buy scene remembers the last amount; clear it or inputText appends.
+- eraseText: 20
 - inputText: ${BUY_AMOUNT}
 
 # --- let the live quote resolve, then capture ---

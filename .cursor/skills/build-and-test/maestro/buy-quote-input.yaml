@@ -11,20 +11,12 @@ env:
 - extendedWaitUntil:
     visible: "Exit PIN"
     timeout: 40000
-- assertVisible: "1"
-- assertVisible: "0"
-- tapOn:
-    text: ${PIN_DIGIT}
-    waitToSettleTimeoutMs: 900
-- tapOn:
-    text: ${PIN_DIGIT}
-    waitToSettleTimeoutMs: 900
-- tapOn:
-    text: ${PIN_DIGIT}
-    waitToSettleTimeoutMs: 900
-- tapOn:
-    text: ${PIN_DIGIT}
-    waitToSettleTimeoutMs: 1500
+# YOLO auto-login can finish mid-entry, so the taps go through the gated
+# login-if-needed flow instead of four unconditional taps.
+- runFlow:
+    file: common/login-if-needed.yaml
+    env:
+      PIN_DIGIT: ${PIN_DIGIT}
 - extendedWaitUntil:
     visible: "Buy"
     timeout: 30000
@@ -54,4 +46,6 @@ env:
           visible: "Amount USD"
           timeout: 10000
 - tapOn: "Amount USD"
+# The Buy scene remembers the last amount; clear it or inputText appends.
+- eraseText: 20
 - inputText: ${BUY_AMOUNT}
