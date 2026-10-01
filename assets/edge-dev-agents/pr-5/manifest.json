@@ -1,0 +1,101 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-01-find-wallet.png",
+      "caption": "find wallet",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T01:03:53Z",
+      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
+      "addedAt": "2026-10-01T01:03:53Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-03-buy-quote-input.png",
+      "caption": "buy quote input",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T01:03:53Z",
+      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
+      "addedAt": "2026-10-01T01:03:53Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-04-ramp-region.png",
+      "caption": "ramp region",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T01:03:53Z",
+      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
+      "addedAt": "2026-10-01T01:03:53Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-05-buy-quote.png",
+      "caption": "buy quote",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T01:03:53Z",
+      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
+      "addedAt": "2026-10-01T01:03:53Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-06-swap-quote.png",
+      "caption": "swap quote",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T01:03:53Z",
+      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
+      "addedAt": "2026-10-01T01:03:53Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-07-swap-success.png",
+      "caption": "swap success",
+      "index": "7",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T01:03:53Z",
+      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
+      "addedAt": "2026-10-01T01:03:53Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-08-send-sent.png",
+      "caption": "send sent",
+      "index": "8",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T01:03:53Z",
+      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
+      "addedAt": "2026-10-01T01:03:53Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-09-throwaway-created.png",
+      "caption": "throwaway created",
+      "index": "9",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T01:03:53Z",
+      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
+      "addedAt": "2026-10-01T01:03:53Z"
+    }
+  ]
+}
