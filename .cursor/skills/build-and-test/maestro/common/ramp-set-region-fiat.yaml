@@ -11,11 +11,15 @@ env:
   FIAT_SEARCH: "USD"
   FIAT_ROW: "USD United States Dollar"
 ---
-- tapOn:
-    text: ".*(Select your region|USA|Germany|United Kingdom|Canada|Australia).*"
-- extendedWaitUntil:
-    visible: "Search region"
-    timeout: 10000
+# With the amount keyboard up, the first tap only dismisses the keyboard.
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn:
+          text: ".*(Select your region|USA|Germany|United Kingdom|Canada|Australia).*"
+      - extendedWaitUntil:
+          visible: "Search region"
+          timeout: 5000
 - tapOn: "Search region"
 - inputText: ${COUNTRY_SEARCH}
 - waitForAnimationToEnd:

@@ -13,8 +13,8 @@
 #      scene, so a fixed-delay single shot is either too early (still loading)
 #      or too late (already crashed → springboard).
 #
-# This wrapper drives the interaction with maestro (the input flow), which does
-# no polling after entering the amount, then captures with an EXTERNAL simctl
+# This wrapper drives the interaction flow (the XCUITest interpreter by
+# default, or maestro), which does no polling after entering the amount, then captures with an EXTERNAL simctl
 # screenshot burst (pixel-only, no hierarchy traversal), keeping the LAST frame
 # taken while the app was still alive — i.e. the resolved quote, just before any
 # crash. Retries the whole cycle until it lands a frame from late enough to
@@ -23,7 +23,7 @@
 # Usage:
 #   capture-buy-quote.sh [--out <path>] [--flow <path-to-maestro-yaml>] \
 #                        [--bundle-id <id>] [--quote-secs N] [--window-secs N] [--cycles N] \
-#                        [--device <udid>] [--driver-port N]
+#                        [--device <udid>] [--driver-port N] [--driver xcuitest|maestro]
 #
 # Defaults:
 #   --out         /tmp/agent-mvp-buy-quote-screenshot.png
@@ -35,6 +35,7 @@
 #   --device      $AGENT_SIM_UDID when set (slot session), else simctl "booted"
 #   --driver-port $AGENT_METRO_PORT+1000 when set (per-slot maestro driver port,
 #                 keeps parallel slots' iOS drivers off each other), else unset
+#   --driver      xcuitest (xcuitest-run.sh; needs a device) or maestro
 #
 # Device pinning: with multiple sims booted (parallel orch slots), an unpinned
 # maestro attaches to an arbitrary device and `simctl io booted` photographs an
@@ -58,6 +59,7 @@ WINDOW_SECS=14
 CYCLES=5
 DEVICE="${AGENT_SIM_UDID:-}"
 DRIVER_PORT=""
+DRIVER="xcuitest"
 [[ -n "${AGENT_METRO_PORT:-}" ]] && DRIVER_PORT=$((AGENT_METRO_PORT + 1000))
 
 while [[ $# -gt 0 ]]; do
@@ -70,6 +72,7 @@ while [[ $# -gt 0 ]]; do
     --cycles)      CYCLES="$2";      shift 2 ;;
     --device)      DEVICE="$2";      shift 2 ;;
     --driver-port) DRIVER_PORT="$2"; shift 2 ;;
+    --driver)      DRIVER="$2";      shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -81,7 +84,11 @@ MAESTRO_ARGS=()
 [[ -n "$DEVICE" ]]      && MAESTRO_ARGS+=(--device "$DEVICE")
 [[ -n "$DRIVER_PORT" ]] && MAESTRO_ARGS+=(--driver-host-port "$DRIVER_PORT")
 
-command -v maestro       >/dev/null 2>&1 || { echo "maestro not found in PATH" >&2; exit 1; }
+case "$DRIVER" in
+  xcuitest) [[ -n "$DEVICE" ]] || { echo "--driver xcuitest needs --device or \$AGENT_SIM_UDID" >&2; exit 1; } ;;
+  maestro) command -v maestro >/dev/null 2>&1 || { echo "maestro not found in PATH" >&2; exit 1; } ;;
+  *) echo "--driver must be xcuitest or maestro" >&2; exit 1 ;;
+esac
 command -v xcrun         >/dev/null 2>&1 || { echo "xcrun not found (need Xcode CLT)" >&2; exit 1; }
 [[ -f "$FLOW" ]] || { echo "Maestro flow not found: $FLOW" >&2; exit 1; }
 
@@ -91,8 +98,13 @@ trap 'rm -rf "$TMP"' EXIT
 alive() { xcrun simctl spawn "$SIMCTL_DEVICE" launchctl list 2>/dev/null | grep -qi "${BUNDLE_ID#*.}"; }
 
 for ((cycle = 1; cycle <= CYCLES; cycle++)); do
-  echo "[capture] cycle $cycle/$CYCLES: maestro ${MAESTRO_ARGS[*]:-} $FLOW (simctl device: $SIMCTL_DEVICE) ..."
-  maestro ${MAESTRO_ARGS[@]+"${MAESTRO_ARGS[@]}"} test "$FLOW" >"$TMP/maestro.log" 2>&1 || true
+  if [[ "$DRIVER" == xcuitest ]]; then
+    echo "[capture] cycle $cycle/$CYCLES: xcuitest-run.sh $FLOW (device: $DEVICE) ..."
+    "$SCRIPT_DIR/xcuitest-run.sh" --flow "$FLOW" --udid "$DEVICE" >"$TMP/driver.log" 2>&1 || true
+  else
+    echo "[capture] cycle $cycle/$CYCLES: maestro ${MAESTRO_ARGS[*]:-} $FLOW (simctl device: $SIMCTL_DEVICE) ..."
+    maestro ${MAESTRO_ARGS[@]+"${MAESTRO_ARGS[@]}"} test "$FLOW" >"$TMP/driver.log" 2>&1 || true
+  fi
   best=""; best_t=0; SECONDS=0
   while [[ "$SECONDS" -lt "$WINDOW_SECS" ]]; do
     alive || break
@@ -109,6 +121,6 @@ for ((cycle = 1; cycle <= CYCLES; cycle++)); do
   echo "[capture] crashed before the quote resolved (last frame t=${best_t}s); retrying ..."
 done
 
-echo "[capture] FAIL after $CYCLES cycles — last maestro output:"
-tail -30 "$TMP/maestro.log" >&2
+echo "[capture] FAIL after $CYCLES cycles — last $DRIVER output:"
+tail -30 "$TMP/driver.log" >&2
 exit 1

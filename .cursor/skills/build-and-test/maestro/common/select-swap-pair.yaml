@@ -1,9 +1,23 @@
-# common/select-swap-pair.yaml — Exchange tab → pick source/receiving wallets →
+# common/select-swap-pair.yaml: open the Exchange scene with the pair selected →
 # enter fiat amount → Next → wait for a quote → optionally force a provider.
 # Assumes logged-in app (compose login-if-needed + dismiss-startup-modals first).
+# The pair is set with one deep link, `edge://exchange/swap?sellAsset=..&buyAsset=..`,
+# which works from any scene. The wallet pickers below it run only for a side
+# the link did not settle.
 # PARAMS:
-#   SRC_WALLET / DST_WALLET — text typed into "Search Wallets" AND the regex
-#                             matched against the filtered result (e.g. ".*Bitcoin.*")
+#   SRC_ASSET / DST_ASSET:    deep-link asset: a plugin id (`bitcoin`) or
+#                             `<pluginId>_<tokenId>` (`ethereum_0xa0b8..`).
+#                             Default bitcoin / ethereum. A side named only by
+#                             SRC_WALLET / DST_WALLET is left out of the link
+#                             and picked by name instead.
+#   MANUAL_PATH:              "true" skips the link: Exchange tab, then both
+#                             wallet pickers. For a task whose change is on the
+#                             tab bar, the Exchange entry or the wallet picker.
+#   SRC_WALLET / DST_WALLET — plain text typed into "Search Wallets" (e.g.
+#                             "My Bitcoin"); the first filtered row is picked.
+#                             Used on the manual path, for a side with no asset
+#                             param, and when the link raises the app's picker
+#                             (the account holds several wallets for the asset)
 #   FIAT_AMOUNT             — fiat number typed into the amount field
 #   PROVIDER                — exact provider name to force (e.g. "Maya Protocol").
 #                             Forcing works by SELECTING it in the provider sheet;
@@ -23,15 +37,44 @@
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
-  SRC_WALLET: ".*Bitcoin.*"
-  DST_WALLET: ".*Ethereum.*"
-  FIAT_AMOUNT: "16"
-  PROVIDER: ""
+  # `${KEY || default}` so a caller's runFlow env wins over the default.
+  # The asset lines come first: they read whether the caller named a wallet
+  # (`typeof`, because an unset name is not declared yet at that point).
+  SRC_ASSET: '${SRC_ASSET || (typeof SRC_WALLET === "string" && SRC_WALLET ? "" : "bitcoin")}'
+  DST_ASSET: '${DST_ASSET || (typeof DST_WALLET === "string" && DST_WALLET ? "" : "ethereum")}'
+  MANUAL_PATH: ${MANUAL_PATH || ""}
+  SRC_WALLET: ${SRC_WALLET || "Bitcoin"}
+  DST_WALLET: ${DST_WALLET || "Ethereum"}
+  FIAT_AMOUNT: ${FIAT_AMOUNT || "16"}
+  PROVIDER: ${PROVIDER || ""}
 ---
-- extendedWaitUntil:
-    visible: "Exchange"
-    timeout: 30000
-- tapOn: "Exchange"
+- runFlow:
+    when:
+      true: ${MANUAL_PATH != 'true'}
+    commands:
+      - openLink: "edge://exchange/swap?sellAsset=${SRC_ASSET}&buyAsset=${DST_ASSET}"
+      - extendedWaitUntil:
+          visible: "Select Source Wallet|Select Receiving Wallet|I have"
+          timeout: 30000
+      # The link returns before the scene settles on the linked pair.
+      - waitForAnimationToEnd:
+          timeout: 5000
+- runFlow:
+    when:
+      true: ${MANUAL_PATH == 'true'}
+    commands:
+      - extendedWaitUntil:
+          visible: "Exchange"
+          timeout: 30000
+      # The tab bar stays hidden for up to ~20s after login while "Exchange" is
+      # already in the hierarchy, so retry the tap until the Exchange scene shows.
+      - retry:
+          maxRetries: 3
+          commands:
+            - tapOn: "Exchange"
+            - extendedWaitUntil:
+                visible: "Select Source Wallet|I have"
+                timeout: 10000
 - runFlow:
     when:
       visible: "Select Source Wallet"
@@ -44,12 +87,16 @@ env:
             visible: "Not Now"
           commands:
             - tapOn: "Not Now"
+      # The search field holds the typed text, so it is always match 0; the
+      # rows' labels contain the wallet name, so match 1 is the first row.
       - extendedWaitUntil:
-          visible: ${SRC_WALLET}
+          visible:
+            text: ".*${SRC_WALLET}.*"
+            index: 1
           timeout: 15000
       - tapOn:
-          text: ${SRC_WALLET}
-          index: 0
+          text: ".*${SRC_WALLET}.*"
+          index: 1
 - runFlow:
     when:
       visible: "Select Receiving Wallet"
@@ -62,12 +109,16 @@ env:
             visible: "Not Now"
           commands:
             - tapOn: "Not Now"
+      # The search field holds the typed text, so it is always match 0; the
+      # rows' labels contain the wallet name, so match 1 is the first row.
       - extendedWaitUntil:
-          visible: ${DST_WALLET}
+          visible:
+            text: ".*${DST_WALLET}.*"
+            index: 1
           timeout: 15000
       - tapOn:
-          text: ${DST_WALLET}
-          index: 0
+          text: ".*${DST_WALLET}.*"
+          index: 1
 - extendedWaitUntil:
     visible: "Tap to edit"
     timeout: 15000

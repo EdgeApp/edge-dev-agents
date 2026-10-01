@@ -1,0 +1,185 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		E0F1000000000000000000B1 /* FlowRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F1000000000000000000A1 /* FlowRunnerTests.swift */; };
+		E0F1000000000000000000B2 /* FlowInterpreter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F1000000000000000000A2 /* FlowInterpreter.swift */; };
+		E0F1000000000000000000B3 /* FlowPreflight.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F1000000000000000000A3 /* FlowPreflight.swift */; };
+		E0F1000000000000000000B4 /* FlowScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F1000000000000000000A4 /* FlowScript.swift */; };
+		E0F1000000000000000000B5 /* EdgeQuiescence.m in Sources */ = {isa = PBXBuildFile; fileRef = E0F1000000000000000000A5 /* EdgeQuiescence.m */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		E0F1000000000000000000A1 /* FlowRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowRunnerTests.swift; sourceTree = "<group>"; };
+		E0F1000000000000000000A2 /* FlowInterpreter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowInterpreter.swift; sourceTree = "<group>"; };
+		E0F1000000000000000000A3 /* FlowPreflight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowPreflight.swift; sourceTree = "<group>"; };
+		E0F1000000000000000000A4 /* FlowScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowScript.swift; sourceTree = "<group>"; };
+		E0F1000000000000000000A5 /* EdgeQuiescence.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = EdgeQuiescence.m; sourceTree = "<group>"; };
+		E0F1000000000000000000A6 /* EdgeQuiescence.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = EdgeQuiescence.h; sourceTree = "<group>"; };
+		E0F1000000000000000000A7 /* EdgeFlowRunner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "EdgeFlowRunner-Bridging-Header.h"; sourceTree = "<group>"; };
+		E0F1000000000000000000A8 /* EdgeFlowRunner.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EdgeFlowRunner.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		E0F1000000000000000000C2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		E0F1000000000000000000D1 = {
+			isa = PBXGroup;
+			children = (
+				E0F1000000000000000000D2 /* EdgeFlowRunner */,
+				E0F1000000000000000000D3 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		E0F1000000000000000000D2 /* EdgeFlowRunner */ = {
+			isa = PBXGroup;
+			children = (
+				E0F1000000000000000000A1 /* FlowRunnerTests.swift */,
+				E0F1000000000000000000A2 /* FlowInterpreter.swift */,
+				E0F1000000000000000000A3 /* FlowPreflight.swift */,
+				E0F1000000000000000000A4 /* FlowScript.swift */,
+				E0F1000000000000000000A6 /* EdgeQuiescence.h */,
+				E0F1000000000000000000A5 /* EdgeQuiescence.m */,
+				E0F1000000000000000000A7 /* EdgeFlowRunner-Bridging-Header.h */,
+			);
+			path = EdgeFlowRunner;
+			sourceTree = "<group>";
+		};
+		E0F1000000000000000000D3 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E0F1000000000000000000A8 /* EdgeFlowRunner.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E0F1000000000000000000E1 /* EdgeFlowRunner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E0F1000000000000000000F2 /* Build configuration list for PBXNativeTarget "EdgeFlowRunner" */;
+			buildPhases = (
+				E0F1000000000000000000C1 /* Sources */,
+				E0F1000000000000000000C2 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = EdgeFlowRunner;
+			productName = EdgeFlowRunner;
+			productReference = E0F1000000000000000000A8 /* EdgeFlowRunner.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E0F1000000000000000000E0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
+			};
+			buildConfigurationList = E0F1000000000000000000F1 /* Build configuration list for PBXProject "EdgeFlowRunner" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = E0F1000000000000000000D1;
+			productRefGroup = E0F1000000000000000000D3 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E0F1000000000000000000E1 /* EdgeFlowRunner */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		E0F1000000000000000000C1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E0F1000000000000000000B1 /* FlowRunnerTests.swift in Sources */,
+				E0F1000000000000000000B2 /* FlowInterpreter.swift in Sources */,
+				E0F1000000000000000000B3 /* FlowPreflight.swift in Sources */,
+				E0F1000000000000000000B4 /* FlowScript.swift in Sources */,
+				E0F1000000000000000000B5 /* EdgeQuiescence.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		E0F1000000000000000000F3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E0F1000000000000000000F4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = app.edge.EdgeFlowRunner;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_OBJC_BRIDGING_HEADER = "EdgeFlowRunner/EdgeFlowRunner-Bridging-Header.h";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		E0F1000000000000000000F1 /* Build configuration list for PBXProject "EdgeFlowRunner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E0F1000000000000000000F3 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E0F1000000000000000000F2 /* Build configuration list for PBXNativeTarget "EdgeFlowRunner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E0F1000000000000000000F4 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E0F1000000000000000000E0 /* Project object */;
+}

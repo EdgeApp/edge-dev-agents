@@ -1,4 +1,9 @@
-# Interaction-only companion to buy-quote.yaml: PIN login -> Buy tab -> enter $500.
+# Interaction-only companion to buy-quote.yaml: PIN login -> Buy scene -> enter $500.
+# The Buy scene opens with one deep link, `edge://exchange/buy?buyAsset=..`.
+# PARAMS: PIN_DIGIT, BUY_AMOUNT, BUY_ASSET (deep-link asset: a plugin id or
+#   `<pluginId>_<tokenId>`, default bitcoin), MANUAL_PATH ("true" taps the Buy
+#   tab instead of the link and leaves the asset as the app has it: for a task
+#   whose change is on the tab bar or the Buy entry).
 # Captures nothing — capture-buy-quote.sh grabs the proof screenshot externally
 # (see that script for why an external burst beats an in-flow screenshot on this build).
 appId: ${APP_ID}
@@ -6,25 +11,19 @@ env:
   APP_ID: co.edgesecure.app
   PIN_DIGIT: "1"
   BUY_AMOUNT: "500"
+  BUY_ASSET: ${BUY_ASSET || "bitcoin"}
+  MANUAL_PATH: ${MANUAL_PATH || ""}
 ---
 - launchApp
 - extendedWaitUntil:
     visible: "Exit PIN"
     timeout: 40000
-- assertVisible: "1"
-- assertVisible: "0"
-- tapOn:
-    text: ${PIN_DIGIT}
-    waitToSettleTimeoutMs: 900
-- tapOn:
-    text: ${PIN_DIGIT}
-    waitToSettleTimeoutMs: 900
-- tapOn:
-    text: ${PIN_DIGIT}
-    waitToSettleTimeoutMs: 900
-- tapOn:
-    text: ${PIN_DIGIT}
-    waitToSettleTimeoutMs: 1500
+# YOLO auto-login can finish mid-entry, so the taps go through the gated
+# login-if-needed flow instead of four unconditional taps.
+- runFlow:
+    file: common/login-if-needed.yaml
+    env:
+      PIN_DIGIT: ${PIN_DIGIT}
 - extendedWaitUntil:
     visible: "Buy"
     timeout: 30000
@@ -43,9 +42,29 @@ env:
       visible: "Claim Your Web3 Handle"
     commands:
       - tapOn: "Not Now"
-- tapOn: "Buy"
-- extendedWaitUntil:
-    visible: "Amount USD"
-    timeout: 15000
+- runFlow:
+    when:
+      true: ${MANUAL_PATH != 'true'}
+    commands:
+      - openLink: "edge://exchange/buy?buyAsset=${BUY_ASSET}"
+      - extendedWaitUntil:
+          visible: "Amount USD"
+          timeout: 30000
+# The tab bar stays hidden for up to ~20s after login while "Buy" is already
+# in the hierarchy, so a single tap can land on nothing. Retry until the Buy
+# scene shows.
+- runFlow:
+    when:
+      true: ${MANUAL_PATH == 'true'}
+    commands:
+      - retry:
+          maxRetries: 3
+          commands:
+            - tapOn: "Buy"
+            - extendedWaitUntil:
+                visible: "Amount USD"
+                timeout: 10000
 - tapOn: "Amount USD"
+# The Buy scene remembers the last amount; clear it or inputText appends.
+- eraseText: 20
 - inputText: ${BUY_AMOUNT}

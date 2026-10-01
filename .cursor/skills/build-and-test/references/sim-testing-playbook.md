@@ -7,7 +7,9 @@ entry (the human audits and prunes it periodically — keep entries dense).
 
 ## Flow library — compose these, never re-derive them
 Parameterized subflows in `~/.cursor/skills/build-and-test/maestro/common/`
-(compose via `runFlow` with `env:`; copy next to your task flow). Re-deriving
+(compose via `runFlow` with `env:`; copy next to your task flow). Every flow
+here runs on the iOS XCUITest interpreter (`scripts/xcuitest-run.sh`) and on the
+maestro CLI. Re-deriving
 any of these inline is wasted derivation — two 2026-07 sessions independently
 rebuilt the entire swap-pair sequence tap-by-tap that `select-swap-pair`
 already encodes, params and gotchas included.
@@ -16,16 +18,16 @@ already encodes, params and gotchas included.
 |---|---|---|
 | `common/login-if-needed.yaml` | (YOLO env) | Land in a logged-in account, incl. PIN entry |
 | `common/dismiss-startup-modals.yaml` | - | Clear survey/notification/update modals |
-| `common/select-swap-pair.yaml` | SRC_WALLET, DST_WALLET, FIAT_AMOUNT, PROVIDER | Exchange tab → pick wallets (via Search Wallets) → amount → quote (+ provider force, amount-field eraseText gotcha) |
+| `common/select-swap-pair.yaml` | SRC_ASSET, DST_ASSET, MANUAL_PATH, SRC_WALLET, DST_WALLET, FIAT_AMOUNT, PROVIDER | Swap deep link sets the pair (MANUAL_PATH: Exchange tab → pick wallets via Search Wallets) → amount → quote (+ provider force, amount-field eraseText gotcha) |
 | `common/find-wallet.yaml` | SEARCH_TERM, MATCH_INDEX | Assets tab → search → open a wallet's detail scene (Receive/Send/Trade) |
 | `common/open-settings.yaml` | - | Side menu → Settings list (compose your own subpage nav after) |
 | `common/confirm-slider.yaml` | - | The confirm slider gesture (SOLVED — never re-derive) |
 | `common/ramp-set-region-fiat.yaml` | COUNTRY_ROW/SEARCH, STATE_ROW/SEARCH, FIAT_ROW/SEARCH | Set ramp region + fiat from Buy/Sell scene (row selectors are the COMBINED row string, e.g. "United States of America US") |
-| `common/send-to-address.yaml` | WALLET_SEARCH, ADDRESS, AMOUNT | Assets → wallet → Send → address → amount → confirm slider |
+| `common/send-to-address.yaml` | CURRENCY_CODE, ADDRESS, AMOUNT, WALLET_SEARCH, MANUAL_PATH | Payment-redirect link → pre-filled Send scene → confirm slider (no CURRENCY_CODE, or MANUAL_PATH: Assets → wallet → Send → address → amount) |
 | `common/create-throwaway-account.yaml` | NEW_USERNAME, NEW_PASSWORD, NEW_PIN, NEW_WALLETS, VERIFY_ACCOUNT_INFO | Login scene → new empty account, logged in (never `clearState`). For tests that would dirty a roster account's SYNCED state |
 | `common/delete-throwaway-account.yaml` | DELETE_USERNAME, DELETE_PASSWORD | Deletes the logged-in account. REQUIRED before the run ends for every throwaway the run created (throwaways are single-use) |
-| `buy-quote-input.yaml` / `buy-quote.yaml` | (see file) | Canonical Buy $500 proof flow |
-| `swap-quote-input.yaml` / `swap-confirm.yaml` | (see file) | Swap quote + confirm proof pair |
+| `buy-quote-input.yaml` / `buy-quote.yaml` | BUY_ASSET, MANUAL_PATH (see file) | Canonical Buy $500 proof flow; opens Buy by deep link (MANUAL_PATH: Buy tab) |
+| `swap-quote-input.yaml` / `swap-confirm.yaml` | (see file) | Maya swap quote + confirm pair. Local library only (`.syncignore`), not in the repo: compose `common/select-swap-pair.yaml` + `common/confirm-slider.yaml` instead |
 
 Wrote a NEW sequence a future task will plausibly need? Propose it for the
 library with a `[flow]`-tagged bullet in your run report's Dev Notes (name,
@@ -458,12 +460,18 @@ debugging screenshots of the wrong device.
   worktree `env.json` (nulling only the username hits a light-account fallback
   that still auto-logs-in), then terminate + launch; restore after. (Promoted
   2026-07-29, run 1215939017452141.)
-- **Drive a deep link from cold start with `ENV.YOLO_DEEP_LINK` in the worktree
-  `env.json`** (read by `DeepLinkingManager` alongside `Linking.getInitialURL`),
-  then `simctl terminate` + `launch`. Deterministic, and avoids `simctl openurl`,
-  which pops an "Open in Edge?" system dialog that can background the app when
-  maestro taps it; maestro's own `openLink` also fails to deliver. (Promoted
-  2026-08-06, run 1217224633446931.)
+- **Drive a deep link with `openLink` on the XCUITest interpreter.** It hands
+  the URL to the running app directly (`edge://` and `https://edge.app/...`
+  alike) with no "Open in Edge?" dialog, from any scene, and the committed
+  flows use it by default. It returns before the app navigates: wait on the
+  target scene's text. Avoid `simctl openurl` and Maestro's own `openLink` on
+  iOS: the first raises the "Open in Edge?" system dialog, which can background
+  the app when tapped, and the second fails to deliver. `ENV.YOLO_DEEP_LINK`
+  in the worktree `env.json` (read by `DeepLinkingManager`, then
+  `simctl terminate` + `launch`) is only for a link that must arrive at cold
+  start. When the account holds several wallets for the linked asset the app
+  raises its own wallet picker; the flows handle it by wallet name. (Replaced
+  2026-10-01, run 1219043297854606.)
 - **Nested `runFlow` with `env:` may NOT override a subflow's own `env:`
   defaults** (maestro 2.x, this host): `select-swap-pair` ran its built-in
   `.*Bitcoin.*` while the parent passed `.*Litecoin.*`, and `inputText` logged
@@ -486,18 +494,27 @@ debugging screenshots of the wrong device.
   you explored through the MCP, kill that slot's daemon and its
   `xcodebuild test-without-building` child (match both on YOUR udid, never
   another slot's), then run the CLI. (Promoted 2026-08-06, run 1216251688512498.)
+  `scripts/xcuitest-run.sh` does this itself: it kills the daemon PIDs matched
+  on `--udid` and terminates the maestro driver app before its own drive. The
+  MCP server does not come back after that kill: the session loses its maestro
+  MCP tools, so finish MCP exploration before the first interpreter run.
 - **Maestro `visible:` matches the WHOLE text node.** "Powered by Maya
   Protocol" renders inside a node whose text is
   `Powered by Maya ProtocolTap to Change Provider`, so the exact match never
   hits while `"Powered by .*"` does. Anchor quote-ready waits on
   `Slide to Confirm` instead — it appears only once a quote resolves.
   (Promoted 2026-07-29, run 1216518039073159.)
-- **Maestro economics:** each `maestro test` invocation pays ~2 min driver
+- **Driver economics:** each `maestro test` invocation pays ~2 min driver
   startup. For EXPLORATION (finding selectors, poking screens) use the **maestro
-  MCP tools** (persistent driver, per-command tap/swipe/hierarchy/screenshot —
+  MCP tools** (persistent driver, per-command tap/swipe/hierarchy/screenshot;
   select the device matching `$AGENT_SIM_UDID` first). For the REPEATABLE PROOF
-  run, compose ONE yaml flow and run it once — that run produces the evidence
-  screenshots for the PR.
+  run, compose ONE yaml flow and run it once: that run produces the evidence
+  screenshots for the PR. On iOS the proof run goes through
+  `scripts/xcuitest-run.sh --flow <yaml>` (the XCUITest interpreter, see
+  `references/xcuitest-interpreter.md`): same YAML, a cached runner, no Maestro
+  driver startup, and quiescence waits capped at 1s. The maestro CLI runs iOS
+  flows only when the task asks for Maestro or the interpreter's preflight
+  rejects a command the flow needs. Android stays on the maestro CLI.
 - Modal gauntlet, eraseText-before-inputText, spaced PIN taps: all encoded in the
   `common/` flows — use them instead of remembering.
 - **Fixed-port debug dev-servers are NOT slot-safe — use `updot` instead.** The

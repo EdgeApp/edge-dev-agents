@@ -6,10 +6,13 @@
 #   ~/.config/edge-secrets/test-accounts.json).
 # GOTCHA: taps MUST stay spaced (waitToSettleTimeoutMs) — fast taps drop digits →
 # wrong PIN → exponential lockout. Never tighten these.
+# YOLO auto-login can finish mid-entry and leave the PIN screen, so each tap
+# is gated on the PIN screen still showing.
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
-  PIN_DIGIT: "0"
+  # `${KEY || default}` so a caller's runFlow env wins over the default.
+  PIN_DIGIT: ${PIN_DIGIT || "0"}
 ---
 - runFlow:
     when:
@@ -18,12 +21,24 @@ env:
       - tapOn:
           text: ${PIN_DIGIT}
           waitToSettleTimeoutMs: 900
+- runFlow:
+    when:
+      visible: "Exit PIN"
+    commands:
       - tapOn:
           text: ${PIN_DIGIT}
           waitToSettleTimeoutMs: 900
+- runFlow:
+    when:
+      visible: "Exit PIN"
+    commands:
       - tapOn:
           text: ${PIN_DIGIT}
           waitToSettleTimeoutMs: 900
+- runFlow:
+    when:
+      visible: "Exit PIN"
+    commands:
       - tapOn:
           text: ${PIN_DIGIT}
           waitToSettleTimeoutMs: 1500
