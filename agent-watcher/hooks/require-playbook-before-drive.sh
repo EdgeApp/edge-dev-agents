@@ -17,12 +17,22 @@
 # a loop only occurs if the agent refuses the read. The deny message carries the
 # flow-library index (the old nudge's payload) so composition guidance still
 # arrives at the drive moment.
+#
+# PHASE SLICES. /build-and-test is a core plus per-phase references, and a
+# maestro drive is the first call of its drive phase, which calls no companion
+# script on the MCP and bare-CLI paths. So this hook also requires the drive and
+# evidence slices (units `build-and-test:drive`, `build-and-test:evidence`) and
+# delivers the missing ones in the deny, through lib/skill-read-gate.sh: same
+# markers, same transcript credit, same one round trip as
+# require-skill-read-for-scripts.sh, which covers capture-buy-quote.sh. A deny
+# that owes both the playbook and slices says so once.
 set -euo pipefail
 
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 MARKER="/tmp/agent-playbook-read-$AGENT_TASK_GID"
 
 INPUT=$(cat)
+LIB="$HOME/.config/agent-watcher/hooks/lib"
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
 IS_DRIVE=0
 case "$TOOL" in
@@ -45,7 +55,6 @@ case "$TOOL" in
     # hierarchy subcommand, or capture-buy-quote.sh / maestro-mcp-wrapper.sh
     # executed. `maestro --version`, `ls .../maestro`, and grep/cat of maestro
     # paths are not drives.
-    LIB="$HOME/.config/agent-watcher/hooks/lib"
     [ -f "$LIB/maestro-cmd.sh" ] || exit 0
     . "$LIB/maestro-cmd.sh"
     if [ -n "$(maestro_cmd_segments "$CMD" "$CMD_M" 2>/dev/null || true)" ]; then
@@ -55,12 +64,25 @@ case "$TOOL" in
 esac
 [ "$IS_DRIVE" = 1 ] || exit 0
 
+# Slices this drive still owes (empty when the lib is unavailable: fail open).
+SLICES=""
+if [ -f "$LIB/skill-read-gate.sh" ]; then
+  export SKILL_READ_KEY="$AGENT_TASK_GID"
+  . "$LIB/skill-read-gate.sh"
+  SLICES=$(skill_read_missing build-and-test:drive build-and-test:evidence)
+  if [ -n "$SLICES" ]; then
+    TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null || true)
+    skill_read_credit_from_transcript "$TRANSCRIPT" $SLICES
+    SLICES=$(skill_read_missing $SLICES)
+  fi
+fi
+
 # Playbook already read: pass, but once per run inject the working-set check at
 # the FIRST post-read drive. Salience delivery, not availability — the playbook
 # is force-read (below) yet its working-set bullet was read-and-missed on an
 # asset task (HOOD, 2026-08-12). Fires only when corePlugins.ts is untouched;
 # a trimmed worktree or a non-gui repo sees nothing. Never blocks.
-if [ -f "$MARKER" ]; then
+if [ -f "$MARKER" ] && [ -z "$SLICES" ]; then
   NUDGE_FLAG="/tmp/agent-coreplugins-nudge-$AGENT_TASK_GID"
   [ -f "$NUDGE_FLAG" ] && exit 0
   : > "$NUDGE_FLAG"
@@ -71,6 +93,14 @@ if [ -f "$MARKER" ]; then
     jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: "corePlugins.ts is untouched. If this task is asset/chain/provider-scoped, trim the plugin set to the task WORKING SET before driving: the target plugin(s) plus funding sources (BTC/ETH/USDC) plus every provider under test — playbook \"working set\" entry. Funding carve-out: if a funding route later needs a filtered-out asset/provider, widen or remove the trim, fund, re-trim if useful; a funding blocker caused by your own trim is self-inflicted (concession-validator denies it). If the full plugin set is intentional for this task, drive on."}}'
   fi
   exit 0
+fi
+
+if [ -f "$MARKER" ]; then
+  {
+    echo "BLOCKED: this maestro drive is the first of the /build-and-test drive phase, whose rules are not yet in this session's context. They are delivered below; re-run the same call."
+    skill_read_deliver $SLICES
+  } >&2
+  exit 2
 fi
 
 PLAYBOOK="$HOME/.cursor/skills/build-and-test/references/sim-testing-playbook.md"
@@ -93,4 +123,11 @@ via runFlow instead of re-deriving taps:
                                   (SRC_WALLET, DST_WALLET, FIAT_AMOUNT, PROVIDER)
   confirm-slider.yaml             the confirm slider gesture (SOLVED)
 MSG
+if [ -n "$SLICES" ]; then
+  {
+    echo
+    echo "The /build-and-test drive-phase rules are also owed; they are delivered below, so only the playbook Read remains."
+    skill_read_deliver $SLICES
+  } >&2
+fi
 exit 2

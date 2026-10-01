@@ -22,8 +22,11 @@
 # it. Without this the split would silently relax every moved rule, which is
 # how a gate erodes into a formality. The map below is the whole list; a script
 # with no entry requires nothing from it and stays quiet. /pr-land took the
-# same split (2026-09-30, units `pr-land:<slice>`); its entries apply in every
-# session, since it runs outside orch too.
+# same split (2026-09-30, units `pr-land:<slice>`), and so did /build-and-test
+# (2026-10-01, units `build-and-test:<slice>`); their entries apply in every
+# session, since both run outside orch too. /build-and-test's drive and evidence
+# slices also arrive on every maestro drive, which calls no companion script:
+# require-playbook-before-drive.sh owns that vector.
 #
 # Markers come from mark-skill-read.sh and
 # inject-run-context.sh; on the would-block path the transcript is scanned for
@@ -47,7 +50,7 @@
 # Scope: every session. Orch runs (AGENT_TASK_GID set) key markers by the gid
 # and get the whole map; any other session keys them sess-<session_id> (what
 # mark-skill-read.sh writes there) and gets only the skill-directory rule and
-# the /pr-land slices, because the remaining shared-script entries are /one-shot
+# the /pr-land and /build-and-test slices, because the remaining shared-script entries are /one-shot
 # phase slices and orch-only intake/completion steps. No session_id: no-op. Exit 0 allow, exit 2
 # block.
 set -uo pipefail
@@ -141,6 +144,10 @@ need '(pr-land-prepare|changelog-union-merge)\.sh([[:space:]]|$)' pr-land:prepar
 need '(pr-land-automerge|pr-merge-watch|pr-land-merge|force-land-rationale)\.sh([[:space:]]|$)' pr-land:merge
 need '(pr-land-publish|npm-publish-web|npm-auth-wait|upgrade-dep)\.sh([[:space:]]|$)' pr-land:publish
 need '(pr-bot-findings-sweep|pr-land-extract-asana-task)\.sh([[:space:]]|$)' pr-land:post-merge
+# /build-and-test phase slices, every session. All four build scripts and the
+# capture script live in build-and-test/scripts, so the core is already required.
+need '(slot-preflight|select-ios-sim|ios-rn-build|ios-rn-build-wait)\.sh([[:space:]]|$)' build-and-test:build
+need 'capture-buy-quote\.sh([[:space:]]|$)'                       build-and-test:drive build-and-test:evidence
 [ "$ORCH" = 1 ] || return 0
 
 # Shared top-level scripts with one governing skill, and the /one-shot phase
@@ -161,8 +168,9 @@ need 'asana-get-context\.sh([[:space:]]|$)'        $INTAKE_UNITS
 need 'setup-task-workspace\.sh([[:space:]]|$)'     one-shot:implementation
 need 'lint-commit\.sh([[:space:]]|$)'              im one-shot:implementation
 need 'set-tested\.sh([[:space:]]|$)'               one-shot:testing
-# build-and-test's drive scripts: the ones that build or drive the app on the
-# sim (select-ios-sim.sh / slot-preflight.sh only pick and check a slot).
+# build-and-test's scripts that build or drive the app on the sim start the
+# /one-shot testing phase (select-ios-sim.sh / slot-preflight.sh only pick and
+# check a slot, so they pull build-and-test:build above and nothing here).
 need '(capture-buy-quote|ios-rn-build|ios-rn-build-wait)\.sh([[:space:]]|$)' one-shot:testing
 need 'asana-review-field\.sh([[:space:]]|$)'       one-shot:review
 need 'pr-create\.sh([[:space:]]|$)'                one-shot:pr
@@ -183,6 +191,16 @@ case "$SEG_M" in
     case "$CMD_M" in *agent-run-report*) SEG_NEEDED="$SEG_NEEDED one-shot:report" ;; esac
     ;;
 esac
+# log-attempt.sh for a value-moving category: the funding slice, as a backstop.
+# The log call follows the action, so this cannot put the rules ahead of the
+# account or pair choice (the core step map tells the agent to read the slice
+# first); it guarantees they are in context before the run concludes anything
+# about funding. The category is often quoted, so it is read from the raw
+# segment, which the mention-stripped view blanks.
+if [ -n "$(invocations 'log-attempt\.sh([[:space:]]|$)')" ] \
+   && printf '%s' "$SEG_RAW" | grep -qE -- "--category[[:space:]=]+[\"']?(swap|send|sweep)([\"'[:space:]]|\$)"; then
+  SEG_NEEDED="$SEG_NEEDED build-and-test:funding"
+fi
 # update-status.sh: --blocked is the blocked completion whatever status rides
 # with it; a plain Complete is the finalize gate.
 US_TAIL=$(invocations 'update-status\.sh([[:space:]]|$)')
@@ -201,6 +219,7 @@ NEEDED=""; BLAME=""
 while read -r B64M B64RAW HD; do
   [ -n "${B64M:-}" ] || continue
   SEG_M=$(printf '%s' "$B64M" | base64 -d 2>/dev/null) || continue
+  SEG_RAW=$(printf '%s' "$B64RAW" | base64 -d 2>/dev/null) || SEG_RAW="$SEG_M"
   segment_units
   for u in $SEG_NEEDED; do
     NEEDED="$NEEDED $u"
