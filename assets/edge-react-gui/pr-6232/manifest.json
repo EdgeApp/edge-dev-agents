@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6232/20260930-180411-agent-proof-1219043297854606-11-frozen-spinner-animations-off.png",
+      "caption": "frozen spinner animations off",
+      "index": "11",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T01:04:11Z",
+      "headSha": "b50957606cd05b7cf03e4e2efff23c0017f978c2",
+      "addedAt": "2026-10-01T01:04:11Z"
+    }
+  ]
+}
