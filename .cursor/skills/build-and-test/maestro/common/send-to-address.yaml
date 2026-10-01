@@ -10,6 +10,8 @@ appId: co.edgesecure.app
 - tapOn: "Assets"
 - extendedWaitUntil: {visible: "Search Wallets", timeout: 20000}
 - tapOn: "Search Wallets"
+# The search text survives navigation; clear it or inputText appends.
+- eraseText: 40
 - inputText: ${WALLET_SEARCH}
 - extendedWaitUntil: {visible: ".*${WALLET_SEARCH}.*", timeout: 15000}
 - tapOn: {text: ".*${WALLET_SEARCH}.*", index: 0}

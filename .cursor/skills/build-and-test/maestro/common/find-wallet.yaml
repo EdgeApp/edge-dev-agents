@@ -18,6 +18,8 @@ env:
     visible: "Search Wallets"
     timeout: 20000
 - tapOn: "Search Wallets"
+# The search text survives navigation; clear it or inputText appends.
+- eraseText: 40
 - inputText: ${SEARCH_TERM}
 - runFlow:
     when:
