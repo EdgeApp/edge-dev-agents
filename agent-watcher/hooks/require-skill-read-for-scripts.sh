@@ -21,7 +21,9 @@
 # requires that phase's slice (unit `one-shot:<slice>`), and the deny delivers
 # it. Without this the split would silently relax every moved rule, which is
 # how a gate erodes into a formality. The map below is the whole list; a script
-# with no entry requires nothing from it and stays quiet.
+# with no entry requires nothing from it and stays quiet. /pr-land took the
+# same split (2026-09-30, units `pr-land:<slice>`); its entries apply in every
+# session, since it runs outside orch too.
 #
 # Markers come from mark-skill-read.sh and
 # inject-run-context.sh; on the would-block path the transcript is scanned for
@@ -44,9 +46,9 @@
 #
 # Scope: every session. Orch runs (AGENT_TASK_GID set) key markers by the gid
 # and get the whole map; any other session keys them sess-<session_id> (what
-# mark-skill-read.sh writes there) and gets only the skill-directory rule,
-# because the shared-script entries below are /one-shot phase slices and
-# orch-only intake/completion steps. No session_id: no-op. Exit 0 allow, exit 2
+# mark-skill-read.sh writes there) and gets only the skill-directory rule and
+# the /pr-land slices, because the remaining shared-script entries are /one-shot
+# phase slices and orch-only intake/completion steps. No session_id: no-op. Exit 0 allow, exit 2
 # block.
 set -uo pipefail
 
@@ -129,6 +131,16 @@ segment_units() {
 for sk in $(invocations 'skills/[a-z0-9-]+/scripts/[^[:space:]]+\.sh' | grep -oE 'skills/[a-z0-9-]+/scripts' | sed -E 's|skills/([a-z0-9-]+)/scripts|\1|' | sort -u); do
   SEG_NEEDED="$SEG_NEEDED $sk"
 done
+# /pr-land phase slices, every session (operators run /pr-land by hand). All
+# live in pr-land/scripts, so the rule above already requires the core.
+# Discovery, the lock and staging-cherry-pick.sh (owned by /staging-cherry-pick)
+# need only the core; step 9 calls no pr-land script, so the core's step map
+# tells the agent to read post-merge itself.
+need 'pr-land-comments\.sh([[:space:]]|$)'                        pr-land:comments
+need '(pr-land-prepare|changelog-union-merge)\.sh([[:space:]]|$)' pr-land:prepare
+need '(pr-land-automerge|pr-merge-watch|pr-land-merge|force-land-rationale)\.sh([[:space:]]|$)' pr-land:merge
+need '(pr-land-publish|npm-publish-web|upgrade-dep)\.sh([[:space:]]|$)' pr-land:publish
+need '(pr-bot-findings-sweep|pr-land-extract-asana-task)\.sh([[:space:]]|$)' pr-land:post-merge
 [ "$ORCH" = 1 ] || return 0
 
 # Shared top-level scripts with one governing skill, and the /one-shot phase

@@ -212,7 +212,10 @@ fi
 # "<pid> <repo-dir>" so prepare can tell a live refresh of ITS checkout from a
 # stale file (it exits 75 and retries); this side yields when a land lease is
 # held on the repo (checked AFTER taking the lock, prepare checks the lock AFTER
-# taking the lease, so at least one side always sees the other). Liveness is
+# taking the lease, so at least one side always sees the other). pr-land takes a
+# run-level hold (repo-land-lock.sh --hold) on edge-react-gui for the whole land,
+# so this skips from discovery through the QA handoff, not only while a single
+# land script is running. Liveness is
 # the pid, not the lock's age: a native rebuild under load runs past an hour.
 if [[ -f "$BUILD_LOCK" ]]; then
   LOCK_PID="$(awk '{print $1; exit}' "$BUILD_LOCK" 2>/dev/null || true)"

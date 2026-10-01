@@ -158,10 +158,10 @@
     "usage_hold": {
       "spawn": {
         "five_hour": 85,
-        "seven_day": 40
+        "seven_day": 90
       },
       "pause": {
-        "seven_day": 40
+        "seven_day": 90
       }
     }
   }

@@ -22,6 +22,12 @@
 #              push re-triggers the bots while auto-merge is still live, which is the
 #              same race the arming gate exists to prevent. Re-arm afterwards through
 #              the normal (gated) path.
+#   --no-bugbot-wait
+#              Arm even while a reviewer-bot check-run is PENDING on HEAD (no
+#              `waiting`, no exit 76). Operator opt-in for large queues that accept
+#              late bot findings as follow-up work; pr-land's post-merge bot sweep
+#              owns harvesting them. Unresolved bot THREADS still block: those are
+#              known findings, and fixing them before the merge costs no extra wait.
 #
 # Per PR, emits one result line to stdout:
 #   armed     — auto-merge enabled; GitHub will merge on green CI
@@ -45,9 +51,11 @@ command -v gh >/dev/null || { echo "ERROR: gh not found" >&2; exit 2; }
 command -v jq >/dev/null || { echo "ERROR: jq not found" >&2; exit 2; }
 
 MODE="arm"
+BOT_WAIT=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --disarm) MODE="disarm"; shift ;;
+    --no-bugbot-wait) BOT_WAIT=""; shift ;;
     *) echo "ERROR: unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -117,7 +125,8 @@ while read -r pr; do
   if [ "$REVIEW" = "CHANGES_REQUESTED" ]; then echo "blocked $REPO#$NUM — changes requested; resolve before landing"; RC=1; continue; fi
 
   # ARMING GATE (see header): reviewer bots finish before auto-merge goes live.
-  PENDING=$(pending_reviewers "$REPO" "$NUM")
+  PENDING=""
+  [ -n "$BOT_WAIT" ] && PENDING=$(pending_reviewers "$REPO" "$NUM")
   if [ -n "$PENDING" ]; then
     echo "waiting $REPO#$NUM — reviewer bot(s) still running on HEAD: $PENDING. Not armed; re-run when they complete."
     [ "$RC" -eq 0 ] && RC=76

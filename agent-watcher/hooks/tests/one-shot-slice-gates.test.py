@@ -80,9 +80,9 @@ check(mapped, 'no `need` entries parsed out of %s' % GATE)
 
 # Units required outside the `need` table: argument-sensitive entries here, the
 # Slack send path, and the session-start followup injection.
-extra_units = set(re.findall(r'one-shot:[a-z]+', gate_src))
-extra_units |= set(re.findall(r'one-shot:[a-z]+', read(SLACK_GATE)))
-extra_units |= set(re.findall(r'one-shot:[a-z]+', read(INJECT)))
+extra_units = set(re.findall(r'one-shot:[a-z-]+', gate_src))
+extra_units |= set(re.findall(r'one-shot:[a-z-]+', read(SLACK_GATE)))
+extra_units |= set(re.findall(r'one-shot:[a-z-]+', read(INJECT)))
 
 # --- 1. every mapped script exists --------------------------------------------
 def globs_for(script_re):
@@ -115,7 +115,7 @@ for script_re, units in mapped:
 
 # --- 2. every reference the core step map names has a gate-map entry ----------
 core = read(os.path.join(ONE_SHOT, 'SKILL.md'))
-cited = set(re.findall(r'references/([a-z]+)\.md', core))
+cited = set(re.findall(r'references/([a-z-]+)\.md', core))
 check(cited, 'the core step map names no reference files')
 covered = {u.split(':', 1)[1] for _re, units in mapped for u in units
            if u.startswith('one-shot:')}

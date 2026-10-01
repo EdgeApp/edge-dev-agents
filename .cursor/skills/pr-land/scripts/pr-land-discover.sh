@@ -60,6 +60,7 @@ const RELEASE_ARG_RE = /^v?\d+(\.\d+){0,2}$/;
 let useBranchScan = false;
 let allReleases = false;
 let releaseArg = null;
+let noBugbotWait = false;
 const args = [];
 for (let i = 0; i < rawArgs.length; i++) {
   const arg = rawArgs[i];
@@ -67,6 +68,10 @@ for (let i = 0; i < rawArgs.length; i++) {
     useBranchScan = true;
   } else if (arg === "--all-releases") {
     allReleases = true;
+  } else if (arg === "--no-bugbot-wait") {
+    // Land-run option, not a discovery filter: echoed into the output so step 5
+    // reads it from the JSON instead of re-parsing the operator's args.
+    noBugbotWait = true;
   } else if (arg === "--release") {
     releaseArg = rawArgs[++i];
     if (!releaseArg || !RELEASE_ARG_RE.test(releaseArg)) {
@@ -272,6 +277,7 @@ async function main() {
   requireGh();
 
   const results = { prs: [], errors: [] };
+  if (noBugbotWait) results.noBugbotWait = true;
 
   // 0. No-args: pull task GIDs from the configured Asana section, filtered to
   //    incomplete tasks assigned to the current user. They flow through the
@@ -420,6 +426,16 @@ async function main() {
   for (const { repo, prNumber } of explicitPrs) {
     try {
       const pr = ghApi(`repos/EdgeApp/${repo}/pulls/${prNumber}`);
+      // Task attachments outlive their PRs: a merged or closed PR is not a
+      // landing target. Report it so the summary can name it, never land it.
+      if (pr.state !== "open") {
+        (results.notOpen = results.notOpen || []).push({
+          repo,
+          prNumber: pr.number,
+          state: pr.merged_at ? "merged" : "closed",
+        });
+        continue;
+      }
       // Paginate: PRs with extensive review history (e.g. cursor[bot] +
       // back-and-forth) can have hundreds of review records, and the user's
       // APPROVED is often the LAST review. Without --paginate we'd silently

@@ -75,6 +75,7 @@ fi
 
 [[ ${#REPOS[@]} -gt 0 ]] || REPOS=(edge-currency-accountbased edge-exchange-plugins edge-core-js edge-currency-plugins edge-login-ui-rn edge-react-gui)
 
+LAND_LOCK="$HOME/.cursor/skills/pr-land/scripts/repo-land-lock.sh"
 CLAIMED=""
 trap '[[ -z "$CLAIMED" ]] || nm_refresh_end "$CLAIMED"' EXIT
 current=0     # repos that ended OK or fast-forwarded (installed tree matching)
@@ -84,6 +85,15 @@ for r in "${REPOS[@]}"; do
   d="$HOME/git/$r"
   [[ -d "$d/.git" ]] || { echo "$r: SKIP (no checkout)"; continue; }
   cd "$d" || continue
+  # pr-land works in this same checkout and holds the repo's land lease for the
+  # whole run (repo-land-lock.sh --hold): a fast-forward or reinstall here would
+  # stomp the land's rebase/install, so yield to any unexpired lease.
+  lease="$("$LAND_LOCK" status --repo "$r" 2>/dev/null || echo free)"
+  if [[ "$lease" != "free" ]] && [[ "$(date +%s)" -lt "$(jq -r '.expires // 0' <<<"$lease" 2>/dev/null || echo 0)" ]]; then
+    echo "$r: HOLD (land in progress, owner $(jq -r '.owner // "?"' <<<"$lease")); retried next sweep"
+    retryable=$((retryable + 1))
+    continue
+  fi
   git fetch origin --quiet 2>/dev/null || { echo "$r: SKIP (fetch failed: offline?)"; retryable=$((retryable + 1)); continue; }
   def=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||')
   def=${def:-master}

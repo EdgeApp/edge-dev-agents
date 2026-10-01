@@ -14,7 +14,8 @@ set -uo pipefail
 #        (bare repo#num defaults owner to EdgeApp)
 #
 # Prints one status line per poll. Final line + exit code:
-#   ALL_MERGED    (exit 0) — every PR merged
+#   ALL_MERGED <repo#num>=<mergeSha> ... (exit 0) — every PR merged; each
+#                 merge commit sha is the input staging-cherry-pick.sh takes
 #   CHECK_FAILED <repo#num> (exit 4) — a check went red; auto-merge left armed
 #   NEEDS_REBASE <repo#num...> (exit 3) — DIRTY, or BEHIND with green checks,
 #                 on two consecutive polls; re-run prepare→push for those PRs
@@ -100,6 +101,7 @@ while :; do
   review_prs=()
   line=""
   next_states=""
+  merged_shas=""
 
   for spec in "${PRS[@]}"; do
     repo_part="${spec%%#*}"
@@ -109,7 +111,7 @@ while :; do
       *) slug="EdgeApp/$repo_part" ;;
     esac
 
-    js=$(gh pr view "$num" --repo "$slug" --json state,mergeStateStatus,statusCheckRollup,reviewDecision 2>/dev/null) || {
+    js=$(gh pr view "$num" --repo "$slug" --json state,mergeStateStatus,statusCheckRollup,reviewDecision,mergeCommit 2>/dev/null) || {
       line="$line $spec=FETCH_ERR"
       open=$((open + 1))
       continue
@@ -117,6 +119,7 @@ while :; do
     st=$(echo "$js" | jq -r '.state')
     if [ "$st" = "MERGED" ]; then
       line="$line $spec=MERGED"
+      merged_shas="$merged_shas $spec=$(echo "$js" | jq -r '.mergeCommit.oid // "unknown"')"
       continue
     fi
     open=$((open + 1))
@@ -156,7 +159,7 @@ while :; do
 
   echo "$(date +%H:%M:%S) open=$open |$line"
 
-  if [ "$open" -eq 0 ]; then finish "ALL_MERGED" 0; fi
+  if [ "$open" -eq 0 ]; then finish "ALL_MERGED$merged_shas" 0; fi
   if [ -n "$red_pr" ]; then finish "CHECK_FAILED $red_pr" 4; fi
   if [ ${#rebase_prs[@]} -gt 0 ]; then finish "NEEDS_REBASE ${rebase_prs[*]}" 3; fi
   if [ ${#review_prs[@]} -gt 0 ]; then finish "BLOCKED_ON_REVIEW ${review_prs[*]}" 6; fi

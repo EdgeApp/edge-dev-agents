@@ -441,7 +441,7 @@
       ]
     },
     "pr-land:bot-thread-gate": {
-      "hash": "8254c99e383b",
+      "hash": "7cb11182fd0f",
       "dims": [
         "A15"
       ]
@@ -1091,8 +1091,8 @@
       "hash": "eee173b32852"
     },
     "pr-land:unexpected-exit": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "67f99deeb57b"
+      "reason": "2026-10-01: 2026-10-01: wording widened to cover the phase reference files after the pr-land split; same STOP-and-report contract, still not re-triaged individually (pre-baseline ack carried forward)",
+      "hash": "359a04c96a4d"
     },
     "pr-land:defer-gui": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",

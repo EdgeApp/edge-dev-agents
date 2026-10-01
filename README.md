@@ -509,7 +509,7 @@ flowchart TB
     CALL -->|yes| RUN
     CALL -->|"no, body ≤ 50KB"| GATE
     GATE -->|retry| CALL
-    CALL -->|"no, body > 50KB (pr-land)"| PTR
+    CALL -->|"no, body > 50KB"| PTR
     EXP -.expires.-> M
 ```
 
@@ -551,7 +551,7 @@ done.
 | | `record-own-asana-story.sh` (PostToolUse) | Records the story gid of each in-flight run's own MCP comment so the Complete gate can tell it from operator scope (`asana-task-update.sh --comment-file` records the script path) |
 | | `require-skill-for-file.sh` | A file with an owning skill is written only after that skill entered context, on every vector (Write, Edit, redirect, tee, sed -i, interpreter heredoc); deny-with-body via the shared gate library, one glob table for all of them. AGENTS.md: agents-md, every session. CHANGELOG.md: changelog, orch runs. The workflow itself (`SKILL.md`, `.mdc` rules, skill and agent-watcher scripts, site-orch's hooks, and `~/.claude/settings.json`, where a wrong registration means a hook never fires): author, every session |
 | | `lint-md-on-write.sh` | Markdown written outside the internal allowlist passes the mechanical no-slop tier on every vector (Write, Edit, redirect, tee, sed -i, perl -pi); CHANGELOG.md targets also pass the changelog entry-shape lint (length cap, mechanism tails, second sentences) |
-| | `require-skill-read-for-scripts.sh` + `mark-skill-read.sh` | A skill's companion script runs only after its SKILL.md FULLY entered context; the deny message delivers the complete body itself (deny-with-body) and writes the marker, so the retry passes educated, and states that the whole Bash command was cancelled. Marking is strict and content-checked against the current file: Read pages covering every line (a token-capped Read counts only the lines it returned), a `cat` whose unaltered stdout holds the body, Skill tool, or gate/session-start injection; partial reads (sed slices, cat piped to head or redirected) earn nothing. Before denying, the gate credits a body the transcript proves is in context since the last compaction (slash-command delivery, uncut `invoked_skills` re-injection, covering Read pages). `--help`/`-h`-only invocations are exempt. Bodies over 50KB (pr-land) fall back to a read-in-pages pointer without a marker. The same gate also delivers a /one-shot PHASE SLICE (`one-shot:<phase>`, `references/<phase>.md`) at the first companion-script call of that phase, since the split left only the core in context by default |
+| | `require-skill-read-for-scripts.sh` + `mark-skill-read.sh` | A skill's companion script runs only after its SKILL.md FULLY entered context; the deny message delivers the complete body itself (deny-with-body) and writes the marker, so the retry passes educated, and states that the whole Bash command was cancelled. Marking is strict and content-checked against the current file: Read pages covering every line (a token-capped Read counts only the lines it returned), a `cat` whose unaltered stdout holds the body, Skill tool, or gate/session-start injection; partial reads (sed slices, cat piped to head or redirected) earn nothing. Before denying, the gate credits a body the transcript proves is in context since the last compaction (slash-command delivery, uncut `invoked_skills` re-injection, covering Read pages). `--help`/`-h`-only invocations are exempt. Bodies over 50KB fall back to a read-in-pages pointer without a marker. The same gate also delivers a PHASE SLICE (`one-shot:<phase>` or `pr-land:<phase>`, `references/<phase>.md`) at the first companion-script call of that phase, since each split left only the core in context by default; the pr-land slices apply in every session, since /pr-land also runs by hand |
 | | `mark-playbook-read.sh` | Records the playbook read the drive gate requires |
 | | `record-file-writes.sh` (PreToolUse Bash + PostToolUse) | Records which session wrote which file, as the write happens, into `~/.local/state/agent-watcher/write-ledger.jsonl`: Write/Edit by `file_path`, Bash by what changed under the synced trees since a pre-call stamp (so `sed -i`, redirects and interpreter heredocs are seen). A file the command names is a strong row; one that only changed during the call is a weak row, since a long command overlaps every other session's writes. A subagent's write lands on its parent session. `/convention-sync` reads it to learn whose diffs it has not seen. Machine-local state, every session, never blocks |
 | | `nudge-asana-mcp.sh` | Steers bulk Asana reads to the cheaper script path |
@@ -851,7 +851,7 @@ scripts, not be re-described independently across skills.
 | Skill | Description |
 |------|-------------|
 | [`/one-shot`](.cursor/skills/one-shot/SKILL.md) | End-to-end task flow: plan, implement, test, PR, finalize; the skill orchestrated runs execute |
-| [`/task-run`](.cursor/skills/task-run/SKILL.md) | The no-PR run shape (Asana `agent_deliverable` = Task or Task + sim): ingest, plan, do the work, post one findings comment, attach a run report, Complete. Shares `one-shot/references/run-rules.md` (the run-wide rules) and the report template with `/one-shot`; loads none of the PR phases |
+| [`/task-run`](.cursor/skills/task-run/SKILL.md) | The no-PR run shape (Asana `agent_deliverable` = Task or Task + sim): ingest, plan, do the work, post one findings comment, attach a run report, Complete. Shares `one-shot/references/run-rules.md` (the run-wide rules) and the report template with `/one-shot`; loads none of the PR phases. A land task (the deliverable is landing a release or listed PRs) runs `/pr-land` in the primary checkouts as its work step |
 | [`/asana-plan`](.cursor/skills/asana-plan/SKILL.md) | Build an implementation plan from Asana or ad-hoc requirements |
 | [`/task-review`](.cursor/skills/task-review/SKILL.md) | Fetch Asana task context, summarize, and resolve the target repo by code evidence |
 | [`/im`](.cursor/skills/im/SKILL.md) | Implement with clean, structured commits (lint-warnings, lint-commit, history discipline) |
@@ -860,7 +860,7 @@ scripts, not be re-described independently across skills.
 | [`/bugbot`](.cursor/skills/bugbot/SKILL.md) | Address Cursor Bugbot findings until the PR is actually clean |
 | [`/pr-address`](.cursor/skills/pr-address/SKILL.md) | Address PR feedback: fixups, reply-then-resolve, mark-addressed |
 | [`/pr-review`](.cursor/skills/pr-review/SKILL.md) | Review a PR: deep multi-agent pass by default, plus an independent parent review (general code review and the Edge-specific checklist) on the session model at every level |
-| [`/pr-land`](.cursor/skills/pr-land/SKILL.md) | Land approved PRs: prepare, merge, publish, GUI dep bumps, staging cherry-picks, Asana updates; before the QA Verification handoff it writes one `QA: <item>` subtask per manual verification item |
+| [`/pr-land`](.cursor/skills/pr-land/SKILL.md) | Land approved PRs: prepare, merge, publish, GUI dep bumps, staging cherry-picks, a late reviewer-bot findings sweep, Asana updates; before the QA Verification handoff it writes one `QA: <item>` subtask per manual verification item. Holds each landing repo's land lease for the whole run, so checkout refreshes yield to it. Split like /one-shot: a core SKILL.md plus one `references/<phase>.md` per phase (comments, prepare, merge, publish, post-merge) |
 | [`/develop-staging`](.cursor/skills/develop-staging/SKILL.md) | Cut a staging release: bump the version, merge develop into staging, gate on develop/staging parity |
 | [`/staging-cherry-pick`](.cursor/skills/staging-cherry-pick/SKILL.md) | Cherry-pick landed staging-targeted commits onto staging |
 | [`/cheese`](.cursor/skills/cheese/SKILL.md) | Push a test-branch build, pinning unpublished dep PRs when required |
@@ -930,12 +930,14 @@ scripts live at `skills/` top level. The ones most worth knowing:
 
 | Script | Phase |
 |------|-------|
-| [`pr-land-discover.sh`](.cursor/skills/pr-land/scripts/pr-land-discover.sh) | Find relevant PRs and approval state |
+| [`pr-land-discover.sh`](.cursor/skills/pr-land/scripts/pr-land-discover.sh) | Find relevant PRs and approval state; drops merged and closed PRs (`notOpen`); `--no-bugbot-wait` lets auto-merge arm without waiting on running reviewer bots |
+| [`repo-land-lock.sh`](.cursor/skills/pr-land/scripts/repo-land-lock.sh) | Per-repo land lease; `--hold` keeps it for the whole run so main-checkout and master-build refreshes skip the repo |
 | [`pr-land-comments.sh`](.cursor/skills/pr-land/scripts/pr-land-comments.sh) | Detect unresolved inline, review-body, and top-level comments |
 | [`pr-land-prepare.sh`](.cursor/skills/pr-land/scripts/pr-land-prepare.sh) | Autosquash, rebase, detect conflicts, verify; refuses (exit 3) a base branch the master-build memo marks unbuildable unless `--allow-broken-develop` |
 | [`pr-land-merge.sh`](.cursor/skills/pr-land/scripts/pr-land-merge.sh) | Rebase again, verify, merge sequentially |
 | [`pr-land-publish.sh`](.cursor/skills/pr-land/scripts/pr-land-publish.sh) | Version bump, changelog, commit, tag |
 | [`upgrade-dep.sh`](.cursor/skills/pr-land/scripts/upgrade-dep.sh) | Bump one package on the current branch and commit lockfile updates |
+| [`pr-bot-findings-sweep.sh`](.cursor/skills/pr-land/scripts/pr-bot-findings-sweep.sh) | After merge, lists reviewer-bot findings that landed late on the merged PRs, so each becomes a follow-up task |
 | [`staging-cherry-pick.sh`](.cursor/skills/staging-cherry-pick/scripts/staging-cherry-pick.sh) | Cherry-pick staging-qualified commits |
 | [`staging-release-merge.sh`](.cursor/skills/develop-staging/scripts/staging-release-merge.sh) | Bump, merge develop into staging in a throwaway worktree, gate parity, push |
 | [`changelog-union-merge.sh`](.cursor/skills/pr-land/scripts/changelog-union-merge.sh) | Mechanical CHANGELOG conflict resolution at land time, and whole-section merging for the develop-into-staging release merge (`--release-merge`) |

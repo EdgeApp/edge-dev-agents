@@ -23,6 +23,16 @@
 #   release --repo R --owner O    only the owner releases; missing lock is fine -> exit 0
 #   status  --repo R              prints the lock JSON or "free"
 #
+# Run-level hold (--hold on acquire/release):
+#   acquire --hold --repo R --owner O --ttl 21600   marks the lease {"hold":true}
+#   release --hold --repo R --owner O               clears it (end of the land run)
+#   A plain release by the owner KEEPS a held lease, so the per-call
+#   acquire/release pairs inside prepare/automerge/publish never open a gap
+#   between pr-land steps. Every renewal (acquire-as-owner, renew) sets
+#   expires = max(current, now + TTL): a 30-min inner renewal never shortens the
+#   run-level hold. Readers (refresh-master-build.sh, refresh-main-checkouts.sh)
+#   skip while any unexpired lease exists, held or not.
+#
 # Lock file: $XDG_STATE_HOME/agent-watcher/land-locks/<repo>.json
 # Owner id: pass $AGENT_SESSION_UUID (orch) or any stable token (operator shell).
 
@@ -30,20 +40,24 @@ set -uo pipefail
 
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/land-locks"
 CMD="${1:-}"; shift || true
-REPO="" OWNER="" TTL=1800
+REPO="" OWNER="" TTL=1800 HOLD=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) REPO="$2"; shift 2 ;;
     --owner) OWNER="$2"; shift 2 ;;
     --ttl) TTL="$2"; shift 2 ;;
+    --hold) HOLD=1; shift ;;
     *) echo "repo-land-lock: unknown arg $1" >&2; exit 2 ;;
   esac
 done
-[[ -n "$CMD" && -n "$REPO" ]] || { echo "usage: repo-land-lock.sh <acquire|renew|release|status> --repo <name> [--owner <id>] [--ttl <s>]" >&2; exit 2; }
+[[ -n "$CMD" && -n "$REPO" ]] || { echo "usage: repo-land-lock.sh <acquire|renew|release|status> --repo <name> [--owner <id>] [--ttl <s>] [--hold]" >&2; exit 2; }
 REPO="${REPO##*/}"   # accept owner/name, key by name
 LOCK="$STATE_DIR/$REPO.json"
 mkdir -p "$STATE_DIR"
 NOW=$(date +%s)
+# Extend-only expiry; --hold additionally marks the lease as a run-level hold.
+EXTEND='.expires = ([.expires // 0, $ex] | max)'
+[[ -n "$HOLD" ]] && EXTEND="$EXTEND | .hold = true"
 
 case "$CMD" in
   acquire)
@@ -63,15 +77,15 @@ case "$CMD" in
     fi
     if [[ ! -f "$LOCK" ]]; then
       if ! ( set -C; jq -nc --arg o "$OWNER" --argjson ts "$NOW" --argjson ex "$((NOW+TTL))" \
-            '{owner:$o, ts:$ts, expires:$ex}' > "$LOCK" ) 2>/dev/null; then
+            "{owner:\$o, ts:\$ts} | $EXTEND" > "$LOCK" ) 2>/dev/null; then
         echo "repo-land-lock: lost the acquire race on $REPO — wait and retry." >&2
         exit 75
       fi
     else
       # renewal (ours)
-      jq -c --argjson ex "$((NOW+TTL))" '.expires=$ex' "$LOCK" > "$LOCK.tmp" 2>/dev/null && mv "$LOCK.tmp" "$LOCK"
+      jq -c --argjson ex "$((NOW+TTL))" "$EXTEND" "$LOCK" > "$LOCK.tmp" 2>/dev/null && mv "$LOCK.tmp" "$LOCK"
     fi
-    echo "repo-land-lock: $REPO leased to $OWNER for ${TTL}s"
+    echo "repo-land-lock: $REPO leased to $OWNER for ${TTL}s${HOLD:+ (run-level hold)}"
     ;;
   renew)
     [[ -n "$OWNER" ]] || { echo "repo-land-lock: renew needs --owner" >&2; exit 2; }
@@ -87,12 +101,16 @@ case "$CMD" in
       echo "repo-land-lock: NOT renewing $REPO: lease owned by $OWNER is expired (expires=$EXPIRES, now=$NOW); re-acquire" >&2
       exit 1
     fi
-    jq -c --argjson ex "$((NOW+TTL))" '.expires=$ex' "$LOCK" > "$LOCK.tmp.$$" 2>/dev/null && mv "$LOCK.tmp.$$" "$LOCK" || { rm -f "$LOCK.tmp.$$"; exit 1; }
+    jq -c --argjson ex "$((NOW+TTL))" '.expires = ([.expires // 0, $ex] | max)' "$LOCK" > "$LOCK.tmp.$$" 2>/dev/null && mv "$LOCK.tmp.$$" "$LOCK" || { rm -f "$LOCK.tmp.$$"; exit 1; }
     ;;
   release)
     if [[ -f "$LOCK" ]]; then
       CUR_OWNER=$(jq -r '.owner // ""' "$LOCK" 2>/dev/null || echo "")
       if [[ -z "$OWNER" || "$CUR_OWNER" == "$OWNER" ]]; then
+        if [[ -z "$HOLD" && "$(jq -r '.hold // false' "$LOCK" 2>/dev/null)" == "true" ]]; then
+          echo "repo-land-lock: $REPO kept (run-level hold; release --hold ends it)"
+          exit 0
+        fi
         rm -f "$LOCK"; echo "repo-land-lock: $REPO released"
       else
         echo "repo-land-lock: NOT releasing $REPO — held by $CUR_OWNER, not $OWNER" >&2

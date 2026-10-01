@@ -72,7 +72,12 @@ set -uo pipefail
 # machines reject bare npm).
 #
 # Usage: npm-publish-web.sh <repo-dir> [--timeout <secs>] [--attempts <n>]
-#          [--settle <secs>]
+#          [--settle <secs>] [--login-only]
+#
+# --login-only: run phase 1 (whoami preflight, web login if needed) and stop,
+# printing `LOGGED_IN <user>`. A batch publish runs this ONCE before starting
+# its per-repo publishes concurrently: concurrent runs that each find no
+# session would each mint their own login link.
 # Exit: 0 = published, 1 = error, 2 = auth never completed (all attempts
 #       timed out or were declined), 3 = terminal registry rejection
 #       (permission, payment),
@@ -89,9 +94,11 @@ MAX_ATTEMPTS=20
 # Seconds to wait, AFTER npm accepted the upload, for the registry to serve it.
 # Only the when is open at that point, not the whether.
 SETTLE=1800
+LOGIN_ONLY=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --login-only) LOGIN_ONLY=1; shift ;;
     --timeout) PHASE_TIMEOUT="$2"; shift 2 ;;
     --attempts) MAX_ATTEMPTS="$2"; shift 2 ;;
     --settle) SETTLE="$2"; shift 2 ;;
@@ -207,6 +214,10 @@ if ! (cd "$REPO_DIR" && $NPM whoami > "$WORK_DIR/whoami" 2>/dev/null); then
   echo "AUTH_DONE login $(tail -1 "$WORK_DIR/whoami" 2>/dev/null)"
 fi
 echo "logged in as $(cat "$WORK_DIR/whoami" 2>/dev/null | tail -1)" >&2
+if [ -n "$LOGIN_ONLY" ]; then
+  echo "LOGGED_IN $(tail -1 "$WORK_DIR/whoami" 2>/dev/null)"
+  exit 0
+fi
 
 # --- Phase 2: publish ---
 pkg_name=$(cd "$REPO_DIR" && node -e "process.stdout.write(require(process.cwd()+\"/package.json\").name)")
