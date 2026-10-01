@@ -9,9 +9,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-10-01T01:03:53Z",
-      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
-      "addedAt": "2026-10-01T01:03:53Z"
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T01:03:53Z",
+      "carriedFrom": "2026-10-01T01:03:53Z"
     },
     {
       "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-03-buy-quote-input.png",
@@ -21,9 +22,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-10-01T01:03:53Z",
-      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
-      "addedAt": "2026-10-01T01:03:53Z"
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T01:03:53Z",
+      "carriedFrom": "2026-10-01T01:03:53Z"
     },
     {
       "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-04-ramp-region.png",
@@ -33,9 +35,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-10-01T01:03:53Z",
-      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
-      "addedAt": "2026-10-01T01:03:53Z"
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T01:03:53Z",
+      "carriedFrom": "2026-10-01T01:03:53Z"
     },
     {
       "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-05-buy-quote.png",
@@ -45,45 +48,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-10-01T01:03:53Z",
-      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
-      "addedAt": "2026-10-01T01:03:53Z"
-    },
-    {
-      "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-06-swap-quote.png",
-      "caption": "swap quote",
-      "index": "6",
-      "hacked": false,
-      "phase": null,
-      "subject": null,
-      "hackNote": null,
-      "batchAt": "2026-10-01T01:03:53Z",
-      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
-      "addedAt": "2026-10-01T01:03:53Z"
-    },
-    {
-      "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-07-swap-success.png",
-      "caption": "swap success",
-      "index": "7",
-      "hacked": false,
-      "phase": null,
-      "subject": null,
-      "hackNote": null,
-      "batchAt": "2026-10-01T01:03:53Z",
-      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
-      "addedAt": "2026-10-01T01:03:53Z"
-    },
-    {
-      "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-08-send-sent.png",
-      "caption": "send sent",
-      "index": "8",
-      "hacked": false,
-      "phase": null,
-      "subject": null,
-      "hackNote": null,
-      "batchAt": "2026-10-01T01:03:53Z",
-      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
-      "addedAt": "2026-10-01T01:03:53Z"
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T01:03:53Z",
+      "carriedFrom": "2026-10-01T01:03:53Z"
     },
     {
       "path": "assets/edge-dev-agents/pr-5/20260930-180353-agent-proof-1219043297854606-09-throwaway-created.png",
@@ -93,9 +61,130 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-10-01T01:03:53Z",
-      "headSha": "b23577a70b103a81eee46e407939de1ecf289932",
-      "addedAt": "2026-10-01T01:03:53Z"
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T01:03:53Z",
+      "carriedFrom": "2026-10-01T01:03:53Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20261001-035346-agent-proof-1219043297854606-12-tap-point.png",
+      "caption": "tap point",
+      "index": "12",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T10:53:46Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20261001-035346-agent-proof-1219043297854606-13-copy-paste-random-text.png",
+      "caption": "copy paste random text",
+      "index": "13",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T10:53:46Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20261001-035346-agent-proof-1219043297854606-14-hide-keyboard.png",
+      "caption": "hide keyboard",
+      "index": "14",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T10:53:46Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20261001-035346-agent-proof-1219043297854606-15-long-press-menu.png",
+      "caption": "long press menu",
+      "index": "15",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T10:53:46Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20261001-035346-agent-proof-1219043297854606-16-scroll-center-element.png",
+      "caption": "scroll center element",
+      "index": "16",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T10:53:46Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20261001-035346-agent-proof-1219043297854606-17-assert-enabled.png",
+      "caption": "assert enabled",
+      "index": "17",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T10:53:46Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20261001-035346-agent-proof-1219043297854606-18-reg-swap-quote.png",
+      "caption": "reg swap quote",
+      "index": "18",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T10:53:46Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20261001-035346-agent-proof-1219043297854606-19-reg-swap-success.png",
+      "caption": "reg swap success",
+      "index": "19",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T10:53:46Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20261001-035346-agent-proof-1219043297854606-20-reg-send-success.png",
+      "caption": "reg send success",
+      "index": "20",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T10:53:46Z"
+    },
+    {
+      "path": "assets/edge-dev-agents/pr-5/20261001-035346-agent-proof-1219043297854606-21-reg-throwaway-deleted.png",
+      "caption": "reg throwaway deleted",
+      "index": "21",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-01T10:53:46Z",
+      "headSha": "a085b7908d7b915e6cbefcc4a37d8c16e43d4fab",
+      "addedAt": "2026-10-01T10:53:46Z"
     }
   ]
 }
