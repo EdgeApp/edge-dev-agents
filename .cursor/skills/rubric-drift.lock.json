@@ -435,7 +435,7 @@
       ]
     },
     "pr-land:npm-publish-auth": {
-      "hash": "7dba906d0af9",
+      "hash": "5405c9c32a2b",
       "dims": [
         "A15"
       ]
@@ -564,7 +564,7 @@
       ]
     },
     "file:lint-commit.sh": {
-      "hash": "f16f81395268",
+      "hash": "6e0b86a5e346",
       "dims": [
         "A12"
       ]
@@ -673,7 +673,7 @@
       ]
     },
     "file:completion-judge.sh": {
-      "hash": "16670672eb38",
+      "hash": "f24bea8e85de",
       "dims": [
         "O9"
       ]
@@ -721,7 +721,7 @@
       ]
     },
     "file:block-raw-gh-writes.sh": {
-      "hash": "fbef6537e034",
+      "hash": "c2aab4b94026",
       "dims": [
         "A36"
       ]
@@ -730,6 +730,12 @@
       "hash": "5106c9fbec45",
       "dims": [
         "A18"
+      ]
+    },
+    "pr-land:land-hold": {
+      "hash": "bca2a798209d",
+      "dims": [
+        "A15"
       ]
     }
   },
@@ -1593,6 +1599,10 @@
     "asana-task-update:set-notes-before-first-run": {
       "reason": "2026-09-30: mechanically enforced by asana-task-update.sh: refused once agent_status is set, so orch runs can never use it",
       "hash": "57d04822b25f"
+    },
+    "task-run:landing-task": {
+      "reason": "2026-10-01: permission-only routing rule; A15 grades the /pr-land run it permits",
+      "hash": "b187b1601553"
     }
   },
   "excluded_skills": {

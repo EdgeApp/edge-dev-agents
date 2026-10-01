@@ -11,7 +11,11 @@ set -euo pipefail
 # and order entries within the merged hunk by type (added → changed →
 # deprecated → fixed → removed → security). Non-entry lines (headings, blanks)
 # keep their position. A hunk whose two sides disagree on their SECTION
-# HEADINGS is refused, because a blind union would scramble sections.
+# HEADINGS is never blind-unioned, because that would scramble sections: when
+# upstream cut releases after the branch forked, upstream's side is kept
+# verbatim and only the branch entries it lacks are placed (see
+# placeBranchEntries); anything that does not place cleanly is refused.
+# Tested by ~/.config/agent-watcher/hooks/tests/changelog-union-merge.test.py.
 #
 # RELEASE-MERGE mode (--release-merge), used by /develop-staging.
 # The develop→staging release merge produces a hunk shape the default mode
@@ -156,6 +160,84 @@ function mergeSectionSequences(ours, theirs) {
   return { lines: outLines, headings };
 }
 
+// ---- released-upstream helpers (default mode, heading-mismatch hunks) --------
+
+// Every line upstream carries: the file outside the branch sides of all hunks.
+// A branch entry found here is already on upstream and adds nothing.
+const upstreamLines = new Set();
+{
+  let side = "";
+  for (const l of lines) {
+    if (l.startsWith("<<<<<<< ")) side = "ours";
+    else if (side && l.startsWith("=======")) side = "theirs";
+    else if (side && l.startsWith(">>>>>>> ")) side = "";
+    else if (side !== "theirs") upstreamLines.add(l);
+  }
+}
+
+// Insert entries into a section body in type order, without moving any line
+// upstream already has.
+function insertEntries(body, add) {
+  const res = [...body];
+  for (const e of add) {
+    const r = typeRank(e);
+    let pos = -1;
+    for (let k = 0; k < res.length; k++) {
+      if (/^- /.test(res[k]) && typeRank(res[k]) <= r) pos = k;
+    }
+    if (pos === -1) {
+      const first = res.findIndex((l) => /^- /.test(l));
+      if (first !== -1) pos = first - 1;
+      else { while (pos + 1 < res.length && res[pos + 1].trim() === "") pos++; }
+    }
+    res.splice(pos + 1, 0, e);
+  }
+  return res;
+}
+
+// Upstream cut releases after the branch forked: the upstream side carries new
+// `## x.y.z` sections, the branch side carries its entries (plus whatever
+// headings the diff aligned in). Upstream is the record, so its side is kept
+// verbatim and only the branch entries upstream lacks are added: entries above
+// the first branch-side heading join the section the hunk opens in; entries
+// under a heading join the upstream section with that same heading. A new entry
+// under any other heading (the branch edited a released section upstream does
+// not show here), or new non-entry text, is refused.
+function placeBranchEntries(ours, theirs, nextLine) {
+  const segs = [{ heading: null, body: [] }];
+  for (const l of ours) {
+    if (/^## /.test(l)) segs.push({ heading: l, body: [] });
+    else segs[segs.length - 1].body.push(l);
+  }
+  const adds = segs.map(() => []);
+  let target = 0;
+  let thHeading = null;
+  for (const l of theirs) {
+    if (/^## /.test(l)) {
+      thHeading = l;
+      target = l === curSection ? 0 : segs.findIndex((s) => s.heading === l);
+      continue;
+    }
+    if (l.trim() === "" || upstreamLines.has(l)) continue;
+    if (!/^- /.test(l)) return { error: "branch side adds non-entry text the hunk cannot place" };
+    if (target === -1) {
+      return { error: "branch adds an entry under " + thHeading + ", which upstream does not carry in this hunk" };
+    }
+    if (!adds[target].includes(l)) adds[target].push(l);
+  }
+  const out = [];
+  const touchedHere = [curSection];
+  segs.forEach((s, k) => {
+    if (s.heading !== null) { out.push(s.heading); touchedHere.push(s.heading); }
+    if (adds[k].length === 0) { out.push(...s.body); return; }
+    const body = insertEntries(s.body, adds[k]);
+    const follows = k + 1 < segs.length ? segs[k + 1].heading : nextLine;
+    if (/^## /.test(follows || "") && body.length && body[body.length - 1].trim() !== "") body.push("");
+    out.push(...body);
+  });
+  return { lines: out, touched: touchedHere };
+}
+
 // ---- main hunk walk ---------------------------------------------------------
 
 let i = 0;
@@ -184,8 +266,14 @@ while (i < lines.length) {
     // bail for hand resolution, unless --release-merge is in effect.
     if (oh.length !== th.length || oh.some((h, k) => h !== th[k])) {
       if (!releaseMerge) {
-        console.error("hunk spans a section heading and the two sides disagree on the headings — resolve by hand");
-        process.exit(1);
+        const placed = placeBranchEntries(ours, theirs, lines[i]);
+        if (placed.error) {
+          console.error(placed.error + " — resolve by hand");
+          process.exit(1);
+        }
+        for (const h of placed.touched) touched.add(h);
+        pushOut(placed.lines);
+        continue;
       }
       const merged = mergeSectionSequences(ours, theirs);
       if (merged === null) {

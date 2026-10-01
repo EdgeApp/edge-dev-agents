@@ -123,6 +123,11 @@
           "type": "command"
         },
         {
+          "command": "~/.config/agent-watcher/hooks/require-npm-link-relay.sh",
+          "timeout": 15,
+          "type": "command"
+        },
+        {
           "command": "~/.config/agent-watcher/hooks/require-maestro-device.sh",
           "timeout": 10,
           "type": "command"

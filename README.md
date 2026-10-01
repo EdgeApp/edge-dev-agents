@@ -937,10 +937,11 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`pr-land-merge.sh`](.cursor/skills/pr-land/scripts/pr-land-merge.sh) | Rebase again, verify, merge sequentially |
 | [`pr-land-publish.sh`](.cursor/skills/pr-land/scripts/pr-land-publish.sh) | Version bump, changelog, commit, tag |
 | [`upgrade-dep.sh`](.cursor/skills/pr-land/scripts/upgrade-dep.sh) | Bump one package on the current branch and commit lockfile updates |
+| [`npm-auth-wait.sh`](.cursor/skills/pr-land/scripts/npm-auth-wait.sh) | Foreground wait on `npm-publish-web.sh` logs; returns within one poll of each new auth link or tap so the relay goes out while the link is live |
 | [`pr-bot-findings-sweep.sh`](.cursor/skills/pr-land/scripts/pr-bot-findings-sweep.sh) | After merge, lists reviewer-bot findings that landed late on the merged PRs, so each becomes a follow-up task |
 | [`staging-cherry-pick.sh`](.cursor/skills/staging-cherry-pick/scripts/staging-cherry-pick.sh) | Cherry-pick staging-qualified commits |
 | [`staging-release-merge.sh`](.cursor/skills/develop-staging/scripts/staging-release-merge.sh) | Bump, merge develop into staging in a throwaway worktree, gate parity, push |
-| [`changelog-union-merge.sh`](.cursor/skills/pr-land/scripts/changelog-union-merge.sh) | Mechanical CHANGELOG conflict resolution at land time, and whole-section merging for the develop-into-staging release merge (`--release-merge`) |
+| [`changelog-union-merge.sh`](.cursor/skills/pr-land/scripts/changelog-union-merge.sh) | Mechanical CHANGELOG conflict resolution at land time, including a branch rebased across releases upstream cut after it forked, and whole-section merging for the develop-into-staging release merge (`--release-merge`) |
 | [`verify-repo.sh`](.cursor/skills/verify-repo.sh) | Run changelog and code verification |
 
 ### Build, lint, and prose

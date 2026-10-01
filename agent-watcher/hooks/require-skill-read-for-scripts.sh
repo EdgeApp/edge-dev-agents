@@ -139,7 +139,7 @@ done
 need 'pr-land-comments\.sh([[:space:]]|$)'                        pr-land:comments
 need '(pr-land-prepare|changelog-union-merge)\.sh([[:space:]]|$)' pr-land:prepare
 need '(pr-land-automerge|pr-merge-watch|pr-land-merge|force-land-rationale)\.sh([[:space:]]|$)' pr-land:merge
-need '(pr-land-publish|npm-publish-web|upgrade-dep)\.sh([[:space:]]|$)' pr-land:publish
+need '(pr-land-publish|npm-publish-web|npm-auth-wait|upgrade-dep)\.sh([[:space:]]|$)' pr-land:publish
 need '(pr-bot-findings-sweep|pr-land-extract-asana-task)\.sh([[:space:]]|$)' pr-land:post-merge
 [ "$ORCH" = 1 ] || return 0
 
