@@ -2,71 +2,6 @@
   "version": 2,
   "entries": [
     {
-      "path": "assets/edge-react-gui/pr-6066/20260702-201020-agent-proof-1216251688512498-01-stealth-send-toggle.png",
-      "caption": "agent proof 1216251688512498 01 stealth send toggle",
-      "hacked": false,
-      "phase": null,
-      "subject": "Warn on send while a swap is queued [skip travis]",
-      "hackNote": null,
-      "migratedFrom": 4872243243,
-      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/reactg6066/001-stealth-send-toggl-62e53a.png",
-      "batchAt": "2026-10-02T18:37:35Z",
-      "headSha": "0f6a3b4579e30ead73267a07eefa3e81067aab69",
-      "carriedFrom": "2026-09-26T02:57:40Z"
-    },
-    {
-      "path": "assets/edge-react-gui/pr-6066/20260702-201020-agent-proof-1216251688512498-03-send-to-any-quote.png",
-      "caption": "agent proof 1216251688512498 03 send to any quote",
-      "hacked": false,
-      "phase": null,
-      "subject": "Warn on send while a swap is queued [skip travis]",
-      "hackNote": null,
-      "migratedFrom": 4872243243,
-      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/reactg6066/003-send-to-any-quote-e5acc8.png",
-      "batchAt": "2026-10-02T18:37:35Z",
-      "headSha": "0f6a3b4579e30ead73267a07eefa3e81067aab69",
-      "carriedFrom": "2026-09-26T02:57:40Z"
-    },
-    {
-      "path": "assets/edge-react-gui/pr-6066/20260702-201020-agent-proof-1216251688512498-04-send-to-any-success.png",
-      "caption": "agent proof 1216251688512498 04 send to any success",
-      "hacked": false,
-      "phase": null,
-      "subject": "Warn on send while a swap is queued [skip travis]",
-      "hackNote": null,
-      "migratedFrom": 4872243243,
-      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/reactg6066/004-send-to-any-succes-d7115d.png",
-      "batchAt": "2026-10-02T18:37:35Z",
-      "headSha": "0f6a3b4579e30ead73267a07eefa3e81067aab69",
-      "carriedFrom": "2026-09-26T02:57:40Z"
-    },
-    {
-      "path": "assets/edge-react-gui/pr-6066/20260702-201020-agent-proof-1216251688512498-05-stealth-swap-toggle.png",
-      "caption": "agent proof 1216251688512498 05 stealth swap toggle",
-      "hacked": false,
-      "phase": null,
-      "subject": "Warn on send while a swap is queued [skip travis]",
-      "hackNote": null,
-      "migratedFrom": 4872243243,
-      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/reactg6066/005-stealth-swap-toggl-91abfd.png",
-      "batchAt": "2026-10-02T18:37:35Z",
-      "headSha": "0f6a3b4579e30ead73267a07eefa3e81067aab69",
-      "carriedFrom": "2026-09-26T02:57:40Z"
-    },
-    {
-      "path": "assets/edge-react-gui/pr-6066/20260702-201020-agent-proof-1216251688512498-06-stealth-swap-houdini-only.png",
-      "caption": "agent proof 1216251688512498 06 stealth swap houdini only",
-      "hacked": false,
-      "phase": null,
-      "subject": "Warn on send while a swap is queued [skip travis]",
-      "hackNote": null,
-      "migratedFrom": 4872243243,
-      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/reactg6066/006-stealth-swap-houdi-31eca5.png",
-      "batchAt": "2026-10-02T18:37:35Z",
-      "headSha": "0f6a3b4579e30ead73267a07eefa3e81067aab69",
-      "carriedFrom": "2026-09-26T02:57:40Z"
-    },
-    {
       "path": "assets/edge-react-gui/pr-6066/20260702-201020-agent-proof-1216251688512498-07-learn-more-browser.png",
       "caption": "agent proof 1216251688512498 07 learn more browser",
       "hacked": false,
@@ -114,45 +49,6 @@
       "hackNote": null,
       "migratedFrom": 4872243243,
       "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/reactg6066/010-multi-recipient-ga-2ca6f8.png",
-      "batchAt": "2026-10-02T18:37:35Z",
-      "headSha": "0f6a3b4579e30ead73267a07eefa3e81067aab69",
-      "carriedFrom": "2026-09-26T02:57:40Z"
-    },
-    {
-      "path": "assets/edge-react-gui/pr-6066/20260708-171332-agent-proof-1216251688512498-01-send-to-any-houdini-1rem-row.png",
-      "caption": "agent proof 1216251688512498 01 send to any houdini 1rem row",
-      "hacked": false,
-      "phase": null,
-      "subject": "Warn on send while a swap is queued [skip travis]",
-      "hackNote": null,
-      "migratedFrom": 4920313752,
-      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/reactg6066/011-send-to-any-houdin-6792d2.png",
-      "batchAt": "2026-10-02T18:37:35Z",
-      "headSha": "0f6a3b4579e30ead73267a07eefa3e81067aab69",
-      "carriedFrom": "2026-09-26T02:57:40Z"
-    },
-    {
-      "path": "assets/edge-react-gui/pr-6066/20260708-171332-agent-proof-1216251688512498-02-send-to-any-configured.png",
-      "caption": "agent proof 1216251688512498 02 send to any configured",
-      "hacked": false,
-      "phase": null,
-      "subject": "Warn on send while a swap is queued [skip travis]",
-      "hackNote": null,
-      "migratedFrom": 4920313752,
-      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/reactg6066/012-send-to-any-config-d153ec.png",
-      "batchAt": "2026-10-02T18:37:35Z",
-      "headSha": "0f6a3b4579e30ead73267a07eefa3e81067aab69",
-      "carriedFrom": "2026-09-26T02:57:40Z"
-    },
-    {
-      "path": "assets/edge-react-gui/pr-6066/20260714-142253-agent-proof-1216251688512498-03-vertical-gap-matched.png",
-      "caption": "agent proof 1216251688512498 03 vertical gap matched",
-      "hacked": false,
-      "phase": null,
-      "subject": "Warn on send while a swap is queued [skip travis]",
-      "hackNote": null,
-      "migratedFrom": 4974121393,
-      "url": "https://pub-a869cb1372dd43279002e19efa2e6176.r2.dev/reactg6066/013-vertical-gap-match-81f05e.png",
       "batchAt": "2026-10-02T18:37:35Z",
       "headSha": "0f6a3b4579e30ead73267a07eefa3e81067aab69",
       "carriedFrom": "2026-09-26T02:57:40Z"
@@ -2004,19 +1900,6 @@
       "carriedFrom": "2026-09-26T02:57:40Z"
     },
     {
-      "path": "assets/edge-react-gui/pr-6066/20260925-195842-agent-proof-1216251688512498-31-plain-uri-memo-filled.png",
-      "caption": "plain uri memo filled",
-      "index": "31",
-      "hacked": false,
-      "phase": null,
-      "subject": null,
-      "hackNote": null,
-      "batchAt": "2026-10-02T18:37:35Z",
-      "headSha": "0f6a3b4579e30ead73267a07eefa3e81067aab69",
-      "addedAt": "2026-09-26T02:58:42Z",
-      "carriedFrom": "2026-09-26T02:57:40Z"
-    },
-    {
       "path": "assets/edge-react-gui/pr-6066/20260925-195842-agent-proof-1216251688512498-32-stealth-armed-tag-seeded.png",
       "caption": "stealth armed tag seeded",
       "index": "32",
@@ -2056,7 +1939,7 @@
       "carriedFrom": "2026-09-26T02:57:40Z"
     },
     {
-      "path": "assets/edge-react-gui/pr-6066/20261002-113735-agent-proof-1216251688512498-47-uri-memo-parsed-shared-parser.png",
+      "path": "assets/edge-react-gui/pr-6066/20261002-113754-agent-proof-1216251688512498-47-uri-memo-parsed-shared-parser.png",
       "caption": "uri memo parsed shared parser",
       "index": "47",
       "hacked": false,
@@ -2065,7 +1948,7 @@
       "hackNote": null,
       "batchAt": "2026-10-02T18:37:35Z",
       "headSha": "0f6a3b4579e30ead73267a07eefa3e81067aab69",
-      "addedAt": "2026-10-02T18:37:35Z"
+      "addedAt": "2026-10-02T18:37:54Z"
     }
   ]
 }
