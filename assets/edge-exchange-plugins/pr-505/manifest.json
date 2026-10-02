@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-exchange-plugins/pr-505/20261001-213606-agent-proof-1219090552440087-01-pol-to-sol-lifi-quote.png",
+      "caption": "pol to sol lifi quote",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T04:36:06Z",
+      "headSha": "4910de0b1f6245e530461638541c6fbae850c7ad",
+      "addedAt": "2026-10-02T04:36:06Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-505/20261001-213606-agent-proof-1219090552440087-02-pol-to-sol-lifi-success.png",
+      "caption": "pol to sol lifi success",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T04:36:06Z",
+      "headSha": "4910de0b1f6245e530461638541c6fbae850c7ad",
+      "addedAt": "2026-10-02T04:36:06Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-505/20261001-213606-agent-proof-1219090552440087-03-sol-to-pol-lifi-quote.png",
+      "caption": "sol to pol lifi quote",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T04:36:06Z",
+      "headSha": "4910de0b1f6245e530461638541c6fbae850c7ad",
+      "addedAt": "2026-10-02T04:36:06Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-505/20261001-213606-agent-proof-1219090552440087-04-sol-to-pol-lifi-success.png",
+      "caption": "sol to pol lifi success",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T04:36:06Z",
+      "headSha": "4910de0b1f6245e530461638541c6fbae850c7ad",
+      "addedAt": "2026-10-02T04:36:06Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-505/20261001-213606-agent-proof-1219090552440087-05-solana-usdc-to-pol-lifi-quote.png",
+      "caption": "solana usdc to pol lifi quote",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T04:36:06Z",
+      "headSha": "4910de0b1f6245e530461638541c6fbae850c7ad",
+      "addedAt": "2026-10-02T04:36:06Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-505/20261001-213606-agent-proof-1219090552440087-06-solana-usdc-to-pol-lifi-success.png",
+      "caption": "solana usdc to pol lifi success",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T04:36:06Z",
+      "headSha": "4910de0b1f6245e530461638541c6fbae850c7ad",
+      "addedAt": "2026-10-02T04:36:06Z"
+    }
+  ]
+}
