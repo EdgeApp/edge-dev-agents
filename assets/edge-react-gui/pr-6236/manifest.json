@@ -9,10 +9,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-10-02T22:07:43Z",
-      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
+      "batchAt": "2026-10-02T23:07:53Z",
+      "headSha": "9e249a3552dfb2fabb6c8cd5ca1b4cf2dd172b50",
       "addedAt": "2026-10-02T21:57:42Z",
-      "carriedFrom": "2026-10-02T21:57:42Z"
+      "carriedFrom": "2026-10-02T22:07:43Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6236/20261002-145742-agent-proof-1219117645108274-02-unknown-order-unverified-no-send.png",
@@ -22,10 +22,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-10-02T22:07:43Z",
-      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
+      "batchAt": "2026-10-02T23:07:53Z",
+      "headSha": "9e249a3552dfb2fabb6c8cd5ca1b4cf2dd172b50",
       "addedAt": "2026-10-02T21:57:42Z",
-      "carriedFrom": "2026-10-02T21:57:42Z"
+      "carriedFrom": "2026-10-02T22:07:43Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6236/20261002-145742-agent-proof-1219117645108274-03-HACKED-open-arbitrum-order-picker-arbitrum-only.png",
@@ -34,11 +34,11 @@
       "hacked": true,
       "phase": null,
       "subject": null,
-      "hackNote": "fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order for transactionId forced-open-arbitrum-eth instead of calling MoonPay; reverted before commit",
-      "batchAt": "2026-10-02T22:07:43Z",
-      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
+      "hackNote": "HACK-NOTE: fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order (0.0001 ETH, quote 0.26 USD, or no quote for the -noquote id) paying the account's own Ethereum-wallet address, instead of calling MoonPay; reverted before commit",
+      "batchAt": "2026-10-02T23:07:53Z",
+      "headSha": "9e249a3552dfb2fabb6c8cd5ca1b4cf2dd172b50",
       "addedAt": "2026-10-02T21:57:42Z",
-      "carriedFrom": "2026-10-02T21:57:42Z"
+      "carriedFrom": "2026-10-02T22:07:43Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6236/20261002-145742-agent-proof-1219117645108274-05-in-app-sell-moonpay-widget-opens-with-per-order-redirect.png",
@@ -48,10 +48,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-10-02T22:07:43Z",
-      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
+      "batchAt": "2026-10-02T23:07:53Z",
+      "headSha": "9e249a3552dfb2fabb6c8cd5ca1b4cf2dd172b50",
       "addedAt": "2026-10-02T21:57:42Z",
-      "carriedFrom": "2026-10-02T21:57:42Z"
+      "carriedFrom": "2026-10-02T22:07:43Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6236/20261002-150743-agent-proof-1219117645108274-04-HACKED-open-order-send-uses-order-address-and-amount.png",
@@ -60,10 +60,11 @@
       "hacked": true,
       "phase": null,
       "subject": null,
-      "hackNote": "fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order for transactionId forced-open-arbitrum-eth instead of calling MoonPay; reverted before commit",
-      "batchAt": "2026-10-02T22:07:43Z",
-      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
-      "addedAt": "2026-10-02T22:07:43Z"
+      "hackNote": "HACK-NOTE: fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order (0.0001 ETH, quote 0.26 USD, or no quote for the -noquote id) paying the account's own Ethereum-wallet address, instead of calling MoonPay; reverted before commit",
+      "batchAt": "2026-10-02T23:07:53Z",
+      "headSha": "9e249a3552dfb2fabb6c8cd5ca1b4cf2dd172b50",
+      "addedAt": "2026-10-02T22:07:43Z",
+      "carriedFrom": "2026-10-02T22:07:43Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6236/20261002-150743-agent-proof-1219117645108274-06-HACKED-open-order-send-tiles-locked-after-taps.png",
@@ -72,10 +73,11 @@
       "hacked": true,
       "phase": null,
       "subject": null,
-      "hackNote": "fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order for transactionId forced-open-arbitrum-eth instead of calling MoonPay; reverted before commit",
-      "batchAt": "2026-10-02T22:07:43Z",
-      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
-      "addedAt": "2026-10-02T22:07:43Z"
+      "hackNote": "HACK-NOTE: fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order (0.0001 ETH, quote 0.26 USD, or no quote for the -noquote id) paying the account's own Ethereum-wallet address, instead of calling MoonPay; reverted before commit",
+      "batchAt": "2026-10-02T23:07:53Z",
+      "headSha": "9e249a3552dfb2fabb6c8cd5ca1b4cf2dd172b50",
+      "addedAt": "2026-10-02T22:07:43Z",
+      "carriedFrom": "2026-10-02T22:07:43Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6236/20261002-152653-agent-proof-1219117645108274-07-HACKED-open-order-funded-send-ready.png",
@@ -84,10 +86,11 @@
       "hacked": true,
       "phase": null,
       "subject": null,
-      "hackNote": "fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order for transactionId forced-open-arbitrum-eth instead of calling MoonPay (frames 07 to 09: deposit address is the test account's own Ethereum-wallet address); reverted before commit",
-      "batchAt": "2026-10-02T22:07:43Z",
-      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
-      "addedAt": "2026-10-02T22:26:53Z"
+      "hackNote": "HACK-NOTE: fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order (0.0001 ETH, quote 0.26 USD, or no quote for the -noquote id) paying the account's own Ethereum-wallet address, instead of calling MoonPay; reverted before commit",
+      "batchAt": "2026-10-02T23:07:53Z",
+      "headSha": "9e249a3552dfb2fabb6c8cd5ca1b4cf2dd172b50",
+      "addedAt": "2026-10-02T22:26:53Z",
+      "carriedFrom": "2026-10-02T22:07:43Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6236/20261002-152653-agent-proof-1219117645108274-08-HACKED-open-order-send-broadcast-transaction-success.png",
@@ -96,22 +99,59 @@
       "hacked": true,
       "phase": null,
       "subject": null,
-      "hackNote": "fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order for transactionId forced-open-arbitrum-eth instead of calling MoonPay (frames 07 to 09: deposit address is the test account's own Ethereum-wallet address); reverted before commit",
-      "batchAt": "2026-10-02T22:07:43Z",
-      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
-      "addedAt": "2026-10-02T22:26:53Z"
+      "hackNote": "HACK-NOTE: fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order (0.0001 ETH, quote 0.26 USD, or no quote for the -noquote id) paying the account's own Ethereum-wallet address, instead of calling MoonPay; reverted before commit",
+      "batchAt": "2026-10-02T23:07:53Z",
+      "headSha": "9e249a3552dfb2fabb6c8cd5ca1b4cf2dd172b50",
+      "addedAt": "2026-10-02T22:26:53Z",
+      "carriedFrom": "2026-10-02T22:07:43Z"
     },
     {
-      "path": "assets/edge-react-gui/pr-6236/20261002-152653-agent-proof-1219117645108274-09-HACKED-open-order-sent-transaction-details.png",
-      "caption": "open order sent transaction details",
-      "index": "9",
+      "path": "assets/edge-react-gui/pr-6236/20261002-160753-agent-proof-1219117645108274-10-HACKED-quoted-order-send-ready.png",
+      "caption": "quoted order send ready",
+      "index": "10",
       "hacked": true,
       "phase": null,
       "subject": null,
-      "hackNote": "fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order for transactionId forced-open-arbitrum-eth instead of calling MoonPay (frames 07 to 09: deposit address is the test account's own Ethereum-wallet address); reverted before commit",
-      "batchAt": "2026-10-02T22:07:43Z",
-      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
-      "addedAt": "2026-10-02T22:26:53Z"
+      "hackNote": "HACK-NOTE: fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order (0.0001 ETH, quote 0.26 USD, or no quote for the -noquote id) paying the account's own Ethereum-wallet address, instead of calling MoonPay; reverted before commit",
+      "batchAt": "2026-10-02T23:07:53Z",
+      "headSha": "9e249a3552dfb2fabb6c8cd5ca1b4cf2dd172b50",
+      "addedAt": "2026-10-02T23:07:53Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6236/20261002-160753-agent-proof-1219117645108274-11-HACKED-quoted-order-details-show-moonpay-sell.png",
+      "caption": "quoted order details show moonpay sell",
+      "index": "11",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "HACK-NOTE: fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order (0.0001 ETH, quote 0.26 USD, or no quote for the -noquote id) paying the account's own Ethereum-wallet address, instead of calling MoonPay; reverted before commit",
+      "batchAt": "2026-10-02T23:07:53Z",
+      "headSha": "9e249a3552dfb2fabb6c8cd5ca1b4cf2dd172b50",
+      "addedAt": "2026-10-02T23:07:53Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6236/20261002-160753-agent-proof-1219117645108274-12-HACKED-quoted-order-details-order-id-receipt-support.png",
+      "caption": "quoted order details order id receipt support",
+      "index": "12",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "HACK-NOTE: fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order (0.0001 ETH, quote 0.26 USD, or no quote for the -noquote id) paying the account's own Ethereum-wallet address, instead of calling MoonPay; reverted before commit",
+      "batchAt": "2026-10-02T23:07:53Z",
+      "headSha": "9e249a3552dfb2fabb6c8cd5ca1b4cf2dd172b50",
+      "addedAt": "2026-10-02T23:07:53Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6236/20261002-160753-agent-proof-1219117645108274-13-HACKED-unquoted-order-send-still-opens.png",
+      "caption": "unquoted order send still opens",
+      "index": "13",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "HACK-NOTE: fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order (0.0001 ETH, quote 0.26 USD, or no quote for the -noquote id) paying the account's own Ethereum-wallet address, instead of calling MoonPay; reverted before commit",
+      "batchAt": "2026-10-02T23:07:53Z",
+      "headSha": "9e249a3552dfb2fabb6c8cd5ca1b4cf2dd172b50",
+      "addedAt": "2026-10-02T23:07:53Z"
     }
   ]
 }
