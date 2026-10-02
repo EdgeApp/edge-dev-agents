@@ -1,0 +1,65 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-exchange-plugins/pr-504/20261001-194459-agent-proof-1218563157181138-20-lifi-sol-to-arc-usdc-quote.png",
+      "caption": "lifi sol to arc usdc quote",
+      "index": "20",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T02:44:59Z",
+      "headSha": "9fc596ae04450c45762ae754a7615b1d028de4b8",
+      "addedAt": "2026-10-02T02:44:59Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-504/20261001-194459-agent-proof-1218563157181138-21-lifi-sol-to-arc-usdc-confirm.png",
+      "caption": "lifi sol to arc usdc confirm",
+      "index": "21",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T02:44:59Z",
+      "headSha": "9fc596ae04450c45762ae754a7615b1d028de4b8",
+      "addedAt": "2026-10-02T02:44:59Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-504/20261001-194459-agent-proof-1218563157181138-22-lifi-sol-to-arc-usdc-success.png",
+      "caption": "lifi sol to arc usdc success",
+      "index": "22",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T02:44:59Z",
+      "headSha": "9fc596ae04450c45762ae754a7615b1d028de4b8",
+      "addedAt": "2026-10-02T02:44:59Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-504/20261001-194459-agent-proof-1218563157181138-27-lifi-solana-usdc-to-pol-confirm.png",
+      "caption": "lifi solana usdc to pol confirm",
+      "index": "27",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T02:44:59Z",
+      "headSha": "9fc596ae04450c45762ae754a7615b1d028de4b8",
+      "addedAt": "2026-10-02T02:44:59Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-504/20261001-194459-agent-proof-1218563157181138-28-lifi-solana-usdc-to-pol-success.png",
+      "caption": "lifi solana usdc to pol success",
+      "index": "28",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T02:44:59Z",
+      "headSha": "9fc596ae04450c45762ae754a7615b1d028de4b8",
+      "addedAt": "2026-10-02T02:44:59Z"
+    }
+  ]
+}
