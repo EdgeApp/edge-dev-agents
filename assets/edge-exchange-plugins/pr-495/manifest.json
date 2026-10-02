@@ -549,6 +549,30 @@
       "batchAt": "2026-10-02T06:19:07Z",
       "headSha": "55b850e0704c629d12fe29283f93ffef56856456",
       "addedAt": "2026-10-02T06:36:44Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20261002-000257-agent-proof-1218563157181138-63-changehero-arc-to-eth-quote.png",
+      "caption": "changehero arc to eth quote",
+      "index": "63",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T06:19:07Z",
+      "headSha": "55b850e0704c629d12fe29283f93ffef56856456",
+      "addedAt": "2026-10-02T07:02:57Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20261002-000257-agent-proof-1218563157181138-64-changehero-arc-to-eth-success.png",
+      "caption": "changehero arc to eth success",
+      "index": "64",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T06:19:07Z",
+      "headSha": "55b850e0704c629d12fe29283f93ffef56856456",
+      "addedAt": "2026-10-02T07:02:57Z"
     }
   ]
 }
