@@ -144,6 +144,30 @@
       "batchAt": "2026-10-01T17:32:41Z",
       "headSha": "9defa8cab58f826f59f5654891215074c8625a7e",
       "addedAt": "2026-10-01T17:32:41Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20261001-173806-agent-proof-1218563157181138-16-arc-wallet-history-after-swaps.png",
+      "caption": "arc wallet history after swaps",
+      "index": "16",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T00:38:06Z",
+      "headSha": "4ac5b4699cc87b440ac6c5d0f40a757e1dde395f",
+      "addedAt": "2026-10-02T00:38:06Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1106/20261001-173806-agent-proof-1218563157181138-17-arc-native-interface-custom-token-rejected.png",
+      "caption": "arc native interface custom token rejected",
+      "index": "17",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T00:38:06Z",
+      "headSha": "4ac5b4699cc87b440ac6c5d0f40a757e1dde395f",
+      "addedAt": "2026-10-02T00:38:06Z"
     }
   ]
 }
