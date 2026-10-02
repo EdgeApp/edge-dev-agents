@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-currency-accountbased/pr-1116/20261001-181255-agent-proof-1219083638576771-01-atom-wallet-loaded.png",
+      "caption": "atom wallet loaded",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T01:12:55Z",
+      "headSha": "6412e5e4aba019c634ae2a1184c557d25afeaaf0",
+      "addedAt": "2026-10-02T01:12:55Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1116/20261001-181255-agent-proof-1219083638576771-02-atom-send-fee-quote.png",
+      "caption": "atom send fee quote",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T01:12:55Z",
+      "headSha": "6412e5e4aba019c634ae2a1184c557d25afeaaf0",
+      "addedAt": "2026-10-02T01:12:55Z"
+    }
+  ]
+}
