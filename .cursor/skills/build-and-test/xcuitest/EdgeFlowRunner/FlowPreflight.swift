@@ -37,14 +37,15 @@ enum FlowPreflight {
     "retry": ["maxRetries", "commands", "file", "_flow"],
     "evalScript": ["script"],
     "waitForAnimationToEnd": ["timeout"],
-    "takeScreenshot": ["path"]
+    "takeScreenshot": ["path"],
+    "inspectScreen": ["full", "verify"]
   ]
 
   /// Commands that may be written as a bare name or with a scalar argument.
   static let scalarForms: Set<String> = [
     "launchApp", "stopApp", "openLink", "tapOn", "assertVisible", "assertNotVisible", "inputText", "eraseText",
     "pressKey", "scroll", "evalScript", "waitForAnimationToEnd", "takeScreenshot", "longPressOn",
-    "copyTextFrom", "pasteText", "inputRandomText", "hideKeyboard", "back"
+    "copyTextFrom", "pasteText", "inputRandomText", "hideKeyboard", "back", "inspectScreen"
   ]
 
   static func problems(in flow: [String: Any]) -> [String] {

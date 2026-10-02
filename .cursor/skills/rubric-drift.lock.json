@@ -873,8 +873,8 @@
       "hash": "ae8c4248ab5a"
     },
     "build-and-test:maestro-flows-are-shortcuts": {
-      "reason": "2026-10-02: flow-authoring and exploration guidance; the drive outcome it leads to is graded by testing-depth",
-      "hash": "d858b7c0bd27"
+      "reason": "2026-10-02: flow-authoring and exploration guidance (iOS exploration moved to xcuitest-run --inspect/--steps); the drive outcome it leads to is graded by testing-depth",
+      "hash": "c5b87cc46f20"
     },
     "build-and-test:proof-screenshots-for-pr": {
       "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged; screenshot evidence graded by A13",
@@ -1601,8 +1601,8 @@
       "hash": "b187b1601553"
     },
     "build-and-test:ios-flows-run-on-xcuitest": {
-      "reason": "2026-10-02: 2026-10-01: driver choice for running a flow; the drive outcome is graded by testing-depth and proof rules, not by which runner executed the yaml (re-ack: MCP daemon restart wording)",
-      "hash": "d6c3ed95de34"
+      "reason": "2026-10-02: driver choice for running a flow; the drive outcome is graded by testing-depth and proof rules, not by which runner executed the yaml (re-ack: pointer to inspect/steps modes)",
+      "hash": "1498de7c87dd"
     }
   },
   "excluded_skills": {

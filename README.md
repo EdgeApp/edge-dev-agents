@@ -633,6 +633,12 @@ the app.
   working-set trim (filter to the assets the task needs, with a funding
   carve-out: filtering is a convenience, never a constraint), and the fallback
   gates. The drive gate blocks the first maestro drive until it is read.
+- **iOS driver** (`build-and-test/scripts/xcuitest-run.sh`): a native
+  XCUITest interpreter runs the same flow YAML on the slot sim with no host
+  port (`--flow`), prints the current screen's elements with testID, label,
+  frame and hittable state (`--inspect`), and runs inline steps against the
+  live app (`--steps`). iOS exploration uses it; the maestro MCP stays for
+  Android and for screens outside the app under test.
 - **Flow library** (`build-and-test/maestro/common/`): parameterized,
   reusable maestro flows (login, wallet find, send-to-address, swap pair
   selection, ramp region/fiat, throwaway-account lifecycle, slider confirm).
@@ -860,7 +866,7 @@ scripts, not be re-described independently across skills.
 | [`/asana-plan`](.cursor/skills/asana-plan/SKILL.md) | Build an implementation plan from Asana or ad-hoc requirements |
 | [`/task-review`](.cursor/skills/task-review/SKILL.md) | Fetch Asana task context, summarize, and resolve the target repo by code evidence |
 | [`/im`](.cursor/skills/im/SKILL.md) | Implement with clean, structured commits (lint-warnings, lint-commit, history discipline) |
-| [`/build-and-test`](.cursor/skills/build-and-test/SKILL.md) | Build and verify: real on-sim maestro drives for GUI work, playbook + flow library |
+| [`/build-and-test`](.cursor/skills/build-and-test/SKILL.md) | Build and verify: real on-sim drives for GUI work (XCUITest interpreter on iOS, maestro on Android), screen inspect, playbook + flow library |
 | [`/pr-create`](.cursor/skills/pr-create/SKILL.md) | Create a PR with repo-aligned title/body, evidence, and Asana attach |
 | [`/bugbot`](.cursor/skills/bugbot/SKILL.md) | Address Cursor Bugbot findings until the PR is actually clean |
 | [`/pr-address`](.cursor/skills/pr-address/SKILL.md) | Address PR feedback: fixups, reply-then-resolve, mark-addressed |

@@ -1,6 +1,7 @@
 # XCUITest flow interpreter (iOS)
 
-`scripts/xcuitest-run.sh` runs Maestro flow YAML natively. One generic XCUITest
+`scripts/xcuitest-run.sh` runs Maestro flow YAML natively, and reads or probes
+the live screen without a flow file (`--inspect`, `--steps`). One generic XCUITest
 bundle (`xcuitest/EdgeFlowRunner`) is built once per Xcode build, iOS runtime
 and source hash (`scripts/xcuitest-build.sh`, cached under
 `~/Library/Caches/edge-flow-runner`). Each run is then one
@@ -39,8 +40,37 @@ and source hash (`scripts/xcuitest-build.sh`, cached under
 | `evalScript` | Full JavaScript (JavaScriptCore). `output.*` persists for the whole run |
 | `waitForAnimationToEnd` | Two consecutive identical screenshots, `timeout` default 15s |
 | `takeScreenshot` | Same path rules as `maestro test`: relative to the current directory, `.png` appended |
+| `inspectScreen` | Runner-only (Maestro has no such command). Prints the screen as `--inspect` does. `full: true` lists every node; `verify: true` also checks each identified on-screen element's `hit` against `XCUIElement.isHittable` (about 1s per element) and prints the differences |
 
 `optional: true` and `label` work on every command.
+
+## Inspect and probe
+
+`--inspect` prints the app's screen from one accessibility snapshot (about
+0.1 to 0.8s inside a 4 to 7s run) and sends no event; it never launches the
+app and exits 2 when the app is not running. The header gives the app state,
+screen size and element count; each line is
+`Type id="" label="" value="" placeholder="" frame=x,y,WxH hit|nohit|offscreen [disabled]`,
+indented by nesting. Compact mode keeps elements that have an identifier or
+readable text and drops unnamed containers, a leaf repeating its parent's
+label, icon-font glyphs, scroll bars and off-screen nodes without an id (it
+prints how many); keyboard keys fold into one line. A SpringBoard alert over
+the app prints in its own section.
+
+`hit` is computed from the snapshot, not by touching the app: XCTest's
+snapshot hit test must pass (`-[XCElementSnapshot hitPoint:]`) and no element
+later in tree order may cover the element's center. React Native draws later
+siblings on top. Covers are elements with an id, non-container types, and
+labelled containers that overlap only part of the element (one that holds
+the whole element is a pass-through scene wrapper). `nohit covered-by="..."`
+names the cover, `screen edge` when the center is off screen. A tap is still
+the ground truth; `inspectScreen: {verify: true}` measures the estimate
+against XCTest.
+
+`--steps '<yaml>'` runs a command list, one `command: args` map or a bare
+command name against the app as it is. Probes default to a 3s element lookup
+(`--lookup-timeout`) and skip xcodebuild's failure diagnostics, so a missed
+selector fails in about 11s instead of 42s.
 
 ## Maestro semantics the runner keeps
 
@@ -80,3 +110,5 @@ Spinners do not hold the quiescence wait in any mode.
 `launchApp clearState: true` and any command missing from the table above.
 To drive a flow that needs one, rewrite the step or run that flow on the
 maestro CLI and name it in the run report.
+Inspect reads only the app under test and a SpringBoard alert; another app's
+screen (Safari, Settings) needs the maestro MCP.

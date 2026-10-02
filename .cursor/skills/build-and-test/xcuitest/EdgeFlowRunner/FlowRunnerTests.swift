@@ -1,7 +1,9 @@
 import XCTest
 
 /// The single test the runner bundle holds: interpret the flow named by
-/// `EDGE_FLOW_FILE` (JSON written by scripts/maestro-yaml-to-json.rb).
+/// `EDGE_FLOW_FILE` (JSON written by scripts/maestro-yaml-to-json.rb). With
+/// `EDGE_INSPECT` set to `compact` or `full` it prints the screen's elements
+/// after the last step, and also after a failed one.
 final class FlowRunnerTests: XCTestCase {
   private var recordedIssue = false
 
@@ -34,12 +36,26 @@ final class FlowRunnerTests: XCTestCase {
     EdgeQuiescence.install()
     print("[edge-flow] start \(flowName.lastPathComponent) cap=\(options.quiescenceCap)s animations=\(options.animations)")
     let started = Date()
+    let interpreter = FlowInterpreter(options: options)
+    var failure: Error?
     do {
-      try FlowInterpreter(options: options).run(document)
-      print(String(format: "[edge-flow] PASSED %@ in %.2fs", flowName.lastPathComponent, Date().timeIntervalSince(started)))
+      try interpreter.run(document)
     } catch {
-      print(String(format: "[edge-flow] FAILED %@ after %.2fs: %@", flowName.lastPathComponent, Date().timeIntervalSince(started), "\(error)"))
-      XCTFail("\(error)")
+      failure = error
+    }
+    if let mode = environment["EDGE_INSPECT"], !mode.isEmpty {
+      do {
+        try interpreter.inspectScreen(full: mode == "full")
+      } catch {
+        print("[edge-flow] inspect failed: \(error)")
+        failure = failure ?? error
+      }
+    }
+    if let failure = failure {
+      print(String(format: "[edge-flow] FAILED %@ after %.2fs: %@", flowName.lastPathComponent, Date().timeIntervalSince(started), "\(failure)"))
+      XCTFail("\(failure)")
+    } else {
+      print(String(format: "[edge-flow] PASSED %@ in %.2fs", flowName.lastPathComponent, Date().timeIntervalSince(started)))
     }
     printCapHits()
   }

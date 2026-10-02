@@ -307,6 +307,8 @@ final class FlowInterpreter {
     case "waitForAnimationToEnd":
       let timeout = (try optionalNumber(map["timeout"]) ?? 15000) / 1000
       if !waitForSettle(timeout: timeout) { return "still animating after \(timeout)s, continuing" }
+    case "inspectScreen":
+      try inspectScreen(full: map["full"] as? Bool ?? false, verify: map["verify"] as? Bool ?? false)
     case "takeScreenshot":
       var path = try script.interpolate(stringArg(args, key: "path"))
       if !path.hasPrefix("/") { path = (options.workingDirectory as NSString).appendingPathComponent(path) }
@@ -626,6 +628,231 @@ final class FlowInterpreter {
     appId = bundleId
     app = XCUIApplication(bundleIdentifier: bundleId)
     screenBounds = nil
+  }
+
+  // MARK: Inspect
+
+  /// Prints the screen's element tree as `[edge-inspect]` lines: type,
+  /// identifier (the testID), label, value, placeholder, frame and whether a
+  /// tap at the element would land on it. Reads one snapshot and sends no
+  /// event, so the app's state does not change; it never launches the app.
+  ///
+  /// The compact form keeps the nodes a selector can name (an identifier or
+  /// some text) and drops what repeats them or cannot be acted on: unnamed containers whose label
+  /// only concatenates their children, a text leaf that repeats its parent's
+  /// label, icon-font glyphs, scroll bars, off-screen nodes without an
+  /// identifier, and the keyboard's keys. `hit` means XCTest's snapshot hit
+  /// test passes and no later-drawn named element covers the center. `full` prints every node untruncated.
+  /// `verify` also asks XCUIElement.isHittable for each identified element
+  /// and reports where the snapshot's answer differs (one query each, slow).
+  func inspectScreen(full: Bool, verify: Bool = false) throws {
+    guard app.state == .runningForeground || app.state == .runningBackground else {
+      throw FlowError("\(appId) is not running; inspectScreen never launches it")
+    }
+    let begin = Date()
+    let root = try app.snapshot()
+    let snapshotTook = Date().timeIntervalSince(begin)
+    let bounds = root.frame
+    var nodes = 0
+    var hittableKnown = true
+    let containers: Set<XCUIElement.ElementType> = [.other, .application, .window, .group, .scrollView]
+    var hidden = 0
+
+    func clean(_ text: String) -> String {
+      let flat = text.replacingOccurrences(of: "\n", with: "\\n").replacingOccurrences(of: "\"", with: "'")
+      return !full && flat.count > 80 ? String(flat.prefix(77)) + "..." : flat
+    }
+    func describe(_ node: XCUIElementSnapshot, index: Int?) -> String {
+      var parts = [typeName(node.elementType)]
+      if !node.identifier.isEmpty { parts.append("id=\"\(clean(node.identifier))\"") }
+      if !node.label.isEmpty { parts.append("label=\"\(clean(node.label))\"") }
+      if let value = node.value.map({ "\($0)" }), !value.isEmpty, value != node.label { parts.append("value=\"\(clean(value))\"") }
+      if let placeholder = node.placeholderValue, !placeholder.isEmpty { parts.append("placeholder=\"\(clean(placeholder))\"") }
+      let frame = node.frame
+      parts.append(String(format: "frame=%.0f,%.0f,%.0fx%.0f", frame.minX, frame.minY, frame.width, frame.height))
+      if !onScreen(node) {
+        parts.append("offscreen")
+      } else if let hit = snapshotHittable(node) {
+        if let cover = index.flatMap(coveredBy) {
+          parts.append("nohit covered-by=\"\(clean(cover))\"")
+        } else {
+          parts.append(hit ? "hit" : "nohit")
+        }
+      } else {
+        hittableKnown = false
+      }
+      if !node.isEnabled { parts.append("disabled") }
+      return parts.joined(separator: " ")
+    }
+    func onScreen(_ node: XCUIElementSnapshot) -> Bool {
+      let overlap = node.frame.intersection(bounds)
+      return !overlap.isNull && overlap.width > 0 && overlap.height > 0
+    }
+    // Icon-font glyphs sit in Unicode's private use area and print as nothing.
+    func readable(_ text: String) -> Bool {
+      text.unicodeScalars.contains { !CharacterSet.whitespacesAndNewlines.contains($0) && !(0xE000...0xF8FF).contains($0.value) }
+    }
+    func named(_ node: XCUIElementSnapshot) -> Bool {
+      !node.identifier.isEmpty || readable(node.label) || readable(node.value.map { "\($0)" } ?? "")
+    }
+    // XCTest's snapshot hit test answers for the element alone: it does not
+    // see a sibling drawn over it. React Native draws later siblings on top,
+    // so an element is covered when a node after its subtree in tree order
+    // holds its center. Unnamed containers do not count: RN lays full-screen
+    // pass-through wrappers over every scene.
+    var flat: [(node: XCUIElementSnapshot, end: Int, solid: Bool)] = []
+    func index(_ node: XCUIElementSnapshot) {
+      let position = flat.count
+      flat.append((node, position, onScreen(node) && !node.label.contains("scroll bar") && (named(node) || !containers.contains(node.elementType))))
+      node.children.forEach(index)
+      flat[position].end = flat.count - 1
+    }
+    func coveredBy(_ position: Int) -> String? {
+      let frame = flat[position].node.frame
+      let center = CGPoint(x: frame.midX, y: frame.midY)
+      guard bounds.contains(center) else { return "screen edge" }
+      guard flat[position].end + 1 < flat.count else { return nil }
+      for other in flat[(flat[position].end + 1)...] where other.solid && other.node.frame.contains(center) {
+        let node = other.node
+        // A labelled container that holds the whole element is a scene
+        // wrapper (touches pass through it); one that overlaps part of it is
+        // a bar or card drawn on top.
+        if node.identifier.isEmpty, containers.contains(node.elementType), node.frame.contains(frame) { continue }
+        return !node.identifier.isEmpty ? node.identifier : readable(node.label) ? node.label : typeName(node.elementType)
+      }
+      return nil
+    }
+    func keyCount(_ node: XCUIElementSnapshot) -> Int {
+      node.children.reduce(node.elementType == .key ? 1 : 0) { $0 + keyCount($1) }
+    }
+    // Returns the subtree's lines as (depth, text), deepest last. `indexed`
+    // is false for a tree outside `flat` (the system alert).
+    func walk(_ node: XCUIElementSnapshot, depth: Int, parentLabel: String, indexed: Bool = true) -> [(Int, String)] {
+      let position = indexed ? nodes : nil
+      nodes += 1
+      if !full, node.elementType == .keyboard {
+        if let position = position { nodes = flat[position].end + 1 }
+        return [(depth, "\(describe(node, index: position)) keys=\(keyCount(node)) (keys omitted)")]
+      }
+      let hasId = !node.identifier.isEmpty
+      let texts = [node.label, node.value.map { "\($0)" } ?? "", node.placeholderValue ?? ""]
+      let hasText = texts.contains { full ? !$0.isEmpty : readable($0) }
+      var lines: [(Int, String)] = []
+      for child in node.children {
+        lines += walk(child, depth: depth + 1, parentLabel: hasId || hasText ? node.label : parentLabel, indexed: indexed)
+      }
+      var keep = full || hasId || hasText
+      if !full, !hasId {
+        if containers.contains(node.elementType), !lines.isEmpty { keep = false }
+        if node.children.isEmpty, !node.label.isEmpty, node.label == parentLabel { keep = false }
+        if node.label.contains("scroll bar") { keep = false }
+        // Off-screen content stays only where an id can scroll it into view.
+        if keep, !onScreen(node) {
+          keep = false
+          hidden += 1
+        }
+      }
+      if keep { return [(depth, describe(node, index: position))] + lines }
+      return lines.map { ($0.0 - 1, $0.1) }
+    }
+    func emit(_ lines: [(Int, String)]) {
+      let base = lines.map { $0.0 }.min() ?? 0
+      for (depth, text) in lines {
+        print("[edge-inspect] " + String(repeating: "  ", count: depth - base) + text)
+      }
+    }
+
+    index(root)
+    let lines = walk(root, depth: 0, parentLabel: "")
+    let state = app.state == .runningForeground ? "foreground" : "background"
+    print(String(
+      format: "[edge-inspect] %@ %@ screen=%.0fx%.0f elements=%d of %d nodes%@ snapshot=%.2fs",
+      appId, state, bounds.width, bounds.height, lines.count, nodes, full ? " (full)" : "", snapshotTook
+    ))
+    emit(lines)
+    if hidden > 0 { print("[edge-inspect] (\(hidden) off-screen elements without an id omitted; --full lists them)") }
+    if !hittableKnown { print("[edge-inspect] note: this XCTest has no snapshot hit test, so hit/nohit is missing") }
+
+    // A system alert (permission prompt) belongs to SpringBoard and covers
+    // the app: selectors resolve against the app, so they cannot reach it.
+    let alert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch
+    if alert.exists, let snapshot = try? alert.snapshot() {
+      print("[edge-inspect] system alert over the app (SpringBoard; flow selectors cannot reach it, tap it by point):")
+      emit(walk(snapshot, depth: 0, parentLabel: "", indexed: false))
+    }
+
+    if verify {
+      var checked = 0
+      var differing: [String] = []
+      for (position, entry) in flat.enumerated() {
+        let node = entry.node
+        if !node.identifier.isEmpty, onScreen(node), let raw = snapshotHittable(node) {
+          let mine = raw && coveredBy(position) == nil
+          let matches = app.descendants(matching: .any).matching(identifier: node.identifier)
+          if matches.count == 1 {
+            checked += 1
+            let theirs = matches.firstMatch.isHittable
+            if theirs != mine { differing.append("\(node.identifier): inspect=\(mine) isHittable=\(theirs)") }
+          }
+        }
+      }
+      print("[edge-inspect] verify: \(checked) identified elements checked against XCUIElement.isHittable, \(differing.count) differ")
+      differing.forEach { print("[edge-inspect]   \($0)") }
+    }
+  }
+
+  /// XCUIElementSnapshot has no public isHittable. The object behind it is
+  /// XCTest's XCElementSnapshot, whose private `hitPoint:` is what
+  /// XCUIElement.isHittable itself calls: it hit-tests the element's
+  /// activation point inside the same snapshot tree, so an element under a
+  /// modal answers false. Returns nil when this XCTest lacks the method.
+  private func snapshotHittable(_ node: XCUIElementSnapshot) -> Bool? {
+    typealias HitPoint = @convention(c) (NSObject, ObjectiveC.Selector, UnsafeMutableRawPointer?) -> NSObject?
+    let selector = NSSelectorFromString("hitPoint:")
+    guard let object = node as? NSObject, object.responds(to: selector), let method = object.method(for: selector) else {
+      return nil
+    }
+    guard let result = unsafeBitCast(method, to: HitPoint.self)(object, selector, nil) else { return false }
+    guard result.responds(to: NSSelectorFromString("isHittable")) else { return nil }
+    return result.value(forKey: "hittable") as? Bool
+  }
+
+  private func typeName(_ type: XCUIElement.ElementType) -> String {
+    switch type {
+    case .other: return "Other"
+    case .application: return "Application"
+    case .window: return "Window"
+    case .group: return "Group"
+    case .alert: return "Alert"
+    case .sheet: return "Sheet"
+    case .button: return "Button"
+    case .keyboard: return "Keyboard"
+    case .key: return "Key"
+    case .navigationBar: return "NavigationBar"
+    case .tabBar: return "TabBar"
+    case .table: return "Table"
+    case .cell: return "Cell"
+    case .collectionView: return "CollectionView"
+    case .slider: return "Slider"
+    case .activityIndicator: return "ActivityIndicator"
+    case .progressIndicator: return "ProgressIndicator"
+    case .switch: return "Switch"
+    case .toggle: return "Toggle"
+    case .link: return "Link"
+    case .image: return "Image"
+    case .icon: return "Icon"
+    case .searchField: return "SearchField"
+    case .scrollView: return "ScrollView"
+    case .staticText: return "StaticText"
+    case .textField: return "TextField"
+    case .secureTextField: return "SecureTextField"
+    case .textView: return "TextView"
+    case .picker: return "Picker"
+    case .pickerWheel: return "PickerWheel"
+    case .webView: return "WebView"
+    case .statusBar: return "StatusBar"
+    default: return "Type\(type.rawValue)"
+    }
   }
 
   // MARK: Gestures
