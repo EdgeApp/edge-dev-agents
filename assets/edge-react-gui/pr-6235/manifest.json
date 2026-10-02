@@ -1,0 +1,53 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6235/20261001-220213-agent-proof-1219076181121183-01-HACKED-before-send-scene.png",
+      "caption": "before send scene",
+      "index": "1",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "First MoonPay widget open is pointed at the payment redirect URL with the quote's amount and the wallet's own address, standing in for a KYC-confirmed MoonPay order; reverted after capture.",
+      "batchAt": "2026-10-02T05:02:13Z",
+      "headSha": "e44a9c842616fee2192b7a451f129c81e75e7285",
+      "addedAt": "2026-10-02T05:02:13Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6235/20261001-220213-agent-proof-1219076181121183-02-HACKED-before-back-error-qr.png",
+      "caption": "before back error qr",
+      "index": "2",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "First MoonPay widget open is pointed at the payment redirect URL with the quote's amount and the wallet's own address, standing in for a KYC-confirmed MoonPay order; reverted after capture.",
+      "batchAt": "2026-10-02T05:02:13Z",
+      "headSha": "e44a9c842616fee2192b7a451f129c81e75e7285",
+      "addedAt": "2026-10-02T05:02:13Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6235/20261001-220213-agent-proof-1219076181121183-03-HACKED-after-send-scene.png",
+      "caption": "after send scene",
+      "index": "3",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "First MoonPay widget open is pointed at the payment redirect URL with the quote's amount and the wallet's own address, standing in for a KYC-confirmed MoonPay order; reverted after capture.",
+      "batchAt": "2026-10-02T05:02:13Z",
+      "headSha": "e44a9c842616fee2192b7a451f129c81e75e7285",
+      "addedAt": "2026-10-02T05:02:13Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6235/20261001-220213-agent-proof-1219076181121183-04-HACKED-after-back-moonpay-widget.png",
+      "caption": "after back moonpay widget",
+      "index": "4",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "First MoonPay widget open is pointed at the payment redirect URL with the quote's amount and the wallet's own address, standing in for a KYC-confirmed MoonPay order; reverted after capture.",
+      "batchAt": "2026-10-02T05:02:13Z",
+      "headSha": "e44a9c842616fee2192b7a451f129c81e75e7285",
+      "addedAt": "2026-10-02T05:02:13Z"
+    }
+  ]
+}
