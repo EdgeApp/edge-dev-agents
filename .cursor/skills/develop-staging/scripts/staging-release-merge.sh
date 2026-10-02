@@ -88,7 +88,7 @@ hdr()  { printf '\n=== %s ===\n' "$*"; }
 # EVERY exit path, so a run that stopped at a gate still reports what the phases
 # before it did. Kept as a newline-delimited string rather than an associative
 # array, which bash 3.2 (the macOS system bash) does not have.
-PHASES="Preflight Crowdin-gui Crowdin-login-ui Workspace zcash piratechain chain-registry Release-dates Version-bump Merge Parity Verify Push"
+PHASES="Preflight Crowdin-gui Crowdin-login-ui Workspace zcash chain-registry Release-dates Version-bump Merge Parity Verify Push"
 STEP_LOG=""
 step() { STEP_LOG="$STEP_LOG$1|$2|$3
 "; }
@@ -302,7 +302,7 @@ if [ ! -e "$WT/src/plugins/contracts" ] && [ -d "$REPO/src/plugins/contracts" ];
 fi
 # Copied rather than linked so nothing the hooks do can write into the caller's
 # checkout. Without these, the precommit tsc fails on unresolvable modules.
-for p in env.json src/controllers/edgeProvider/client/rolledUp.js src/controllers/edgeProvider/injectThisInWebView.js; do
+for p in env.json config.json keys.json src/controllers/edgeProvider/client/rolledUp.js src/controllers/edgeProvider/injectThisInWebView.js; do
   [ -e "$WT/$p" ] && continue
   [ -e "$REPO/$p" ] || { warn "missing $p in $REPO, the precommit hooks may fail"; continue; }
   mkdir -p "$(dirname "$WT/$p")"
@@ -331,6 +331,12 @@ dep_step() {
   local repo_dir="$HOME/git/$pkg" pin latest
   pin="$(pinned_version "$pkg")"
   latest="$(registry_version "$pkg")"
+  # A package the gui no longer depends on has no pin to upgrade, and
+  # upgrade-dep.sh would re-add it. Nothing to refresh for this release.
+  if [ -z "$pin" ]; then
+    step "$phase" ok "$pkg is not a dependency of $DEVELOP's package.json; nothing to refresh"
+    return 0
+  fi
   if [ -n "$DRY_RUN" ]; then
     step "$phase" dry-run "would refresh in $repo_dir, publish via pr-land machinery, upgrade gui (pin $pin, registry ${latest:-unknown})"
     return 0
@@ -361,11 +367,22 @@ const [file, entry] = process.argv.slice(2);
 const lines = fs.readFileSync(file, "utf8").split("\n");
 const at = lines.findIndex((l) => /^##\s+Unreleased\b/.test(l));
 if (at === -1) { console.error("no ## Unreleased heading"); process.exit(1); }
-if (!lines.slice(at + 1, at + 12).some((l) => l === entry)) lines.splice(at + 1, 0, "", entry);
+// Look only inside the Unreleased section: an identical entry under an older
+// release (every checkpoint release has one) is not this release's entry.
+let end = lines.findIndex((l, i) => i > at && /^##\s/.test(l));
+if (end === -1) end = lines.length;
+if (!lines.slice(at + 1, end).some((l) => l === entry)) lines.splice(at + 1, 0, "", entry);
 fs.writeFileSync(file, lines.join("\n"));
 CLNODE
     ( cd "$repo_dir" && "$LINT_COMMIT" -m "${cl_entry#- changed: }" ) >>"$TMPROOT/staging-release-merge.$$.$pkg.log" 2>&1 \
       || { step "$phase" failed "commit failed"; die "dep: $pkg commit failed"; }
+    # pr-land-publish.sh releases whatever ## Unreleased holds, so a refresh
+    # commit without its entry would publish an undocumented version. Check
+    # the committed file, independently of the edit above, before anything
+    # leaves this machine.
+    git -C "$repo_dir" show HEAD:CHANGELOG.md \
+      | awk -v e="$cl_entry" '/^##[[:space:]]+Unreleased/{u=1;next} /^##[[:space:]]/{u=0} u&&$0==e{f=1} END{exit f?0:1}' \
+      || { step "$phase" failed "refresh commit $(git -C "$repo_dir" rev-parse --short HEAD) has no '$cl_entry' under ## Unreleased; nothing pushed"; die "dep: $pkg refresh commit lacks its changelog entry"; }
     # The refresh commit must reach origin BEFORE pr-land-publish.sh runs: that
     # script hard-resets the branch to origin/<branch> (it assumes pr-land's
     # already-merged state), so an unpushed local commit would be destroyed.
@@ -461,7 +478,6 @@ CLNODE
 
 hdr "Dependency updates"
 dep_step zcash react-native-zcash "\"$HOME/.cursor/skills/pm.sh\" run update-checkpoints" "- changed: Update checkpoints" patch
-dep_step piratechain react-native-piratechain "\"$HOME/.cursor/skills/pm.sh\" run update-checkpoints" "- changed: Update checkpoints" patch
 # pm.sh has no `add` subcommand; resolve the PM once and call it directly.
 dep_step chain-registry edge-currency-accountbased 'PM=$("$HOME/.cursor/skills/pm.sh" detect); "$PM" add chain-registry && "$HOME/.cursor/skills/pm.sh" run prepare' "- changed: Update chain-registry"
 
@@ -565,18 +581,69 @@ if [ $rc -ne 0 ]; then
 
   # Take develop's side for paths the operator has already cleared. --theirs is
   # a silent no-op once a path has been `git add`ed, so this runs before
-  # anything stages a conflicted file.
+  # anything stages a conflicted file. A path develop deleted (modify/delete
+  # conflict) has no stage-3 entry for --theirs to check out, so develop's side
+  # of it is the deletion.
   for p in "${RESOLVE_THEIRS[@]+"${RESOLVE_THEIRS[@]}"}"; do
     if printf '%s\n' "$CONFLICTS" | grep -qx -- "$p"; then
-      git -C "$WT" checkout --theirs -- "$p"
-      git -C "$WT" add -- "$p"
-      say "resolved (develop's side, operator-cleared): $p"
+      if git -C "$WT" ls-files -u -- "$p" | awk '$3 == 3 { found = 1 } END { exit !found }'; then
+        git -C "$WT" checkout --theirs -- "$p"
+        git -C "$WT" add -- "$p"
+        say "resolved (develop's side, operator-cleared): $p"
+      else
+        git -C "$WT" rm --quiet -- "$p"
+        say "resolved (develop's side is a deletion, operator-cleared): $p"
+      fi
+    elif ! git -C "$WT" diff --cached --quiet "$TMP_DEV" -- "$p"; then
+      # Merged without a conflict, yet the result is not develop's file: the
+      # same change reached both branches at different positions and git
+      # applied it twice.
+      if git -C "$WT" cat-file -e "$TMP_DEV:$p" 2>/dev/null; then
+        git -C "$WT" checkout "$TMP_DEV" -- "$p"
+      else
+        git -C "$WT" rm --quiet -f -- "$p"
+      fi
+      say "resolved (auto-merged result replaced with develop's side, operator-cleared): $p"
     else
-      warn "--resolve-theirs $p: not conflicted, ignored"
+      warn "--resolve-theirs $p: not conflicted and already equal to $DEVELOP, ignored"
     fi
   done
 
-  REMAINING="$(git -C "$WT" diff --name-only --diff-filter=U | grep -v '^CHANGELOG\.md$' || true)"
+  # Auto-merged paths whose result differs from develop. Left alone they reach
+  # the merge commit, where the repo's pre-commit hook fails on them without
+  # naming them, so they stop here with the conflicts.
+  UNMERGED="$(git -C "$WT" diff --name-only --diff-filter=U)"
+  DRIFT=""
+  while IFS= read -r p; do
+    [ -z "$p" ] && continue
+    [ "$p" = "CHANGELOG.md" ] && continue
+    printf '%s\n' "$UNMERGED" | grep -qx -- "$p" && continue
+    cleared=""
+    for g in "${ALLOW[@]+"${ALLOW[@]}"}"; do
+      case "$p" in $g) cleared=1 ;; esac
+    done
+    [ -n "$cleared" ] || DRIFT="${DRIFT}${p}"$'\n'
+  done <<< "$(git -C "$WT" diff --cached --name-only "$TMP_DEV" || true)"
+
+  REMAINING="$(printf '%s\n' "$UNMERGED" | grep -v '^CHANGELOG\.md$' || true)"
+  if [ -n "$DRIFT" ]; then
+    hdr "STOP: auto-merged paths differ from $DEVELOP"
+    echo "Git merged these without a conflict, but the result is not $DEVELOP's"
+    echo "file. Each diff reads from $DEVELOP to the merge result. Clear a path"
+    echo "with --resolve-theirs <path> to take $DEVELOP's file, or back-port"
+    echo "what only $STAGING has."
+    echo
+    while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      printf '  %s\n' "$f"
+      git -C "$WT" --no-pager diff --cached "$TMP_DEV" -- "$f" | sed -n '1,60p' | sed 's/^/      /'
+      echo
+    done <<< "$DRIFT"
+    if [ -z "$REMAINING" ]; then
+      step Merge stopped "$(printf '%s' "$DRIFT" | grep -c . ) auto-merged path(s) differ from $DEVELOP and need an operator decision"
+      finish conflicts 2
+    fi
+  fi
   if [ -n "$REMAINING" ]; then
     hdr "STOP: conflicts outside CHANGELOG.md"
     echo "Conflicts here are normal on a release cut: staging accumulates hotfix"

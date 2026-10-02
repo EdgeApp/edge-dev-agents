@@ -6,6 +6,11 @@
           "command": "~/.config/agent-watcher/hooks/record-phone-captures.sh",
           "timeout": 15,
           "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/refresh-report-judge-section.sh",
+          "timeout": 120,
+          "type": "command"
         }
       ],
       "matcher": "Bash"

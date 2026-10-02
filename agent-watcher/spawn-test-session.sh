@@ -220,6 +220,14 @@ if [[ -n "$TASK_GID" ]]; then
 "
     echo ">> spawn-test-session: orch version $AGENT_ORCH_VERSION ($_SEG, task $TASK_GID)" >&2
   fi
+  # Jev landing decision (shadow, log only; ~/.config/jev/routing/README.md): is this
+  # segment's only deliverable landing an existing PR? Logged beside the model the spawn
+  # really uses; $AGENT_MODEL is never changed here. Detached, best-effort.
+  if [[ -f "$HOME/.config/jev/routing/jev_route.py" ]]; then
+    perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' python3 "$HOME/.config/jev/routing/jev_route.py" landing \
+      --gid "$TASK_GID" --segment "$_SEG" --model "${AGENT_MODEL:-default}" </dev/null >/dev/null 2>&1 &
+    disown 2>/dev/null || true
+  fi
 fi
 if [[ -n "$SLOT_INDEX" ]]; then
   [[ -n "$TASK_GID" ]]   && ENV_EXPORTS+="export AGENT_TASK_GID=\"$TASK_GID\"

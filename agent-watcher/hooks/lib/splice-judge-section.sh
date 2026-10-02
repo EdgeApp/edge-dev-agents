@@ -2,12 +2,12 @@
 # splice-judge-section.sh -- write the run report's "## Completion Judge" section
 # from the judge provenance log. Source this; do not execute it.
 #
-# The section is machine-generated (judge-report-section.sh renders one row per
-# judge call), so the agent never writes it and every attach re-renders it.
+# The section is machine-generated (judge-report-section.sh renders the final verdict per
+# event and one row per judge call), so the agent never writes it and every attach re-renders it.
 # Two callers, because a report attached BEFORE the first judge call would
 # otherwise carry "_No judge call yet._" for the life of the task:
 #   hooks/require-clean-run-report.sh   at every attach
-#   hooks/require-completion-judgment.sh  once a verdict exists for this segment
+#   hooks/refresh-report-judge-section.sh  after the finishing status write
 #
 # splice_judge_section <gid> <report>: replaces an existing "## Completion Judge"
 # block, else inserts before "## Testing", else appends. Always returns 0 (a

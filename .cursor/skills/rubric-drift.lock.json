@@ -228,19 +228,19 @@
       ]
     },
     "build-and-test:test-on-sim-by-default": {
-      "hash": "cb6c331ece2d",
+      "hash": "1435d588fa2c",
       "dims": [
         "A21"
       ]
     },
     "build-and-test:gui-dependency-integration": {
-      "hash": "92eba5e3ec81",
+      "hash": "63130c2458bb",
       "dims": [
         "A21"
       ]
     },
     "build-and-test:test-drives-the-real-action": {
-      "hash": "e11de6646b51",
+      "hash": "a1d1d2d8d484",
       "dims": [
         "A21"
       ]
@@ -333,19 +333,19 @@
       ]
     },
     "build-and-test:build-the-test-harness": {
-      "hash": "7b05988c27ee",
+      "hash": "a40818f7fbd3",
       "dims": [
         "A25"
       ]
     },
     "build-and-test:single-asset-plugin-trim": {
-      "hash": "f645019cb548",
+      "hash": "1d9331c99067",
       "dims": [
         "A25"
       ]
     },
     "build-and-test:no-mutation": {
-      "hash": "400407463137",
+      "hash": "0f89e33a962b",
       "dims": [
         "A25"
       ]
@@ -357,25 +357,25 @@
       ]
     },
     "build-and-test:force-swap-provider-locally": {
-      "hash": "b776ad0863c2",
+      "hash": "91fc26e578f0",
       "dims": [
         "A27"
       ]
     },
     "build-and-test:funded-test-accounts": {
-      "hash": "c3ac1457b713",
+      "hash": "abdb13652443",
       "dims": [
         "A27"
       ]
     },
     "build-and-test:log-every-attempt": {
-      "hash": "a5f4b6eaee50",
+      "hash": "5cb9f45e6c34",
       "dims": [
         "A26"
       ]
     },
     "build-and-test:slot-sim-is-the-clone": {
-      "hash": "738b56cb7942",
+      "hash": "a1753820dc10",
       "dims": [
         "O10"
       ]
@@ -423,7 +423,7 @@
       ]
     },
     "build-and-test:preflight-before-build-decisions": {
-      "hash": "cfb4bb8b97eb",
+      "hash": "489c79c737ba",
       "dims": [
         "A29"
       ]
@@ -600,7 +600,7 @@
       ]
     },
     "build-and-test:testids-over-coordinates": {
-      "hash": "ce8652fc4f59",
+      "hash": "deb8cf249cbd",
       "dims": [
         "A21"
       ]
@@ -667,7 +667,7 @@
       ]
     },
     "file:require-completion-judgment.sh": {
-      "hash": "dd36bfac66af",
+      "hash": "e115bd5b551f",
       "dims": [
         "O9"
       ]
@@ -841,60 +841,56 @@
       "hash": "a308daeb4f05"
     },
     "build-and-test:autodetect-repo-shape": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "cec8c2324192"
+      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged",
+      "hash": "32044b069144"
     },
     "build-and-test:report-failures-actionable": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "625a193ffb67"
+      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged",
+      "hash": "db74ffb30bf6"
     },
     "build-and-test:scripts-over-inline": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "a764d339517c"
+      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged",
+      "hash": "c3912c19f149"
     },
     "build-and-test:runtime-inspection-via-debugger": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "8bb3e0cd59cf"
+      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged",
+      "hash": "a39df29c5c3f"
     },
     "build-and-test:blocking-in-turn-waits": {
-      "reason": "2026-09-15: graded under A5/A6 via era: chunked waits; build detach+wait is mechanized by ios-rn-build.sh --detach and ios-rn-build-wait.sh",
-      "hash": "a75763ac4fa4"
+      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged; graded under A5/A6, build detach+wait mechanized by ios-rn-build.sh --detach and ios-rn-build-wait.sh",
+      "hash": "e7865db57dd1"
     },
     "build-and-test:lockfile-driven-pm": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "ecc89c94d6f9"
+      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged",
+      "hash": "950f8470769b"
     },
     "build-and-test:platform-ios-default-android-on-callout": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "59ae13d6ba0f"
+      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged",
+      "hash": "b00daeb8b7be"
     },
     "build-and-test:unrunnable-asset-proxy-verification": {
-      "reason": "2026-07-23: edit only adds the visual-surface carve-out pointing at hack-verify-visual-changes; the proxy+unit-test expectation is unchanged and graded by the testing-depth dimension",
-      "hash": "e54df9d8c6b4"
+      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged; graded by the testing-depth dimension",
+      "hash": "ae8c4248ab5a"
     },
     "build-and-test:maestro-flows-are-shortcuts": {
-      "reason": "2026-07-23: Adds flow-update tag + embedded-yaml requirement and defers all promotion to eval consolidation; still proposal-channel mechanics, not run-graded behavior; a flow-reuse dimension remains the future candidate once consolidation produces promotion data",
-      "hash": "133b3c48f3a5"
+      "reason": "2026-10-02: flow-authoring and exploration guidance; the drive outcome it leads to is graded by testing-depth",
+      "hash": "d858b7c0bd27"
     },
     "build-and-test:proof-screenshots-for-pr": {
-      "reason": "2026-07-23: edit only adds the HACKED filename-token cross-reference; the screenshot-evidence expectation itself is graded by A13",
-      "hash": "6769bb66b04a"
+      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged; screenshot evidence graded by A13",
+      "hash": "1c458a64d065"
     },
     "build-and-test:executable-pair-must-complete": {
-      "reason": "2026-09-23: 2026-09-23: only dropped the stale SQLite-crash aside; expectation unchanged",
-      "hash": "6ce01177d6e3"
+      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged",
+      "hash": "c49babdd176e"
     },
     "build-and-test:spaced-pin-taps": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "75ab33a14f8c"
+      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged",
+      "hash": "cac3d810eb03"
     },
     "build-and-test:no-hideKeyboard": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "4f1f7e892e18"
-    },
-    "build-and-test:no-hierarchy-polling-on-buy": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "baaf8f5a0c09"
+      "reason": "2026-10-02: per-driver flow-authoring guidance; no run-level behavior an eval dimension would grade",
+      "hash": "051cb2a55b9c"
     },
     "cheese:cheese-branch-only": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1453,8 +1449,8 @@
       "hash": "c32f66511e88"
     },
     "build-and-test:hack-verify-visual-changes": {
-      "reason": "2026-09-17: 2026-09-17: edit only adds a pointer to pr-create:evidence-dispositions; the hack-verify expectation itself is unchanged and stays graded by A13, and the disposition behavior is graded on the pr-create side",
-      "hash": "d9e4958bf7fc"
+      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged; graded by A13",
+      "hash": "a552c99de9cc"
     },
     "one-shot:description-current-state": {
       "reason": "2026-08-28: 2026-08-28: write-path change only (raw curl+PUT mechanics replaced by asana-task-update.sh --set-current-state, which now owns the delimiter, the strip-and-replace and the authorship marking); the graded expectation — refresh the section when delivered scope diverges, never touch operator prose — is unchanged from the prior ack",
@@ -1603,6 +1599,10 @@
     "task-run:landing-task": {
       "reason": "2026-10-01: permission-only routing rule; A15 grades the /pr-land run it permits",
       "hash": "b187b1601553"
+    },
+    "build-and-test:ios-flows-run-on-xcuitest": {
+      "reason": "2026-10-02: driver choice for running a flow; the drive outcome is graded by testing-depth and proof rules, not by which runner executed the yaml",
+      "hash": "4389497b6b8a"
     }
   },
   "excluded_skills": {

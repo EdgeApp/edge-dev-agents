@@ -2,9 +2,13 @@
 # judge-report-section.sh -- print the run report's "## Completion Judge" section
 # from the judge provenance log (one row per judge call: event, verdict, failed
 # dimensions, summary; an override row names the operator's directive and where it
-# came from, an Asana comment or a consumed waiver file). Spliced into the
-# report at attach time by hooks/require-clean-run-report.sh, so the agent never
-# writes it. Usage: judge-report-section.sh --gid <gid>
+# came from, an Asana comment or a consumed waiver file). The first line is the
+# final verdict per event (the last call for that event, the one the run finished
+# on); the history table follows, oldest first, so an early deny reads as a
+# fix-and-retry rather than the outcome. Spliced into the report at attach time by
+# hooks/require-clean-run-report.sh and again after the finishing status call by
+# hooks/refresh-report-judge-section.sh, so the agent never writes it.
+# Usage: judge-report-section.sh --gid <gid>
 # Env: COMPLETION_JUDGE_LOG_DIR overrides the log directory (tests).
 set -uo pipefail
 GID=""
@@ -20,10 +24,17 @@ const fs=require("fs");
 const rows=fs.readFileSync(process.argv[1],"utf8").split("\n").filter(Boolean).map(l=>{try{return JSON.parse(l)}catch{return null}}).filter(Boolean);
 if(!rows.length){console.log("_No judge call yet._");process.exit(0)}
 const esc=s=>String(s||"").replace(/\|/g,"\\|").replace(/\s+/g," ").trim();
+const ts=r=>(r.ts||"").replace(/^\d{4}-/,"").replace("T"," ");
+const last={};rows.forEach((r,i)=>{if(r.event)last[r.event]=i});
+const fin=Object.keys(last).sort((a,b)=>last[a]-last[b]).map(e=>`${e}: **${rows[last[e]].verdict||"?"}** (#${last[e]+1}, ${ts(rows[last[e]])})`);
+console.log(`Final verdict per event: ${fin.join("; ")||"none"}`);
+console.log("");
+console.log("Every judge call, oldest first:");
+console.log("");
 console.log("| # | Time (UTC) | Event | Verdict | Failed | Summary |");
 console.log("|---|---|---|---|---|---|");
 rows.forEach((r,i)=>{
-  const t=(r.ts||"").replace(/^\d{4}-/,"").replace("T"," ").replace(/Z$/,"Z");
+  const t=ts(r);
   let failed="", summary="";
   if(r.verdict==="override"){failed="";const via=r.comment_at?`via Asana comment ${r.comment_at.replace(/^\d{4}-/,"")}`:`via ${esc(r.source)||"operator waiver"}`;summary=`operator override (${r.override||"?"}) ${via}: ${esc(r.directive).slice(0,120)}`}
   else if(r.verdict==="unavailable"){summary=`judge unavailable: ${esc(r.error)}`}

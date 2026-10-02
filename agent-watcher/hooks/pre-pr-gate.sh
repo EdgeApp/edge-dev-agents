@@ -62,6 +62,27 @@ if [ "$HAS_EVIDENCE" = 0 ]; then
   exit 2
 fi
 
+# ---- Check 1b: Jev money diff check (shadow, log only) ----------------------
+# ~/.config/jev/routing/README.md: asks whether the diff about to open as a PR
+# touches money-path code (path rule plus the DEFINITION.md question over the
+# diff). Shadow: one row per task and repo in ~/.config/jev/shadow/routing/
+# diffcheck.jsonl, detached, never blocks and never changes this hook's output.
+# Live routing turns a flagged Sonnet-routed diff into an Opus review here.
+jev_diffcheck_async() {
+  local d="$HOME/.config/jev/routing/jev_diffcheck.py" cwd top flag
+  [ -f "$d" ] || return 0
+  cwd=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)
+  top=$(git -C "${cwd:-/nonexistent}" rev-parse --show-toplevel 2>/dev/null || true)
+  [ -n "$top" ] || return 0
+  flag="/tmp/agent-diffcheck-$AGENT_TASK_GID-$(basename "$top")"
+  [ -f "$flag" ] && return 0
+  : > "$flag"
+  perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' python3 "$d" shadow --gid "$AGENT_TASK_GID" --repo-dir "$top" \
+    </dev/null >/dev/null 2>&1 & disown 2>/dev/null || true
+  return 0
+}
+jev_diffcheck_async || true
+
 # ---- Check 2: duplicate-utility scan (soft, once per task) ------------------
 DEDUP_FLAG="/tmp/agent-dedup-scan-$AGENT_TASK_GID"
 [ -f "$DEDUP_FLAG" ] && exit 0

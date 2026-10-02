@@ -126,7 +126,6 @@ Return success exit only on PASS.
 
 <rule id="spaced-pin-taps">Edge's RN keypad drops digits tapped too fast → wrong PIN → exponential lockout (465s → 914s → …). Each PIN digit tap in `buy-quote-input.yaml` uses `waitToSettleTimeoutMs`. Never speed it up. If a run logs "Invalid PIN: Account locked for N seconds", wait — do NOT tap.</rule>
 <rule id="no-hideKeyboard">On this debug build, `hideKeyboard` reliably triggers an RN Fabric text-measure SIGABRT. The flow leaves the keyboard up. Do not add `hideKeyboard` steps.</rule>
-<rule id="no-hierarchy-polling-on-buy">`assertVisible`/`extendedWaitUntil` traverse the a11y hierarchy on a poll loop, provoking the same Fabric crash on the Buy scene. The flow stops polling once the amount is entered; the capture script uses external simctl screenshots (no hierarchy traversal).</rule>
 
 </step>
 

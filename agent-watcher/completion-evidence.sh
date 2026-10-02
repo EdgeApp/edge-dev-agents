@@ -4,8 +4,11 @@
 # description, operator asks since the run-report watermark, the run report, the
 # state file, the attempt-log, proof frames, the concession reason, per-worktree git
 # facts (commits, diff stat, CHANGELOG diff, scaffolding scan, capped diff) and the
-# mechanical CHANGELOG lint. The bundle's sha256 (over everything but the generated
-# line) binds the verdict to exactly this evidence.
+# mechanical CHANGELOG lint. The bundle's sha256 binds the verdict to exactly this
+# evidence. Clock lines (generated, the scope marker's checked_at, the report's
+# mtime) are left out of the hash: they change on every call, so an immediate
+# retry with unchanged evidence would otherwise miss the verdict cache and pay
+# for a fresh judgment.
 #
 # Usage:
 #   completion-evidence.sh --gid <gid> --event complete|pr-create|block [--reason "<text>"]
@@ -172,7 +175,7 @@ done
 [ "$found" = 1 ] || line "(no worktrees under $WT_ROOT)"
 
 # ---- Hash + finalize ----
-HASH=$(grep -v '^generated: ' "$TMP" | shasum -a 256 | cut -c1-16)
+HASH=$(grep -v -E '^(generated|checked_at): ' "$TMP" | sed -E 's/^(file: \/tmp\/agent-run-report-[^ ]+) \([0-9T:-]+\)$/\1/' | shasum -a 256 | cut -c1-16)
 line ""; line "evidence_hash: $HASH"
 mv -f "$TMP" "$OUT"
 echo "path=$OUT hash=$HASH"

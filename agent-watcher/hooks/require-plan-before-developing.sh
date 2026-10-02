@@ -124,10 +124,11 @@ fi
 [ "$FOLLOWUP" = 1 ] && exit 0
 
 # Jev routing at the gate (~/.config/jev/routing/README.md): on an ALLOWED first-plan
-# transition, ask Jev which model can carry the implementation and, when it qualifies,
-# start a Sonnet shadow. Detached in its own session with a delay (a plan written in this
-# same command lands first); it never touches this hook's exit code. The router dedupes
-# per gid, skips Task deliverables, and honors ~/.config/jev/shadow/OFF.
+# transition, ask Jev whether the planned change is money-moving (below 0.2 the pick is
+# Sonnet) and log the pick; nothing is routed. Detached in its own session with a delay (a
+# plan written in this same command lands first); it never touches this hook's exit code.
+# The router dedupes per gid, logs Task deliverables as not routable, and honors
+# ~/.config/jev/shadow/OFF.
 jev_route_async() {
   local r="$HOME/.config/jev/routing/jev_route.py"
   [ -f "$r" ] || return 0

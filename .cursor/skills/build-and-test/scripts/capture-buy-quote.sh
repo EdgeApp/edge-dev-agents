@@ -5,17 +5,14 @@
 #
 # The Buy (Ramp) scene in this debug build has an INTERMITTENT React Native
 # Fabric text-measure crash (RCTTextLayoutManager / folly::EvictingCacheMap
-# SIGABRT). Two things make a single in-flow screenshot unreliable:
-#   1. maestro's assertVisible / extendedWaitUntil traverse the accessibility
-#      hierarchy on a poll loop, which forces text re-measurement and
-#      *provokes* the crash.
-#   2. The quote takes ~6s to resolve, but the crash can fire any time on the
-#      scene, so a fixed-delay single shot is either too early (still loading)
-#      or too late (already crashed → springboard).
+# SIGABRT). The quote takes ~6s to resolve, but the crash can fire any time on
+# the scene, so a fixed-delay single in-flow shot is either too early (still
+# loading) or too late (already crashed → springboard).
 #
 # This wrapper drives the interaction flow (the XCUITest interpreter by
-# default, or maestro), which does no polling after entering the amount, then captures with an EXTERNAL simctl
-# screenshot burst (pixel-only, no hierarchy traversal), keeping the LAST frame
+# default, or maestro), which ends at amount entry, then captures with an
+# EXTERNAL simctl screenshot burst (pixel-only, independent of the flow),
+# keeping the LAST frame
 # taken while the app was still alive — i.e. the resolved quote, just before any
 # crash. Retries the whole cycle until it lands a frame from late enough to
 # show the quote.

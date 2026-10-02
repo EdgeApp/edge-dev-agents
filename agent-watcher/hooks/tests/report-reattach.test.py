@@ -22,8 +22,9 @@ Covers:
   G. Report REPLACE matches the name FAMILY (ordinal-insensitive, same slug), so
      a gate-re-numbered re-attach replaces this segment's copy instead of
      leaving the task with two report docs.
-  H. require-completion-judgment.sh splices a recorded verdict into this
-     segment's report and re-attaches it once, and never loops.
+  H. The completion gate leaves the report alone; refresh-report-judge-section.sh
+     splices the final verdict and re-attaches the report only after a status
+     write that finished the segment (Complete or --blocked yes) succeeded.
   I. require-clean-run-report.sh resolves --attach-file "$F" and blocks a
      write-and-attach in ONE command with the split named.
 
@@ -75,6 +76,7 @@ UNDER_TEST = [
     '.config/agent-watcher/hooks/block-raw-asana-api.sh',
     '.config/agent-watcher/hooks/record-own-asana-story.sh',
     '.config/agent-watcher/hooks/require-completion-judgment.sh',
+    '.config/agent-watcher/hooks/refresh-report-judge-section.sh',
     '.config/agent-watcher/hooks/lib/splice-judge-section.sh',
 ]
 LINKED = [
@@ -85,8 +87,8 @@ LINKED = [
     '.config/agent-watcher/hooks/lib/reviewer-outage-noise.sh',
     '.config/agent-watcher/hooks/lib/shell-word-resolve.sh',
     '.config/agent-watcher/hooks/cmd-executes.sh',
-    '.config/agent-watcher/judge-report-section.sh',
 ]
+UNDER_TEST.append('.config/agent-watcher/judge-report-section.sh')
 for rel in UNDER_TEST:
     dst = os.path.join(HOME, rel); os.makedirs(os.path.dirname(dst), exist_ok=True)
     shutil.copy(src(rel), dst); os.chmod(dst, 0o755)
@@ -170,12 +172,11 @@ def calls():
     return [json.loads(l) for l in open(LOG)]
 
 
-JMARK = f'/tmp/agent-judge-reattach-{GID}'
 JUDGE_LOG = os.path.join(STATE, f'agent-watcher/judge/{GID}.jsonl')
 
 
 def reset():
-    for p in (LOG, OWN, MARKER, DOCMARK, JMARK, JUDGE_LOG, os.path.join(TMP, 'check.log')):
+    for p in (LOG, OWN, MARKER, DOCMARK, JUDGE_LOG, os.path.join(TMP, 'check.log')):
         if os.path.exists(p):
             os.remove(p)
 
@@ -522,10 +523,13 @@ check('J2 lone bare prior-segment report does not block the first numbered repor
       p.returncode == 0 and any(x['method'] == 'POST' for x in calls()) and not any(x['method'] == 'DELETE' for x in calls()),
       p.stdout + p.stderr)
 
-# ---------------- H. judge verdict lands in the attached report ----------------
+# ---------------- H. final verdict lands in the attached report ----------------
 JGATE = os.path.join(HOME, '.config/agent-watcher/hooks/require-completion-judgment.sh')
-COMPLETE_CMD = json.dumps({'tool_input': {'command': f'~/.config/agent-watcher/update-status.sh {GID} Complete'}})
+JPOST = os.path.join(HOME, '.config/agent-watcher/hooks/refresh-report-judge-section.sh')
+STATUS = f'~/.config/agent-watcher/update-status.sh {GID} Complete'
+COMPLETE_CMD = json.dumps({'tool_input': {'command': STATUS}})
 RJ = os.path.join(TMP, 'agent-run-report-judge.md')
+R2 = lambda: att(('R2', '2-agent-run-report.md', '2026-09-15T11:00:00.000Z'))
 
 
 def judge_report():
@@ -533,42 +537,82 @@ def judge_report():
                         '<!-- cat: completion-judge -->\n_No judge call yet._\n\n## Testing\n\nDriven on the sim.\n')
 
 
+def judge_rows(*rows):
+    os.makedirs(os.path.dirname(JUDGE_LOG), exist_ok=True)
+    with open(JUDGE_LOG, 'w') as fh:
+        for ts, event, verdict in rows:
+            fh.write(json.dumps({'ts': ts, 'gid': GID, 'event': event, 'verdict': verdict,
+                                 'fails': 1 if verdict == 'deny' else 0,
+                                 'fail_ids': ['J3'] if verdict == 'deny' else [], 'summary': verdict + ' summary'}) + '\n')
+
+
 def jgate(**kw):
     return subprocess.run([JGATE], input=COMPLETE_CMD, capture_output=True, text=True,
-                          env=env(FAKE_ATTACH_JSON=att(('R2', '2-agent-run-report.md', '2026-09-15T11:00:00.000Z')), **kw),
-                          timeout=120)
+                          env=env(FAKE_ATTACH_JSON=R2(), **kw), timeout=120)
 
+
+def jpost(stdout, cmd=STATUS, orch=True, **kw):
+    e = env(FAKE_ATTACH_JSON=R2(), **kw)
+    if not orch:
+        e.pop('AGENT_TASK_GID')
+    payload = {'tool_name': 'Bash', 'tool_input': {'command': cmd},
+               'tool_response': {'stdout': stdout, 'stderr': '', 'interrupted': False}}
+    return subprocess.run([JPOST], input=json.dumps(payload), capture_output=True, text=True, env=e, timeout=120)
+
+
+posted = lambda: [x for x in calls() if x['method'] == 'POST' and x['url'].endswith('/attachments')]
+DONE = f'Updated task {GID}: agent_status=Complete\n>> section move: Complete'
 
 reset(); judge_report(); open(DOCMARK, 'w').write(f'sess-j|judge|{RJ}\n')
 p = jgate()
+check('H1 the gate allows without touching the report',
+      p.returncode == 0 and '_No judge call yet._' in open(RJ).read() and not posted(), p.stdout + p.stderr)
+
+reset(); judge_report(); open(DOCMARK, 'w').write(f'sess-j|judge|{RJ}\n')
+judge_rows(('2026-09-16T10:00:00Z', 'complete', 'deny'), ('2026-09-16T10:20:00Z', 'complete', 'allow'))
+p = jpost(DONE)
 body = open(RJ).read()
-posts = [x for x in calls() if x['method'] == 'POST' and x['url'].endswith('/attachments')]
-check('H1 an allowed verdict is spliced into the report',
-      p.returncode == 0 and '| # | Time (UTC) | Event | Verdict' in body and 'allow' in body and '_No judge call yet._' not in body,
-      p.stdout + p.stderr + body[-300:])
-check('H1 the report is re-attached in place', len(posts) == 1 and any(x['method'] == 'DELETE' and x['url'].endswith('R2') for x in calls()), p.stdout + p.stderr)
+check('H2 a finished Complete splices the final verdict above the history',
+      p.returncode == 0 and 'Final verdict per event: complete: **allow** (#2,' in body
+      and body.index('Final verdict') < body.index('| # | Time (UTC)') and '| 1 | 09-16 10:00:00Z | complete | deny | J3 |' in body
+      and '_No judge call yet._' not in body and body.index('## Completion Judge') < body.index('## Testing'),
+      p.stdout + p.stderr + body)
+check('H2 the report is re-attached in place under its iteration name',
+      len(posted()) == 1 and '2-agent-run-report.md' in posted()[0]['form'] + posted()[0]['data'] + json.dumps(calls())
+      and any(x['method'] == 'DELETE' and x['url'].endswith('R2') for x in calls()), p.stdout + p.stderr)
 
-reset()
-p = jgate()
-check('H2 a second completion event does not re-attach (no loop)',
-      p.returncode == 0 and not any(x['method'] == 'POST' and x['url'].endswith('/attachments') for x in calls()), p.stdout + p.stderr)
+reset(); judge_report(); open(DOCMARK, 'w').write(f'sess-j|judge|{RJ}\n'); judge_rows(('2026-09-16T10:00:00Z', 'block', 'allow'))
+p = jpost(f'Updated task {GID}: agent_status=Pending, blocked=yes (reason: no funds)')
+check('H3 a finished block write re-attaches too',
+      p.returncode == 0 and len(posted()) == 1 and 'block: **allow**' in open(RJ).read(), p.stdout + p.stderr)
 
-reset(); judge_report(); open(DOCMARK, 'w').write(f'sess-j2|judge|{RJ}\n')
-p = jgate(FAKE_JUDGE_RC=1)
-check('H3 a denied verdict is spliced and re-attached too',
-      p.returncode == 2 and 'allow' in open(RJ).read() and any(x['method'] == 'POST' and x['url'].endswith('/attachments') for x in calls()),
-      p.stdout + p.stderr)
+for name, stdout, cmd in [
+        ('H4 a failed status write does nothing', 'Asana API error:', STATUS),
+        ('H5 a non-finishing status does nothing', f'Updated task {GID}: agent_status=In Progress', f'~/.config/agent-watcher/update-status.sh {GID} "In Progress"'),
+        ('H6 another task\'s Complete does nothing', 'Updated task 999: agent_status=Complete', '~/.config/agent-watcher/update-status.sh 999 Complete'),
+        ('H7 a command only quoting the script does nothing', '', f'echo "next: {STATUS}"')]:
+    reset(); judge_report(); open(DOCMARK, 'w').write(f'sess-j|judge|{RJ}\n'); judge_rows(('2026-09-16T10:00:00Z', 'complete', 'allow'))
+    p = jpost(stdout, cmd)
+    check(name, p.returncode == 0 and not calls() and '_No judge call yet._' in open(RJ).read(), p.stdout + p.stderr)
 
-reset(); judge_report()
-p = jgate()
-check('H4 no attached report doc: verdict path untouched',
-      p.returncode == 0 and '_No judge call yet._' in open(RJ).read() and not calls(), p.stdout + p.stderr)
+reset(); judge_report(); judge_rows(('2026-09-16T10:00:00Z', 'complete', 'allow'))
+p = jpost(DONE)
+check('H8 no attached report doc: no-op', p.returncode == 0 and not calls(), p.stdout + p.stderr)
 
-reset(); open(DOCMARK, 'w').write(f'sess-j3|judge|{RJ}\n')
-open(RJ, 'w').write('---\niteration: "2"\n---\n\n## Completion Judge\n\n| # | Time (UTC) | Event | Verdict | Failed | Summary |\n')
-p = jgate()
-check('H5 a report that already carries a verdict is left alone',
-      p.returncode == 0 and not any(x['method'] == 'POST' for x in calls()), p.stdout + p.stderr)
+reset(); judge_report(); open(DOCMARK, 'w').write(f'sess-j|judge|{RJ}\n'); judge_rows(('2026-09-16T10:00:00Z', 'complete', 'allow'))
+p = jpost(DONE, orch=False)
+check('H9 outside an orch run: no-op', p.returncode == 0 and not calls(), p.stdout + p.stderr)
+
+reset(); judge_report(); open(DOCMARK, 'w').write(f'sess-j|judge|{RJ}\n'); judge_rows(('2026-09-16T10:00:00Z', 'complete', 'allow'))
+p = jpost(DONE, FAKE_UPLOAD_FAIL=1)
+check('H10 a failed re-attach exits 2 with the manual command',
+      p.returncode == 2 and 'asana-task-update.sh --task' in p.stderr and '--attach-name 2-agent-run-report.md' in p.stderr, p.stdout + p.stderr)
+
+reset(); judge_report(); open(DOCMARK, 'w').write(f'sess-j|judge|{RJ}\n'); judge_rows(('2026-09-16T10:00:00Z', 'complete', 'allow'))
+p = jpost(DONE); first = open(RJ).read(); p2 = jpost(DONE)
+check('H11 a repeated finish re-splices in place (one section)',
+      p2.returncode == 0 and open(RJ).read().count('## Completion Judge') == 1 and open(RJ).read() == first, p2.stdout + p2.stderr)
+
 
 # ---------------- I. attach-file word resolution + write-and-attach split ----------------
 RV = os.path.join(TMP, f'agent-run-report-{GID}-varpath.md')

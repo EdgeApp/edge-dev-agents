@@ -71,11 +71,8 @@ env:
 - inputText: ${BUY_AMOUNT}
 
 # --- let the live quote resolve, then capture ---
-# IMPORTANT: do NOT use extendedWaitUntil / assertVisible here. Those traverse the
-# accessibility hierarchy on a poll loop, which forces RN text re-measurement and
-# reliably triggers the Fabric text-cache SIGABRT on this debug build. waitForAnimationToEnd
-# only diffs screenshots (no hierarchy traversal), so the scene survives long enough for the
-# quote ("Amount BTC" value + "1 BTC = <rate> USD") to render before we grab the screenshot.
+# waitForAnimationToEnd diffs screenshots until the quote ("Amount BTC" value +
+# "1 BTC = <rate> USD") has rendered.
 - waitForAnimationToEnd:
     timeout: 8000
 - takeScreenshot: ${SCREENSHOT_PATH}

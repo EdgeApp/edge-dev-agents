@@ -100,6 +100,9 @@ try:
     check('collector: bundle carries ask, attempt-log, report, state, proof frame, event, followup scope line',
           all(x in b for x in ('try multiple tokens incl custom', 'HFUN detect', 'verified: pass', '- verified X', f'agent-proof-{GID}-01-x.png', 'event: complete', 'segment: FOLLOWUP', '2026-09-09T19:26:39Z')))
     check('collector: hash stable across runs', collect() == h1)
+    m = json.load(open(MARKER)); m['checked_at'] = '2026-09-10T23:59:59Z'; json.dump(m, open(MARKER, 'w'))
+    os.utime(f'/tmp/agent-run-report-{GID}-fixture.md', (1700000000, 1700000000))
+    check('collector: clock lines (checked_at, report mtime) do not move the hash, so a retry hits the cache', collect() == h1)
     marker([ASK], watermark='')
     collect(); check('collector: no report before the segment -> FIRST RUN scope', 'segment: FIRST RUN' in open(EVID).read())
     marker([])
@@ -146,6 +149,12 @@ try:
           len(open(SHADOW_BLOCKER).read().splitlines()) == 1 and 'reason' not in json.loads(open(LOGF).read().strip().splitlines()[-1]))
     p = subprocess.run([f'{AW}/judge-report-section.sh', '--gid', GID], capture_output=True, text=True, env=ENV)
     sec = p.stdout
+    last_ev = {}
+    for i, r in enumerate(json.loads(l) for l in open(LOGF).read().splitlines()):
+        last_ev[r['event']] = (i + 1, r['verdict'])
+    check('report section: first line is the final verdict per event, the last call for each',
+          sec.splitlines()[3].startswith('Final verdict per event: ') and all(f'{e}: **{v}** (#{n},' in sec.splitlines()[3] for e, (n, v) in last_ev.items())
+          and sec.index('Final verdict') < sec.index('| # | Time (UTC)'), sec[:400])
     check('report section: one row per judge call with failed ids, override and unavailable rows', sec.startswith('## Completion Judge') and '| deny | J1 |' in sec and 'operator override (bypass)' in sec and 'judge unavailable' in sec, sec[:400])
     rep = f'/tmp/agent-run-report-{GID}-fixture.md'
     open(rep, 'w').write('---\noutcome: complete\n---\n## Finalize Gate\n_x_\n\n## Completion Judge\n_No judge call yet._\n\n## Testing\ndrove it\n')

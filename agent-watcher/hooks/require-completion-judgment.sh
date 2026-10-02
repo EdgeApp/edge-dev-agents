@@ -25,10 +25,9 @@
 # output) DENIES with a retry recipe: a timed-out hook would fail OPEN, so the
 # launcher deadline (480s) stays under this hook's timeout (600s).
 #
-# After a verdict is recorded, this segment's attached run report is re-attached
-# with its Completion Judge section filled from the provenance log (see
-# refresh_report_judge_section below): the report is attached before the first
-# completion event, so nothing else ever puts the verdict in it.
+# The verdict reaches the attached run report after the status write lands
+# (hooks/refresh-report-judge-section.sh, PostToolUse), not from here: an allow
+# here is not the outcome while a sibling gate can still deny the same call.
 #
 # Scope: no-op unless AGENT_TASK_GID is set. Exit 0 allow; exit 2 block (stderr to
 # the model). Trigger precision via cmd-executes.sh, which strips mentions itself.
@@ -74,43 +73,6 @@ if [ "$EVENT" = "block" ]; then
   fi
 fi
 
-# The report is attached BEFORE the first completion event, so its Completion
-# Judge section shipped as "_No judge call yet._" on every run: the judge rules
-# after the attach and nothing re-attached the report. Once a verdict is
-# recorded, splice it in and re-attach this segment's report doc.
-# CANNOT LOOP, three ways: the re-attach runs from this hook as a subprocess (no
-# PreToolUse hook fires, so no second judge call), it only fires while the report
-# still carries the placeholder (a re-attach removes it), and a one-shot marker
-# caps it at one per segment. A failed splice or attach never changes the
-# verdict: the agent is told to re-attach, and the next attach splices anyway.
-refresh_report_judge_section() {
-  local mark="/tmp/agent-judge-reattach-$GID" doc="/tmp/agent-report-doc-$GID" line report iter name
-  [ -s "$doc" ] || return 0
-  line=$(head -1 "$doc")
-  case "$line" in *"|"*) report="${line##*|}" ;; *) return 0 ;; esac
-  # Marker carries the doc line (session|slug|path), so one refresh per segment
-  # per report doc: a followup segment's own report still gets its verdict.
-  if [ -s "$mark" ] && [ "$(head -1 "$mark")" = "$line" ]; then return 0; fi
-  [ -s "$report" ] || return 0
-  grep -q '_No judge call yet\._' "$report" || return 0
-  case "$("$H/judge-report-section.sh" --gid "$GID" 2>/dev/null || true)" in
-    ""|*"_No judge call yet._"*) return 0 ;;
-  esac
-  printf '%s\n' "$line" > "$mark"
-  . "$H/hooks/lib/splice-judge-section.sh"
-  splice_judge_section "$GID" "$report"
-  iter=$(grep -m1 -E '^iteration: "?[0-9]+' "$report" 2>/dev/null | grep -oE '[0-9]+' | head -1 || true)
-  name="agent-run-report.md"
-  [ -n "$iter" ] && name="$iter-agent-run-report.md"
-  if "$HOME/.cursor/skills/asana-task-update/scripts/asana-task-update.sh" \
-       --task "$GID" --attach-file "$report" --attach-name "$name" >/dev/null 2>&1; then
-    echo "completion judge: verdict spliced into $report and re-attached as $name"
-  else
-    echo "completion judge: verdict spliced into $report but the re-attach failed; re-attach it with asana-task-update.sh --task $GID --attach-file $report --attach-name agent-run-report.md" >&2
-  fi
-  return 0
-}
-
 # OPERATOR WAIVER: one event, then gone. The file is CONSUMED here (removed) and
 # the skip is written to the judge provenance log as a `"verdict":"override"` line,
 # the same log resolve-run surfaces as blocking.judge_log: an authorized bypass is
@@ -130,7 +92,6 @@ if [ -s "$WAIVER" ]; then
   rm -f "$WAIVER" 2>/dev/null
   echo "completion judge WAIVED by operator for this $EVENT event on task $GID: $TEXT"
   echo "The waiver is consumed: it covered this one event and is now gone, so the next completion event is judged again (the operator waives again by saying so again). Logged to the judge provenance log as an operator override."
-  refresh_report_judge_section
   exit 0
 fi
 
@@ -138,8 +99,6 @@ ARGS=(--gid "$GID" --event "$EVENT")
 [ -n "$REASON" ] && ARGS+=(--reason "$REASON")
 OUT=$("$H/completion-judge.sh" "${ARGS[@]}" 2>/tmp/agent-judge-$GID.stderr)
 RC=$?
-# A verdict exists now (allow or deny): put it in the attached report.
-if [ "$RC" = 0 ] || [ "$RC" = 1 ]; then refresh_report_judge_section; fi
 case "$RC" in
   0) echo "completion judge: allow ($EVENT)"; exit 0 ;;
   1)
