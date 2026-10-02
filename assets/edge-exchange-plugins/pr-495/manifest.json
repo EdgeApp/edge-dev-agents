@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "entries": [
     {
       "path": "assets/edge-exchange-plugins/pr-495/20260916-155930-agent-proof-1218563157181138-02-lifi-quote-polygon-usdc-to-arc.png",
@@ -63,6 +63,78 @@
       "subject": "Add Arc swaps via LI.FI",
       "hackNote": null,
       "addedAt": "2026-09-16T23:50:58.421Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20261001-173746-agent-proof-1218563157181138-12-lifi-pol-to-arc-usdc-quote.png",
+      "caption": "lifi pol to arc usdc quote",
+      "index": "12",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T00:37:46Z",
+      "headSha": "5ce2b95efee8dbdea0dde33c6bd4886475197929",
+      "addedAt": "2026-10-02T00:37:46Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20261001-173746-agent-proof-1218563157181138-13-lifi-pol-to-arc-usdc-success.png",
+      "caption": "lifi pol to arc usdc success",
+      "index": "13",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T00:37:46Z",
+      "headSha": "5ce2b95efee8dbdea0dde33c6bd4886475197929",
+      "addedAt": "2026-10-02T00:37:46Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20261001-173746-agent-proof-1218563157181138-14-lifi-arc-usdc-to-pol-quote.png",
+      "caption": "lifi arc usdc to pol quote",
+      "index": "14",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T00:37:46Z",
+      "headSha": "5ce2b95efee8dbdea0dde33c6bd4886475197929",
+      "addedAt": "2026-10-02T00:37:46Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20261001-173746-agent-proof-1218563157181138-15-lifi-arc-usdc-to-pol-success.png",
+      "caption": "lifi arc usdc to pol success",
+      "index": "15",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T00:37:46Z",
+      "headSha": "5ce2b95efee8dbdea0dde33c6bd4886475197929",
+      "addedAt": "2026-10-02T00:37:46Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20261001-173746-agent-proof-1218563157181138-18-lifi-arc-usdc-max-swap-quote.png",
+      "caption": "lifi arc usdc max swap quote",
+      "index": "18",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T00:37:46Z",
+      "headSha": "5ce2b95efee8dbdea0dde33c6bd4886475197929",
+      "addedAt": "2026-10-02T00:37:46Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20261001-173746-agent-proof-1218563157181138-19-lifi-arc-usdc-max-swap-success.png",
+      "caption": "lifi arc usdc max swap success",
+      "index": "19",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T00:37:46Z",
+      "headSha": "5ce2b95efee8dbdea0dde33c6bd4886475197929",
+      "addedAt": "2026-10-02T00:37:46Z"
     }
   ]
 }
