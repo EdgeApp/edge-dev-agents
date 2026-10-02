@@ -9,9 +9,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-10-02T21:57:42Z",
-      "headSha": "a21d986b27deb21ad770fc29b1d15fda7ff7642e",
-      "addedAt": "2026-10-02T21:57:42Z"
+      "batchAt": "2026-10-02T22:07:43Z",
+      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
+      "addedAt": "2026-10-02T21:57:42Z",
+      "carriedFrom": "2026-10-02T21:57:42Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6236/20261002-145742-agent-proof-1219117645108274-02-unknown-order-unverified-no-send.png",
@@ -21,9 +22,10 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-10-02T21:57:42Z",
-      "headSha": "a21d986b27deb21ad770fc29b1d15fda7ff7642e",
-      "addedAt": "2026-10-02T21:57:42Z"
+      "batchAt": "2026-10-02T22:07:43Z",
+      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
+      "addedAt": "2026-10-02T21:57:42Z",
+      "carriedFrom": "2026-10-02T21:57:42Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6236/20261002-145742-agent-proof-1219117645108274-03-HACKED-open-arbitrum-order-picker-arbitrum-only.png",
@@ -33,21 +35,10 @@
       "phase": null,
       "subject": null,
       "hackNote": "fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order for transactionId forced-open-arbitrum-eth instead of calling MoonPay; reverted before commit",
-      "batchAt": "2026-10-02T21:57:42Z",
-      "headSha": "a21d986b27deb21ad770fc29b1d15fda7ff7642e",
-      "addedAt": "2026-10-02T21:57:42Z"
-    },
-    {
-      "path": "assets/edge-react-gui/pr-6236/20261002-145742-agent-proof-1219117645108274-04-HACKED-open-order-send-uses-order-address-and-amount.png",
-      "caption": "open order send uses order address and amount",
-      "index": "4",
-      "hacked": true,
-      "phase": null,
-      "subject": null,
-      "hackNote": "fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order for transactionId forced-open-arbitrum-eth instead of calling MoonPay; reverted before commit",
-      "batchAt": "2026-10-02T21:57:42Z",
-      "headSha": "a21d986b27deb21ad770fc29b1d15fda7ff7642e",
-      "addedAt": "2026-10-02T21:57:42Z"
+      "batchAt": "2026-10-02T22:07:43Z",
+      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
+      "addedAt": "2026-10-02T21:57:42Z",
+      "carriedFrom": "2026-10-02T21:57:42Z"
     },
     {
       "path": "assets/edge-react-gui/pr-6236/20261002-145742-agent-proof-1219117645108274-05-in-app-sell-moonpay-widget-opens-with-per-order-redirect.png",
@@ -57,9 +48,34 @@
       "phase": null,
       "subject": null,
       "hackNote": null,
-      "batchAt": "2026-10-02T21:57:42Z",
-      "headSha": "a21d986b27deb21ad770fc29b1d15fda7ff7642e",
-      "addedAt": "2026-10-02T21:57:42Z"
+      "batchAt": "2026-10-02T22:07:43Z",
+      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
+      "addedAt": "2026-10-02T21:57:42Z",
+      "carriedFrom": "2026-10-02T21:57:42Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6236/20261002-150743-agent-proof-1219117645108274-04-HACKED-open-order-send-uses-order-address-and-amount.png",
+      "caption": "open order send uses order address and amount",
+      "index": "4",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order for transactionId forced-open-arbitrum-eth instead of calling MoonPay; reverted before commit",
+      "batchAt": "2026-10-02T22:07:43Z",
+      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
+      "addedAt": "2026-10-02T22:07:43Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6236/20261002-150743-agent-proof-1219117645108274-06-HACKED-open-order-send-tiles-locked-after-taps.png",
+      "caption": "open order send tiles locked after taps",
+      "index": "6",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order for transactionId forced-open-arbitrum-eth instead of calling MoonPay; reverted before commit",
+      "batchAt": "2026-10-02T22:07:43Z",
+      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
+      "addedAt": "2026-10-02T22:07:43Z"
     }
   ]
 }
