@@ -76,6 +76,42 @@
       "batchAt": "2026-10-02T22:07:43Z",
       "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
       "addedAt": "2026-10-02T22:07:43Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6236/20261002-152653-agent-proof-1219117645108274-07-HACKED-open-order-funded-send-ready.png",
+      "caption": "open order funded send ready",
+      "index": "7",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order for transactionId forced-open-arbitrum-eth instead of calling MoonPay (frames 07 to 09: deposit address is the test account's own Ethereum-wallet address); reverted before commit",
+      "batchAt": "2026-10-02T22:07:43Z",
+      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
+      "addedAt": "2026-10-02T22:26:53Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6236/20261002-152653-agent-proof-1219117645108274-08-HACKED-open-order-send-broadcast-transaction-success.png",
+      "caption": "open order send broadcast transaction success",
+      "index": "8",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order for transactionId forced-open-arbitrum-eth instead of calling MoonPay (frames 07 to 09: deposit address is the test account's own Ethereum-wallet address); reverted before commit",
+      "batchAt": "2026-10-02T22:07:43Z",
+      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
+      "addedAt": "2026-10-02T22:26:53Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6236/20261002-152653-agent-proof-1219117645108274-09-HACKED-open-order-sent-transaction-details.png",
+      "caption": "open order sent transaction details",
+      "index": "9",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "fetchMoonpaySellOrder returns a canned waitingForDeposit ETH-on-Arbitrum order for transactionId forced-open-arbitrum-eth instead of calling MoonPay (frames 07 to 09: deposit address is the test account's own Ethereum-wallet address); reverted before commit",
+      "batchAt": "2026-10-02T22:07:43Z",
+      "headSha": "0fed003793f7695e670e028f8a2394aa1a04c5ec",
+      "addedAt": "2026-10-02T22:26:53Z"
     }
   ]
 }
