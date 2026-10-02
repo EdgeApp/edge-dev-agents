@@ -922,8 +922,10 @@ function listRetiredSessions() {
 //   resume-task) when a prior transcript exists, else fresh-spawns. So phase statuses are
 //   progress-only (set by the running agent), never a manual re-engagement trigger, and
 //   this watchdog stays out of re-engagement entirely (see the header BOUNDARY note).
-// Every orch claude is launched with maestro-mcp.json, so it carries a
-// `maestro mcp --device <udid>` JVM as a stdio child (~160 MB, ~50 threads). At
+// Every orch claude is launched with maestro-mcp.json. Its server is the lazy
+// proxy (maestro-mcp-lazy.js), which runs a `maestro mcp --device <udid>` JVM
+// (~160 MB, ~50 threads) from a maestro tool call until 10 idle minutes pass,
+// so a retiree can still be carrying one. At
 // retirement the sim it points at is deleted, so the JVM serves nothing for the
 // rest of the retiree's life; kill it and keep only the claude process. Also swept
 // on every prune tick so a JVM that outlives or respawns after retirement dies too.

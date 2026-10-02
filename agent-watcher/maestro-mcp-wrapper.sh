@@ -9,9 +9,18 @@
 # daemon's iOS driver gets METRO+2000 — distinct from CLI proof runs at
 # METRO+1000 (both can be live in the same slot simultaneously) and unique
 # per slot (parallel slots' drivers stay off each other's ports).
+# The server runs behind maestro-mcp-lazy.js: the JVM starts on the session's
+# first maestro tool call and stops after 10 idle minutes, so a session that
+# never drives with maestro holds no JVM. MAESTRO_MCP_EAGER=1 runs the JVM
+# directly, as does a machine without node.
 set -euo pipefail
 
 MAESTRO=/Users/eddy/.maestro/bin/maestro
+LAZY="$(cd "$(dirname "$0")" && pwd)/maestro-mcp-lazy.js"
+if [ -z "${MAESTRO_MCP_EAGER:-}" ] && [ -f "$LAZY" ] && command -v node >/dev/null 2>&1; then
+  export MAESTRO_BIN="$MAESTRO"
+  MAESTRO="$LAZY"
+fi
 
 if [ -n "${AGENT_SIM_UDID:-}" ]; then
   PORT_ARGS=()

@@ -254,6 +254,11 @@ just a viewport.
   effort flags) and launches it with `tmux new-session -d`. When claude exits
   the wrapper prints the exit time and drops to a shell, so the pane and its
   scrollback survive for diagnosis.
+- **Maestro MCP.** Every session's maestro MCP server is
+  `agent-watcher/maestro-mcp-lazy.js`, a stdio proxy that answers the MCP
+  handshake from a cache, starts the maestro JVM on the first tool call, and
+  stops it with its iOS driver after 10 idle minutes. A session that never
+  drives with maestro holds no JVM.
 - **Resume poking.** `claude --resume` on a prior transcript shows an
   interactive menu that would wedge a hands-off session, so the spawner polls
   the pane and answers it with send-keys (Down+Enter: FULL resume; the

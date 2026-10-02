@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "f7cd8fa8fdd2",
+      "hash": "ffb543a03933",
       "dims": [
         "O4",
         "O5",
@@ -1601,8 +1601,8 @@
       "hash": "b187b1601553"
     },
     "build-and-test:ios-flows-run-on-xcuitest": {
-      "reason": "2026-10-02: driver choice for running a flow; the drive outcome is graded by testing-depth and proof rules, not by which runner executed the yaml",
-      "hash": "4389497b6b8a"
+      "reason": "2026-10-02: 2026-10-01: driver choice for running a flow; the drive outcome is graded by testing-depth and proof rules, not by which runner executed the yaml (re-ack: MCP daemon restart wording)",
+      "hash": "d6c3ed95de34"
     }
   },
   "excluded_skills": {
