@@ -48,6 +48,54 @@
       "batchAt": "2026-10-02T05:02:13Z",
       "headSha": "e44a9c842616fee2192b7a451f129c81e75e7285",
       "addedAt": "2026-10-02T05:02:13Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6235/20261001-223218-agent-proof-1219076181121183-05-HACKED-forced-broadcast-failure.png",
+      "caption": "forced broadcast failure",
+      "index": "5",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Local uncommitted edits, reverted: the first MoonPay widget open was pointed at the payment redirect URL (stands in for a KYC-confirmed order, 0.00001 BTC to the wallet's own address), and frames 05-06 also forced the first broadcast to throw",
+      "batchAt": "2026-10-02T05:02:13Z",
+      "headSha": "e44a9c842616fee2192b7a451f129c81e75e7285",
+      "addedAt": "2026-10-02T05:32:18Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6235/20261001-223218-agent-proof-1219076181121183-06-HACKED-back-after-failed-send.png",
+      "caption": "back after failed send",
+      "index": "6",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Local uncommitted edits, reverted: the first MoonPay widget open was pointed at the payment redirect URL (stands in for a KYC-confirmed order, 0.00001 BTC to the wallet's own address), and frames 05-06 also forced the first broadcast to throw",
+      "batchAt": "2026-10-02T05:02:13Z",
+      "headSha": "e44a9c842616fee2192b7a451f129c81e75e7285",
+      "addedAt": "2026-10-02T05:32:18Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6235/20261001-223218-agent-proof-1219076181121183-07-HACKED-sell-order-complete.png",
+      "caption": "sell order complete",
+      "index": "7",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Local uncommitted edits, reverted: the first MoonPay widget open was pointed at the payment redirect URL (stands in for a KYC-confirmed order, 0.00001 BTC to the wallet's own address), and frames 05-06 also forced the first broadcast to throw",
+      "batchAt": "2026-10-02T05:02:13Z",
+      "headSha": "e44a9c842616fee2192b7a451f129c81e75e7285",
+      "addedAt": "2026-10-02T05:32:18Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6235/20261001-223218-agent-proof-1219076181121183-08-HACKED-saved-tx-details.png",
+      "caption": "saved tx details",
+      "index": "8",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "Local uncommitted edits, reverted: the first MoonPay widget open was pointed at the payment redirect URL (stands in for a KYC-confirmed order, 0.00001 BTC to the wallet's own address), and frames 05-06 also forced the first broadcast to throw",
+      "batchAt": "2026-10-02T05:02:13Z",
+      "headSha": "e44a9c842616fee2192b7a451f129c81e75e7285",
+      "addedAt": "2026-10-02T05:32:18Z"
     }
   ]
 }
