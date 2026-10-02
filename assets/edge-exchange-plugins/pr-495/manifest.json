@@ -501,6 +501,54 @@
       "batchAt": "2026-10-02T06:19:07Z",
       "headSha": "55b850e0704c629d12fe29283f93ffef56856456",
       "addedAt": "2026-10-02T06:19:07Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20261001-233644-agent-proof-1218563157181138-59-0xgasless-arc-usdc-to-eurc-quote-shared-table.png",
+      "caption": "0xgasless arc usdc to eurc quote shared table",
+      "index": "59",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T06:19:07Z",
+      "headSha": "55b850e0704c629d12fe29283f93ffef56856456",
+      "addedAt": "2026-10-02T06:36:44Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20261001-233644-agent-proof-1218563157181138-60-0xgasless-arc-usdc-to-eurc-success-shared-table.png",
+      "caption": "0xgasless arc usdc to eurc success shared table",
+      "index": "60",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T06:19:07Z",
+      "headSha": "55b850e0704c629d12fe29283f93ffef56856456",
+      "addedAt": "2026-10-02T06:36:44Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20261001-233644-agent-proof-1218563157181138-61-lifi-arc-usdc-to-pol-quote-shared-table.png",
+      "caption": "lifi arc usdc to pol quote shared table",
+      "index": "61",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T06:19:07Z",
+      "headSha": "55b850e0704c629d12fe29283f93ffef56856456",
+      "addedAt": "2026-10-02T06:36:44Z"
+    },
+    {
+      "path": "assets/edge-exchange-plugins/pr-495/20261001-233644-agent-proof-1218563157181138-62-lifi-arc-usdc-to-pol-success-shared-table.png",
+      "caption": "lifi arc usdc to pol success shared table",
+      "index": "62",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T06:19:07Z",
+      "headSha": "55b850e0704c629d12fe29283f93ffef56856456",
+      "addedAt": "2026-10-02T06:36:44Z"
     }
   ]
 }
