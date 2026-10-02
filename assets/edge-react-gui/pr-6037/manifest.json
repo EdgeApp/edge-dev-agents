@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6037/20261002-110246-agent-proof-1215776835822919-01-HACKED-stub-api-btc-direct-in-ideal-provider-list.png",
+      "caption": "stub api btc direct in ideal provider list",
+      "index": "1",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "keys.json apiUrl pointed at a local stub of the BTC Direct partner API (no partner credentials exist); app code unmodified",
+      "batchAt": "2026-10-02T18:02:46Z",
+      "headSha": "af5f233fc82688f362d972c479b44a2666c93582",
+      "addedAt": "2026-10-02T18:02:46Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6037/20261002-110246-agent-proof-1215776835822919-02-HACKED-stub-api-btc-direct-ideal-quote-selected.png",
+      "caption": "stub api btc direct ideal quote selected",
+      "index": "2",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "keys.json apiUrl pointed at a local stub of the BTC Direct partner API (no partner credentials exist); app code unmodified",
+      "batchAt": "2026-10-02T18:02:46Z",
+      "headSha": "af5f233fc82688f362d972c479b44a2666c93582",
+      "addedAt": "2026-10-02T18:02:46Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6037/20261002-110246-agent-proof-1215776835822919-03-HACKED-stub-api-checkout-url-opened-in-app.png",
+      "caption": "stub api checkout url opened in app",
+      "index": "3",
+      "hacked": true,
+      "phase": null,
+      "subject": null,
+      "hackNote": "keys.json apiUrl pointed at a local stub of the BTC Direct partner API (no partner credentials exist); app code unmodified",
+      "batchAt": "2026-10-02T18:02:46Z",
+      "headSha": "af5f233fc82688f362d972c479b44a2666c93582",
+      "addedAt": "2026-10-02T18:02:46Z"
+    }
+  ]
+}
