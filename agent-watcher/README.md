@@ -195,7 +195,7 @@ name/runtime, Metro defaults to 8081.
 | `agent-authored-text.sh` | wrap Asana prose in the 🥋/👊 authorship markers, idempotently; wraps ONLY in orch-run context (via `orch-run-context.sh`), operator-context text passes through unmarked |
 | `asana-config.json` | project GIDs + `.watcher.*` knobs |
 | `update-status.sh` | set `agent_status` (+ kanban section move) |
-| `usage-hold.sh` | the watcher's usage oracle, once per tick: prints `{spawn_hold,paused,reason}` from `claude-usage.sh` against `watcher.usage_hold` thresholds, and writes or clears the pause stamp `/tmp/agent-usage-pause.json` that session-watchdog.js and `hooks/require-continuation-or-block.sh` read (paused runs checkpoint and end their turn; the watchdog revives them when the stamp clears). Unknown usage fails open |
+| `usage-hold.sh` | the watcher's usage oracle, once per tick: prints `{spawn_hold,paused,reason}` from `claude-usage.sh` against `watcher.usage_hold` thresholds, and writes or clears the pause stamp `/tmp/agent-usage-pause.json` that session-watchdog.js and `hooks/require-continuation-or-block.sh` read (paused runs checkpoint and end their turn; the watchdog revives them when the stamp clears). Unknown usage fails open; a stale reading under 30 min (served during a rate-limit backoff) counts as known, and the reason line notes it |
 
 ## Asana authorship markers (🥋/👊)
 

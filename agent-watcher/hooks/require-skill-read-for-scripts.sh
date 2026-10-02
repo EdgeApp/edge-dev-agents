@@ -103,8 +103,9 @@ for a, e in cuts:
 
 # An interpreter word must stand alone: `\b` also matched the `.sh ` ending one
 # path, so `a.sh <dir>/skills/x/scripts/y.sh` (two paths passed to git or stat)
-# read as `sh <script>`.
-EXEC_POS='(^|[;&|(]|\$\(|(^|[[:space:];&|(])(bash|sh|source)[[:space:]]+)[[:space:]]*[^[:space:]]*'
+# read as `sh <script>`. The command token never crosses `=`: `U=<path>` assigns
+# a variable, it does not run the script.
+EXEC_POS='(^|[;&|(]|\$\(|(^|[[:space:];&|(])(bash|sh|source)[[:space:]]+)[[:space:]]*[^[:space:]=]*'
 # Arguments up to the next command separator; help-only when nothing but
 # --help/-h (plus stderr/stdout redirections) follows the script path.
 ARGS_TAIL='[^;&|)]*'

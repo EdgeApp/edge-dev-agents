@@ -22,7 +22,9 @@
 #   hooks/require-continuation-or-block.sh  allows the stop while the stamp exists
 #
 # Unknown usage (claude-usage.sh exit 1: stale token, network) fails OPEN for spawns and leaves
-# the pause stamp as it was, so a blip neither blocks work nor flaps paused sessions.
+# the pause stamp as it was, so a blip neither blocks work nor flaps paused sessions. During a
+# rate-limit backoff claude-usage.sh serves the last good reading (stale, under 30 min), which
+# counts as known: holds apply and a pause can lift; the reason line notes the staleness.
 #
 # Usage: usage-hold.sh      prints {"spawn_hold":bool,"paused":bool,"reason":"..."}; exit 0
 set -uo pipefail
@@ -69,5 +71,6 @@ if (p) {
 }
 const sp = over(hold.spawn) || p
 const fmt = o => o.window + " " + o.pct + "% >= " + o.threshold + "% (resets " + o.resets_at + ")"
-out({ spawn_hold: !!sp, paused: !!p, reason: sp ? fmt(sp) : "under thresholds (5h " + s.five_hour?.pct + "%, 7d " + s.seven_day?.pct + "%)" })
+const staleNote = s.stale ? " [stale " + s.age_s + "s: " + s.stale_reason + "]" : ""
+out({ spawn_hold: !!sp, paused: !!p, reason: (sp ? fmt(sp) : "under thresholds (5h " + s.five_hour?.pct + "%, 7d " + s.seven_day?.pct + "%)") + staleNote })
 '

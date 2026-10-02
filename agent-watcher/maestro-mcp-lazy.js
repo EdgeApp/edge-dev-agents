@@ -101,7 +101,7 @@ function toChild(m) {
 
 function onChildLine(line) {
   let m
-  try { m = JSON.parse(line) } catch { return process.stdout.write(line + '\n') }
+  try { m = JSON.parse(line) } catch { return log(`server: ${line}`) } // the JVM's logging banner; stdout carries JSON-RPC only
   const isResponse = m.id !== undefined && !m.method
   if (isResponse && m.id === INIT_ID) {
     ready = true

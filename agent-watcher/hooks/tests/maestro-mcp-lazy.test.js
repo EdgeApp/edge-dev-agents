@@ -12,6 +12,7 @@ const STARTS = path.join(TMP, 'starts')
 const FAKE = path.join(TMP, 'fake-maestro')
 fs.writeFileSync(FAKE, `#!/usr/bin/env node
 require('fs').appendFileSync(${JSON.stringify(STARTS)}, process.argv.slice(2).join(' ') + '\\n')
+process.stdout.write('logging banner, not JSON\\n')
 let b = ''
 process.stdin.on('data', (d) => { b += d; let i; while ((i = b.indexOf('\\n')) >= 0) { const m = JSON.parse(b.slice(0, i)); b = b.slice(i + 1)
   const r = (result) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result }) + '\\n')
@@ -33,14 +34,15 @@ function session(idle = '0') {
     env: { ...process.env, MAESTRO_BIN: FAKE, MAESTRO_MCP_CACHE: path.join(TMP, 'cache.json'), MAESTRO_MCP_IDLE_SECS: idle, AGENT_SIM_UDID: '' } })
   const got = {}
   let b = ''
-  p.stdout.on('data', (d) => { b += d; let i; while ((i = b.indexOf('\n')) >= 0) { const m = JSON.parse(b.slice(0, i)); b = b.slice(i + 1); got[m.id] = m } })
+  let junk = 0
+  p.stdout.on('data', (d) => { b += d; let i; while ((i = b.indexOf('\n')) >= 0) { let m; try { m = JSON.parse(b.slice(0, i)) } catch { junk++ } b = b.slice(i + 1); if (m) got[m.id] = m } })
   const w = (m) => p.stdin.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\n')
   const handshake = async () => {
     w({ id: 1, method: 'initialize', params: { protocolVersion: 'p', capabilities: {} } }); await sleep(400)
     w({ method: 'notifications/initialized' }); w({ id: 2, method: 'tools/list' }); await sleep(400)
   }
   const call = async (id, name) => { w({ id, method: 'tools/call', params: { name, arguments: {} } }); await sleep(500); return got[id] }
-  return { p, got, w, handshake, call, end: async () => { p.stdin.end(); await sleep(300) } }
+  return { p, got, w, handshake, call, junk: () => junk, end: async () => { p.stdin.end(); await sleep(300) } }
 }
 
 ;(async () => {
@@ -69,6 +71,7 @@ function session(idle = '0') {
   ok('cached: ping starts no server', starts().length === 0 && s.got[3]?.result)
   let r = await s.call(4, 'echo')
   ok('first tool call starts the server and gets its answer', starts().length === 1 && r?.result?.content?.[0]?.text === 'ran echo')
+  ok('a non-JSON line from the server stays off the client stream', s.junk() === 0)
   ok('the replayed initialize answer is not sent to the client', !('__lazy_init__' in s.got))
   await sleep(1500)
   r = await s.call(5, 'echo')

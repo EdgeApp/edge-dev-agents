@@ -21,7 +21,7 @@ metadata:
 ~/.cursor/skills/claude-usage/scripts/claude-usage.sh
 ```
 
-Report `five_hour.pct` and `seven_day.pct` as percent USED (remaining is 100 minus it), each with its `resets_at` converted to the operator's local time, plus any `scoped` entry at or above 80%. `locked: true` means new requests fail until `locked_until`.
+Report `five_hour.pct` and `seven_day.pct` as percent USED (remaining is 100 minus it), each with its `resets_at` converted to the operator's local time, plus any `scoped` entry at or above 80%. `locked: true` means new requests fail until `locked_until`. `stale: true` means the endpoint was rate-limited or failing, so this is the last good reading: say it is `age_s` seconds old and give `stale_reason`.
 
 For a yes/no gate against thresholds, use `check` (exit 0 under, 3 at or over):
 
@@ -31,5 +31,5 @@ For a yes/no gate against thresholds, use `check` (exit 0 under, 3 at or over):
 </step>
 
 <edge-cases>
-<case name="Exit 1">Relay the `error` field (`token_stale`, `no_credentials`, `network`, `http_<code>`) in one line. Treat usage as unknown, not as zero or full.</case>
+<case name="Exit 1">Relay the `error` field (`token_stale`, `no_credentials`, `network`, `http_<code>`, or `rate_limited` while a backoff holds and no reading under `--max-stale` exists) in one line. Treat usage as unknown, not as zero or full, and do not re-run the script in a loop: the backoff is shared, so a retry only answers the same thing.</case>
 </edge-cases>

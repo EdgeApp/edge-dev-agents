@@ -16,13 +16,21 @@
 #
 # SHARED STATE: every successful fetch writes the compact summary to $CLAUDE_USAGE_STATE
 # (default /tmp/claude-usage-state.json) atomically. Both orchestrators read it; any caller
-# within --max-age seconds (default 60) reuses it instead of hitting the endpoint.
+# within --max-age seconds (default 300) reuses it instead of hitting the endpoint.
+#
+# RATE LIMITS: the endpoint answers 429 when several callers poll it (two orchestrators on 1-2
+# min ticks plus the stop hooks). A 429 or 5xx writes $CLAUDE_USAGE_STATE.backoff: Retry-After
+# when the response carries one, else 2, 4, 8, then 16 min for consecutive failures; the next
+# success clears it. While a backoff holds, NO caller fetches. A fetch that fails or is skipped
+# returns the last good summary marked {"stale":true,"age_s":N,"stale_reason":"..."} as long as
+# it is under --max-stale seconds old (default 1800); older than that it is an error (exit 1),
+# so callers keep treating a long outage as unknown usage.
 #
 # Usage:
-#   claude-usage.sh [--max-age S] [--wake]       compact JSON summary (cached if fresh)
-#   claude-usage.sh --raw [--wake]                full endpoint response (always fetches)
+#   claude-usage.sh [--max-age S] [--max-stale S] [--wake]   compact JSON summary (cached if fresh)
+#   claude-usage.sh --raw [--wake]                full endpoint response (fetches unless backing off)
 #   claude-usage.sh --cached                      state file only, never fetches
-#   claude-usage.sh check [--five-hour N] [--seven-day N] [--max-age S] [--wake]
+#   claude-usage.sh check [--five-hour N] [--seven-day N] [--max-age S] [--max-stale S] [--wake]
 #                                                 exit 0 under every given threshold, 3 over one
 #
 # Compact summary: {"ok":true,"fetched_at":"<iso>","five_hour":{"pct":8,"resets_at":"<iso>",
@@ -35,7 +43,7 @@
 # 2 usage error, 3 check: a threshold is met or exceeded (one-line JSON reason on stdout).
 set -euo pipefail
 
-MODE=summary MAX_AGE=60 WAKE=0 FIVE="" SEVEN=""
+MODE=summary MAX_AGE=300 MAX_STALE=1800 WAKE=0 FIVE="" SEVEN=""
 while [ $# -gt 0 ]; do
   case "$1" in
     check) MODE=check ;;
@@ -43,6 +51,7 @@ while [ $# -gt 0 ]; do
     --cached) MODE=cached ;;
     --wake) WAKE=1 ;;
     --max-age) MAX_AGE="$2"; shift ;;
+    --max-stale) MAX_STALE="$2"; shift ;;
     --five-hour) FIVE="$2"; shift ;;
     --seven-day) SEVEN="$2"; shift ;;
     -h|--help) sed -n '2,33p' "$0"; exit 0 ;;
@@ -53,9 +62,10 @@ done
 
 STATE="${CLAUDE_USAGE_STATE:-/tmp/claude-usage-state.json}"
 
-MODE="$MODE" MAX_AGE="$MAX_AGE" WAKE="$WAKE" FIVE="$FIVE" SEVEN="$SEVEN" STATE="$STATE" exec node -e '
+MODE="$MODE" MAX_AGE="$MAX_AGE" MAX_STALE="$MAX_STALE" WAKE="$WAKE" FIVE="$FIVE" SEVEN="$SEVEN" STATE="$STATE" exec node -e '
 const fs = require("fs"), os = require("os"), path = require("path"), cp = require("child_process")
-const { MODE, MAX_AGE, WAKE, FIVE, SEVEN, STATE } = process.env
+const { MODE, MAX_AGE, MAX_STALE, WAKE, FIVE, SEVEN, STATE } = process.env
+const BACKOFF = STATE + ".backoff"
 
 function out(obj, code) { process.stdout.write(JSON.stringify(obj) + "\n"); process.exit(code) }
 function fail(error, detail) { out({ ok: false, error, ...(detail ? { detail } : {}) }, 1) }
@@ -81,7 +91,7 @@ async function fetchUsage() {
     })
   } catch (e) { return { error: "network", detail: String(e.message || e) } }
   if (res.status === 401) return { error: "token_stale" }
-  if (!res.ok) return { error: "http_" + res.status }
+  if (!res.ok) return { error: "http_" + res.status, retryAfterMs: retryAfterMs(res.headers.get("retry-after")) }
   try { return { data: await res.json() } } catch { return { error: "bad_json" } }
 }
 
@@ -123,6 +133,36 @@ function summarize(d) {
   }
 }
 
+// Retry-After is delta-seconds or an HTTP date.
+function retryAfterMs(h) {
+  if (!h) return null
+  const n = Number(h)
+  if (Number.isFinite(n)) return Math.max(0, n * 1000)
+  const d = Date.parse(h)
+  return Number.isFinite(d) ? Math.max(0, d - Date.now()) : null
+}
+
+function readBackoff() { try { return JSON.parse(fs.readFileSync(BACKOFF, "utf8")) } catch { return null } }
+function backoffActive() { const b = readBackoff(); return b && Date.now() < b.until ? b : null }
+function clearBackoff() { try { fs.unlinkSync(BACKOFF) } catch {} }
+function noteFailure(r) {
+  if (!/^http_(429|5\d\d)$/.test(r.error)) return
+  const level = Math.min(((readBackoff() || {}).level || 0) + 1, 4)
+  const delay = r.retryAfterMs != null ? r.retryAfterMs : 120000 * 2 ** (level - 1)
+  const b = { until: Date.now() + delay, level, error: r.error, at: new Date().toISOString() }
+  const tmp = BACKOFF + "." + process.pid + ".tmp"
+  try { fs.writeFileSync(tmp, JSON.stringify(b) + "\n"); fs.renameSync(tmp, BACKOFF) } catch {}
+}
+
+// The last good summary, marked stale, while it is young enough to act on; else the error.
+function staleOr(s, reason, error, detail) {
+  if (s && s.ok) {
+    const age = Math.round((Date.now() - Date.parse(s.fetched_at)) / 1000)
+    if (age <= Number(MAX_STALE)) return { ...s, stale: true, age_s: age, stale_reason: reason }
+  }
+  fail(error, detail)
+}
+
 function readState() { try { return JSON.parse(fs.readFileSync(STATE, "utf8")) } catch { return null } }
 function writeState(s) {
   const tmp = STATE + "." + process.pid + ".tmp"
@@ -133,8 +173,14 @@ function writeState(s) {
 async function current() {
   const s = readState()
   if (s && s.ok && Date.now() - Date.parse(s.fetched_at) < Number(MAX_AGE) * 1000) return s
+  const b = backoffActive()
+  if (b) {
+    const until = new Date(b.until).toISOString()
+    return staleOr(s, "backing off after " + b.error + " until " + until, "rate_limited", "backing off until " + until)
+  }
   const r = await fetchWithWake()
-  if (r.error) fail(r.error, r.detail)
+  if (r.error) { noteFailure(r); return staleOr(s, r.error, r.error, r.detail) }
+  clearBackoff()
   const sum = summarize(r.data)
   writeState(sum)
   return sum
@@ -147,8 +193,11 @@ async function current() {
     out(s, 0)
   }
   if (MODE === "raw") {
+    const b = backoffActive()
+    if (b) fail("rate_limited", "backing off until " + new Date(b.until).toISOString())
     const r = await fetchWithWake()
-    if (r.error) fail(r.error, r.detail)
+    if (r.error) { noteFailure(r); fail(r.error, r.detail) }
+    clearBackoff()
     writeState(summarize(r.data))
     out(r.data, 0)
   }
