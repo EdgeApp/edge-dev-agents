@@ -170,9 +170,18 @@ function forward(m) {
 function onClient(m) {
   if (m.method === 'initialize') {
     clientInit = m
-    if (cache) { handshaken = true; return send({ jsonrpc: '2.0', id: m.id, result: cache.initialize }) }
+    if (cache) {
+      handshaken = true
+      if (child && !ready) child.stdin.write(JSON.stringify({ ...m, id: INIT_ID }) + '\n')
+      return send({ jsonrpc: '2.0', id: m.id, result: cache.initialize })
+    }
     captureIds[m.id] = 'initialize'
     return forward(m)
+  }
+  // A client probing for a newer protocol sends another request before
+  // initialize. The JVM refuses those, so the proxy refuses them itself.
+  if (!handshaken && cache && !child && m.id !== undefined) {
+    return send({ jsonrpc: '2.0', id: m.id, error: { code: -32601, message: `Server does not support ${m.method}` } })
   }
   if (m.method === 'notifications/initialized') {
     clientInitialized = m
