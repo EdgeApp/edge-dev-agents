@@ -1,0 +1,101 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-currency-accountbased/pr-1117/20261001-223701-agent-proof-1215613109965491-01-remote-tokens-in-wallet-search.png",
+      "caption": "remote tokens in wallet search",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T05:37:01Z",
+      "headSha": "0f9a7a8063959269ec687843a14f8f91cd3daf0e",
+      "addedAt": "2026-10-02T05:37:01Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1117/20261001-223701-agent-proof-1215613109965491-02-token-list-top.png",
+      "caption": "token list top",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T05:37:01Z",
+      "headSha": "0f9a7a8063959269ec687843a14f8f91cd3daf0e",
+      "addedAt": "2026-10-02T05:37:01Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1117/20261001-223701-agent-proof-1215613109965491-03-token-list-bottom.png",
+      "caption": "token list bottom",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T05:37:01Z",
+      "headSha": "0f9a7a8063959269ec687843a14f8f91cd3daf0e",
+      "addedAt": "2026-10-02T05:37:01Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1117/20261001-223701-agent-proof-1215613109965491-04-ruji-balance.png",
+      "caption": "ruji balance",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T05:37:01Z",
+      "headSha": "0f9a7a8063959269ec687843a14f8f91cd3daf0e",
+      "addedAt": "2026-10-02T05:37:01Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1117/20261001-223701-agent-proof-1215613109965491-05-ruji-send-confirm.png",
+      "caption": "ruji send confirm",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T05:37:01Z",
+      "headSha": "0f9a7a8063959269ec687843a14f8f91cd3daf0e",
+      "addedAt": "2026-10-02T05:37:01Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1117/20261001-223701-agent-proof-1215613109965491-06-ruji-send-success.png",
+      "caption": "ruji send success",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T05:37:01Z",
+      "headSha": "0f9a7a8063959269ec687843a14f8f91cd3daf0e",
+      "addedAt": "2026-10-02T05:37:01Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1117/20261001-223701-agent-proof-1215613109965491-07-ruji-send-details.png",
+      "caption": "ruji send details",
+      "index": "7",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T05:37:01Z",
+      "headSha": "0f9a7a8063959269ec687843a14f8f91cd3daf0e",
+      "addedAt": "2026-10-02T05:37:01Z"
+    },
+    {
+      "path": "assets/edge-currency-accountbased/pr-1117/20261001-223701-agent-proof-1215613109965491-08-ruji-history.png",
+      "caption": "ruji history",
+      "index": "8",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-02T05:37:01Z",
+      "headSha": "0f9a7a8063959269ec687843a14f8f91cd3daf0e",
+      "addedAt": "2026-10-02T05:37:01Z"
+    }
+  ]
+}
