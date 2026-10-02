@@ -6,7 +6,8 @@ description: Compose, draft, send, or schedule Slack messages, comms, replies, a
 <goal>Deliver Slack messages that render correctly on the path they actually travel (draft vs tool-send vs client copy), reviewed when unreviewed text should not leave, with the posted link relayed back.</goal>
 
 <rules description="Non-negotiable constraints.">
-<rule id="prose-standard">Slack is external comms: /no-slop and the writing-style em-dash ban apply in full. Enforced mechanically at the tool boundary by slack-prose-gate.sh (shared lint + semantic judge on every send/draft/schedule/canvas; brevity nudge over ~900 chars). Write brief by default; length is earned only by genuine technical depth.</rule>
+<rule id="prose-standard">Slack is external comms: /no-slop and the writing-style em-dash ban apply in full to text the agent writes (operator-quoted text follows `verbatim-quoted`). Enforced mechanically at the tool boundary by slack-prose-gate.sh (shared lint + semantic judge on every send/draft/schedule/canvas; brevity nudge over ~900 chars). Write brief by default; length is earned only by genuine technical depth.</rule>
+<rule id="verbatim-quoted">When the operator wraps the ENTIRE requested message in quotes, post the quoted text exactly as written: no rewording, no /no-slop edits, no restructuring, no added greeting or sign-off. It is operator-authored, so it counts as reviewed text (step 2 path 1). slack-prose-gate.sh skips its prose lint when the outgoing text matches a quoted span in a recent operator message, so a lint denial means the text drifted from the quote; restore it rather than rewording. Quotes around only part of a request mark a phrase to include, not a verbatim message.</rule>
 <rule id="gfm-only">Write standard GitHub-flavored markdown. NEVER pre-convert to Slack mrkdwn: the connector converts server-side, and a pre-pass double-converts (*bold* renders italic, fences lose highlighting).</rule>
 <rule id="no-tables-in-drafts">Messages that start as a draft carry NO markdown tables (slack-prose-gate blocks them). The draft path stores raw text: tables show as pipe soup in the client, survive only an agent tool-send, and die on operator manual send or copy. Restructure as labeled lists ("`0xdac…ec7` (lowercase): order created"). Even in direct tool-sends, prefer lists when recipients may copy or quote the message; a sent table does not survive copy-out of Slack.</rule>
 <rule id="draft-first-for-unreviewed">Text the operator has not reviewed goes out as a draft (slack_send_message_draft), not a send, unless the operator explicitly said to send directly.</rule>
@@ -16,12 +17,12 @@ description: Compose, draft, send, or schedule Slack messages, comms, replies, a
 </rules>
 
 <step id="1" name="Compose">
-Draft the text as GFM per `gfm-only`, structured per `no-tables-in-drafts`, sized per `prose-standard`. Code blocks take a language tag for highlighting; a bare ``` fence stays a plain block. Do not put sensitive values in link query params.
+Operator-quoted message → use it unchanged per `verbatim-quoted` and skip to step 2. Otherwise draft the text as GFM per `gfm-only`, structured per `no-tables-in-drafts`, sized per `prose-standard`. Code blocks take a language tag for highlighting; a bare ``` fence stays a plain block. Do not put sensitive values in link query params.
 </step>
 
 <step id="2" name="Review gate">
 Decide the path per `draft-first-for-unreviewed`:
-1. Operator already approved the exact text, or asked for a direct send → slack_send_message.
+1. Operator already approved the exact text, supplied it in quotes (`verbatim-quoted`), or asked for a direct send → slack_send_message.
 2. Otherwise → slack_send_message_draft, tell the operator where it is (channel_link), and stop until they rule.
 </step>
 

@@ -57,7 +57,7 @@ Most gates no-op unless `AGENT_TASK_GID` is set, which is what confines them to 
 | Script | Event / matcher | What it does | What it prevents |
 |---|---|---|---|
 | `lint-md-on-write.sh` | PreToolUse / Bash and Write, Edit | Runs the shared no-slop lint on markdown writes outside the internal allowlist, full-file for new files and fragment-only for edits, plus locale strings files in `--strings` mode | Prose reaching `gh --body-file` unlinted, since the posting boundary sees only `$(cat file)` |
-| `slack-prose-gate.sh` | PreToolUse / Slack MCP send, draft, schedule, canvas | Denies on HARD lint findings and attaches a brevity nudge as additionalContext above the length threshold | Em dashes, banned vocabulary, and Claude session links leaving the team on Slack |
+| `slack-prose-gate.sh` | PreToolUse / Slack MCP send, draft, schedule, canvas | Denies on HARD lint findings and attaches a brevity nudge as additionalContext above the length threshold; skips both when the text matches a quoted span in a recent operator message (verbatim post) | Em dashes, banned vocabulary, and Claude session links leaving the team on Slack |
 | `require-clean-run-report.sh` | PreToolUse / Bash | Lints the report file at the `--attach-file` boundary against the live template: reversibility annotations, em dashes, missing sections, unlabeled hack-forced frames, a second report doc per segment | Report form reverting to remembered shape after compaction, and one segment splintering into parallel report docs |
 | `mark-agent-authored-asana.sh` | PreToolUse / `mcp__claude_ai_Asana__.*` | Rewrites comment and notes fields of an in-flight run to carry the authorship markers, idempotently | Agent-written Asana prose being read by the next run as operator instruction |
 

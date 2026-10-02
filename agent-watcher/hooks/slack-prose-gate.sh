@@ -29,6 +29,45 @@ esac
 TEXT=$(printf '%s' "$INPUT" | jq -r '[.tool_input // {} | .. | strings] | join("\n")' 2>/dev/null || true)
 [ -n "$TEXT" ] || exit 0
 
+# VERBATIM BYPASS (operator ruling 2026-10-01, slack skill verbatim-quoted):
+# when the operator wraps the entire requested message in quotes, the session
+# posts it exactly as written, so the prose lint, skill-read gate, and brevity
+# nudge must not demand a rewrite. Detection: the longest string in the tool
+# input (the message body), trimmed, appears wrapped in matching quotes ("",
+# curly double, '', curly single) inside one of the last 10 human messages in
+# the transcript. Only the operator authors those, so a session cannot
+# self-grant the bypass. The draft-table check below still runs (rendering,
+# not prose). Fail-closed to linting on any parse error.
+TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null || true)
+BODY_TEXT=$(printf '%s' "$INPUT" | jq -r '[.tool_input // {} | .. | strings] | max_by(length) // empty' 2>/dev/null || true)
+VERBATIM=0
+if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ] && [ -n "$BODY_TEXT" ]; then
+  if BODY_TEXT="$BODY_TEXT" TRANSCRIPT="$TRANSCRIPT" node -e '
+    const fs = require("fs");
+    const body = process.env.BODY_TEXT.trim();
+    if (!body) process.exit(1);
+    const lines = fs.readFileSync(process.env.TRANSCRIPT, "utf8").split("\n").slice(-4000);
+    const human = [];
+    for (const l of lines) {
+      let e; try { e = JSON.parse(l); } catch { continue; }
+      if (e.type !== "user" || e.isMeta) continue;
+      const c = e.message && e.message.content;
+      if (typeof c === "string") human.push(c);
+      else if (Array.isArray(c) && !c.some(p => p.type === "tool_result"))
+        human.push(c.filter(p => p.type === "text").map(p => p.text).join("\n"));
+    }
+    const pairs = [["\"", "\""], ["“", "”"], ["\x27", "\x27"], ["‘", "’"]];
+    const hit = human.slice(-10).some(m => pairs.some(([o, c]) => {
+      const re = new RegExp(o + "\\s*([\\s\\S]*?)\\s*" + c, "g");
+      for (const x of m.matchAll(re)) if (x[1] === body) return true;
+      return m.includes(o + body + c);
+    }));
+    process.exit(hit ? 0 : 1);
+  ' 2>/dev/null; then
+    VERBATIM=1
+  fi
+fi
+
 # Skill-read gate (orch runs only): outbound Slack text is outward prose, so
 # the first send/draft in a segment without the no-slop marker is denied with
 # the full skill body (lib/skill-read-gate.sh); the retry passes this check and
@@ -39,7 +78,7 @@ TEXT=$(printf '%s' "$INPUT" | jq -r '[.tool_input // {} | .. | strings] | join("
 # comms phase of an orchestrated run, and that phase's rules moved out of the
 # core SKILL.md into references/comms.md when /one-shot was split, so the
 # slice is delivered here the same way, by the same gate.
-if [ -n "${AGENT_TASK_GID:-}" ] && [ -f "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh" ]; then
+if [ "$VERBATIM" = 0 ] && [ -n "${AGENT_TASK_GID:-}" ] && [ -f "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh" ]; then
   . "$HOME/.config/agent-watcher/hooks/lib/skill-read-gate.sh"
   UNITS="no-slop one-shot:comms"
   MISSING=$(skill_read_missing $UNITS)
@@ -63,13 +102,15 @@ fi
 
 # Trailing Xs required: macOS mktemp treats an embedded-X template
 # (name.XXXXXX.md) as a LITERAL filename — concurrent sessions collide.
-TMP=$(mktemp /tmp/slack-prose.XXXXXX) || exit 0
+RC=0
+if [ "$VERBATIM" = 0 ] && TMP=$(mktemp /tmp/slack-prose.XXXXXX); then
 printf '%s\n' "$TEXT" > "$TMP"
 # --semantic: the haiku judge tier for courtesy enders / forward references
 # (calibrated + enabled 2026-08-19). Slack sends are infrequent enough that
 # the judge's seconds of latency are acceptable at this boundary.
 LINT=$("$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh" "$TMP" --semantic 2>/dev/null); RC=$?
 rm -f "$TMP"
+fi
 
 if [ "$RC" -eq 1 ]; then
   HARD=$(printf '%s' "$LINT" | grep '^HARD' | head -6)
@@ -106,7 +147,7 @@ fi
 # mrkdwn DOUBLE-converts: *bold* reads as standard-markdown italic and fence
 # tags lose highlighting. Sessions write plain GitHub-flavored markdown.
 BRIEF_CHARS=900
-if [ "${#TEXT}" -gt "$BRIEF_CHARS" ]; then
+if [ "$VERBATIM" = 0 ] && [ "${#TEXT}" -gt "$BRIEF_CHARS" ]; then
   jq -nc '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",

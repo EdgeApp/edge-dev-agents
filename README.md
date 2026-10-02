@@ -548,7 +548,7 @@ done.
 | | `block-sim-wipe.sh` | No sim erase/wipe (pooled sims carry funded test accounts) |
 | | `require-bundle-triage.sh` | Stale-bundle symptoms get triaged before deeper debugging |
 | Prose gates | `lint-md-on-write.sh` | Mechanical no-slop lint on markdown written outside the internal allowlist (full on Write, fragment on Edit/heredoc) |
-| | `slack-prose-gate.sh` | Outbound Slack text passes the shared lint with the judge tier; brevity nudge over ~900 chars |
+| | `slack-prose-gate.sh` | Outbound Slack text passes the shared lint with the judge tier; brevity nudge over ~900 chars; operator-quoted text posts verbatim, unlinted |
 | Hygiene / injectors | `no-interactive-prompt.sh` | No AskUserQuestion in hands-off runs; pick the defensible default |
 | | `no-self-respawn.sh` | No ScheduleWakeup/CronCreate/`claude --resume` self-respawn |
 | | `guard-piped-watcher-scripts.sh` | Watcher status scripts run bare (pipes silently masked their exit codes); gated-claim commands hard-block instead of rewriting |
