@@ -12,19 +12,22 @@
 #
 # Usage:
 #   completion-evidence.sh --gid <gid> --event complete|pr-create|block [--reason "<text>"]
-#                          [--out <file>] [--offline]
+#                          [--base <branch>] [--out <file>] [--offline]
+# --base: the branch a pr-create event is about to target (no PR exists yet).
 # Prints:  path=<bundle> hash=<sha256 first 16>
 # --offline skips the Asana/GitHub fetches (tests; a run whose scope marker is fresh).
 # Env: COMPLETION_JUDGE_OFFLINE=1 has the same effect as --offline.
 # Exit: 0 bundle written; 2 usage.
 set -uo pipefail
+source "$HOME/.config/agent-watcher/lib/worktree-root.sh"  # the one worktree-root resolver
 
-GID="" EVENT="" REASON="" OUT="" OFFLINE="${COMPLETION_JUDGE_OFFLINE:-0}"
+GID="" EVENT="" REASON="" BASE_ARG="" OUT="" OFFLINE="${COMPLETION_JUDGE_OFFLINE:-0}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --gid) GID="$2"; shift 2 ;;
     --event) EVENT="$2"; shift 2 ;;
     --reason) REASON="$2"; shift 2 ;;
+    --base) BASE_ARG="$2"; shift 2 ;;
     --out) OUT="$2"; shift 2 ;;
     --offline) OFFLINE=1; shift ;;
     *) echo "completion-evidence: unknown arg $1" >&2; exit 2 ;;
@@ -59,9 +62,12 @@ if [ "$OFFLINE" = 1 ] || [ -z "$TOKEN" ]; then
   line "(task fetch skipped: offline)"
 else
   RESP=$(curl -sf --max-time 20 -H "Authorization: Bearer $TOKEN" \
-    "$API/tasks/$GID?opt_fields=name,completed,notes,custom_fields.name,custom_fields.display_value" 2>/dev/null || true)
+    "$API/tasks/$GID?opt_fields=name,completed,notes,custom_fields.gid,custom_fields.name,custom_fields.display_value" 2>/dev/null || true)
   if [ -n "$RESP" ]; then
-    printf '%s' "$RESP" | jq -r '.data | "name: \(.name)\ncompleted: \(.completed)\nfields: " + ([.custom_fields[]? | select(.name|test("^(agent_status|blocked|tested|TDD\\?|Build \\(staging/cheese\\)|Release \\(4\\.x\\.x\\)|Force Land|agent_lane|agent_deliverable|agent_review|Repo)$")) | "\(.name)=\(.display_value // "null")"] | join("; "))' >> "$TMP" 2>/dev/null || line "(task fields unparseable)"
+    # Registered fields only, by gid (lib/task-fields.sh): the same set the
+    # segment snapshot and the field deltas below are built from.
+    printf '%s' "$RESP" | jq -r '.data | "name: \(.name)\ncompleted: \(.completed)"' >> "$TMP" 2>/dev/null || line "(task fields unparseable)"
+    line "fields: $(source "$H/lib/task-fields.sh" && printf '%s' "$RESP" | task_field_line 2>/dev/null)"
     line ""; line "description:"; line '```'
     printf '%s' "$RESP" | jq -r '.data.notes // ""' | cap 12000 >> "$TMP"
     line ""; line '```'
@@ -98,9 +104,9 @@ else
 fi
 section "Operator asks (this segment's scope)"
 if [ -s "$MARKER" ]; then
-  jq -r --arg k "$ASKS_KEY" '"checked_at: \(.checked_at // "?")\nnewest report attach overall: \(.watermark // "NONE")\ngithub_blocking_threads: \(.github_blocking_threads // 0); github_unanswered_bodies: \(.github_unanswered_bodies // 0); github_bots_incomplete: \(.github_bots_incomplete // 0)\n"
+  jq -r --arg k "$ASKS_KEY" '"checked_at: \(.checked_at // "?")\nnewest report attach overall: \(.watermark // "NONE")\ngithub_blocking_threads: \(.github_blocking_threads // 0); github_unanswered_bodies: \(.github_unanswered_bodies // 0); github_bots_incomplete: \(.github_bots_incomplete // 0); github_bots_waived (reviewer outage per watch-pr, excluded from the count): \(.github_bots_waived // [] | if length == 0 then "none" else join("; ") end)\n"
     + ((.[$k] // []) | if length == 0 then "(no operator comments in scope)" else ([.[] | "- [\(.created_at)] \(.by) (\(.authored)): \(.text)"] | join("\n")) end)
-    + "\n\nfield deltas since the previous segment: " + ((.field_deltas // []) | map("\(.field): \(.was) -> \(.now)") | join("; "))' "$MARKER" >> "$TMP" 2>/dev/null || line "(marker unparseable)"
+    + "\n\nfield deltas since the previous segment: " + ((.field_deltas // []) | map("\(.field): \(.was) -> \(.now)" + (if .run_param then " (run parameter, not an ask)" else "" end)) | join("; "))' "$MARKER" >> "$TMP" 2>/dev/null || line "(marker unparseable)"
 else
   line "(no followup-scope marker: run check-followup-scope.sh --task-gid $GID)"
 fi
@@ -122,13 +128,18 @@ file_or_note "$STATE/attempts/$GID.jsonl" 30000 "(EMPTY: no attempt was ever log
 section "Proof frames and notes"
 FRAMES=$(ls -la /tmp/agent-proof-"$GID"-*.png 2>/dev/null | awk '{print $5" "$9}')
 if [ -n "$FRAMES" ]; then line "proof frames (bytes path):"; line '```'; line "$FRAMES"; line '```'; else line "no proof frames at /tmp/agent-proof-$GID-*.png"; fi
+HACKED=$("$HOME/.cursor/skills/pr-create/scripts/hacked-frames.sh" /tmp/agent-proof-"$GID"-*.png 2>/dev/null)
+[ -n "$HACKED" ] && { line "hack-forced frames (HACKED token, per hacked-frames.sh):"; line '```'; line "$HACKED"; line '```'; }
+# The other artifacts set-tested.sh's option definitions accept (Android Sim build-only).
+ANDROID=$(ls -la /tmp/agent-android-build-"$GID"*.log /tmp/agent-proof-"$GID"-*.apk 2>/dev/null | awk '{print $5" "$9}')
+[ -n "$ANDROID" ] && { line "android build artifacts (bytes path):"; line '```'; line "$ANDROID"; line '```'; }
 [ -s "/tmp/agent-test-blocker-$GID.md" ] && { line "test-blocker note:"; file_or_note "/tmp/agent-test-blocker-$GID.md" 4000 ""; }
 [ -s "/tmp/agent-concession-reason-$GID.txt" ] && { line "concession reason file:"; file_or_note "/tmp/agent-concession-reason-$GID.txt" 4000 ""; }
 [ -s "/tmp/agent-history-concession-$GID.md" ] && { line "history concession note:"; file_or_note "/tmp/agent-history-concession-$GID.md" 4000 ""; }
 
 # ---- Git per worktree ----
 section "Git (per worktree)"
-WT_ROOT="${AGENT_WORKTREE_ROOT:-$HOME/git/.agent-worktrees}/$GID"
+WT_ROOT="$(task_worktree "$GID")"
 found=0
 for wt in "$WT_ROOT"/*/; do
   [ -d "$wt/.git" ] || [ -f "$wt/.git" ] || continue
@@ -141,12 +152,11 @@ for wt in "$WT_ROOT"/*/; do
     [ -n "$prinfo" ] && base=$(printf '%s' "$prinfo" | jq -r '.baseRefName // empty')
   fi
   [ -n "$prinfo" ] && line "pr: $prinfo" || line "pr: none found"
-  # The repo's default branch (origin/HEAD) is what a new PR targets; a stale
-  # origin/develop in a master-default repo would otherwise inflate the diff.
-  [ -z "$base" ] && base=$(git -C "$wt" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
-  if [ -z "$base" ]; then
-    for b in develop master main; do git -C "$wt" rev-parse --verify -q "origin/$b" >/dev/null 2>&1 && { base="$b"; break; }; done
-  fi
+  # No PR yet (the pr-create event): the base the run is about to open the PR
+  # against (--base, passed through by the gate), else the repo default from
+  # the shared resolver.
+  [ -z "$base" ] && base="$BASE_ARG"
+  [ -z "$base" ] && base=$("$HOME/.cursor/skills/git-default-branch.sh" -C "$wt" --short 2>/dev/null || true)
   if [ -z "$base" ]; then line "(no base branch resolvable)"; continue; fi
   line "base: origin/$base"
   line "commits (base..HEAD):"; line '```'

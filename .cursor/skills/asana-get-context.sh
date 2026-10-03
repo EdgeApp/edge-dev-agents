@@ -105,7 +105,7 @@ TASK_JSON=$(curl -s "$API/tasks/$TASK_GID?opt_fields=name,notes,num_subtasks,cre
   -H "$AUTH")
 export TASK_JSON
 printf '%s' "$TASK_JSON" | python3 -c "
-import sys, json
+import sys, json, os
 data = json.load(sys.stdin)['data']
 
 print(f\"TASK_NAME: {data['name']}\")
@@ -126,14 +126,13 @@ print(f\"DESCRIPTION_FILE: {desc_path}\")
 # those are other teams' state and a same-named one reads as ours if shown. The
 # jon-claude agent_* fields are the watcher's inputs, not task context, so they
 # are not printed.
-FIELDS = {
-    '1213843686985522': 'PRIORITY',
-    '1213901829133612': 'LOE',
-    '1213919399225909': 'REPO',
-    '1214085985050203': 'CATEGORY',
-    '1213939602865824': 'RELEASE',   # Release (4.x.x): CHANGELOG placement signal
-    '1213928707858644': 'BUILD',     # Build (staging/cheese): placement + routing
-}
+# Gids come from the field registry (asana-config.json custom_fields).
+_cf = json.load(open(os.path.expanduser('~/.config/agent-watcher/asana-config.json')))['custom_fields']
+FIELDS = {_cf[k]['gid']: label for k, label in (
+    ('priority', 'PRIORITY'), ('loe', 'LOE'), ('repo', 'REPO'), ('category', 'CATEGORY'),
+    ('release', 'RELEASE'),   # Release (4.x.x): CHANGELOG placement signal
+    ('build', 'BUILD'),       # Build (staging/cheese): placement + routing
+)}
 for f in data.get('custom_fields', []):
     label = FIELDS.get(f['gid'])
     if label:
@@ -206,11 +205,15 @@ op = os.environ.get('OPERATOR_GID') or ''
 task = json.loads(os.environ.get('TASK_JSON') or '{}').get('data', {})
 ceiling = int('$TEXT_CEILING')
 path = '$DOWNLOAD_DIR/comments.txt'
+# Authored class from the ONE marker test (~/.config/agent-watcher/lib/agent-authored.jq),
+# one jq call for every story.
+import subprocess
+_cl = subprocess.run(['jq', '-c', '-L', os.path.expanduser('~/.config/agent-watcher/lib'), '--arg', 'op', op,
+                      'include \"agent-authored\"; [.[] | authored_class(\$op)]'],
+                     input=json.dumps(data), capture_output=True, text=True).stdout
+_cls = dict(zip(map(id, data), json.loads(_cl or '[]')))
 def cls(st):
-    raw = (st.get('text') or '').strip()
-    if st.get('resource_subtype') == 'comment_added' and raw.startswith('🥋') and raw.endswith('👊'):
-        return 'agent'
-    return 'operator' if (st.get('created_by') or {}).get('gid') == op else 'other'
+    return _cls.get(id(st), 'other')
 comments = [st for st in data if st.get('resource_subtype') == 'comment_added']
 edits = [st for st in data if st.get('resource_subtype') == 'notes_changed']
 def fmt(c):

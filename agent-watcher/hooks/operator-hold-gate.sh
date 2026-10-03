@@ -25,9 +25,11 @@ CMD_M=$(printf '%s' "$CMD" | "$H/hooks/strip-cmd-mentions.sh" 2>/dev/null || pri
 executes() { printf '%s' "$CMD" | "$H/hooks/cmd-executes.sh" "$1" 2>/dev/null; }
 
 WHAT=""
-if executes update-status.sh; then
-  case "$CMD_M" in *--blocked*yes*) ;; *) WHAT="an agent_status transition (update-status.sh)" ;; esac
-fi
+# A blocked completion is allowed under a hold (operator-directed); every other
+# status write is held. Classified by the shared lib so this gate and the
+# completion judge agree on what a block is.
+source "$H/hooks/lib/completion-event.sh"
+case "$(completion_event "$CMD")" in complete|status) WHAT="an agent_status transition (update-status.sh)" ;; esac
 for s in pr-create.sh pr-land-automerge.sh pr-land-merge.sh pr-land-publish.sh npm-publish-web.sh upgrade-dep.sh staging-cherry-pick.sh pr-finalize-fixups.sh cheese.sh; do
   [ -n "$WHAT" ] && break
   executes "$s" && WHAT="a PR/landing action ($s)"

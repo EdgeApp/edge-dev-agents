@@ -51,7 +51,7 @@ that base instead so verification and the PR diff cover the same commits.
 Gather context in parallel:
 
 ```bash
-DEFAULT_BRANCH=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|origin/||' || git remote show origin 2>/dev/null | sed -n '/HEAD branch/s/.*: //p' || echo master)
+DEFAULT_BRANCH=$(~/.cursor/skills/git-default-branch.sh --short)
 git log origin/$DEFAULT_BRANCH..HEAD --format=%B---
 ```
 

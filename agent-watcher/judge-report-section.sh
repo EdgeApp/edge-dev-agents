@@ -14,7 +14,8 @@ set -uo pipefail
 GID=""
 while [ $# -gt 0 ]; do case "$1" in --gid) GID="$2"; shift 2 ;; *) echo "usage: judge-report-section.sh --gid <gid>" >&2; exit 2 ;; esac; done
 [ -n "$GID" ] || { echo "usage: judge-report-section.sh --gid <gid>" >&2; exit 2; }
-LOG="${COMPLETION_JUDGE_LOG_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/judge}/$GID.jsonl"
+. "$HOME/.config/agent-watcher/lib/judge-log.sh"
+LOG="$(judge_log_path "$GID")"
 echo "## Completion Judge"
 echo "<!-- cat: completion-judge -->"
 echo "<!-- auto-filled at attach from the judge provenance log; leave as is -->"

@@ -207,20 +207,16 @@ echo ">> watch-pr: ${REMAINING}s of round budget remain (HEAD ${CUR_HEAD:0:8}); 
 # Poll loop instead of `gh pr checks --watch`: --watch blocks on ALL checks with
 # no way to exempt the slow-CI check. Same budget contract as before.
 SLOW_CI_PATTERN="Travis CI"
-# The reviewer bots' check-run NAME prefixes (not their logins), `|`-separated
-# and matched with startswith. They are the SAME two prefixes the Complete gate
-# counts (check-followup-scope.sh), so this watch can never report coverage the
-# gate then refuses. A reviewer that never posts a check-run on a HEAD whose
-# other checks all completed is UNAVAILABLE, not pending: it is out of quota,
-# disabled for the repo, or down. That is a different verdict from "found
-# nothing", and only this script can tell them apart, so it reports which one
-# rather than leaving the caller to guess. Each reviewer is judged SEPARATELY:
-# one bot's clean check-run says nothing about the other's absence.
-REVIEWER_CHECK_PATTERN="${REVIEWER_CHECK_PATTERN:-Cursor Bugbot|Cursor Security}"
-# The reviewers' shared GitHub LOGIN, for the review query below. GraphQL strips
-# the `[bot]` suffix, so BOTH Cursor bots appear as plain `cursor`, which is why
-# a review on HEAD can only answer "one of them reviewed", never which one.
-REVIEWER_BOT_LOGIN="${REVIEWER_BOT_LOGIN:-cursor}"
+# Reviewer names and the per-head verdict (pending / clean / findings /
+# unavailable) come from the shared lib, the same reading the Complete gate
+# and the completion judge count with, so this watch can never report coverage
+# the gate then refuses. A reviewer that is unavailable once every other check
+# completed is out of quota, disabled, or down: only this script sees that
+# moment, so it records the outage for the gate rather than leaving the caller
+# to guess.
+# shellcheck source=/dev/null
+source "$HOME/.config/agent-watcher/lib/reviewer-bots.sh" \
+  || { echo "watch-pr: missing ~/.config/agent-watcher/lib/reviewer-bots.sh" >&2; exit 2; }
 WIP_GUARD_PATTERN="block-wip-pr"
 WIP_MODE=""  # cached review-mode verdict; fetched at most once per invocation
 
@@ -252,26 +248,11 @@ wip_guard_expected() {
   [ "$WIP_MODE" = "preserve" ]
 }
 
-# reviewer_reviewed_head: did the reviewer bot post a REVIEW whose commit IS the
-# PR's current head? The check-run bucket alone lies in both directions — Cursor
-# Bugbot has reported `skipping` on a HEAD it had just reviewed and filed a
-# finding on, so trusting the bucket would have recorded a real finding as
-# "reviewer unavailable" and walked past it. A review pinned to the head commit
-# is the only proof of coverage.
-reviewer_reviewed_head() {
-
-  local count
-  count=$(gh api graphql -f query="{repository(owner:\"${REPO%%/*}\",name:\"${REPO##*/}\"){pullRequest(number:$PR){headRefOid reviews(last:50){nodes{author{login} commit{oid}}}}}}" \
-    --jq ".data.repository.pullRequest | .headRefOid as \$h | [.reviews.nodes[] | select(.author.login == \"$REVIEWER_BOT_LOGIN\") | select(.commit.oid == \$h)] | length" \
-    2>/dev/null || echo 0)
-  [ "${count:-0}" -gt 0 ]
-}
-
 while :; do
   NOW=$(date +%s)
   [ "$NOW" -ge "$DEADLINE" ] && { echo ">> watch-pr: remaining-budget timeout" >&2; exit 124; }
   renew_land_lease
-  JSON=$(gh pr checks "$PR" --repo "$REPO" --json name,bucket 2>/dev/null || true)
+  JSON=$(gh pr checks "$PR" --repo "$REPO" --json name,bucket,state 2>/dev/null || true)
   [ -n "$JSON" ] || JSON="[]"
   TOTAL=$(jq 'length' <<<"$JSON" 2>/dev/null || echo 0)
   # ZERO checks: nothing has posted at all (draft PR, [skip travis] HEAD, or a
@@ -301,28 +282,10 @@ while :; do
   PENDING_OTHER=$(jq -r --arg p "$SLOW_CI_PATTERN" '[.[] | select(.bucket=="pending") | .name | select(startswith($p) | not)] | join(", ")' <<<"$JSON" 2>/dev/null || true)
   PENDING_SLOW=$(jq -r --arg p "$SLOW_CI_PATTERN" '[.[] | select(.bucket=="pending") | .name | select(startswith($p))] | join(", ")' <<<"$JSON" 2>/dev/null || true)
   if [ "$TOTAL" -gt 0 ] && [ -z "$PENDING_OTHER" ]; then
-    # A reviewer that did not actually review looks two ways: no check-run at
-    # all, or one whose bucket is "skipping". Neither is reviewed-and-clean, so
-    # neither may be reported as reviewer coverage — but neither PROVES absence
-    # either, so the check-run only raises the question. A review pinned to the
-    # head commit answers it, and that answer wins. That answer is per-LOGIN and
-    # both Cursor reviewers post as `cursor`, so it can only say "one of them
-    # reviewed": it clears the note when EVERY reviewer is missing (the outage it
-    # was written for), and when one reviewer DID post a usable check-run the
-    # other's absence stands on its own.
-    REVIEWER_MISS=$(jq -r --arg p "$REVIEWER_CHECK_PATTERN" '
-      . as $c
-      | [ ($p | split("|"))[]
-          | . as $n
-          | { n: $n,
-              seen:   ([ $c[] | select(.name | startswith($n)) ] | length),
-              usable: ([ $c[] | select((.name | startswith($n)) and (.bucket != "skipping")) ] | length) }
-          | select(.usable == 0)
-          | .n + (if .seen == 0 then "(no check-run)" else "(check-run skipped)" end) ] as $m
-      | [ ($m | length), (($p | split("|")) | length), ($m | join(", ")) ] | @tsv' <<<"$JSON" 2>/dev/null || true)
-    IFS=$'\t' read -r MISS_N REVIEWER_N MISS_TEXT <<<"${REVIEWER_MISS:-0	0	}"
+    VERDICTS=$(reviewer_bot_verdicts "$REPO" "$PR" "$JSON")
+    MISS_TEXT=$(jq -r '[.[] | select(.verdict == "unavailable") | "\(.bot)(\(.detail))"] | join(", ")' <<<"$VERDICTS" 2>/dev/null || true)
     REVIEWER_NOTE=""
-    if [ "${MISS_N:-0}" -gt 0 ] && ! { [ "$MISS_N" -eq "${REVIEWER_N:-0}" ] && reviewer_reviewed_head; }; then
+    if [ -n "$MISS_TEXT" ]; then
       # DRAFT PRs (the 2026-07-31 bugbot-credit gate): reviewer bots skip drafts
       # BY DESIGN — absence is the gate working, not an outage. Distinct suffix
       # so the caller knows the finalize path is `gh pr ready` + re-watch, and
@@ -343,6 +306,10 @@ while :; do
         echo ">> watch-pr: $MISS_TEXT did not review HEAD. Proceed. Record it ONLY as the unchecked reviewer box in the run report's Finalize Gate; mention it nowhere else (operator ruling 2026-09-02)." >&2
       fi
     fi
+    # A neutral reviewer check is a non-failure to the exit code but means the
+    # reviewer posted findings (bugbot-in-watch): name it so the caller runs /bugbot.
+    FINDINGS_TEXT=$(jq -r '[.[] | select(.verdict == "findings") | "\(.bot)(\(.detail))"] | join(", ")' <<<"$VERDICTS" 2>/dev/null || true)
+    [ -n "$FINDINGS_TEXT" ] && echo ">> watch-pr: reviewer findings on HEAD: $FINDINGS_TEXT. Address them (/bugbot for cursor[bot]) before Complete." >&2
     if [ -n "$FAILS_WIP" ]; then
       echo ">> watch-pr: green except wip-guard ($FAILS_WIP): expected while fixups are PRESERVED for the active reviewer — do NOT squash to clear it" >&2
       echo "RESULT: green-wip-preserve ($FAILS_WIP)$REVIEWER_NOTE"

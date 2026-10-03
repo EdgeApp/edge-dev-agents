@@ -32,12 +32,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$BASE" ]]; then
-  DEFAULT_UPSTREAM="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
-    || echo "origin/$(git remote show origin 2>/dev/null | sed -n '/HEAD branch/s/.*: //p')" \
-    || echo "origin/master")"
-  if [[ -z "$DEFAULT_UPSTREAM" || "$DEFAULT_UPSTREAM" == "origin/" ]]; then
-    DEFAULT_UPSTREAM="origin/master"
-  fi
+  DEFAULT_UPSTREAM="$("$HOME/.cursor/skills/git-default-branch.sh" 2>/dev/null || echo "origin/master")"
   BASE="$(git merge-base "$DEFAULT_UPSTREAM" HEAD 2>/dev/null || true)"
   if [[ -z "$BASE" ]]; then
     echo "Error: could not determine merge-base with $DEFAULT_UPSTREAM" >&2

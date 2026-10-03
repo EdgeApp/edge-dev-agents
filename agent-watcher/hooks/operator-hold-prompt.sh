@@ -19,7 +19,9 @@
 #   hold     a question (a sentence ending in "?", except a request phrased as
 #            "can/could/would/will you ..."), an interrupt (wait|hold on|hang on|
 #            hold up|pause opening the message, or one of those or a bare "stop"
-#            as a whole clause), or a negated go ("don't continue", "not yet")
+#            as a whole clause), a deferred hold ("hold when/until/for ...", "hold
+#            off", "wait for my confirmation"), or a negated go ("don't
+#            continue", "not yet")
 #   steer    anything else a human typed ("the fee row is wrong, fix it"):
 #            carried out, no hold
 # A completion or stop directive, or an explicit "bypass the judge", also writes

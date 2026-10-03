@@ -21,6 +21,7 @@
 # Exit:    0 = removal attempted for every repo, 1 = usage error
 
 set -euo pipefail
+source "$HOME/.config/agent-watcher/lib/worktree-root.sh"  # the one worktree-root resolver
 
 [[ $# -ge 2 ]] || { echo "usage: remove-task-worktrees.sh <gid> <repo> [<repo>...]" >&2; exit 1; }
 GID="$1"; shift
@@ -29,7 +30,7 @@ GID="$1"; shift
 DIR="$HOME/.config/agent-watcher"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"
 MARKER="$STATE_DIR/removing/$GID"
-GID_DIR="$HOME/git/.agent-worktrees/$GID"
+GID_DIR="$(task_worktree "$GID")"
 
 mkdir -p "$STATE_DIR/removing"
 echo "$$" > "$MARKER"

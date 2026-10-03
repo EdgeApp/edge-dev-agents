@@ -38,25 +38,23 @@
 # Never blocks. Any failure (no PR, no doc, gh error, PR owned by someone else)
 # leaves the body untouched and the run continues.
 set -euo pipefail
+source "$HOME/.config/agent-watcher/lib/worktree-root.sh"  # the one worktree-root resolver
 exec 3>&2   # keep a handle for notes; all paths exit 0
 
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
-# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
-# backticked spans blanked): a command that merely QUOTES a trigger string --
-# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
-# argument extraction, where quoted values are load-bearing. Fail-open to the
-# raw command if the helper is unavailable.
-CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
-printf '%s' "$CMD_M" | grep -qE 'update-status\.sh[^|;&]*[[:space:]]Complete([[:space:]]|$)' || exit 0
+# Plain Complete only, per the shared classifier: a blocked completion is the
+# exit when the work cannot finish, so it does not owe a current TDD.
+source "$HOME/.config/agent-watcher/hooks/lib/completion-event.sh"
+[ "$(completion_event "$CMD")" = complete ] || exit 0
 
 FIELD=$("$HOME/.cursor/skills/asana-field-value.sh" "$AGENT_TASK_GID" "TDD?" 2>/dev/null || echo "none")
 [ "$FIELD" = "tdd" ] || exit 0
 
 # Resolve the doc URL once, from whichever worktree hosts the doc.
 URL=""
-for REPO_DIR in "$HOME/git/.agent-worktrees/$AGENT_TASK_GID"/*/; do
+for REPO_DIR in "$(task_worktree "$AGENT_TASK_GID")"/*/; do
   [ -d "$REPO_DIR" ] || continue
   U=$("$HOME/.cursor/skills/tdd/scripts/tdd-doc-links.sh" "$REPO_DIR" 2>/dev/null | sed -n 's/^TDD_BRANCH_URL=//p') || true
   if [ -n "${U:-}" ]; then URL="$U"; break; fi
@@ -64,7 +62,7 @@ done
 [ -n "$URL" ] || exit 0
 
 # Append the link to every worktree PR that lacks it.
-for REPO_DIR in "$HOME/git/.agent-worktrees/$AGENT_TASK_GID"/*/; do
+for REPO_DIR in "$(task_worktree "$AGENT_TASK_GID")"/*/; do
   [ -d "$REPO_DIR" ] || continue
 
   PR=$(cd "$REPO_DIR" && gh pr view --json number,body 2>/dev/null) || continue

@@ -79,8 +79,9 @@ emit_run() {
     fi
     stories=$(curl -s --max-time 6 -H "Authorization: Bearer $tok" \
       "https://app.asana.com/api/1.0/tasks/$gid/stories?opt_fields=type,created_at,text,created_by.gid&limit=100" 2>/dev/null \
-      | jq -r --arg wm "$wm" --arg gid "$gid" --arg op "$(curl -s --max-time 6 -H "Authorization: Bearer $tok" "https://app.asana.com/api/1.0/users/me?opt_fields=gid" 2>/dev/null | jq -r '.data.gid // empty')" --argjson ceil "${ASANA_TEXT_CEILING:-20000}" '
-          [.data[]? | select(.type == "comment" and .created_at > $wm) | "  [\(.created_at)] [\(if (.text | test("^🥋") and test("👊$")) then "agent" elif (.created_by.gid == $op) then "operator" else "other" end)] \(.text | gsub("\n"; "\n    "))"]
+      | jq -L "$HOME/.config/agent-watcher/lib" -r --arg wm "$wm" --arg gid "$gid" --arg op "$(curl -s --max-time 6 -H "Authorization: Bearer $tok" "https://app.asana.com/api/1.0/users/me?opt_fields=gid" 2>/dev/null | jq -r '.data.gid // empty')" --argjson ceil "${ASANA_TEXT_CEILING:-20000}" 'include "agent-authored";
+
+          [.data[]? | select(.type == "comment" and .created_at > $wm) | "  [\(.created_at)] [\(authored_class($op))] \(.text | gsub("\n"; "\n    "))"]
           | . as $all | (map(length) | add // 0) as $total
           | if $total <= $ceil then $all[]
             else ( reduce ($all|reverse)[] as $c ({keep: [], used: 0};

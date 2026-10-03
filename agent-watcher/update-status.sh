@@ -124,6 +124,14 @@ elif [[ "$STATUS_NAME" == "Pending" || "$STATUS_NAME" == "Planning" || "$STATUS_
   rm -f "$FINAL_MARKER" 2>/dev/null || true
 fi
 
+# Repo field: a Complete that passed every gate adds the Repo option of each
+# repo the task changed (sync-repo-field.sh owns the rule). Best-effort: a
+# failure warns and never undoes or fails the status write above.
+if [[ "$STATUS_NAME" == "Complete" && -x "$HOME/.config/agent-watcher/sync-repo-field.sh" ]]; then
+  "$HOME/.config/agent-watcher/sync-repo-field.sh" --task-gid "$TASK_GID" 2>&1 \
+    || echo ">> Repo sync: WARN, sync-repo-field.sh failed; run it by hand: ~/.config/agent-watcher/sync-repo-field.sh --task-gid $TASK_GID" >&2
+fi
+
 # Best-effort section move so a Board view of the kanban reflects the status.
 SECTION_GID=$(jq -r --arg s "$STATUS_NAME" '.custom_fields.agent_status.section_gids[$s] // empty' "$CONFIG")
 if [[ -z "$SECTION_GID" ]]; then

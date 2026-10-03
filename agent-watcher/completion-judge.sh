@@ -24,24 +24,26 @@
 #      timed-out hook fails OPEN), COMPLETION_JUDGE_OFFLINE=1, COMPLETION_JUDGE_LOG_DIR.
 set -uo pipefail
 
-GID="" EVENT="" REASON="" FORCE=0 QUIET=0 OFFLINE="${COMPLETION_JUDGE_OFFLINE:-0}"
+GID="" EVENT="" REASON="" BASE_ARG="" FORCE=0 QUIET=0 OFFLINE="${COMPLETION_JUDGE_OFFLINE:-0}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --gid) GID="$2"; shift 2 ;;
     --event) EVENT="$2"; shift 2 ;;
     --reason) REASON="$2"; shift 2 ;;
+    --base) BASE_ARG="$2"; shift 2 ;;
     --offline) OFFLINE=1; shift ;;
     --force) FORCE=1; shift ;;
     --quiet) QUIET=1; shift ;;
     *) echo "completion-judge: unknown arg $1" >&2; exit 2 ;;
   esac
 done
-[ -n "$GID" ] && [ -n "$EVENT" ] || { echo "usage: completion-judge.sh --gid <gid> --event complete|pr-create|block [--reason R] [--offline] [--force]" >&2; exit 2; }
+[ -n "$GID" ] && [ -n "$EVENT" ] || { echo "usage: completion-judge.sh --gid <gid> --event complete|pr-create|block [--reason R] [--base <branch>] [--offline] [--force]" >&2; exit 2; }
 
 H="$HOME/.config/agent-watcher"
 SK="$HOME/.cursor/skills/completion-judge/references"
 VERDICT="/tmp/agent-completion-verdict-$GID.json"
-LOG_DIR="${COMPLETION_JUDGE_LOG_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/judge}"
+. "$H/lib/judge-log.sh"
+LOG_DIR="$(judge_log_dir)"
 MODEL="${COMPLETION_JUDGE_MODEL:-opus}"
 EFFORT="${COMPLETION_JUDGE_EFFORT:-high}"
 DEADLINE="${COMPLETION_JUDGE_DEADLINE:-480}"
@@ -65,6 +67,7 @@ trap 'shadow_blocker_row $?' EXIT
 # 1. Evidence
 EV_ARGS=(--gid "$GID" --event "$EVENT")
 [ -n "$REASON" ] && EV_ARGS+=(--reason "$REASON")
+[ -n "$BASE_ARG" ] && EV_ARGS+=(--base "$BASE_ARG")
 [ "$OFFLINE" = 1 ] && EV_ARGS+=(--offline)
 EV=$("$H/completion-evidence.sh" "${EV_ARGS[@]}") || { echo "completion-judge: evidence collection failed" >&2; exit 3; }
 BUNDLE=${EV#path=}; BUNDLE=${BUNDLE%% hash=*}; HASH=${EV##*hash=}
@@ -83,9 +86,7 @@ if [ -s "$MARKER" ] && . "$H/hooks/lib/operator-directives.sh" 2>/dev/null; then
     case " $kinds " in *" bypass "*) hit=bypass ;; esac
     [ -z "$hit" ] && case "$EVENT" in complete|pr-create) case " $kinds " in *" complete "*) hit=complete ;; esac ;; block) case " $kinds " in *" stop "*) hit=stop ;; esac ;; esac
     [ -n "$hit" ] || continue
-    printf '{"ts":"%s","gid":"%s","event":"%s","evidence_hash":"%s","nonce":"override","verdict":"override","override":%s,"comment_at":"%s","directive":%s}\n' \
-      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GID" "$EVENT" "$HASH" "$(printf '%s' "$hit" | jq -Rs .)" "$c_ts" \
-      "$(printf '%s' "$c_text" | head -c 300 | tr '\n' ' ' | jq -Rs .)" >> "$LOG_DIR/$GID.jsonl"
+    judge_log_override "$GID" "$EVENT" "$hit" "operator comment" "$c_text" "$HASH" "$c_ts"
     JUDGE_PATH=override
     echo "verdict: allow ($EVENT) by OPERATOR OVERRIDE: Asana comment $c_ts orders '$hit' ($(printf '%s' "$c_text" | head -c 160 | tr '\n' ' '))"
     exit 0
@@ -114,6 +115,10 @@ fi
 # 3. Fresh judgment in a clean headless context
 command -v claude >/dev/null 2>&1 || { echo "completion-judge: claude binary not on PATH" >&2; exit 3; }
 [ -s "$SK/rubric.md" ] || { echo "completion-judge: rubric missing at $SK/rubric.md" >&2; exit 3; }
+TRUE_BLOCKERS=$(grep -o '<rule id="yolo-true-blockers">.*</rule>' "$HOME/.cursor/skills/one-shot/references/blocking.md" 2>/dev/null | head -1)
+[ -n "$TRUE_BLOCKERS" ] || { echo "completion-judge: yolo-true-blockers rule not found in one-shot references/blocking.md" >&2; exit 3; }
+TESTED_OPTIONS=$(sed -n '/^# Options (multi-select/,/^# Exit:/p' "$H/set-tested.sh" | sed -e '$d' -e 's/^# \{0,1\}//')
+[ -n "$TESTED_OPTIONS" ] || { echo "completion-judge: tested option block not found in set-tested.sh" >&2; exit 3; }
 NONCE=$(head -c 8 /dev/urandom | xxd -p 2>/dev/null || date +%s%N)
 WORK="/tmp/agent-judge-$GID"; mkdir -p "$WORK"
 PROMPT="$WORK/prompt.md"
@@ -121,6 +126,11 @@ PROMPT="$WORK/prompt.md"
   cat "$SK/rubric.md"
   printf '\n\n---\n\n'
   [ -s "$SK/concession-taxonomy.md" ] && cat "$SK/concession-taxonomy.md"
+  # The ONE list of true blockers, from its owner (one-shot blocking.md), verbatim:
+  # the taxonomy's allow section points here instead of keeping its own copy.
+  printf '\n\n## one-shot `yolo-true-blockers` (verbatim)\n\n%s\n' "$TRUE_BLOCKERS"
+  # The ONE definition of each `tested` option and its artifact (rubric J4).
+  printf '\n\n## `tested` options (verbatim from set-tested.sh)\n\n%s\n' "$TESTED_OPTIONS"
   printf '\n\n---\n\n# EVIDENCE BUNDLE (the only facts you have)\n\n'
   cat "$BUNDLE"
   printf '\n\n---\nJudge the `%s` event for task %s now. Return only the JSON object in a ```json fence.\n' "$EVENT" "$GID"

@@ -8,6 +8,67 @@
   "user_gid": "1200972350160586",
   "user_email": "jon@edge.app",
   "custom_fields": {
+    "repo": {
+      "_doc": "Engineering-board Repo multi-enum, resolved on the task by name. github_repo_options maps a GitHub repo name to its option name: the ONE copy, read by asana-task-update.sh --set-repos (and so by sync-repo-field.sh at every Complete). Only options named here are ever removed. A repo with no entry is reported and skipped, never auto-created.",
+      "name": "Repo",
+      "github_repo_options": {
+        "edge-react-gui": "GUI",
+        "edge-core-js": "Core",
+        "edge-exchange-plugins": "Exch",
+        "edge-currency-accountbased": "Accb",
+        "edge-currency-plugins": "Currp",
+        "edge-login-ui-rn": "LoginUi"
+      },
+      "gid": "1213919399225909"
+    },
+    "priority": {
+      "gid": "1213843686985522",
+      "name": "Priority"
+    },
+    "loe": {
+      "gid": "1213901829133612",
+      "name": "LOE"
+    },
+    "category": {
+      "gid": "1214085985050203",
+      "name": "Category"
+    },
+    "release": {
+      "gid": "1213939602865824",
+      "name": "Release (4.x.x)"
+    },
+    "build": {
+      "gid": "1213928707858644",
+      "name": "Build (staging/cheese)"
+    },
+    "board_state": {
+      "gid": "1213992584300456",
+      "name": "Board State 🤖"
+    },
+    "developer": {
+      "gid": "1214028561571290",
+      "name": "🤖 - Developer"
+    },
+    "departments": {
+      "gid": "1214112351733543",
+      "name": "Departments 🤖"
+    },
+    "collaborators": {
+      "gid": "1214167375707266",
+      "name": "Collaborators"
+    },
+    "estimate": {
+      "gid": "1214463904306553",
+      "name": "Estimate (hrs)"
+    },
+    "force_land": {
+      "gid": "1216270424525434",
+      "name": "Force Land"
+    },
+    "tdd": {
+      "gid": "1216703631044738",
+      "name": "TDD?"
+    },
     "agent_status": {
       "gid": "1215088146891589",
       "options": {
@@ -25,14 +86,16 @@
         "Reviewing": "1215158736217710",
         "Testing": "1215158740998633",
         "Complete": "1215158738301289"
-      }
+      },
+      "name": "agent_status"
     },
     "blocked": {
       "gid": "1215088177189902",
       "options": {
         "No": "1215088177189903",
         "Yes": "1215088177189904"
-      }
+      },
+      "name": "blocked"
     },
     "tested": {
       "gid": "1215645627282791",
@@ -44,7 +107,8 @@
         "Untested": "1215645627282794",
         "CouchDB": "1216219577215531",
         "Android Device": "1217260739948719"
-      }
+      },
+      "name": "tested"
     },
     "agent_model": {
       "gid": "1216249098365971",
@@ -61,7 +125,8 @@
           "gid": "1216249114532968",
           "model": "sonnet[1m]"
         }
-      }
+      },
+      "name": "agent_model"
     },
     "agent_effort": {
       "gid": "1216249097796648",
@@ -71,14 +136,16 @@
         "high": "1216249097796651",
         "xhigh": "1216249098451814",
         "max": "1216249098451815"
-      }
+      },
+      "name": "agent_effort"
     },
     "agent_deliverable": {
       "gid": "1218805984040086",
       "options": {
         "PR": "1218805984040087",
         "Task": "1218805984040088"
-      }
+      },
+      "name": "agent_deliverable"
     },
     "agent_lane": {
       "gid": "1216838728898168",
@@ -88,7 +155,16 @@
         "Android Sim": "1216838728898170",
         "Android Device": "1216838728898171",
         "None": "1216838728898172"
-      }
+      },
+      "name": "agent_lane"
+    },
+    "agent_review": {
+      "gid": "1218643120920355",
+      "name": "agent_review"
+    },
+    "agent_on_complete": {
+      "gid": "1218856424282016",
+      "name": "agent_on_complete"
     }
   },
   "watcher": {
@@ -164,5 +240,27 @@
         "seven_day": 90
       }
     }
+  },
+  "task_fields": {
+    "_doc": "The ONE registry of the task fields the orch reads: every custom_fields entry with a gid (Engineering Board + jon-claude; Jon's rule: no other board's fields). Matched by gid, so other boards' same-named fields (two 'Status' fields ride on most tasks) never read as ours. lib/task-fields.sh builds the segment field snapshot (stamp-orch-version.sh, check-followup-scope.sh) and the judge's field line from it. run_params: fields whose change between segments is a run parameter, not an ask (check-followup-scope.sh tags those deltas; the judge rubric reads the tag). never_delta: fields with their own reader, left out of field deltas.",
+    "run_params": [
+      "Priority",
+      "LOE",
+      "Estimate (hrs)",
+      "Board State 🤖",
+      "🤖 - Developer",
+      "Departments 🤖",
+      "Collaborators",
+      "agent_status",
+      "blocked",
+      "agent_model",
+      "agent_effort",
+      "agent_lane",
+      "agent_deliverable",
+      "agent_review"
+    ],
+    "never_delta": [
+      "agent_on_complete"
+    ]
   }
 }

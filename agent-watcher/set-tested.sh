@@ -8,17 +8,27 @@
 #   set-tested.sh <task_gid> --clear          # set the field to empty (blank)
 #   set-tested.sh <task_gid> ... --dry-run     # print payload, do not PUT
 #
-# Options (multi-select; pass every method that genuinely ran):
+# Options (multi-select; pass every method that genuinely ran). This block is
+# the ONE definition of each option and the artifact that earns it: the
+# completion judge reads it verbatim (rubric J4), so change it here only.
 #   iOS Sim     — the change was driven in-app on the iOS sim (maestro / build +
-#                 simctl launch, real action to terminal success). DEFAULT sim
-#                 platform; quote it ("iOS Sim") since it contains a space.
-#   Android Sim — exercised on an Android EMULATOR (gradle :app:assembleDebug for a
-#                 build-only fix, or an AVD/maestro in-app drive). Android tasks only.
-#   Android Device — exercised on a PHYSICAL Android device (e.g. the S9). Never
-#                 record a physical drive as Android Sim.
-#   Unit Tests  — jest / mocha / `npm test` ran (verify-repo's test step)
+#                 simctl launch, real action to terminal success). Artifact:
+#                 proof frames /tmp/agent-proof-<gid>-*.png plus an attempt-log
+#                 success entry. DEFAULT sim platform; quote it ("iOS Sim").
+#   Android Sim — exercised on an Android EMULATOR. Artifact: in-app proof frames
+#                 from the AVD drive, or for a build-only fix the gradle
+#                 :app:assembleDebug log /tmp/agent-android-build-<gid>*.log (or the
+#                 APK /tmp/agent-proof-<gid>-*.apk). Android tasks only.
+#   Android Device — exercised on a PHYSICAL Android device (e.g. the S9).
+#                 Artifact: proof frames captured from the device. Never record a
+#                 physical drive as Android Sim.
+#   Unit Tests  — jest / mocha / `npm test` ran (verify-repo's test step).
+#                 Artifact: the suite's pass/fail result in the run report.
 #   CouchDB     — a CouchDB-backed test ran (sync / server repos: edge-reports-
-#                 server, edge-core-js sync, a couch/pouch integration test)
+#                 server, edge-core-js sync, a couch/pouch integration test).
+#                 Artifact: the test command and its result in the run report.
+#   Other       — a real test method not listed above. Artifact: the run report
+#                 names the method and its result.
 #   Untested    — NO test method applied; mutually exclusive with the others
 #                 (only static tsc/lint, or nothing). Never combine with a real
 #                 method.

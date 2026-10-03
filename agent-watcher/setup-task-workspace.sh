@@ -55,9 +55,10 @@
 #   2 = usage error
 
 set -euo pipefail
+source "$HOME/.config/agent-watcher/lib/worktree-root.sh"  # the one worktree-root resolver
 
 CONFIG="$HOME/.config/agent-watcher/asana-config.json"
-WORKTREES_ROOT="$HOME/git/.agent-worktrees"
+WORKTREES_ROOT="$(worktree_root)"
 REPOS_ROOT="$HOME/git"
 
 source "$HOME/.config/agent-watcher/lib/node-modules-freshness.sh"
@@ -104,18 +105,9 @@ if [[ -z "$BASE" ]]; then
   esac
 fi
 if [[ -z "$BASE" ]]; then
-  BASE="$(git -C "$MAIN_REPO" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/||')"
-  if [[ -z "$BASE" ]]; then
-    # local clone never had origin/HEAD recorded — ask the remote once
-    git -C "$MAIN_REPO" remote set-head origin --auto >/dev/null 2>&1 || true
-    BASE="$(git -C "$MAIN_REPO" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/||')"
-  fi
-  if [[ -z "$BASE" ]]; then
-    # offline fallback: main/master before develop (develop last — stale-branch hazard)
-    for cand in origin/main origin/master origin/develop; do
-      git -C "$MAIN_REPO" rev-parse --verify --quiet "$cand" >/dev/null 2>&1 && { BASE="$cand"; break; }
-    done
-  fi
+  # The shared resolver owns the order (origin/HEAD, ask the remote once,
+  # then main/master/develop offline).
+  BASE="$("$HOME/.cursor/skills/git-default-branch.sh" -C "$MAIN_REPO" 2>/dev/null || true)"
   [[ -z "$BASE" ]] && { echo "setup-task-workspace: cannot resolve a base ref for $REPO (no origin/HEAD, main, master, or develop) — refusing to guess" >&2; exit 1; }
   echo ">> setup-task-workspace: base ref for $REPO → $BASE" >&2
 fi

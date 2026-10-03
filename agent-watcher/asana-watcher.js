@@ -316,7 +316,7 @@ function spawnForTask(task, cfg) {
   // No eager worktree: the agent reads the task, determines the target repo(s), and
   // creates co-located per-task worktrees itself (one-shot skill → setup-task-workspace).
   // cwd is ~/git; cleanup/gc scan ~/git/.agent-worktrees/<gid>/ for whatever it created.
-  const worktreesParent = path.join(reposRoot, '.agent-worktrees', task.gid)
+  const worktreesParent = path.join(require('./lib/worktree-root.js').worktreeRoot(), task.gid)
 
   // Allocate resources BEFORE touching agent_status: a Planning task with no
   // session is invisible to every sweep (the watcher only spawns Pending), so a

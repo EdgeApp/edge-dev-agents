@@ -70,6 +70,10 @@ def install(rel, body=None, from_path=None):
 
 UPDATE = install('.cursor/skills/asana-task-update/scripts/asana-task-update.sh',
                  from_path=src('.cursor/skills/asana-task-update/scripts/asana-task-update.sh'))
+# The shared default-branch resolver pr-create calls under $HOME.
+install('.cursor/skills/git-default-branch.sh', from_path=os.path.expanduser('~/.cursor/skills/git-default-branch.sh'))
+# The field registry the scripts read their gids from (read-only copy).
+install('.config/agent-watcher/asana-config.json', from_path=os.path.expanduser('~/.config/agent-watcher/asana-config.json'))
 install('.cursor/skills/asana-whoami.sh', '#!/bin/bash\n[[ -n "${ASANA_TOKEN:-}" ]] || exit 1\necho 1111\n')
 
 CURL = r'''#!/usr/bin/env python3

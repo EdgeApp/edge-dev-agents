@@ -20,7 +20,7 @@
       ]
     },
     "file:update-status.sh": {
-      "hash": "2ff8f0fc138d",
+      "hash": "ada60fd7fa79",
       "dims": [
         "A4",
         "O8"
@@ -222,7 +222,7 @@
       ]
     },
     "file:set-tested.sh": {
-      "hash": "c352db4fdd98",
+      "hash": "d3b40d2b73de",
       "dims": [
         "A22"
       ]
@@ -246,7 +246,7 @@
       ]
     },
     "file:asana-watcher.js": {
-      "hash": "b38b72fd851f",
+      "hash": "cc3904a3ff5b",
       "dims": [
         "O1"
       ]
@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "ffb543a03933",
+      "hash": "4bd22ef977ad",
       "dims": [
         "O4",
         "O5",
@@ -273,7 +273,7 @@
       ]
     },
     "file:setup-task-workspace.sh": {
-      "hash": "6299fa11dd1f",
+      "hash": "f46ca6642936",
       "dims": [
         "O8"
       ]
@@ -399,7 +399,7 @@
       ]
     },
     "file:asana-build-field.sh": {
-      "hash": "298f5d580893",
+      "hash": "340533cfb7e0",
       "dims": [
         "A28"
       ]
@@ -411,13 +411,13 @@
       ]
     },
     "file:asana-force-land.sh": {
-      "hash": "b7036bbd8c43",
+      "hash": "23009f1e77b0",
       "dims": [
         "A8"
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "01dc7d12a503",
+      "hash": "9fd8f70f192e",
       "dims": [
         "A9"
       ]
@@ -539,7 +539,7 @@
       ]
     },
     "file:tdd-doc-links.sh": {
-      "hash": "f5dda2908e75",
+      "hash": "4dcbd8d7c7b6",
       "dims": [
         "A31"
       ]
@@ -557,14 +557,14 @@
       ]
     },
     "file:require-followup-scope-on-complete.sh": {
-      "hash": "82168e24f53a",
+      "hash": "7b1e20850b73",
       "dims": [
         "A14",
         "A9"
       ]
     },
     "file:lint-commit.sh": {
-      "hash": "6e0b86a5e346",
+      "hash": "4ca68dfe2ee6",
       "dims": [
         "A12"
       ]
@@ -612,7 +612,7 @@
       ]
     },
     "file:tdd-stamp.sh": {
-      "hash": "74431dff6c02",
+      "hash": "041a2968e4d9",
       "dims": [
         "A31"
       ]
@@ -648,13 +648,13 @@
       ]
     },
     "file:operator-hold-gate.sh": {
-      "hash": "3c0e25a44206",
+      "hash": "6b4ea742726b",
       "dims": [
         "A7"
       ]
     },
     "file:concession-taxonomy.md": {
-      "hash": "0d3c070b6a87",
+      "hash": "2571ea43fa04",
       "dims": [
         "A32",
         "A7"
@@ -667,13 +667,13 @@
       ]
     },
     "file:require-completion-judgment.sh": {
-      "hash": "e115bd5b551f",
+      "hash": "596045fd3dd4",
       "dims": [
         "O9"
       ]
     },
     "file:completion-judge.sh": {
-      "hash": "f24bea8e85de",
+      "hash": "26940cf40e0d",
       "dims": [
         "O9"
       ]
@@ -1581,12 +1581,12 @@
       "hash": "c7dc9b74daa9"
     },
     "asana-task-update:qa-subtasks": {
-      "reason": "2026-09-26: mechanically enforced: asana-task-update.sh QA_SUBTASKS_REQUIRED gate and asana-get-context.sh filter",
-      "hash": "6543c1770bdc"
+      "reason": "2026-10-02: mechanically enforced by asana-task-update.sh (QA_SUBTASKS_REQUIRED gate, QA_NOT_PLAIN check)",
+      "hash": "53f0c32bcda2"
     },
     "pr-land:qa-subtasks-before-handoff": {
-      "reason": "2026-09-26: operator ruling 2026-09-26: existence is gated by asana-task-update.sh; item quality not an eval dimension",
-      "hash": "4cdc34aa5e93"
+      "reason": "2026-10-02: existence gated by asana-task-update.sh (QA_SUBTASKS_REQUIRED); plain-language enforced by its QA_NOT_PLAIN check; item quality not an eval dimension per operator ruling 2026-09-26",
+      "hash": "f60d851331a2"
     },
     "one-shot:claude-calls-on-subscription": {
       "reason": "2026-09-27: operator standing preference 2026-09-27; a missed case surfaces as a blocked completion or an API bill, both visible without an eval dimension",

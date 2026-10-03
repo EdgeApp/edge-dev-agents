@@ -15,6 +15,7 @@
 # Never prints credential VALUES; reads token only to query Asana.
 
 set -euo pipefail
+source "$HOME/.config/agent-watcher/lib/worktree-root.sh"  # the one worktree-root resolver
 # Attachment naming lives in the orch lib; the fallback keeps this skill script
 # working on a machine without the orch (convention-sync copies skills only).
 source "$HOME/.config/agent-watcher/lib/attach-names.sh" 2>/dev/null || REPORT_ATTACH_RE='^([0-9]+-)?agent-run-report.*\.md$'
@@ -22,7 +23,7 @@ source "$HOME/.config/agent-watcher/lib/attach-names.sh" 2>/dev/null || REPORT_A
 WATCHER_LOG="/tmp/asana-watcher.out"
 WATCHDOG_LOG="/tmp/session-watchdog.out"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"
-WORKTREES_ROOT="$HOME/git/.agent-worktrees"
+WORKTREES_ROOT="$(worktree_root)"
 PROJECTS_DIR="${PROJECTS_DIR:-$HOME/.claude/projects}"
 
 # Shared run-signature check: agent-watcher's lib/transcript-heads.js (cached
@@ -447,7 +448,8 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
   # log the judge launcher appends (a verdict whose nonce has no log line is forged).
   local judge_verdict="null" judge_log="[]"
   [ -r "/tmp/agent-completion-verdict-$gid.json" ] && judge_verdict=$(jq -c . "/tmp/agent-completion-verdict-$gid.json" 2>/dev/null || echo null)
-  [ -r "$STATE_DIR/judge/$gid.jsonl" ] && judge_log=$(jq -cs . "$STATE_DIR/judge/$gid.jsonl" 2>/dev/null || echo "[]")
+  local jlog; jlog=$(. "$HOME/.config/agent-watcher/lib/judge-log.sh" && judge_log_path "$gid")
+  [ -r "$jlog" ] && judge_log=$(jq -cs . "$jlog" 2>/dev/null || echo "[]")
 
   jq -cn \
     --arg gid "$gid" --arg name_hint "$name_hint" --arg spawned "$spawned" \

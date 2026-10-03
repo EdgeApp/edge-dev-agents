@@ -81,11 +81,16 @@ UNDER_TEST = [
 ]
 LINKED = [
     '.config/agent-watcher/lib/attach-names.sh',
+    '.config/agent-watcher/asana-config.json',
+    '.config/agent-watcher/lib/worktree-root.sh',
+    '.config/agent-watcher/lib/judge-log.sh',
+    '.config/agent-watcher/lib/agent-authored.jq',
     '.config/agent-watcher/orch-run-context.sh',
     '.config/agent-watcher/agent-authored-text.sh',
     '.config/agent-watcher/hooks/strip-cmd-mentions.sh',
     '.config/agent-watcher/hooks/lib/reviewer-outage-noise.sh',
     '.config/agent-watcher/hooks/lib/shell-word-resolve.sh',
+    '.config/agent-watcher/hooks/lib/completion-event.sh',
     '.config/agent-watcher/hooks/cmd-executes.sh',
 ]
 UNDER_TEST.append('.config/agent-watcher/judge-report-section.sh')

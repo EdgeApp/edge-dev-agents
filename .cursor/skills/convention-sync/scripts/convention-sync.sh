@@ -168,7 +168,7 @@ LEGACY_REPO_README="$REPO_CURSOR/README.md"
 # machine-migration bundle (NEW-MACHINE-SETUP.md). Format: "SRC_ABS|REPO_SUBDIR|csv-excludes"
 # Excludes are rsync patterns (matched against the path relative to SRC).
 EXTRA_TREES=(
-  "$HOME/.config/agent-watcher|agent-watcher|credentials.json,secrets,*.log,*.state,*.lock,pool.json,slots.json,watchdog-state.json,oom-repro/forensics,oom-repro/logs,*-anchor-brief.*,briefs,.DS_Store,.git"
+  "$HOME/.config/agent-watcher|agent-watcher|credentials.json,secrets,*.log,*.state,*.lock,pool.json,slots.json,watchdog-state.json,oom-repro/forensics,oom-repro/logs,*-anchor-brief.*,briefs,__pycache__,*.pyc,.DS_Store,.git"
   "$HOME/.claude/workflows|claude-workflows|.DS_Store,.git"
 )
 # Single committable files (home canonical) → repo relpath. Format: "SRC_FILE|REPO_RELPATH"
@@ -217,8 +217,7 @@ dropped_hooks_between() {
 # origin/<name>. A dirty tree blocks the switch: the sync never discards or
 # carries someone's uncommitted work.
 git -C "$REPO_DIR" fetch origin --quiet 2>/dev/null || true
-DEF_BRANCH="$(git -C "$REPO_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || true)"
-[[ -z "$DEF_BRANCH" ]] && DEF_BRANCH="main"
+DEF_BRANCH="$("$HOME/.cursor/skills/git-default-branch.sh" -C "$REPO_DIR" --short 2>/dev/null || echo main)"
 SYNC_BRANCH="${BRANCH_ARG:-$DEF_BRANCH}"
 current_branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 if [[ "$current_branch" != "$SYNC_BRANCH" ]]; then

@@ -37,6 +37,7 @@
 #
 # Scope: no-ops unless AGENT_TASK_GID is set. Exit 0 allow, exit 2 block.
 set -euo pipefail
+source "$HOME/.config/agent-watcher/lib/worktree-root.sh"  # the one worktree-root resolver
 
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 
@@ -144,7 +145,7 @@ jev_route_async() {
 # Prints none | listed | missing.
 plan_conflicts() {
   local f v src
-  f=$(ls -t /tmp/plan-"$GID"-*.md "$HOME"/git/.agent-worktrees/"$GID"/*/plan-"$GID"-*.md \
+  f=$(ls -t /tmp/plan-"$GID"-*.md "$(task_worktree "$GID")"/*/plan-"$GID"-*.md \
         /private/tmp/claude-*/*/*/scratchpad/plan-"$GID"-*.md 2>/dev/null | head -1 || true)
   if [ -n "$f" ]; then conflicts_verdict < "$f"; return; fi
   v=$(printf '%s' "$CMD" | conflicts_verdict)
@@ -183,7 +184,7 @@ conflicts_gate() {
 }
 
 if ls /tmp/plan-"$GID"-*.md >/dev/null 2>&1 || \
-   ls "$HOME"/git/.agent-worktrees/"$GID"/*/plan-"$GID"-*.md >/dev/null 2>&1 || \
+   ls "$(task_worktree "$GID")"/*/plan-"$GID"-*.md >/dev/null 2>&1 || \
    ls /private/tmp/claude-*/*/*/scratchpad/plan-"$GID"-*.md >/dev/null 2>&1; then
   conflicts_gate
   jev_route_async

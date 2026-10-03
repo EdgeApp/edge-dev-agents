@@ -49,6 +49,11 @@ GRAMMAR = [
     ('is that the right wallet? fix the fee too', 'hold'), ('wait before you finish', 'hold'),
     ('Stop, I am going to let QA finish testing', 'hold'), ('stop', 'hold'), ('hang on a sec', 'hold'), ('pause', 'hold'),
     ('do not continue', 'hold'), ("fix X and don't continue", 'hold'), ('not yet', 'hold'),
+    # deferred holds: hold at a decision point
+    ("Hold when you've decided what to do for confirmation", 'hold'), ('hold off on the push', 'hold'),
+    ('hold until I check the sim', 'hold'), ('Investigate the fee, then hold for my confirmation', 'hold'),
+    ('wait for my approval before posting', 'hold'), ('fix it and hold for the go-ahead', 'hold'),
+    ('hold the fee row at 2 decimals', 'steer'),
     # steers: anything else a human typed, including negated or conditional directives,
     # requests phrased as questions, and "stop <thing>" that is not a stop order
     ('yes do it', 'steer'), ('approved', 'steer'), ("don't complete yet", 'steer'),

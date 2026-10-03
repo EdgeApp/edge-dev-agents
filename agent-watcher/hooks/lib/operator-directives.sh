@@ -42,6 +42,12 @@ release_anchor() {
 #   interrupt  wait | hold on | hang on | hold up | pause as the first word of the
 #              message, or any of those plus bare "stop" as a whole clause
 #              ("no, hold on"; "Stop, I'll let QA test"); "stop the sim" is a steer
+#   deferred   hold opening the message with a deferral or condition (hold off |
+#              hold for | hold until | hold when | hold once | hold after | hold
+#              before | hold here | hold there), or "hold/wait for my
+#              confirmation|approval|go-ahead|ok" anywhere: the operator wants a
+#              stop at a decision point, and only a stamped hold lets the Stop
+#              hook allow that stop ("hold the fee at 2 decimals" stays a steer)
 #   negated go don't/do not/never continue|proceed|go ahead|go on, or "not yet"
 # A release anchor in the same message wins (the caller checks release first).
 hold_trigger() {
@@ -57,6 +63,8 @@ hold_trigger() {
   done < <(printf '%s' "$norm" | grep -oE '[^?]+\?' || true)
   first=$(printf '%s' "$norm" | sed -E 's/^(ok|okay|k|yes|yep|yeah|sure|please|no|hmm|hm|uh)[[:punct:] ]+//')
   printf '%s' "$first" | grep -qE '^(wait|hold on|hang on|hold up|pause)([[:punct:] ]|$)' && { printf 'hold'; return 0; }
+  printf '%s' "$first" | grep -qE '^hold (off|for|until|till|when|once|after|before|here|there)([[:punct:] ]|$)' && { printf 'hold'; return 0; }
+  printf '%s' "$norm" | grep -qE "(^|[^a-z])(hold|wait) (for|until) (my|your|the|an?) ?(confirmation|approval|go-?ahead|ok|okay|sign-?off|go)([^a-z]|$)" && { printf 'hold'; return 0; }
   while IFS= read -r clause; do
     clause=$(printf '%s' "$clause" | sed -E 's/^[[:punct:] ]+//; s/[[:punct:] ]+$//; s/^(ok|okay|please|no|and|then) +//; s/ (please|a sec|a second|a moment|a minute|there|here|now)$//')
     case "$clause" in wait|"hold on"|"hang on"|"hold up"|pause|stop) printf 'hold'; return 0 ;; esac

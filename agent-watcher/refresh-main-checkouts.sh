@@ -95,8 +95,7 @@ for r in "${REPOS[@]}"; do
     continue
   fi
   git fetch origin --quiet 2>/dev/null || { echo "$r: SKIP (fetch failed: offline?)"; retryable=$((retryable + 1)); continue; }
-  def=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||')
-  def=${def:-master}
+  def=$("$HOME/.cursor/skills/git-default-branch.sh" --short 2>/dev/null || echo master)
   cur=$(git branch --show-current)
   behind=$(git rev-list --count "HEAD..origin/$def" 2>/dev/null || echo '?')
   if [[ -n "$(git status --porcelain)" ]]; then

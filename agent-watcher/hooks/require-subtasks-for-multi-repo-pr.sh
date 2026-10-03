@@ -10,6 +10,7 @@
 # that merely name the script path never fire it.
 # Enforcement-over-prose: the 2026-06-20 eval cohort had a run flat-attach a 2-repo PR set.
 set -euo pipefail
+source "$HOME/.config/agent-watcher/lib/worktree-root.sh"  # the one worktree-root resolver
 
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
@@ -34,7 +35,7 @@ printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" pr-crea
 # count) there is nothing to gate.
 printf '%s' "$CMD_M" | grep -qE -- '(^|[[:space:]])--asana-attach([[:space:]=]|$)' || exit 0
 
-WT="$HOME/git/.agent-worktrees/$AGENT_TASK_GID"
+WT="$(task_worktree "$AGENT_TASK_GID")"
 [ -d "$WT" ] || exit 0
 
 # Count repo worktrees holding REAL PR work: a feature branch WITH commits ahead

@@ -35,18 +35,16 @@ set -euo pipefail
 
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
-# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
-# backticked spans blanked): a command that merely QUOTES a trigger string --
-# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
-# argument extraction, where quoted values are load-bearing. Fail-open to the
-# raw command if the helper is unavailable.
-CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
-# Only gate: update-status.sh ... Complete for THIS session's task.
-case "$CMD_M" in
-  *update-status.sh*"$AGENT_TASK_GID"*Complete*) ;;
-  *) exit 0 ;;
-esac
+# Gate this session's task's completion events, classified by the shared lib
+# (lib/completion-event.sh). A BLOCKED completion still owes a fresh scope
+# check and a last-placed report (it must not block past unread operator
+# comments), but not the GitHub counters below: a block is the prescribed exit
+# exactly when those cannot reach zero (bots still red at the watch budget),
+# and the completion judge rules on its reason.
+source "$HOME/.config/agent-watcher/hooks/lib/completion-event.sh"
+EVENT=$(completion_event "$CMD" "$AGENT_TASK_GID")
+case "$EVENT" in complete|block) ;; *) exit 0 ;; esac
 
 GID="$AGENT_TASK_GID"
 MARKER="/tmp/agent-followup-scope-$GID.json"
@@ -63,7 +61,7 @@ fi
 
 # Freshness: the marker must cover the live newest comment. Best-effort — any
 # failure here fails OPEN (marker exists, Asana/API may be down).
-TOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null)}"
+TOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null || true)}"
 if [ -n "$TOKEN" ]; then
   LIVE_STORIES="$(curl -sS --max-time 15 -H "Authorization: Bearer $TOKEN" \
     "https://app.asana.com/api/1.0/tasks/$GID/stories?opt_fields=gid,created_at,resource_subtype" 2>/dev/null || true)"
@@ -104,6 +102,7 @@ fi
 
 # GitHub-side scope: the marker's own record blocks. No live re-fetch here — the
 # check script owns that; a re-run after resolving threads refreshes the count.
+[ "$EVENT" = block ] && exit 0
 GH_BLOCKING="$(jq -r '.github_blocking_threads // 0' "$MARKER" 2>/dev/null || echo 0)"
 if [ "$GH_BLOCKING" -gt 0 ] 2>/dev/null; then
   echo "BLOCKED: your followup-scope check recorded $GH_BLOCKING unresolved review thread(s) on an OWNED open PR; that is THIS run's scope (human threads count: a reviewer's comments are the re-arm reason even with zero Asana activity). Address each per pr-address reply-then-resolve, re-run: $CHECK; then retry Complete once it records zero blocking threads. $SOLO" >&2
@@ -123,11 +122,12 @@ if [ "$GH_UNANSWERED" -gt 0 ] 2>/dev/null; then
 fi
 
 # Reviewer-bot completeness: Complete may not rest on a ready HEAD the bots
-# never ran on (the 2026-08-06 cohort's two A3 gate FAILs). watch-pr writes the
-# outage waiver when a reviewer is genuinely unavailable; its presence exempts.
+# never ran on (the 2026-08-06 cohort's two A3 gate FAILs). The count is already
+# net of watch-pr's per-HEAD outage waivers (check-followup-scope.sh owns that
+# arithmetic, and the completion judge reads the same count).
 GH_BOTS="$(jq -r '.github_bots_incomplete // 0' "$MARKER" 2>/dev/null || echo 0)"
-if [ "$GH_BOTS" -gt 0 ] 2>/dev/null && [ ! -s "/tmp/agent-bot-unavailable-$GID" ]; then
-  echo "BLOCKED: $GH_BOTS reviewer-bot check(s) missing or not completed-clean on an OWNED ready PR HEAD. Complete requires the bots to have RUN AND CONCLUDED there (success/skipped): if the PR just flipped ready, run watch-pr.sh and let them finish; a red bot means findings to address first. A genuine bot outage is waived automatically when watch-pr records reviewer-unavailable. Re-run: $CHECK; then retry Complete. $SOLO" >&2
+if [ "$GH_BOTS" -gt 0 ] 2>/dev/null; then
+  echo "BLOCKED: $GH_BOTS reviewer-bot check(s) missing or not completed-clean on an OWNED ready PR HEAD. Complete requires the bots to have RUN AND CONCLUDED there (success/skipped): if the PR just flipped ready, run watch-pr.sh and let them finish; a red bot means findings to address first. A genuine bot outage is waived for that HEAD once watch-pr records reviewer-unavailable, so run watch-pr.sh rather than waiting it out. Re-run: $CHECK; then retry Complete. $SOLO" >&2
   exit 2
 fi
 

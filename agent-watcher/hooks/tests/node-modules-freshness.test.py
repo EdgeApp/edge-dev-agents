@@ -84,7 +84,7 @@ os.makedirs(os.path.join(aw, 'lib'))
 os.makedirs(stubdir)
 for f in ('setup-task-workspace.sh', 'refresh-main-checkouts.sh'):
     os.symlink(SETUP if f.startswith('setup') else REFRESH, os.path.join(aw, f))
-for f in ('node-modules-freshness.sh', 'node-modules-reinstall.sh'):
+for f in ('node-modules-freshness.sh', 'node-modules-reinstall.sh', 'worktree-root.sh'):
     os.symlink(os.path.join(LIBDIR, f), os.path.join(aw, 'lib', f))
 with open(os.path.join(aw, 'lib/launchd-env.sh'), 'w') as f:
     f.write('# test stub: keep the stub PATH\n')
@@ -97,6 +97,9 @@ skills = os.path.join(tmp, 'skills')
 os.makedirs(skills)
 os.symlink(INSTALL_DEPS, os.path.join(skills, 'install-deps.sh'))
 os.symlink(PREP_CMD, os.path.join(skills, 'verification-prepare-cmd.sh'))
+# The shared default-branch resolver setup-task-workspace.sh calls under $HOME.
+os.makedirs(os.path.join(home, '.cursor/skills'), exist_ok=True)
+os.symlink(os.path.expanduser('~/.cursor/skills/git-default-branch.sh'), os.path.join(home, '.cursor/skills/git-default-branch.sh'))
 gitcfg = os.path.join(tmp, 'gitconfig')
 with open(gitcfg, 'w') as f:
     f.write('[user]\n\tname = t\n\temail = t@t\n[init]\n\tdefaultBranch = master\n[advice]\n\tdetachedHead = false\n')

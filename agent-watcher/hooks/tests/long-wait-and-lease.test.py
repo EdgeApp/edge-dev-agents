@@ -108,6 +108,11 @@ case "$*" in
 esac
 ''')
 
+# Scripts under test source shared libs from $HOME; give the fixture HOME the real ones.
+os.makedirs(os.path.join(home, '.config', 'agent-watcher'), exist_ok=True)
+if not os.path.exists(os.path.join(home, '.config', 'agent-watcher', 'lib')):
+    os.symlink(os.path.join(HOME_REAL, '.config', 'agent-watcher', 'lib'), os.path.join(home, '.config', 'agent-watcher', 'lib'))
+
 ENV = dict(os.environ, HOME=home, XDG_STATE_HOME=state, LWL_MARKS=marks,
            PATH=f'{stub}:{os.environ["PATH"]}', AGENT_SESSION_UUID='owner-A')
 for k in ('AGENT_SIM_UDID', 'AGENT_METRO_PORT', 'MAX_CALL'):

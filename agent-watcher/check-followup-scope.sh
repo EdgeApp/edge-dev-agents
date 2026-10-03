@@ -58,6 +58,10 @@ set -euo pipefail
 
 DIR="$HOME/.config/agent-watcher"
 source "$HOME/.config/agent-watcher/lib/attach-names.sh"  # one attachment naming scheme
+source "$HOME/.config/agent-watcher/lib/reviewer-bots.sh"  # one reviewer list and per-head verdict
+source "$HOME/.config/agent-watcher/lib/task-pr-urls.sh"   # PRs on the task and its subtasks
+source "$HOME/.config/agent-watcher/lib/task-fields.sh"     # registered fields, snapshot, deltas
+AJQ="jq -L $HOME/.config/agent-watcher/lib"                # + include "agent-authored": the one marker test
 TASK_GID=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -91,7 +95,7 @@ NEWER_COUNT="$(echo "$NEWER" | jq 'length')"
 # today; spool each one so the drain can log a per-clause "addressed to the agent?"
 # Noul beside that (deduped by story gid). Never changes this script's output.
 if . "$DIR/lib/jev-shadow.sh" 2>/dev/null; then
-  echo "$NEWER" | jq -c --arg t "$TASK_GID" '.[] | select(((.text // "") | test("^🥋") and test("👊$")) | not)
+  echo "$NEWER" | $AJQ -c --arg t "$TASK_GID" 'include "agent-authored"; .[] | select((.text | agent_authored) | not)
     | {story: .gid, text: (.text // ""), created_at, task: $t}' 2>/dev/null \
     | while IFS= read -r row; do printf '%s' "$row" | jev_shadow_enqueue followup; done || true
 fi
@@ -106,7 +110,7 @@ NEWEST_COMMENT_AT="$(echo "$STORIES" | jq -r '[.data[] | select(.resource_subtyp
 # yet: comments BEFORE the first attach are the prescribed order.
 AGENT_AFTER_WM=0
 if [[ -n "$WATERMARK" ]]; then
-  AGENT_AFTER_WM="$(echo "$NEWER" | jq '[.[] | select((.text // "") | test("^\\s*🥋"))] | length')"
+  AGENT_AFTER_WM="$(echo "$NEWER" | $AJQ 'include "agent-authored"; [.[] | select(.text | agent_authored)] | length')"
 fi
 
 # Field deltas: live fields vs the previous segment's snapshot in versions/<gid>.jsonl.
@@ -118,9 +122,8 @@ BASELINE_TS=""
 DELTA_STATUS="unavailable: no prior field snapshot"
 LIVE_FIELDS="null"
 RESP=$(curl -sf --max-time 20 -H "Authorization: Bearer $TOKEN" \
-  "$API/tasks/$TASK_GID?opt_fields=name,completed,custom_fields.name,custom_fields.display_value" 2>/dev/null) \
-  && LIVE_FIELDS=$(echo "$RESP" | jq -c '{name: .data.name, completed: .data.completed}
-       + ([.data.custom_fields[]? | {(.name // "?"): (.display_value // null)}] | add // {})' 2>/dev/null) \
+  "$API/tasks/$TASK_GID?opt_fields=name,completed,custom_fields.gid,custom_fields.name,custom_fields.display_value" 2>/dev/null) \
+  && LIVE_FIELDS=$(echo "$RESP" | task_field_snapshot 2>/dev/null) \
   || LIVE_FIELDS="null"
 [[ -n "$LIVE_FIELDS" ]] || LIVE_FIELDS="null"
 
@@ -134,14 +137,14 @@ elif [[ -f "$VERSIONS_FILE" ]]; then
   BASELINE=$(echo "$SNAPS" | jq -c 'last // empty')
   if [[ -n "$BASELINE" ]]; then
     BASELINE_TS=$(echo "$BASELINE" | jq -r '.ts')
-    # agent_on_complete is never scope: finalize's on-complete step is its only
-    # reader, so a change to it is not reported here.
-    FIELD_DELTAS=$(jq -nc \
-      --argjson old "$(echo "$BASELINE" | jq -c '.fields')" \
-      --argjson new "$LIVE_FIELDS" \
-      '[ (($old | keys) + ($new | keys) | unique)[]
-         | select(. != "agent_on_complete" and $old[.] != $new[.])
-         | {field: ., was: $old[.], now: $new[.]} ]' 2>/dev/null || echo "[]")
+    # lib/task-fields.sh owns the delta rule: registered fields only, never_delta
+    # fields dropped (agent_on_complete has its own reader), run parameters
+    # tagged, and a field whose live value is exactly the orch's own last write
+    # (orch-field-writes ledger, e.g. the Repo sync at Complete) dropped.
+    FW_LEDGER="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/orch-field-writes/$TASK_GID.jsonl"
+    ORCH_WRITES="{}"
+    [[ -s "$FW_LEDGER" ]] && ORCH_WRITES=$(jq -cs 'reduce .[] as $w ({}; . + {($w.field): ($w.values | sort)})' "$FW_LEDGER" 2>/dev/null || echo "{}")
+    FIELD_DELTAS=$(task_field_deltas "$(echo "$BASELINE" | jq -c '.fields')" "$LIVE_FIELDS" "$ORCH_WRITES" 2>/dev/null || echo "[]")
     DELTA_STATUS="ok"
   fi
 fi
@@ -155,26 +158,10 @@ if command -v gh >/dev/null 2>&1; then
   GH_STATUS="ok"
   GH_USER=$(gh api user -q .login 2>/dev/null || true)
   [[ -n "$GH_USER" ]] || GH_STATUS="unavailable: gh auth failed"
-  PR_URLS=$(echo "$ATT" | jq -r '[.data[] | .view_url // "" | select(test("github\\.com/.+/pull/[0-9]+$"))] | unique | .[]' 2>/dev/null || true)
-  # view_url needs its own fetch when the first attachments call lacked it.
-  if [[ -z "$PR_URLS" ]]; then
-    ATT2="$(curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" \
-      "$API/tasks/$TASK_GID/attachments?opt_fields=view_url" 2>/dev/null || true)"
-    PR_URLS=$(echo "$ATT2" | jq -r '[.data[]? | .view_url // "" | select(test("github\\.com/.+/pull/[0-9]+$"))] | unique | .[]' 2>/dev/null || true)
-  fi
-  # SUBTASK attachments too: multi-repo runs attach PRs to a subtask per repo
-  # (one-shot multi-repo-subtasks), so a parent-only sweep saw ZERO GitHub
-  # scope on exactly those tasks (found 2026-08-20 testing on the zano/xmr
-  # task: threads, bots, and review bodies were all silently unguarded for
-  # every multi-repo task). Best-effort: a failed fetch just adds nothing.
-  SUBT="$(curl -sS --max-time 20 -H "Authorization: Bearer $TOKEN" \
-    "$API/tasks/$TASK_GID/subtasks?opt_fields=gid" 2>/dev/null || true)"
-  for SGID in $(echo "$SUBT" | jq -r '.data[]?.gid // empty' 2>/dev/null); do
-    SATT="$(curl -sS --max-time 20 -H "Authorization: Bearer $TOKEN" \
-      "$API/tasks/$SGID/attachments?opt_fields=view_url" 2>/dev/null || true)"
-    SURLS=$(echo "$SATT" | jq -r '[.data[]? | .view_url // "" | select(test("github\\.com/.+/pull/[0-9]+$"))] | unique | .[]' 2>/dev/null || true)
-    [[ -n "$SURLS" ]] && PR_URLS=$(printf '%s\n%s\n' "$PR_URLS" "$SURLS" | grep -v '^$' | sort -u)
-  done
+  # Task AND subtask attachments (lib/task-pr-urls.sh): multi-repo runs
+  # attach PRs to a subtask per repo, so a parent-only sweep left threads,
+  # bots and review bodies unguarded on exactly those tasks.
+  PR_URLS=$(task_pr_urls "$TASK_GID" "$ATT")
   if [[ "$GH_STATUS" == "ok" ]]; then
     while IFS= read -r url; do
       [[ -n "$url" ]] || continue
@@ -207,31 +194,45 @@ if command -v gh >/dev/null 2>&1; then
           fi
         fi
         PRJ=$(jq -c --argjson ub "${UNANSWERED:-0}" --argjson ul "${UN_LIST:-[]}" '. + {unanswered_bodies: $ub, unanswered: $ul}' <<<"$PRJ")
-        # Reviewer-bot check-run state on the ready HEAD: Complete without the
-        # bots having run-and-concluded there is the cohort's repeat A3 FAIL
-        # class (2026-08-06). Count each required bot that is missing or not
-        # completed success/skipped. watch-pr's reviewer-unavailable waiver
-        # (/tmp/agent-bot-unavailable-<gid>) exempts genuine outages at the gate.
+        # Reviewer-bot state on the ready HEAD: Complete without the bots having
+        # run-and-concluded there is the cohort's repeat A3 FAIL class
+        # (2026-08-06). Count each reviewer whose verdict (lib/reviewer-bots.sh,
+        # the same reading watch-pr uses) is pending or unavailable; clean and
+        # findings both concluded (findings are gated as threads). An
+        # unavailable bot that watch-pr recorded on THIS head
+        # (/tmp/agent-bot-unavailable-<gid> names the bot and the head's first
+        # 12 chars) is an outage, not missing work: it moves to bots_waived and
+        # out of the count. This count is the ONE reading the Complete gate and
+        # the completion judge share; a judge that saw the raw count denied
+        # outages and runs slept to manufacture a wait. A waiver for an older
+        # head never covers a new one.
         HEADSHA=$(jq -r '.head' <<<"$PRJ")
-        BOTS_INCOMPLETE=0
+        BOTS_INCOMPLETE=0; BOTS_WAIVED="[]"
         if [[ "$(jq -r '.owned' <<<"$PRJ")" == "true" && -n "$HEADSHA" ]]; then
-          CRS=$(gh api "repos/$OWNER/$RNAME/commits/$HEADSHA/check-runs" \
-            --jq '[.check_runs[] | {name, st: .status, c: (.conclusion // "")}]' 2>/dev/null || echo "[]")
-          for BOT in "Cursor Bugbot" "Cursor Security"; do
-            OK=$(jq --arg b "$BOT" '[.[] | select(.name | startswith($b)) | select(.st == "completed" and (.c == "success" or .c == "skipped"))] | length' <<<"$CRS" 2>/dev/null || echo 0)
-            [[ "${OK:-0}" -gt 0 ]] || BOTS_INCOMPLETE=$((BOTS_INCOMPLETE + 1))
-          done
+          VERDICTS=$(reviewer_bot_verdicts "$OWNER/$RNAME" "$NUM" "$(reviewer_checks_rest "$OWNER/$RNAME" "$HEADSHA")")
+          WAIVER_FILE="/tmp/agent-bot-unavailable-$TASK_GID"
+          while IFS=$'\t' read -r BOT VERDICT; do
+            [[ -n "$BOT" ]] || continue
+            [[ "$VERDICT" == "clean" || "$VERDICT" == "findings" ]] && continue
+            if [[ "$VERDICT" == "unavailable" && -s "$WAIVER_FILE" ]] && grep -F "HEAD ${HEADSHA:0:12} " "$WAIVER_FILE" | grep -qF "$BOT("; then
+              BOTS_WAIVED=$(jq -c --arg b "$BOT" '. + [$b]' <<<"$BOTS_WAIVED")
+            else
+              BOTS_INCOMPLETE=$((BOTS_INCOMPLETE + 1))
+            fi
+          done < <(jq -r '.[] | [.bot, .verdict] | @tsv' <<<"$VERDICTS" 2>/dev/null)
         fi
-        PRJ=$(jq -c --argjson bi "$BOTS_INCOMPLETE" '. + {bots_incomplete: $bi}' <<<"$PRJ")
+        PRJ=$(jq -c --argjson bi "$BOTS_INCOMPLETE" --argjson bw "$BOTS_WAIVED" '. + {bots_incomplete: $bi, bots_waived: $bw}' <<<"$PRJ")
         GH_SCOPE=$(jq -c --argjson p "$PRJ" '. + [$p]' <<<"$GH_SCOPE")
       fi
     done <<<"$PR_URLS"
     GH_BLOCKING=$(jq '[.[] | select(.owned) | .unresolved | length] | add // 0' <<<"$GH_SCOPE")
     GH_BOTS_INCOMPLETE=$(jq '[.[] | select(.owned) | .bots_incomplete // 0] | add // 0' <<<"$GH_SCOPE")
+    GH_BOTS_WAIVED=$(jq -c '[.[] | select(.owned) | .bots_waived[]? as $b | "\($b) on \(.url) HEAD \(.head[0:12])"]' <<<"$GH_SCOPE")
     GH_UNANSWERED=$(jq '[.[] | select(.owned) | .unanswered_bodies // 0] | add // 0' <<<"$GH_SCOPE")
   fi
 fi
 GH_UNANSWERED="${GH_UNANSWERED:-0}"
+GH_BOTS_WAIVED="${GH_BOTS_WAIVED:-[]}"
 
 # SEGMENT scope (completion judge, 2026-09-10): the asks that re-armed THIS segment
 # are the operator comments newer than the newest report attached BEFORE the segment
@@ -252,14 +253,14 @@ MARKER="/tmp/agent-followup-scope-$TASK_GID.json"
 jq -n \
   --arg segment_start "$SEG_START" \
   --arg segment_watermark "$SEG_WATERMARK" \
-  --argjson segment_comments "$(echo "$SEG_NEWER" | jq --arg op "$OP_GID" '[.[] | {created_at, by: (.created_by.name // "?"), authored: (if ((.text // "") | test("^🥋") and test("👊$")) then "agent" elif (.created_by.gid == $op) then "operator" else "other" end), text: (.text // "")}]')" \
+  --argjson segment_comments "$(echo "$SEG_NEWER" | $AJQ --arg op "$OP_GID" 'include "agent-authored"; [.[] | {created_at, by: (.created_by.name // "?"), authored: authored_class($op), text: (.text // "")}]')" \
   --arg gid "$TASK_GID" \
   --arg checked_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --arg watermark "$WATERMARK" \
   --arg newest_comment_at "$NEWEST_COMMENT_AT" \
   --argjson newer_count "$NEWER_COUNT" \
   --argjson agent_after_wm "$AGENT_AFTER_WM" \
-  --argjson comments "$(echo "$NEWER" | jq --arg op "$OP_GID" '[.[] | {created_at, by: (.created_by.name // "?"), authored: (if ((.text // "") | test("^🥋") and test("👊$")) then "agent" elif (.created_by.gid == $op) then "operator" else "other" end), text: (.text // "")}]')" \
+  --argjson comments "$(echo "$NEWER" | $AJQ --arg op "$OP_GID" 'include "agent-authored"; [.[] | {created_at, by: (.created_by.name // "?"), authored: authored_class($op), text: (.text // "")}]')" \
   --arg delta_status "$DELTA_STATUS" \
   --arg baseline_ts "$BASELINE_TS" \
   --argjson field_deltas "$FIELD_DELTAS" \
@@ -268,10 +269,11 @@ jq -n \
   --argjson gh_blocking "$GH_BLOCKING" \
   --argjson gh_bots_incomplete "${GH_BOTS_INCOMPLETE:-0}" \
   --argjson gh_unanswered "${GH_UNANSWERED:-0}" \
+  --argjson gh_bots_waived "$GH_BOTS_WAIVED" \
   '{task_gid: $gid, checked_at: $checked_at, watermark: $watermark, newest_comment_at: $newest_comment_at, newer_count: $newer_count, agent_comments_after_watermark: $agent_after_wm, comments: $comments,
     segment_start: $segment_start, segment_watermark: $segment_watermark, segment_comments: $segment_comments,
     field_delta_status: $delta_status, field_baseline_ts: $baseline_ts, field_deltas: $field_deltas,
-    github_status: $gh_status, github_prs: $gh_scope, github_blocking_threads: $gh_blocking, github_bots_incomplete: $gh_bots_incomplete, github_unanswered_bodies: $gh_unanswered}' \
+    github_status: $gh_status, github_prs: $gh_scope, github_blocking_threads: $gh_blocking, github_bots_incomplete: $gh_bots_incomplete, github_bots_waived: $gh_bots_waived, github_unanswered_bodies: $gh_unanswered}' \
   > "$MARKER"
 
 echo ">> check-followup-scope: task $TASK_GID"
@@ -284,7 +286,7 @@ if [[ "$NEWER_COUNT" -eq 0 ]]; then
   echo ">>   0 comments newer than the watermark — no new comment scope"
 else
   echo ">>   $NEWER_COUNT comment(s) NEWER than the watermark — read all of them; the parts addressed to the run are its scope, clauses handed to someone else are context (followup-scope-is-the-deliverable):"
-  echo "$NEWER" | jq -r --arg op "$OP_GID" '.[] | "     [\(.created_at)] [\(if ((.text // "") | test("^🥋") and test("👊$")) then "agent" elif (.created_by.gid == $op) then "operator" else "other" end)] \(.created_by.name // "?"): \(.text // "" | gsub("\n"; "\n       "))"'
+  echo "$NEWER" | $AJQ -r --arg op "$OP_GID" 'include "agent-authored"; .[] | "     [\(.created_at)] [\(authored_class($op))] \(.created_by.name // "?"): \(.text // "" | gsub("\n"; "\n       "))"'
 fi
 if [[ "$AGENT_AFTER_WM" -gt 0 ]]; then
   echo ">>   $AGENT_AFTER_WM AGENT-authored comment(s) postdate the report attachment — the watermark is not last, so these are invisible to the next run's scope check. Re-attach the report (same file: its iteration ordinal stays stable) so the watermark lands last; Complete is gate-blocked until a re-check records zero."
@@ -311,7 +313,10 @@ if [[ "$GH_STATUS" == "ok" ]]; then
       | (if $ao > 0 then "     \($ao) of them await the owner (not our PR, our comment is the last word): no action owed, not listed" else empty end),
         (.unresolved[] | select(.awaiting_owner | not) | "     [\(.at)] \(.by): \(.text | gsub("\\s+"; " ") | .[0:160])")' <<<"$GH_SCOPE"
     if [[ "${GH_BOTS_INCOMPLETE:-0}" -gt 0 ]]; then
-      echo ">>   $GH_BOTS_INCOMPLETE reviewer-bot check(s) missing/incomplete on OWNED ready PR HEAD(s) — Complete is gate-blocked until they run and conclude (flip ready re-triggers them; a genuine bot outage is waived by watch-pr's reviewer-unavailable marker)."
+      echo ">>   $GH_BOTS_INCOMPLETE reviewer-bot check(s) missing/incomplete on OWNED ready PR HEAD(s) — Complete is gate-blocked until they run and conclude (flip ready re-triggers them; run watch-pr.sh on the PR: when a bot is genuinely unavailable it records that for this HEAD and the next check stops counting it)."
+    fi
+    if [[ "$(jq 'length' <<<"$GH_BOTS_WAIVED")" -gt 0 ]]; then
+      echo ">>   reviewer bot(s) unavailable per watch-pr, waived for their HEAD: $(jq -r 'join("; ")' <<<"$GH_BOTS_WAIVED"). No wait owed: the unchecked reviewer box in the Finalize Gate is the whole record."
     fi
     if [[ "$GH_BLOCKING" -gt 0 ]]; then
       echo ">>   $GH_BLOCKING unresolved thread(s) on OWNED PR(s) — THIS RUN'S SCOPE regardless of Asana silence (a human review IS the re-arm reason; scope lives where the reviewer wrote it). Address per pr-address reply-then-resolve; Complete is gate-blocked until a re-check records zero."

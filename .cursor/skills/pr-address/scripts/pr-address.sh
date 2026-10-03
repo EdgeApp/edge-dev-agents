@@ -793,8 +793,7 @@ case "$CMD" in
     ;;
 
   autosquash)
-    DEFAULT_UPSTREAM=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
-      || echo "origin/$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')")
+    DEFAULT_UPSTREAM=$("$HOME/.cursor/skills/git-default-branch.sh")
     ~/.cursor/skills/git-branch-ops.sh autosquash --merge-base-with "$DEFAULT_UPSTREAM"
     ;;
 

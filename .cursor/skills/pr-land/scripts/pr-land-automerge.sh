@@ -60,10 +60,12 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# The reviewer bots' check-run NAME prefixes, `|`-separated, matched with startswith.
-# Same prefixes watch-pr.sh gates on, so a land can never arm over a reviewer the
-# Complete gate then refuses.
-REVIEWER_CHECK_PATTERN="${REVIEWER_CHECK_PATTERN:-Cursor Bugbot|Cursor Security}"
+# The reviewer bots' check-run NAME prefixes (REVIEWER_CHECK_PATTERN), from the
+# shared lib watch-pr.sh and the Complete gate read, so a land can never arm over
+# a reviewer the Complete gate then refuses.
+# shellcheck source=/dev/null
+source "$HOME/.config/agent-watcher/lib/reviewer-bots.sh" \
+  || { echo "ERROR: missing ~/.config/agent-watcher/lib/reviewer-bots.sh" >&2; exit 2; }
 COMMENTS_SH="$HOME/.cursor/skills/pr-land/scripts/pr-land-comments.sh"
 
 INPUT="$(cat)"

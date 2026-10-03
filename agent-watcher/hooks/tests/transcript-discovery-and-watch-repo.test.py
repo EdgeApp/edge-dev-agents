@@ -168,6 +168,9 @@ exit 0
 wdir = tempfile.mkdtemp(prefix='watch-pr-stubs-')
 bindir = os.path.join(wdir, 'bin')
 os.makedirs(bindir)
+# watch-pr runs with HOME=wdir; give it the real shared reviewer lib.
+os.makedirs(os.path.join(wdir, '.config', 'agent-watcher'))
+os.symlink(os.path.join(HOME, '.config', 'agent-watcher', 'lib'), os.path.join(wdir, '.config', 'agent-watcher', 'lib'))
 for name, body in (('gh', GH_STUB), ('curl', CURL_STUB)):
     path = os.path.join(bindir, name)
     with open(path, 'w') as fh:
@@ -233,6 +236,9 @@ BUGBOT_SKIPPED = json.dumps([{'name': 'Travis CI - Pull Request', 'bucket': 'pas
                              {'name': 'Cursor Bugbot', 'bucket': 'skipping'},
                              {'name': 'Cursor Security Agent: Security Reviewer', 'bucket': 'pass'}])
 NEITHER = json.dumps([{'name': 'Travis CI - Pull Request', 'bucket': 'pass'}])
+BUGBOT_NEUTRAL = json.dumps([{'name': 'Travis CI - Pull Request', 'bucket': 'pass', 'state': 'SUCCESS'},
+                             {'name': 'Cursor Bugbot', 'bucket': 'skipping', 'state': 'NEUTRAL'},
+                             {'name': 'Cursor Security Agent: Security Reviewer', 'bucket': 'pass', 'state': 'SUCCESS'}])
 
 p = watch(['--pr', '6021', '--repo', 'EdgeApp/edge-react-gui', '--task-gid', GID], checks=GREEN)
 check('both reviewer bots clean: plain green, no unavailable note',
@@ -248,6 +254,18 @@ p = watch(['--pr', '6021', '--repo', 'EdgeApp/edge-react-gui', '--task-gid', GID
           checks=BUGBOT_SKIPPED, STUB_REVIEW_COUNT=1)
 check('one reviewer skipped, the other clean: the per-login review probe cannot clear it',
       'reviewer-unavailable:Cursor Bugbot(check-run skipped)' in p.stdout, p.stdout)
+
+p = watch(['--pr', '6021', '--repo', 'EdgeApp/edge-react-gui', '--task-gid', GID],
+          checks=BUGBOT_NEUTRAL, STUB_REVIEW_COUNT=1)
+check('bugbot neutral with a review on HEAD: findings, not an outage, and no waiver',
+      'RESULT: green' in p.stdout and 'reviewer-unavailable' not in p.stdout
+      and 'reviewer findings on HEAD: Cursor Bugbot(check-run neutral)' in p.stderr
+      and not os.path.exists(WAIVER), p.stdout + p.stderr)
+
+p = watch(['--pr', '6021', '--repo', 'EdgeApp/edge-react-gui', '--task-gid', GID],
+          checks=BUGBOT_NEUTRAL, STUB_REVIEW_COUNT=0)
+check('neutral with nothing posted: unavailable (the 4-second security-reviewer case)',
+      'reviewer-unavailable:Cursor Bugbot(check-run neutral)' in p.stdout, p.stdout)
 
 p = watch(['--pr', '6021', '--repo', 'EdgeApp/edge-react-gui', '--task-gid', GID],
           checks=NEITHER, STUB_REVIEW_COUNT=1)

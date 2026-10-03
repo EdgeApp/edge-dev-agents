@@ -42,6 +42,7 @@ MOVE_TO_SECTION=""
 SET_PRIORITY=""
 SET_RELEASE=""
 SET_DEVELOPER_GID=""
+SET_REPOS=""
 
 CREATE_SUBTASK=false
 SUBTASK_NAME=""
@@ -91,6 +92,7 @@ while [[ $# -gt 0 ]]; do
     --set-priority) SET_PRIORITY="$2"; shift 2 ;;
     --set-release) SET_RELEASE="$2"; shift 2 ;;
     --set-developer) SET_DEVELOPER_GID="$2"; shift 2 ;;
+    --set-repos) SET_REPOS="$2"; shift 2 ;;
     *) echo "Unknown flag: $1" >&2; exit 1 ;;
   esac
 done
@@ -100,7 +102,7 @@ if [[ -z "$TASK_GID" ]]; then
   exit 1
 fi
 
-if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$MOVE_TO_SECTION" ]] && [[ -z "$SET_PRIORITY" ]] && [[ -z "$SET_RELEASE" ]] && [[ -z "$SET_DEVELOPER_GID" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$SET_NOTES_FILE" ]] && [[ -z "$COMMENT_FILE" ]] && [[ -z "$DELETE_COMMENT_GID" ]] && [[ -z "$EDIT_COMMENT_GID" ]]; then
+if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$MOVE_TO_SECTION" ]] && [[ -z "$SET_PRIORITY" ]] && [[ -z "$SET_RELEASE" ]] && [[ -z "$SET_DEVELOPER_GID" ]] && [[ -z "$SET_REPOS" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$SET_NOTES_FILE" ]] && [[ -z "$COMMENT_FILE" ]] && [[ -z "$DELETE_COMMENT_GID" ]] && [[ -z "$EDIT_COMMENT_GID" ]]; then
   echo "Error: No operations specified" >&2
   exit 1
 fi
@@ -200,6 +202,35 @@ asana_request() {
 # prepended to the delimiter line must not hide a stale section from the strip.
 CURRENT_STATE_DELIM="===== CURRENT STATE (agent-maintained; supersedes any stale prose above) ====="
 
+# QA: subtasks are read by non-technical testers who never open GitHub. Refuse
+# developer artifacts in the title or body: PR references, GitHub links, commit
+# hashes, branch/merge/publish vocabulary, package names, source paths. Hex runs
+# need a letter AND a digit and stop at 40 chars, so 0x addresses and 64-char
+# txids (sometimes legitimately quoted to a tester) pass. Exit 1 lists each hit.
+qa_plain_language_check() {
+  local hits
+  hits="$(printf '%s\n%s\n' "$1" "$2" | node -e '
+    const pats = [
+      /github\.com/i, /\bPR\s*#?\d+/i, /\bpull request/i,
+      /\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b/,
+      /\b(commits?|merged?|branch(es)?|rebase|cherry-pick(ed)?|npm|changelog|repo(sitory)?|(un)?published|master)\b/i,
+      /\bedge-[a-z]+(-[a-z]+)+\b/, /\bsrc\/|\.tsx?\b/
+    ];
+    const lines = require("fs").readFileSync(0, "utf8").split("\n");
+    lines.forEach((line, i) => {
+      for (const re of pats) {
+        const m = line.match(re);
+        if (m) { console.log(`  line ${i + 1}: "${m[0]}"`); break; }
+      }
+    });
+  ')"
+  if [[ -n "$hits" ]]; then
+    echo "Error: QA_NOT_PLAIN: '${QA_SUBTASK_PREFIX}' subtasks are read by non-technical testers (pr-land qa-subtasks-before-handoff). Remove the developer detail below; name the build by app version:" >&2
+    printf '%s\n' "$hits" >&2
+    exit 1
+  fi
+}
+
 # --create-subtask: create a subtask under --task, print its gid, and re-point
 # TASK_GID to it so any --attach-pr/--set-board-state in the SAME invocation lands on
 # the new subtask (one call: make the per-PR subtask AND attach its PR).
@@ -215,6 +246,9 @@ if $CREATE_SUBTASK; then
       echo "Error: --subtask-notes must not carry a CURRENT STATE section (write plain steps and expected results)" >&2; exit 1
     fi
   fi
+  if [[ "$SUBTASK_NAME" == "$QA_SUBTASK_PREFIX"* ]]; then
+    qa_plain_language_check "$SUBTASK_NAME" "$SUB_NOTES"
+  fi
   SUB_GID="$(jq -n --arg n "$SUBTASK_NAME" --arg notes "$SUB_NOTES" '{data: ({name: $n} + (if $notes == "" then {} else {notes: $notes} end))}' \
     | curl -sS -X POST "$ASANA_API/tasks/$TASK_GID/subtasks" \
     -H "Authorization: Bearer $ASANA_TOKEN" -H "Content-Type: application/json" -d @- \
@@ -228,10 +262,14 @@ fi
 # written here: a task GET also lists workspace-global fields from other boards
 # (the old Status / Reviewer / Implementor / Planned set), and Asana refuses a
 # whole PUT that names a field outside the task's projects.
-BOARD_STATE_FIELD="1213992584300456"
-PRIORITY_FIELD="1213843686985522"
-RELEASE_FIELD="1213939602865824"
-DEVELOPER_FIELD="1214028561571290"
+# Gids from the field registry (asana-config.json custom_fields), the one copy.
+_field_gid() { jq -r --arg k "$1" '.custom_fields[$k].gid // empty' "$HOME/.config/agent-watcher/asana-config.json" 2>/dev/null; }
+BOARD_STATE_FIELD="$(_field_gid board_state)"
+PRIORITY_FIELD="$(_field_gid priority)"
+RELEASE_FIELD="$(_field_gid release)"
+DEVELOPER_FIELD="$(_field_gid developer)"
+[[ -n "$BOARD_STATE_FIELD" && -n "$PRIORITY_FIELD" && -n "$RELEASE_FIELD" && -n "$DEVELOPER_FIELD" ]] \
+  || { echo "Error: field gids missing from ~/.config/agent-watcher/asana-config.json custom_fields" >&2; exit 1; }
 
 # Resolve an enum option to its gid by NAME, from the field's OWN enum_options
 # on this task. Never from a hand-maintained table: the operator adds and renames
@@ -625,6 +663,57 @@ fi
 if [[ -n "$SET_DEVELOPER_GID" ]]; then
   CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --arg k "$DEVELOPER_FIELD" --arg v "$SET_DEVELOPER_GID" '. + {($k): [$v]}')
 fi
+# --set-repos <csv>: make the Repo multi-enum name exactly these repos, adding
+# and removing options. Each item is a GitHub repo name (mapped through
+# asana-config custom_fields.repo.github_repo_options, the one copy of that
+# map) or an option name. Only MANAGED options (the map's values) are ever
+# removed: an option the map does not cover was set by a person for a reason
+# this script cannot see, so it stays. An unmapped repo or a missing option is
+# reported and skipped, never created. The written value is recorded in the
+# orch field-write ledger so the next segment's field-delta check does not
+# read the orch's own write as operator intent.
+REPO_WRITE=""
+if [[ -n "$SET_REPOS" ]]; then
+  AW_CONFIG="$HOME/.config/agent-watcher/asana-config.json"
+  REPO_FIELD_NAME="$(jq -r '.custom_fields.repo.name // "Repo"' "$AW_CONFIG" 2>/dev/null || echo Repo)"
+  REPO_MAP="$(jq -c '.custom_fields.repo.github_repo_options // {}' "$AW_CONFIG" 2>/dev/null || echo '{}')"
+  asana_request "Task read (Repo field)" "$ASANA_API/tasks/$TASK_GID?opt_fields=custom_fields.gid,custom_fields.name,custom_fields.resource_subtype,custom_fields.multi_enum_values.gid,custom_fields.multi_enum_values.name,custom_fields.enum_options.gid,custom_fields.enum_options.name,custom_fields.enum_options.enabled" \
+    -H "Authorization: Bearer $ASANA_TOKEN" || exit 1
+  REPO_FIELD_JSON="$(printf '%s' "$ASANA_RESPONSE" | jq -c --arg n "$REPO_FIELD_NAME" \
+    'first(.data.custom_fields[]? | select(.name == $n and .resource_subtype == "multi_enum")) // empty')"
+  if [[ -z "$REPO_FIELD_JSON" ]]; then
+    echo ">> Repo: task $TASK_GID carries no \"$REPO_FIELD_NAME\" multi-enum field; skipped"
+  else
+    REPO_PLAN="$(jq -c --arg csv "$SET_REPOS" --argjson map "$REPO_MAP" '
+      . as $f
+      | ([$map[] | ascii_downcase]) as $managed
+      | [$csv | split(",")[] | gsub("^\\s+|\\s+$"; "") | select(. != "") | sub("^.*/"; "")] as $items
+      | [$items[] | . as $i | ($map[$i] // $i) as $o
+         | (first($f.enum_options[]? | select(.enabled != false) | select((.name | ascii_downcase) == ($o | ascii_downcase))) // null) as $hit
+         | {item: $i, opt: ($hit.name // $o), gid: ($hit.gid // null)}] as $want
+      | [$want[] | select(.gid != null)] as $found
+      | [$found[].gid] as $want_gids
+      | [$f.multi_enum_values[]?] as $cur
+      | {field: $f.gid,
+         current: [$cur[].gid],
+         current_names: [$cur[].name],
+         add: ([$found[] | select(.gid as $g | [$cur[].gid] | index($g) | not) | .opt] | unique),
+         remove: [$cur[] | select((.name | ascii_downcase) as $n | $managed | index($n)) | select(.gid as $g | $want_gids | index($g) | not) | .name],
+         keep: [$cur[] | select(.gid as $g | $want_gids | index($g) | not) | select((.name | ascii_downcase) as $n | $managed | index($n) | not)],
+         want: $found,
+         skipped: ([$want[] | select(.gid == null) | .item] | unique)}
+      | . + {target: ([.keep[].gid] + [.want[].gid] | unique),
+             names: ([.keep[].name] + [.want[].opt] | unique)}' <<<"$REPO_FIELD_JSON")"
+    REPO_SKIPPED="$(jq -r '.skipped | join(", ")' <<<"$REPO_PLAN")"
+    [[ -n "$REPO_SKIPPED" ]] && echo ">> Repo: no option for $REPO_SKIPPED (not in custom_fields.repo.github_repo_options, not an option name); skipped"
+    if [[ "$(jq '(.add | length) + (.remove | length)' <<<"$REPO_PLAN")" -eq 0 ]]; then
+      echo ">> Repo: unchanged ($(jq -r '.current_names | join(", ")' <<<"$REPO_PLAN"))"
+    else
+      CUSTOM_FIELDS_PATCH=$(echo "$CUSTOM_FIELDS_PATCH" | jq --argjson p "$REPO_PLAN" '. + {($p.field): $p.target}')
+      REPO_WRITE="$(jq -c '{add, remove, names}' <<<"$REPO_PLAN")"
+    fi
+  fi
+fi
 
 UPDATE_BODY='{"data":{}}'
 HAS_UPDATE=false
@@ -668,6 +757,15 @@ if [[ -n "$SET_RELEASE" ]]; then
 fi
 if [[ -n "$SET_DEVELOPER_GID" ]]; then
   echo ">> Developer field: set"
+fi
+if [[ -n "$REPO_WRITE" ]]; then
+  echo ">> Repo: added [$(jq -r '.add | join(", ")' <<<"$REPO_WRITE")], removed [$(jq -r '.remove | join(", ")' <<<"$REPO_WRITE")] (now: $(jq -r '.names | join(", ")' <<<"$REPO_WRITE"))"
+  # Orch field-write ledger: check-followup-scope.sh drops a field delta whose
+  # new value is exactly what the orch wrote last.
+  FW_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/orch-field-writes"
+  mkdir -p "$FW_DIR" 2>/dev/null \
+    && jq -cn --arg f "$REPO_FIELD_NAME" --argjson w "$REPO_WRITE" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+         '{field: $f, values: $w.names, ts: $ts}' >> "$FW_DIR/$TASK_GID.jsonl" 2>/dev/null || true
 fi
 
 # --move-to-section "<name>": move the task into a section of the jon-claude

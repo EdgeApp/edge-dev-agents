@@ -177,7 +177,7 @@ if [ -n "$NEEDS_MODE" ]; then
     fi
   fi
   if [ "$MODE" = "preserve" ] && [ "$GBO_OP" = "push" ]; then
-    UPSTREAM=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/master)
+    UPSTREAM=$("$HOME/.cursor/skills/git-default-branch.sh" 2>/dev/null || echo origin/master)
     MB=$(git merge-base "$UPSTREAM" HEAD 2>/dev/null || true)
     # Capture first: `git log | grep -q` dies of SIGPIPE under pipefail.
     SUBJECTS=$([ -n "$MB" ] && git log "$MB..HEAD" --format=%s 2>/dev/null || true)

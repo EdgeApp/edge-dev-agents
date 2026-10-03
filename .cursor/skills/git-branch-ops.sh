@@ -195,18 +195,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# The repo's default branch, from the one shared resolver.
 resolve_default_upstream() {
-  local upstream
-  upstream="$(
-    git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
-      || echo "origin/$(git remote show origin 2>/dev/null | sed -n '/HEAD branch/s/.*: //p')" \
-      || echo "origin/master"
-  )"
-  if [[ -z "$upstream" || "$upstream" == "origin/" ]]; then
-    echo "origin/master"
-  else
-    echo "$upstream"
-  fi
+  "$HOME/.cursor/skills/git-default-branch.sh" 2>/dev/null || echo "origin/master"
 }
 
 # Fill BASE from --base, --merge-base-with, or the default upstream's merge base.

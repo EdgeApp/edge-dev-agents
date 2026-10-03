@@ -39,14 +39,7 @@ esac
 # touches no docs at all. Ownership is the branch diff: a doc this branch added
 # or modified since it left its base. Most-recently-committed still wins when one
 # branch carries several.
-BASE_REF=""
-for cand in \
-  "$(git -C "$REPO_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)" \
-  origin/develop origin/main origin/master
-do
-  [ -n "$cand" ] || continue
-  if git -C "$REPO_DIR" rev-parse --verify --quiet "$cand" >/dev/null 2>&1; then BASE_REF="$cand"; break; fi
-done
+BASE_REF="$("$HOME/.cursor/skills/git-default-branch.sh" -C "$REPO_DIR" 2>/dev/null || true)"
 
 MERGE_BASE=""
 if [ -n "$BASE_REF" ]; then

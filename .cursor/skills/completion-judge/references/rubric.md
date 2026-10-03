@@ -63,12 +63,12 @@ The bundle's "Segment scope" line decides what the bar is:
   | unanswered review bodies or top-level PR comments on an owned PR | reply to each and mark it addressed | `github_unanswered_bodies` reads zero |
   | reviewDecision CHANGES_REQUESTED | the two rows above, then ready for re-review | counters zero; Complete means "ready for re-review", never "re-approved" |
   | reviewDecision APPROVED with checks green | land per the landing rules | PR MERGED or auto-merge armed |
-  | a failing or missing check on HEAD | fix the failure, or wait the bots out | checks green or completed on HEAD; a reviewer-bot outage is one unchecked Finalize Gate box |
-  | reviewer bots incomplete on a ready HEAD | let them run and conclude | `github_bots_incomplete` reads zero |
+  | a failing or missing check on HEAD | fix the failure | checks green or completed on HEAD |
+  | reviewer bots incomplete on a ready HEAD | let them run and conclude | `github_bots_incomplete` reads zero. That count already excludes bots listed in `github_bots_waived` (an outage watch-pr recorded on this HEAD): a waived bot is delivered as one unchecked Finalize Gate box, and no wait, retrigger or outage confirmation is owed for it |
   | threads on a PR the run does NOT own | reply only, no resolving, no Complete on their behalf | replies present; the thread count is not this segment's to zero |
 
-  Fields that are run parameters, not asks: agent_model, agent_effort, agent_lane,
-  Priority, LOE, Estimate, assignee, Board State, agent_status, blocked. When nothing
+  A delta the bundle marks "(run parameter, not an ask)" is never an ask (the list
+  lives in asana-config `task_fields.run_params`); neither is an assignee change. When nothing
   in the deltas, the PR record or the counters names an outcome, the segment's only
   ask is a clean re-finalize of the existing PR; do not invent one. A signal you cannot
   map is out of scope, never a fail.
@@ -164,10 +164,10 @@ honest only when the Testing section shows nothing had a runtime surface; a Task
 run that drove the sim reports `pass`/`partial`/`not-run` like any other.
 
 ### J4 tested-field-accuracy (C)
-The task's `tested` value matches the evidence: `iOS Sim` only with a pixel-verified
-in-app drive on the iOS sim (proof frames present, attempt-log success); `Android
-Sim` / `Android Device` only with the matching drive; `Unit Tests` only when a suite
-executed; `Untested` when nothing ran. A credited value with no artifact is a `fail`.
+The task's `tested` value matches the evidence: each credited option needs the
+artifact its definition names in the "`tested` options" block attached below
+(verbatim from set-tested.sh, the one definition), and `Untested` is never combined
+with a real method. A credited value with no artifact is a `fail`.
 
 ### J5 deferral-validity (C, P, B)
 A deferral is a fail ONLY when it defers something one of THIS SEGMENT'S asks
@@ -205,7 +205,7 @@ entry is a `fail`).
 ### J8 visual-proof (C, P)
 When the change alters something a user sees (a row, badge, spinner, empty state,
 copy, layout), a captured frame of that surface exists among the proof frames (a
-`*-HACKED-*` frame when the state had to be forced). Logic-only evidence for a visual
+frame the bundle lists under "hack-forced frames" when the state had to be forced). Logic-only evidence for a visual
 change is a `fail` with the hack-verify recipe as `what_to_do`. `na` when the change
 has no visual surface.
 

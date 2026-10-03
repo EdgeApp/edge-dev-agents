@@ -99,10 +99,9 @@ if [[ -n "$TOKEN" ]]; then
   # provider priority" by rename on 2026-08-05 with zero comments, invisible to
   # the custom-fields-only snapshot; rename stories are not comment_added).
   RESP=$(curl -sf --max-time 20 \
-    "https://app.asana.com/api/1.0/tasks/$GID?opt_fields=name,completed,custom_fields.name,custom_fields.display_value" \
+    "https://app.asana.com/api/1.0/tasks/$GID?opt_fields=name,completed,custom_fields.gid,custom_fields.name,custom_fields.display_value" \
     -H "Authorization: Bearer $TOKEN" 2>/dev/null) \
-    && FIELDS=$(echo "$RESP" | jq -c '{name: .data.name, completed: .data.completed}
-         + ([.data.custom_fields[]? | {(.name // "?"): (.display_value // null)}] | add // {})' 2>/dev/null) \
+    && FIELDS=$(source "$HOME/.config/agent-watcher/lib/task-fields.sh" && echo "$RESP" | task_field_snapshot 2>/dev/null) \
     || FIELDS="null"
   [[ -n "$FIELDS" ]] || FIELDS="null"
 fi

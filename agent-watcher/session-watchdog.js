@@ -162,7 +162,7 @@ const SESSION_PREFIX = 'claude-asana-'
 // them — freeing capacity — while the session stays alive and attachable for
 // inspection / remote re-engagement. pruneRetiredSessions() caps how many linger.
 const RETIRED_PREFIX = 'done-asana-'
-const WORKTREES_ROOT = path.join(HOME, 'git/.agent-worktrees')
+const WORKTREES_ROOT = require('./lib/worktree-root.js').worktreeRoot()
 const DEFAULT_KEEP_COMPLETED_SESSIONS = 3
 
 // Cache: token + status field GID read once per process run.

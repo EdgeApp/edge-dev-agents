@@ -54,6 +54,7 @@
 # phase slices and orch-only intake/completion steps. No session_id: no-op. Exit 0 allow, exit 2
 # block.
 set -uo pipefail
+. "$HOME/.config/agent-watcher/hooks/lib/completion-event.sh"  # one completion-event classifier
 
 INPUT=$(cat 2>/dev/null || true)
 CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
@@ -202,15 +203,14 @@ if [ -n "$(invocations 'log-attempt\.sh([[:space:]]|$)')" ] \
    && printf '%s' "$SEG_RAW" | grep -qE -- "--category[[:space:]=]+[\"']?(swap|send|sweep)([\"'[:space:]]|\$)"; then
   SEG_NEEDED="$SEG_NEEDED build-and-test:funding"
 fi
-# update-status.sh: --blocked is the blocked completion whatever status rides
-# with it; a plain Complete is the finalize gate.
+# update-status.sh: classified by the shared lib (lib/completion-event.sh), so a
+# blocked completion here is the same thing the completion judge calls one.
 US_TAIL=$(invocations 'update-status\.sh([[:space:]]|$)')
 if [ -n "$US_TAIL" ]; then
-  if printf '%s' "$US_TAIL" | grep -qE -- '--blocked'; then
-    SEG_NEEDED="$SEG_NEEDED one-shot:blocking"
-  elif printf '%s' "$US_TAIL" | grep -qE '[[:space:]]Complete([[:space:]]|$)'; then
-    SEG_NEEDED="$SEG_NEEDED $COMPLETE_UNIT"
-  fi
+  case "$(completion_event_text "$US_TAIL")" in
+    block) SEG_NEEDED="$SEG_NEEDED one-shot:blocking" ;;
+    complete) SEG_NEEDED="$SEG_NEEDED $COMPLETE_UNIT" ;;
+  esac
 fi
 }
 

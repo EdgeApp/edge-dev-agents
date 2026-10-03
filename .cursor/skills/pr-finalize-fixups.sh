@@ -172,10 +172,7 @@ if [[ "$MODE" == "preserve" && "$IS_OWNER" == "true" && -n "${AGENT_TASK_GID:-}"
   fi
 fi
 
-DEFAULT_UPSTREAM="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null \
-  || echo "origin/$(git remote show origin 2>/dev/null | sed -n '/HEAD branch/s/.*: //p')" \
-  || echo "origin/master")"
-[[ -z "$DEFAULT_UPSTREAM" || "$DEFAULT_UPSTREAM" == "origin/" ]] && DEFAULT_UPSTREAM="origin/master"
+DEFAULT_UPSTREAM="$("$HOME/.cursor/skills/git-default-branch.sh" 2>/dev/null || echo "origin/master")"
 MERGE_BASE="$(git merge-base "$DEFAULT_UPSTREAM" HEAD 2>/dev/null || true)"
 
 # Capture before grepping: under pipefail, `git log | grep -q` dies of SIGPIPE

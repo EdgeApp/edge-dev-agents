@@ -31,17 +31,15 @@
 # Escape hatch: /tmp/agent-tdd-current-waiver-<gid>.md explaining why the doc is
 # legitimately unchanged (audited by /eval-run; an unjustified note is a finding).
 set -euo pipefail
+source "$HOME/.config/agent-watcher/lib/worktree-root.sh"  # the one worktree-root resolver
 
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
-# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
-# backticked spans blanked): a command that merely QUOTES a trigger string --
-# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
-# argument extraction, where quoted values are load-bearing. Fail-open to the
-# raw command if the helper is unavailable.
-CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
-printf '%s' "$CMD_M" | grep -qE 'update-status\.sh[^|;&]*[[:space:]]Complete([[:space:]]|$)' || exit 0
+# Plain Complete only, per the shared classifier: a blocked completion is the
+# exit when the work cannot finish, so it does not owe a current TDD.
+source "$HOME/.config/agent-watcher/hooks/lib/completion-event.sh"
+[ "$(completion_event "$CMD")" = complete ] || exit 0
 
 [ -f "/tmp/agent-tdd-current-waiver-$AGENT_TASK_GID.md" ] && exit 0
 
@@ -50,7 +48,7 @@ FIELD=$("$HOME/.cursor/skills/asana-field-value.sh" "$AGENT_TASK_GID" "TDD?" 2>/
 [ "$FIELD" = "tdd" ] || exit 0
 
 # Locate the task's worktree (any repo under it that carries the doc).
-WT_ROOT="$HOME/git/.agent-worktrees/$AGENT_TASK_GID"
+WT_ROOT="$(task_worktree "$AGENT_TASK_GID")"
 [ -d "$WT_ROOT" ] || exit 0
 DOC=""; REPO_DIR=""
 for d in "$WT_ROOT"/*/; do
@@ -65,7 +63,7 @@ done
 BASE=$(git -C "$REPO_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || echo "origin/develop")
 # The branch's FIRST commit is measured from the DEFAULT branch, not @{upstream}
 # (after a push, origin/<branch>..HEAD would name the first unpushed commit).
-DEFAULT_UPSTREAM=$(git -C "$REPO_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo "origin/develop")
+DEFAULT_UPSTREAM=$("$HOME/.cursor/skills/git-default-branch.sh" -C "$REPO_DIR" 2>/dev/null || echo HEAD)
 FIRST_SHA=$(git -C "$REPO_DIR" rev-list --reverse "$(git -C "$REPO_DIR" merge-base "$DEFAULT_UPSTREAM" HEAD 2>/dev/null || echo HEAD)..HEAD" 2>/dev/null | head -1)
 STAMP_SH="$HOME/.cursor/skills/tdd/scripts/tdd-stamp.sh"
 DOC_REL="${DOC#$REPO_DIR}"; DOC_REL="${DOC_REL#/}"

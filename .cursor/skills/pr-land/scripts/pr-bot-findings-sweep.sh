@@ -38,8 +38,10 @@ while [ $# -gt 0 ]; do
 done
 [ ${#PRS[@]} -gt 0 ] || { echo "usage: pr-bot-findings-sweep.sh <repo#num> [more...] [--wait <secs>]" >&2; exit 2; }
 
-# Same reviewer prefixes the arming gate uses (pr-land-automerge.sh).
-REVIEWER_CHECK_PATTERN="${REVIEWER_CHECK_PATTERN:-Cursor Bugbot|Cursor Security}"
+# Same reviewer prefixes (REVIEWER_CHECK_PATTERN) the arming gate uses, from the shared lib.
+# shellcheck source=/dev/null
+source "$HOME/.config/agent-watcher/lib/reviewer-bots.sh" \
+  || { echo "ERROR: missing ~/.config/agent-watcher/lib/reviewer-bots.sh" >&2; exit 2; }
 COMMENTS_SH="$HOME/.cursor/skills/pr-land/scripts/pr-land-comments.sh"
 
 slug_of() { case "${1%%#*}" in */*) echo "${1%%#*}" ;; *) echo "EdgeApp/${1%%#*}" ;; esac; }

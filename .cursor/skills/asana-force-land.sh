@@ -18,7 +18,8 @@ GID="${1:-}"
 TOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null)}"
 [ -n "$TOKEN" ] || { echo "ERROR: no ASANA_TOKEN and no credentials.json token" >&2; exit 1; }
 
-FIELD_GID="1216270424525434" # "Force Land" on the Engineering Board
+FIELD_GID="$(jq -r '.custom_fields.force_land.gid // empty' "$HOME/.config/agent-watcher/asana-config.json")" # "Force Land", from the field registry
+[ -n "$FIELD_GID" ] || { echo "ERROR: no custom_fields.force_land.gid in asana-config.json" >&2; exit 1; }
 
 resp=$(curl -sf --max-time 20 \
   "https://app.asana.com/api/1.0/tasks/$GID?opt_fields=custom_fields.gid,custom_fields.name,custom_fields.display_value" \

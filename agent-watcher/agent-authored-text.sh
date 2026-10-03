@@ -46,12 +46,11 @@ if [[ "$MODE" == "wrap" ]] && ! "$(dirname "$0")/orch-run-context.sh"; then
   exit 0
 fi
 
-# Already wrapped? First non-empty line STARTS WITH the open marker (it sits
-# inline with the text) AND the last non-empty line is the close marker alone.
-first_ne="$(printf '%s\n' "$TEXT" | grep -m1 -v '^[[:space:]]*$' || true)"
-last_ne="$(printf '%s\n' "$TEXT" | grep -v '^[[:space:]]*$' | tail -1 || true)"
-if [[ "$first_ne" == "$OPEN"* \
-   && "$(printf '%s' "$last_ne" | tr -d '[:space:]')" == "$CLOSE" ]]; then
+# Already wrapped? The ONE test lives in lib/agent-authored.jq (every reader of
+# the markers uses it): first non-blank line opens with the open marker, last
+# non-blank line is the close marker alone.
+SELF="$0"; [[ -L "$SELF" ]] && SELF="$(readlink "$SELF")"   # tests link this script into a fake HOME
+if printf '%s' "$TEXT" | jq -Rse -L "$(dirname "$SELF")/lib" 'include "agent-authored"; agent_authored' >/dev/null 2>&1; then
   [[ "$MODE" == "check" ]] && exit 0
   printf '%s' "$TEXT"
   exit 0

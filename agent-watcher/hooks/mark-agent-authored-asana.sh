@@ -52,12 +52,8 @@ fi
 # and the MCP schema rejects null for these fields, so every call whose caller
 # omitted one of them fails validation before it reaches Asana. `has($k)` is the
 # only form that leaves a missing key missing.
-UPDATED=$(printf '%s' "$INPUT" | jq -c '
-  def marked: (. // "") | (
-    (split("\n") | map(select(test("^\\s*$") | not))) as $ne
-    | (($ne[0] // "") | startswith("🥋")) and (($ne[-1] // "" | gsub("\\s"; "")) == "👊")
-  );
-  def mark: if (. == null or . == "" or marked) then . else "🥋 " + . + "\n👊" end;
+UPDATED=$(printf '%s' "$INPUT" | jq -c -L "$HOME/.config/agent-watcher/lib" 'include "agent-authored";
+  def mark: if (. == null or . == "" or agent_authored) then . else "🥋 " + . + "\n👊" end;
   def markfield($k): if has($k) then .[$k] |= mark else . end;
   def markprose:
       markfield("text")

@@ -319,7 +319,7 @@ function collectPool (liveGids) {
 }
 
 function collectWorktrees (liveGids) {
-  const root = `${HOME}/git/.agent-worktrees`
+  const root = require('./worktree-root.js').worktreeRoot()
   const out = []
   try {
     for (const gid of fs.readdirSync(root)) {

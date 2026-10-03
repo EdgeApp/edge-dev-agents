@@ -37,6 +37,7 @@
 # pacing aid, never a gate. After --max-wait it prints WAIT_TIMEOUT and returns
 # so the caller's verification runs anyway (and its own retry rule applies).
 set -uo pipefail
+source "$HOME/.config/agent-watcher/lib/worktree-root.sh"  # the one worktree-root resolver
 MAX_WAIT=1200
 NCPU=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 8)
 THRESHOLD=$((NCPU * 2))
@@ -76,7 +77,7 @@ own_share() {
   local roots tag
   roots=$(own_roots)
   tag=""
-  [ -n "${AGENT_TASK_GID:-}" ] && tag="${HOME:-}/git/.agent-worktrees/${AGENT_TASK_GID}"
+  [ -n "${AGENT_TASK_GID:-}" ] && tag="$(task_worktree "$AGENT_TASK_GID")"
   ps -Ao pid=,ppid=,pcpu=,command= 2>/dev/null | awk -v roots="$roots" -v tag="$tag" '
     {
       pp[$1] = $2; cpu[$1] = $3

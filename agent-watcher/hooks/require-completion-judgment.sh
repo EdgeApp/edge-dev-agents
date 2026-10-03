@@ -40,22 +40,11 @@ CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
 CMD_M=$(printf '%s' "$CMD" | "$H/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 
-EXEC="$H/hooks/cmd-executes.sh"
-RUNS_UPDATE_STATUS=false; RUNS_PR_CREATE=false
-printf '%s' "$CMD" | "$EXEC" update-status.sh 2>/dev/null && RUNS_UPDATE_STATUS=true
-printf '%s' "$CMD" | "$EXEC" pr-create.sh 2>/dev/null && RUNS_PR_CREATE=true
-
-EVENT=""
-if $RUNS_UPDATE_STATUS; then
-  # Only this session's task.
-  case "$CMD_M" in *"$GID"*) ;; *) exit 0 ;; esac
-  case "$CMD_M" in
-    *--blocked*yes*) EVENT="block" ;;
-    *Complete*) EVENT="complete" ;;
-  esac
-fi
-[ -z "$EVENT" ] && $RUNS_PR_CREATE && EVENT="pr-create"
-[ -n "$EVENT" ] || exit 0
+# The shared classifier (lib/completion-event.sh) decides the event, so every
+# completion gate reads the same command the same way.
+source "$H/hooks/lib/completion-event.sh"
+EVENT=$(completion_event "$CMD" "$GID")
+case "$EVENT" in block|complete|pr-create) ;; *) exit 0 ;; esac
 
 REASON=""
 if [ "$EVENT" = "block" ]; then
@@ -84,11 +73,8 @@ if [ -s "$WAIVER" ]; then
   TEXT=$(head -c 300 "$WAIVER" | tr '\n' ' ')
   KIND=$(printf '%s' "$TEXT" | sed -nE 's/^operator-directed ([a-z]+) .*/\1/p; s/^operator override \(([a-z]+)\).*/\1/p' | head -1)
   [ -n "$KIND" ] || KIND=waiver
-  LOG_DIR="${COMPLETION_JUDGE_LOG_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/judge}"
-  mkdir -p "$LOG_DIR" 2>/dev/null
-  printf '{"ts":"%s","gid":"%s","event":"%s","nonce":"override","verdict":"override","override":%s,"source":"operator waiver","directive":%s}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GID" "$EVENT" "$(printf '%s' "$KIND" | jq -Rs .)" "$(printf '%s' "$TEXT" | jq -Rs .)" \
-    >> "$LOG_DIR/$GID.jsonl" 2>/dev/null
+  . "$H/lib/judge-log.sh"
+  judge_log_override "$GID" "$EVENT" "$KIND" "operator waiver" "$TEXT"
   rm -f "$WAIVER" 2>/dev/null
   echo "completion judge WAIVED by operator for this $EVENT event on task $GID: $TEXT"
   echo "The waiver is consumed: it covered this one event and is now gone, so the next completion event is judged again (the operator waives again by saying so again). Logged to the judge provenance log as an operator override."
@@ -97,6 +83,12 @@ fi
 
 ARGS=(--gid "$GID" --event "$EVENT")
 [ -n "$REASON" ] && ARGS+=(--reason "$REASON")
+# pr-create: the PR does not exist yet, so its --base (when given) tells the
+# evidence bundle which branch the diff is measured from.
+if [ "$EVENT" = pr-create ]; then
+  PR_BASE=$(printf '%s' "$CMD" | sed -nE 's/.*--base[[:space:]=]+["'"'"']?([^"'"'"'[:space:]]+).*/\1/p' | head -1)
+  [ -n "$PR_BASE" ] && ARGS+=(--base "$PR_BASE")
+fi
 OUT=$("$H/completion-judge.sh" "${ARGS[@]}" 2>/tmp/agent-judge-$GID.stderr)
 RC=$?
 case "$RC" in

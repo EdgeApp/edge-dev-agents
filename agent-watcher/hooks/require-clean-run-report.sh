@@ -77,6 +77,7 @@
 #
 # Scope: no-op (exit 0) unless AGENT_TASK_GID is set. Exit 2 = block (stderr -> model).
 set -euo pipefail
+source "$HOME/.config/agent-watcher/lib/worktree-root.sh"  # the one worktree-root resolver
 
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 # Shared attachment naming (report ordinal + name): one scheme for every surface.
@@ -223,7 +224,7 @@ set_frontmatter agent_session_uuid "${AGENT_SESSION_UUID:-}"
 TDD_FIELD=$("$HOME/.cursor/skills/asana-field-value.sh" "$AGENT_TASK_GID" "TDD?" 2>/dev/null || echo "none")
 TDD_URL="none"
 if [ "$TDD_FIELD" = "tdd" ]; then
-  for d in "$HOME/git/.agent-worktrees/$AGENT_TASK_GID"/*/; do
+  for d in "$(task_worktree "$AGENT_TASK_GID")"/*/; do
     [ -d "$d" ] || continue
     u=$("$HOME/.cursor/skills/tdd/scripts/tdd-doc-links.sh" "$d" 2>/dev/null | sed -n 's/^TDD_PINNED_URL=//p') || true
     [ -n "$u" ] && { TDD_URL="$u"; break; }
@@ -388,7 +389,8 @@ if [ -f "$TEMPLATE" ]; then
 fi
 
 # 4. Hack-forced screenshots must be declared with the 🪓 marker.
-HACKED_SHOTS="$(ls /tmp/agent-proof-"$AGENT_TASK_GID"-*HACKED*.png 2>/dev/null || true)"
+# Which frames are hack-forced: the one naming rule (hacked-frames.sh).
+HACKED_SHOTS="$("$HOME/.cursor/skills/pr-create/scripts/hacked-frames.sh" /tmp/agent-proof-"$AGENT_TASK_GID"-*.png 2>/dev/null || true)"
 # 🩹 accepted alongside 🪓: reports from runs in flight when the marker changed
 if [ -n "$HACKED_SHOTS" ] && ! grep -qE '🪓|🩹|HACK-FORCED' "$REPORT"; then
   FAIL+="- Hack-forced screenshots are not declared in the report. This run captured:

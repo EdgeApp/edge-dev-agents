@@ -17,9 +17,10 @@
 #   2 = usage error
 
 set -euo pipefail
+source "$HOME/.config/agent-watcher/lib/worktree-root.sh"  # the one worktree-root resolver
 
 REPOS_ROOT="$HOME/git"
-WORKTREES_ROOT="$HOME/git/.agent-worktrees"
+WORKTREES_ROOT="$(worktree_root)"
 
 TASK_GID=""
 REPO=""

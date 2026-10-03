@@ -203,24 +203,23 @@ if (["master", "develop", "HEAD"].includes(branch)) {
   process.exit(1);
 }
 
-// Detect default branch
+// Default branch, from the one shared resolver (~/.cursor/skills/git-default-branch.sh).
 let defaultBranch;
 try {
-  defaultBranch = git(
-    "symbolic-ref --quiet --short refs/remotes/origin/HEAD"
-  ).replace("origin/", "");
+  defaultBranch = execSync(
+    `"${process.env.HOME}/.cursor/skills/git-default-branch.sh" --short`,
+    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }
+  ).trim();
 } catch {
-  try {
-    const show = execSync("git remote show origin", { encoding: "utf8" });
-    defaultBranch =
-      show.match(/HEAD branch:\s*(.+)/)?.[1]?.trim() || "master";
-  } catch {
-    defaultBranch = "master";
-  }
+  defaultBranch = undefined;
 }
 
 // The PR's base: --base when given, else the repo default.
 const baseBranch = baseArg ?? defaultBranch;
+if (!baseBranch) {
+  console.error("ERROR: cannot resolve this repo's default branch (no origin/HEAD, main, master or develop). Pass --base.");
+  process.exit(1);
+}
 if (baseBranch === branch) {
   console.error(
     `ERROR: --base ${baseBranch} is the current branch. A PR cannot merge a branch into itself.`

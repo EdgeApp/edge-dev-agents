@@ -33,7 +33,8 @@ case "$MODE" in value|--kind) ;; *) echo "usage: asana-build-field.sh <task-gid>
 TOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null)}"
 [ -n "$TOKEN" ] || { echo "ERROR: no ASANA_TOKEN and no credentials.json token" >&2; exit 1; }
 
-FIELD_GID="1213928707858644" # "Build (staging/cheese)" on the Engineering Board
+FIELD_GID="$(jq -r '.custom_fields.build.gid // empty' "$HOME/.config/agent-watcher/asana-config.json")" # "Build (staging/cheese)", from the field registry
+[ -n "$FIELD_GID" ] || { echo "ERROR: no custom_fields.build.gid in asana-config.json" >&2; exit 1; }
 
 resp=$(curl -sf --max-time 20 \
   "https://app.asana.com/api/1.0/tasks/$GID?opt_fields=custom_fields.gid,custom_fields.name,custom_fields.display_value" \

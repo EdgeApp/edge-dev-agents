@@ -48,8 +48,8 @@ esac
 HAS_EVIDENCE=0
 if ls /tmp/agent-proof-"$AGENT_TASK_GID"-*.png >/dev/null 2>&1; then
   HAS_EVIDENCE=1
-# Android build evidence: an assembleDebug log or APK is valid terminal-success
-# evidence for an Android-called-out / build-only task (GitHub CI does not build
+# Android build evidence: an assembleDebug log or APK, the build-only artifact
+# set-tested.sh's Android Sim definition names (GitHub CI does not build
 # Android, so this is the only gate that catches those regressions).
 elif ls /tmp/agent-android-build-"$AGENT_TASK_GID"*.log >/dev/null 2>&1 || ls /tmp/agent-proof-"$AGENT_TASK_GID"-*.apk >/dev/null 2>&1; then
   HAS_EVIDENCE=1
@@ -58,7 +58,7 @@ elif [ -s "/tmp/agent-test-blocker-$AGENT_TASK_GID.md" ]; then
 fi
 
 if [ "$HAS_EVIDENCE" = 0 ]; then
-  echo "BLOCKED: no in-app test evidence for task $AGENT_TASK_GID. Before creating the PR, run /build-and-test and drive the changed behavior on the sim to its terminal state (proof screenshots land at /tmp/agent-proof-$AGENT_TASK_GID-NN-<slug>.png). For a gui-dependency repo this includes the gui integration test. If a playbook-sanctioned blocker genuinely applies (provider halt; a funded attempt hit a documented crash; a funded attempt produced a TRUE loss of principal — fees/slippage never count; repo is not a gui dependency), write the specific justification to /tmp/agent-test-blocker-$AGENT_TASK_GID.md and retry — the note is audited. NOT valid blockers: 'no funds' (swap-to-fund per the playbook); anticipated loss risk (fees/slippage are budgeted at \$15 equivalent per run; blocked-ness is established by ATTEMPTING, never predicted); task scope ('deliverable is dep-repo only', 'prototype', 'gui wiring deferred' — local gui-worktree wiring is test scaffolding, not a production change); 'unvetted code + real funds' (small sanctioned-roster swaps through new plugins are the prescribed test)." >&2
+  echo "BLOCKED: no in-app test evidence for task $AGENT_TASK_GID. Before creating the PR, run /build-and-test and drive the changed behavior on the sim to its terminal state (proof screenshots land at /tmp/agent-proof-$AGENT_TASK_GID-NN-<slug>.png). For a gui-dependency repo this includes the gui integration test. If a sanctioned reason genuinely applies, write the specific justification to /tmp/agent-test-blocker-$AGENT_TASK_GID.md and retry; the completion judge rules on that note at pr-create. Valid and invalid reasons are ONE list: the allow, deny-on-sight and downgrade-fallbacks sections of ~/.cursor/skills/completion-judge/references/concession-taxonomy.md (read it before writing the note; 'no funds', a predicted loss and 'gui wiring deferred' are all deny-on-sight)." >&2
   exit 2
 fi
 
@@ -92,11 +92,10 @@ CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)
 TOP=$(git -C "${CWD:-/nonexistent}" rev-parse --show-toplevel 2>/dev/null || true)
 [ -n "$TOP" ] || exit 0
 
-BASE=""
-for b in origin/develop origin/master origin/main; do
-  BASE=$(git -C "$TOP" merge-base HEAD "$b" 2>/dev/null || true)
-  [ -n "$BASE" ] && break
-done
+# The PR's own --base when given, else the repo default (shared resolver).
+PR_BASE=$(printf '%s' "$CMD" | sed -nE 's/.*--base[[:space:]=]+["'"'"']?([^"'"'"'[:space:]]+).*/\1/p' | head -1)
+[ -n "$PR_BASE" ] && BASE_REF="origin/$PR_BASE" || BASE_REF=$("$HOME/.cursor/skills/git-default-branch.sh" -C "$TOP" 2>/dev/null || true)
+BASE=$(git -C "$TOP" merge-base HEAD "$BASE_REF" 2>/dev/null || true)
 [ -n "$BASE" ] || exit 0
 
 # Added helper definitions: new exported/top-level function-ish lines.

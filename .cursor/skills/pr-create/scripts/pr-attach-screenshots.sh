@@ -82,9 +82,7 @@ USAGE="Usage: pr-attach-screenshots.sh --repo <owner/repo> --pr <num> [--carry-f
 for f in "${IMAGES[@]:-}"; do [[ -z "$f" || -f "$f" ]] || { echo "Not found: $f" >&2; exit 1; }; done
 
 ANY_HACKED=false
-for f in "${IMAGES[@]:-}"; do
-  [[ -n "$f" && "$(basename "$f")" == *HACKED* ]] && ANY_HACKED=true
-done
+[[ -n "$("$(dirname "$0")/hacked-frames.sh" "${IMAGES[@]:-}")" ]] && ANY_HACKED=true
 if $ANY_HACKED && [[ -z "$HACK_NOTE" ]]; then
   echo "HACKED image(s) present: pass --hack-note '<one short line: WHAT was hacked>' (e.g. --hack-note 'hard-coded the empty-state branch true in WalletList') so the PR banner is specific. See build-and-test hack-verify-visual-changes." >&2
   exit 1

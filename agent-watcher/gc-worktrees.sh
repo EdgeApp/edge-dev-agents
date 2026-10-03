@@ -28,9 +28,10 @@
 #   2 = usage error
 
 set -euo pipefail
+source "$HOME/.config/agent-watcher/lib/worktree-root.sh"  # the one worktree-root resolver
 
 DIR="$HOME/.config/agent-watcher"
-WORKTREES_ROOT="$HOME/git/.agent-worktrees"
+WORKTREES_ROOT="$(worktree_root)"
 CONFIG="$DIR/asana-config.json"
 CRED="$DIR/credentials.json"
 
