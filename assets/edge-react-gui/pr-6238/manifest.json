@@ -1,0 +1,89 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "path": "assets/edge-react-gui/pr-6238/20261002-182729-agent-proof-1219037271814376-01-android-pirate-wallet-synced.png",
+      "caption": "android pirate wallet synced",
+      "index": "1",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-03T01:27:29Z",
+      "headSha": "898e33ec0f62694056ad7478175950e7043009c0",
+      "addedAt": "2026-10-03T01:27:29Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6238/20261002-182729-agent-proof-1219037271814376-02-android-shielded-send-confirm.png",
+      "caption": "android shielded send confirm",
+      "index": "2",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-03T01:27:29Z",
+      "headSha": "898e33ec0f62694056ad7478175950e7043009c0",
+      "addedAt": "2026-10-03T01:27:29Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6238/20261002-182729-agent-proof-1219037271814376-03-android-shielded-send-success.png",
+      "caption": "android shielded send success",
+      "index": "3",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-03T01:27:29Z",
+      "headSha": "898e33ec0f62694056ad7478175950e7043009c0",
+      "addedAt": "2026-10-03T01:27:29Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6238/20261002-182729-agent-proof-1219037271814376-04-params-download-blocked-send-retryable.png",
+      "caption": "params download blocked send retryable",
+      "index": "4",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-03T01:27:29Z",
+      "headSha": "898e33ec0f62694056ad7478175950e7043009c0",
+      "addedAt": "2026-10-03T01:27:29Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6238/20261002-182729-agent-proof-1219037271814376-05-params-retry-send-success.png",
+      "caption": "params retry send success",
+      "index": "5",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-03T01:27:29Z",
+      "headSha": "898e33ec0f62694056ad7478175950e7043009c0",
+      "addedAt": "2026-10-03T01:27:29Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6238/20261002-182729-agent-proof-1219037271814376-06-ios-pirate-wallet-synced.png",
+      "caption": "ios pirate wallet synced",
+      "index": "6",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-03T01:27:29Z",
+      "headSha": "898e33ec0f62694056ad7478175950e7043009c0",
+      "addedAt": "2026-10-03T01:27:29Z"
+    },
+    {
+      "path": "assets/edge-react-gui/pr-6238/20261002-182729-agent-proof-1219037271814376-07-ios-shielded-send-success.png",
+      "caption": "ios shielded send success",
+      "index": "7",
+      "hacked": false,
+      "phase": null,
+      "subject": null,
+      "hackNote": null,
+      "batchAt": "2026-10-03T01:27:29Z",
+      "headSha": "898e33ec0f62694056ad7478175950e7043009c0",
+      "addedAt": "2026-10-03T01:27:29Z"
+    }
+  ]
+}
