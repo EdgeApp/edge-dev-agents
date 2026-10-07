@@ -167,10 +167,14 @@ function getDeliverable(task, cfg) {
   return name.startsWith('Task') ? 'Task' : 'PR'
 }
 
-function needsSim(task, cfg) {
+function getLanes(task, cfg) {
   const gid = cfg.custom_fields?.agent_lane?.gid
   const field = gid && task.custom_fields?.find((f) => f.gid === gid)
-  const lanes = (field?.multi_enum_values || []).map((v) => v.name)
+  return (field?.multi_enum_values || []).map((v) => v.name)
+}
+
+function needsSim(task, cfg) {
+  const lanes = getLanes(task, cfg)
   return lanes.length === 0 || lanes.includes('iOS Sim')
 }
 
@@ -356,6 +360,7 @@ function spawnForTask(task, cfg) {
     '--worktree-path', reposRoot,
     '--label', label,
     '--deliverable', deliverable,
+    '--lanes', getLanes(task, cfg).join(','),
   ], { stdio: 'inherit' })
   if (r.status !== 0) {
     log(`  spawn helper failed with exit code ${r.status} — rolling back to Pending and releasing resources`)

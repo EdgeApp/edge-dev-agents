@@ -13,6 +13,14 @@ struct RunOptions {
   var lookupTimeout: TimeInterval = 17
   var optionalLookupTimeout: TimeInterval = 7
   var workingDirectory = FileManager.default.currentDirectoryPath
+  /// `note` compares the screen before and after every tap and says so in the
+  /// step log when nothing changed; `off` skips the two screenshots.
+  var tapCheck = "note"
+  /// How long a tap gets to change the screen before it counts as a no-op.
+  var tapChangeWindow: TimeInterval = 1
+  /// `auto` picks the typing path per step (see `typeKeys`); `events` sends
+  /// every string as key events, for a scene where the other paths misfire.
+  var typing = "auto"
 
   init(environment: [String: String]) {
     if let cap = environment["EDGE_QUIESCENCE_CAP"].flatMap(Double.init) { quiescenceCap = cap }
@@ -20,6 +28,8 @@ struct RunOptions {
     if let ms = environment["EDGE_LOOKUP_MS"].flatMap(Double.init) { lookupTimeout = ms / 1000 }
     if let ms = environment["EDGE_OPTIONAL_LOOKUP_MS"].flatMap(Double.init) { optionalLookupTimeout = ms / 1000 }
     if let cwd = environment["EDGE_FLOW_CWD"], !cwd.isEmpty { workingDirectory = cwd }
+    if let mode = environment["EDGE_TAP_CHECK"], !mode.isEmpty { tapCheck = mode }
+    if let mode = environment["EDGE_TYPING"], !mode.isEmpty { typing = mode }
   }
 }
 
@@ -58,6 +68,8 @@ final class FlowInterpreter {
   private var screenBounds: CGRect?
   private var copiedText: String?
   private var lastInteraction = Date()
+  /// True once launchApp has started the selected app in this session.
+  private var launchedByRunner = false
   private let started = Date()
 
   init(options: RunOptions) {
@@ -149,26 +161,37 @@ final class FlowInterpreter {
       } else {
         app.launchArguments = options.animations == "on" ? [] : ["-EdgeTestAnimations", options.animations]
         app.launch()
+        launchedByRunner = true
       }
       screenBounds = nil
       interacted()
     case "stopApp":
       if let appId = map["appId"] as? String { selectApp(try script.interpolate(appId)) }
       app.terminate()
+      launchedByRunner = false
       interacted()
     case "openLink":
-      // XCUIApplication.open hands the URL to the app under test itself, so
-      // custom schemes and https links both arrive without the system's
-      // "Open in <app>?" prompt and without an associated-domains lookup.
+      // A custom scheme goes through the system opener, which delivers it to
+      // the app whether or not this session launched it and shows no
+      // "Open in <app>?" prompt. The system opener would hand an http(s) link
+      // to Safari, so that one stays on XCUIApplication.open, which then waits
+      // for the app's accessibility to load: instant after launchApp started
+      // the app, a 60 s failure for an app this session only attached to.
       // autoVerify and browser are Android-only and ignored.
       let link = try script.interpolate(stringArg(args, key: "link"))
-      guard let url = URL(string: link), url.scheme != nil else {
+      guard let url = URL(string: link), let scheme = url.scheme?.lowercased() else {
         throw FlowError("not a URL: \(link)")
       }
-      guard #available(iOS 16.4, *) else {
-        throw FlowError("openLink needs iOS 16.4 or later")
+      if scheme != "http" && scheme != "https" {
+        XCUIDevice.shared.system.open(url)
+      } else if launchedByRunner {
+        guard #available(iOS 16.4, *) else {
+          throw FlowError("openLink needs iOS 16.4 or later")
+        }
+        app.open(url)
+      } else {
+        throw FlowError("openLink with an http(s) link needs an app this session launched: use the link's custom-scheme form, or put launchApp (without stopApp: false) before it")
       }
-      app.open(url)
       screenBounds = nil
       interacted()
     case "tapOn", "longPressOn":
@@ -186,10 +209,27 @@ final class FlowInterpreter {
         let offset = try map["point"].map { try point($0, in: frame) } ?? CGPoint(x: frame.width / 2, y: frame.height / 2)
         target = coordinate(CGPoint(x: frame.minX + offset.x, y: frame.minY + offset.y))
       }
-      let before = map["retryTapIfNoChange"] as? Bool == true ? screenPixels() : nil
+      // A tap that lands on nothing raises no error, so compare the screen
+      // around it. retryTapIfNoChange taps once more; failIfNoChange (not a
+      // Maestro argument) fails the step; otherwise the step log says so.
+      let retry = map["retryTapIfNoChange"] as? Bool == true
+      let mustChange = map["failIfNoChange"] as? Bool == true
+      let before = retry || mustChange || options.tapCheck != "off" ? screenPixels() : nil
       press(target, long: long)
-      if let before = before, screenPixels() == before { press(target, long: long) }
+      var note: String?
+      if let before = before, !screenChanged(from: before) {
+        if retry {
+          press(target, long: long)
+          note = screenChanged(from: before) ? "ok after a second tap (the first changed nothing)" : nil
+        }
+        if note == nil {
+          let window = String(format: "%.1fs", options.tapChangeWindow)
+          if mustChange { throw FlowError("the tap changed nothing on screen within \(window)") }
+          note = "ok, but the screen did not change within \(window)\(retry ? " (tapped twice)" : "")"
+        }
+      }
       if let ms = try optionalNumber(map["waitToSettleTimeoutMs"]) { waitForSettle(timeout: ms / 1000) }
+      return note
     case "assertVisible":
       let selector = try parseSelector(args)
       let timeout = adjusted(optional ? options.optionalLookupTimeout : options.lookupTimeout)
@@ -226,11 +266,11 @@ final class FlowInterpreter {
       }
     case "inputText":
       let text = try script.interpolate(stringArg(args, key: "text"))
-      try typeKeys(text)
+      return try typeKeys(text)
     case "inputRandomText":
       let length = Int(try optionalNumber(map.isEmpty ? args : map["length"]) ?? 8)
       let letters = "abcdefghijklmnopqrstuvwxyz"
-      try typeKeys(String((0..<(length > 0 ? length : 8)).compactMap { _ in letters.randomElement() }))
+      return try typeKeys(String((0..<(length > 0 ? length : 8)).compactMap { _ in letters.randomElement() }))
     case "copyTextFrom":
       let selector = try parseSelector(args)
       let timeout = optional ? options.optionalLookupTimeout : options.lookupTimeout
@@ -243,7 +283,7 @@ final class FlowInterpreter {
       return "copied \"\(text)\""
     case "pasteText":
       guard let text = copiedText else { return "nothing copied, typed nothing" }
-      try typeKeys(text)
+      return try typeKeys(text)
     case "hideKeyboard":
       return try hideKeyboard()
     case "back":
@@ -251,12 +291,12 @@ final class FlowInterpreter {
       return "no-op on iOS"
     case "eraseText":
       let count = Int(try optionalNumber(map.isEmpty ? args : map["charactersToErase"]) ?? 50)
-      try typeKeys(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count))
+      return try typeKeys(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count))
     case "pressKey":
       let key = try script.interpolate(stringArg(args, key: "key")).lowercased()
       switch key {
-      case "enter": try typeKeys(XCUIKeyboardKey.return.rawValue)
-      case "backspace": try typeKeys(XCUIKeyboardKey.delete.rawValue)
+      case "enter": return try typeKeys(XCUIKeyboardKey.return.rawValue)
+      case "backspace": return try typeKeys(XCUIKeyboardKey.delete.rawValue)
       case "home":
         XCUIDevice.shared.press(.home)
         interacted()
@@ -270,7 +310,7 @@ final class FlowInterpreter {
     case "scrollUntilVisible":
       return try scrollUntilVisible(map)
     case "swipe":
-      try swipe(map)
+      return try swipe(map)
     case "repeat":
       let times = try optionalNumber(map["times"]).map { Int($0) }
       var count = 0
@@ -412,21 +452,30 @@ final class FlowInterpreter {
     }
   }
 
-  private func swipe(_ map: [String: Any]) throws {
+  /// Returns the gesture's resolved points, and for an element origin its
+  /// frame before and after the drag, so the step log shows whether the
+  /// element moved.
+  private func swipe(_ map: [String: Any]) throws -> String? {
     let bounds = screen()
     let duration = (try optionalNumber(map["duration"]) ?? 400) / 1000
+    func xy(_ p: CGPoint) -> String { "(\(Int(p.x)),\(Int(p.y)))" }
+    func box(_ r: CGRect) -> String { "\(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height))" }
     if let start = map["start"], let end = map["end"] {
-      drag(from: try point(start, in: bounds), to: try point(end, in: bounds), duration: duration)
-      return
+      let from = try point(start, in: bounds)
+      let to = try point(end, in: bounds)
+      drag(from: from, to: to, duration: duration)
+      return "\(xy(from)) -> \(xy(to))"
     }
     let direction = try script.interpolate("\(map["direction"] ?? "")").uppercased()
     var from = CGPoint(x: bounds.midX, y: bounds.midY)
+    var origin: (selector: Selector, frame: CGRect)?
     if let element = map["from"] {
       let selector = try parseSelector(element)
       guard let frame = try waitForElement(selector, timeout: options.lookupTimeout) else {
         throw FlowError("swipe origin not found: \(selector)")
       }
       from = CGPoint(x: frame.midX, y: frame.midY)
+      origin = (selector, frame)
     }
     // Maestro swipes from the origin to the screen edge in the direction.
     let to: CGPoint
@@ -439,6 +488,12 @@ final class FlowInterpreter {
     }
     drag(from: from, to: to, duration: duration)
     if let ms = try optionalNumber(map["waitToSettleTimeoutMs"]) { waitForSettle(timeout: ms / 1000) }
+    var note = "\(xy(from)) -> \(xy(to))"
+    if let origin {
+      let after = try findElement(origin.selector)
+      note += ", origin \(box(origin.frame)) then \(after.map(box) ?? "gone")"
+    }
+    return note
   }
 
   // MARK: Conditions
@@ -627,6 +682,7 @@ final class FlowInterpreter {
   private func selectApp(_ bundleId: String) {
     appId = bundleId
     app = XCUIApplication(bundleIdentifier: bundleId)
+    launchedByRunner = false
     screenBounds = nil
   }
 
@@ -903,19 +959,34 @@ final class FlowInterpreter {
 
   // MARK: Keyboard
 
-  /// Types into the focused field. React Native can hide the focused input
-  /// (Edge's PIN entry), so no element reports keyboard focus and `typeText`
-  /// fails with the keyboard up. Maestro synthesizes key events regardless of
-  /// focus; this falls back to tapping the on-screen keys instead.
-  private func typeKeys(_ text: String) throws {
+  /// Types into the focused field, by the first path that can work:
+  /// 1. An element reports keyboard focus: `typeText`.
+  /// 2. No element does (React Native hides the focused input on Edge's PIN
+  ///    entry, and `typeText` then fails with the keyboard up) and every key
+  ///    the text needs is on screen: tap the keys.
+  /// 3. A keyboard exists but a key is missing or off screen (the simulator
+  ///    minimizes the software keyboard to its toolbar after hardware key
+  ///    events, leaving the keys below the screen edge): XCTest's daemon
+  ///    sends the string as key events, which is how Maestro types.
+  /// With no focus and no keyboard at all nothing would receive the text, so
+  /// that stays a failure.
+  private func typeKeys(_ text: String) throws -> String? {
+    if options.typing == "events" {
+      try sendKeyEvents(text)
+      interacted()
+      return "ok, typed as key events (--typing events)"
+    }
     let focused = app.descendants(matching: .any).matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
     if focused.exists {
       app.typeText(text)
       interacted()
-      return
+      return nil
     }
     let keyboard = app.keyboards.firstMatch
     guard keyboard.exists else { throw FlowError("no element has keyboard focus and no keyboard is showing") }
+    let bounds = screen()
+    var keys: [XCUIElement] = []
+    var blocker: String?
     for character in text {
       let labels: [String]
       switch String(character) {
@@ -928,11 +999,54 @@ final class FlowInterpreter {
         keyboard.descendants(matching: .any).matching(NSPredicate(format: "label ==[c] %@", label)).firstMatch
       }.first { $0.exists }
       guard let key = match else {
-        throw FlowError("no element has keyboard focus, and the keyboard has no '\(labels[0])' key to tap")
+        blocker = "the keyboard has no '\(labels[0])' key"
+        break
       }
-      key.tap()
+      let frame = key.frame
+      guard bounds.contains(CGPoint(x: frame.midX, y: frame.midY)) else {
+        blocker = "the keyboard's keys are off screen"
+        break
+      }
+      keys.append(key)
     }
+    if let blocker = blocker {
+      try sendKeyEvents(text)
+      interacted()
+      return "ok, typed as key events (no element has keyboard focus and \(blocker))"
+    }
+    for key in keys { key.tap() }
     interacted()
+    return "ok, tapped the on-screen keys (no element has keyboard focus)"
+  }
+
+  /// Types through XCTest's runner daemon (`_XCT_sendString`, private API,
+  /// the call Maestro's iOS driver makes for inputText). The events go to
+  /// the first responder whether or not a keyboard is drawn.
+  private func sendKeyEvents(_ text: String) throws {
+    let send = NSSelectorFromString("_XCT_sendString:maximumFrequency:completion:")
+    guard
+      let sessionClass = NSClassFromString("XCTRunnerDaemonSession"),
+      let session = (sessionClass as AnyObject).perform(NSSelectorFromString("sharedSession"))?.takeUnretainedValue() as? NSObject,
+      let proxy = session.perform(NSSelectorFromString("daemonProxy"))?.takeUnretainedValue() as? NSObject
+    else {
+      throw FlowError("cannot type as key events: XCTest's daemon session is unavailable")
+    }
+    typealias Completion = @convention(block) (NSError?) -> Void
+    typealias Send = @convention(c) (NSObject, ObjectiveC.Selector, NSString, Int, AnyObject) -> Void
+    let call = unsafeBitCast(proxy.method(for: send), to: Send.self)
+    let done = DispatchSemaphore(value: 0)
+    var failure: NSError?
+    let completion: Completion = { error in
+      failure = error
+      done.signal()
+    }
+    // 10 characters a second: Edge's inputs drop keys that arrive faster.
+    call(proxy, send, text as NSString, 10, unsafeBitCast(completion, to: AnyObject.self))
+    let limit = 10 + Double(text.count) / 5
+    guard done.wait(timeout: .now() + limit) == .success else {
+      throw FlowError("typing as key events did not finish within \(Int(limit))s")
+    }
+    if let failure = failure { throw FlowError("typing as key events failed: \(failure.localizedDescription)") }
   }
 
   // MARK: Screen settle
@@ -940,6 +1054,17 @@ final class FlowInterpreter {
   private func screenPixels() -> Data? {
     guard let image = XCUIScreen.main.screenshot().image.cgImage else { return nil }
     return image.dataProvider?.data as Data?
+  }
+
+  /// True as soon as the screen differs from `before`; false when it still
+  /// matches after the tap-change window.
+  private func screenChanged(from before: Data) -> Bool {
+    let deadline = Date().addingTimeInterval(options.tapChangeWindow)
+    repeat {
+      if let current = screenPixels(), current != before { return true }
+      Thread.sleep(forTimeInterval: 0.1)
+    } while Date() < deadline
+    return false
   }
 
   /// Returns once two consecutive screenshots are identical (Maestro's

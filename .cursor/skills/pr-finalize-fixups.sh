@@ -172,7 +172,7 @@ if [[ "$MODE" == "preserve" && "$IS_OWNER" == "true" && -n "${AGENT_TASK_GID:-}"
   fi
 fi
 
-DEFAULT_UPSTREAM="$("$HOME/.cursor/skills/git-default-branch.sh" 2>/dev/null || echo "origin/master")"
+DEFAULT_UPSTREAM="$("$HOME/.cursor/skills/git-branch-base.sh" 2>/dev/null || echo "origin/master")"
 MERGE_BASE="$(git merge-base "$DEFAULT_UPSTREAM" HEAD 2>/dev/null || true)"
 
 # Capture before grepping: under pipefail, `git log | grep -q` dies of SIGPIPE

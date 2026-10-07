@@ -185,11 +185,28 @@ function mergeManifest (manifest, entries) {
     // Carry a hosted url across a re-merge. A migrate re-run rebuilds entries
     // from the PR comments and knows nothing about object storage, so a blind
     // replace would silently revert a re-hosted PR to its long raw URLs and
-    // could push it back over the body cap.
-    if (at >= 0) out[at] = (e.url == null && out[at].url != null) ? { ...e, url: out[at].url } : e
+    // could push it back over the body cap. Same path only: a re-shot frame has
+    // a new stamped path, and the old url would show the frame it replaced.
+    if (at >= 0) out[at] = (e.url == null && out[at].url != null && e.path === out[at].path) ? { ...e, url: out[at].url } : e
     else out.push(e)
   }
   return { version: 2, entries: out }
+}
+
+// Object-storage key for one frame: <repo6><pr>/<NNN>-<slug18>-<rand6>.<ext>.
+// The table embeds each frame's URL twice, so key length sets how many frames
+// fit under GitHub's body cap; that is why the repo name and the slug are cut
+// short. The random suffix is what makes the URL unguessable (the bucket has no
+// listing) and lets a re-shot frame land beside the one it replaces instead of
+// overwriting an object a cached PR page still points at.
+function bucketKey ({ repoName, pr, file, n, prefix }) {
+  const p = prefix || (String(repoName).replace(/^edge-/, '').replace(/[^a-z0-9]/g, '').slice(0, 6) + pr)
+  const ext = (baseOf(file).match(/\.[a-z0-9]+$/i) || ['.png'])[0].toLowerCase()
+  const slug = baseOf(file).replace(/\.[a-z0-9]+$/i, '')
+    .replace(/^\d{8}-\d{6}-/, '').replace(/^agent-proof-\d+-/, '').replace(/^\d+-/, '')
+    .slice(0, 18).replace(/[^a-zA-Z0-9-]/g, '-').replace(/-*$/, '')
+  const rand = require('crypto').randomBytes(3).toString('hex')
+  return `${p}/${String(n).padStart(3, '0')}-${slug}-${rand}${ext}`
 }
 
 // commits: [{sha, subject}] from the PR, newest last. A batch sha still present
@@ -317,6 +334,6 @@ function moveSectionFirst (body, heading) {
 
 module.exports = {
   parseName, frameKey, sceneId, resolveScenes, batchesOf, pruneBatches, wouldRetire,
-  mergeManifest, render, splice, replaceSection, removeSection, moveSectionFirst,
+  mergeManifest, bucketKey, render, splice, replaceSection, removeSection, moveSectionFirst,
   marks, START, END, LEGACY
 }

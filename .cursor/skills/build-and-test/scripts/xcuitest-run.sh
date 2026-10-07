@@ -20,7 +20,8 @@
 # Usage: xcuitest-run.sh (--flow <flow.yaml> | --steps '<yaml>' | --inspect)
 #          [--full] [--udid <udid>] [--env K=V ...]
 #          [--quiescence-cap <seconds>] [--animations off|fast|on]
-#          [--lookup-timeout <seconds>] [--keep-mcp]
+#          [--lookup-timeout <seconds>] [--tap-check note|off] [--typing auto|events]
+#          [--keep-mcp] [--login-role <role>]
 #   --udid defaults to $AGENT_SIM_UDID.
 #   --steps: a command list (`- tapOn: Wallets`), one `command: args` map, or
 #     a bare command name. The steps run against the app as it is: nothing
@@ -42,6 +43,17 @@
 #     `-EdgeTestAnimations <mode>` on launchApp and persisted in the sim's
 #     defaults for relaunches (default off; `on` clears it). Without --flow
 #     the sim default is left alone unless --animations is passed.
+#   --tap-check: `note` (default) compares the screen before and after every
+#     tap and marks a tap that changed nothing in its step line; `off` skips
+#     the two screenshots per tap.
+#   --typing: `auto` (default) types through the focused element, then the
+#     on-screen keys, then key events when the keys are off screen; `events`
+#     sends every string as key events.
+#   --login-role: a role in ~/.config/edge-secrets/test-accounts.json. Passes
+#     that account to the flow as env EXPECT_USERNAME and PIN_DIGIT (read by
+#     common/login-if-needed.yaml, which refuses to tap a PIN on another
+#     account's PIN scene) and masks the username and tapped digits in the
+#     output.
 #   Relative takeScreenshot paths resolve against the current directory, as
 #   with `maestro test`.
 # Output: `[edge-flow]` step lines and the inspect lines, then
@@ -62,6 +74,9 @@ LOOKUP=""
 ANIMATIONS="off"
 SET_ANIMATIONS=0
 KEEP_MCP=0
+TAP_CHECK="note"
+TYPING="auto"
+LOGIN_ROLE=""
 BUNDLE_ID="co.edgesecure.app"
 ENV_ARGS=()
 while [[ $# -gt 0 ]]; do
@@ -75,7 +90,10 @@ while [[ $# -gt 0 ]]; do
     --quiescence-cap) CAP="$2"; shift 2 ;;
     --lookup-timeout) LOOKUP="$2"; shift 2 ;;
     --animations) ANIMATIONS="$2"; SET_ANIMATIONS=1; shift 2 ;;
+    --tap-check) TAP_CHECK="$2"; shift 2 ;;
+    --typing) TYPING="$2"; shift 2 ;;
     --keep-mcp) KEEP_MCP=1; shift ;;
+    --login-role) LOGIN_ROLE="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -89,6 +107,20 @@ fi
 [[ "$FULL" == 0 ]] || { [[ -n "$INSPECT" ]] || { echo "xcuitest-run: --full needs --inspect" >&2; exit 1; }; INSPECT="full"; }
 [[ -n "$UDID" ]] || { echo "xcuitest-run: no --udid and \$AGENT_SIM_UDID unset" >&2; exit 1; }
 case "$ANIMATIONS" in off|fast|on) ;; *) echo "xcuitest-run: --animations must be off, fast or on" >&2; exit 1 ;; esac
+case "$TAP_CHECK" in note|off) ;; *) echo "xcuitest-run: --tap-check must be note or off" >&2; exit 1 ;; esac
+case "$TYPING" in auto|events) ;; *) echo "xcuitest-run: --typing must be auto or events" >&2; exit 1 ;; esac
+
+MASK=()
+if [[ -n "$LOGIN_ROLE" ]]; then
+  ROSTER="$HOME/.config/edge-secrets/test-accounts.json"
+  LOGIN_USER="$(jq -r --arg r "$LOGIN_ROLE" '.roster[$r].username // empty' "$ROSTER" 2>/dev/null)"
+  LOGIN_PIN="$(jq -r --arg r "$LOGIN_ROLE" '.roster[$r].pin // empty' "$ROSTER" 2>/dev/null)"
+  [[ -n "$LOGIN_USER" && -n "$LOGIN_PIN" ]] || { echo "xcuitest-run: no roster role $LOGIN_ROLE in $ROSTER" >&2; exit 1; }
+  ENV_ARGS+=(--env "EXPECT_USERNAME=$LOGIN_USER" --env "PIN_DIGIT=${LOGIN_PIN:0:1}")
+  MASK=(-e "s/$(printf '%s' "$LOGIN_USER" | sed 's/[][\\.*^$/]/\\&/g')/<$LOGIN_ROLE account>/g"
+    -e 's/tapOn "[0-9]"/tapOn "<digit>"/g' -e 's/"text":"[0-9]"/"text":"<digit>"/g'
+    -e 's/text="[0-9]"/text="<digit>"/g')
+fi
 
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 START=$(date +%s)
@@ -144,6 +176,8 @@ TEST_RUNNER_EDGE_FLOW_CWD="$(pwd)" \
 TEST_RUNNER_EDGE_QUIESCENCE_CAP="$CAP" \
 TEST_RUNNER_EDGE_TEST_ANIMATIONS="$ANIMATIONS" \
 TEST_RUNNER_EDGE_INSPECT="$INSPECT" \
+TEST_RUNNER_EDGE_TAP_CHECK="$TAP_CHECK" \
+TEST_RUNNER_EDGE_TYPING="$TYPING" \
 TEST_RUNNER_EDGE_LOOKUP_MS="$LOOKUP_MS" \
 TEST_RUNNER_EDGE_OPTIONAL_LOOKUP_MS="$LOOKUP_MS" \
   xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination "id=$UDID" \
@@ -152,7 +186,7 @@ TEST_RUNNER_EDGE_OPTIONAL_LOOKUP_MS="$LOOKUP_MS" \
     -resultBundlePath "$RUN_DIR/result.xcresult" > "$RUN_DIR/xcodebuild.log" 2>&1 &
 XC_PID=$!
 # Stream step and inspect lines as they land (the log is the full record).
-tail -n +1 -f "$RUN_DIR/xcodebuild.log" 2>/dev/null > >(sed -l -n -e '/\[edge-flow\]/p' -e 's/^.*\[edge-inspect\] //p') &
+tail -n +1 -f "$RUN_DIR/xcodebuild.log" 2>/dev/null > >(sed -l -n ${MASK[@]+"${MASK[@]}"} -e '/\[edge-flow\]/p' -e 's/^.*\[edge-inspect\] //p') &
 TAIL_PID=$!
 wait "$XC_PID"
 STATUS=$?

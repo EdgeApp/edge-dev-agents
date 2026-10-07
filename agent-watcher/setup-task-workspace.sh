@@ -7,7 +7,8 @@
 # on a fresh branch `agent/<task-gid>` based on origin/develop (configurable).
 # Works for ANY repo under ~/git (gui or a dependency), so one task can have several
 # co-located worktrees that updot can sibling-link.
-# env.json is COPIED (a real file, NOT a symlink) from the main checkout. A symlink is
+# env.json (and, on develop, its split config.json / keys.json / edgeKey.json) is
+# COPIED (a real file, NOT a symlink) from the main checkout. A symlink is
 # fragile: the repo's `configure` step (scripts/configure.ts → cleaner-config makeConfig)
 # rewrites env.json, and if the link isn't resolving to a real file when that runs, the
 # worktree ends up with a defaults-only skeleton (every secret blank/false/null). A real
@@ -270,19 +271,35 @@ ensure_husky_runtime() {
   fi
 }
 
-# ── Copy env.json from the main checkout (durable real file, NOT a symlink) ───
-# rm first so we never write *through* an existing symlink into the shared main
-# env.json. See the header comment for why a copy beats a symlink here.
+# ── Copy the gitignored app config from the main checkout (real files, NOT symlinks) ─
+# develop split the legacy env.json into config.json (non-secret, holds YOLO_*),
+# keys.json (secrets) and edgeKey.json (apiKey/apiSecret for makeApiSigner);
+# staging/master still read env.json. The worktree branch decides which set the
+# build reads, so copy every file the main checkout has. rm first so we never
+# write *through* an existing symlink into the shared main file. See the header
+# comment for why a copy beats a symlink here.
+APP_CONFIG_FILES=(env.json config.json keys.json edgeKey.json)
 ensure_env_json() {
-  if [[ -f "$MAIN_REPO/env.json" ]]; then
-    rm -f "$WT/env.json"
-    cp "$MAIN_REPO/env.json" "$WT/env.json"
-    echo ">> setup-task-workspace: copied env.json ← $MAIN_REPO/env.json" >&2
-    # Enforce the standard agent login: every new run starts on the roster's
-    # default role (the `agent` account), regardless of master env.json
-    # drift. YOLO auto-login re-asserts this account on every app relaunch. The
-    # roster is local-only (~/.config/edge-secrets/test-accounts.json) so account
-    # names never land in the synced tree.
+  local f copied=0
+  for f in "${APP_CONFIG_FILES[@]}"; do
+    [[ -f "$MAIN_REPO/$f" ]] || continue
+    rm -f "$WT/$f"
+    cp "$MAIN_REPO/$f" "$WT/$f"
+    copied=1
+    echo ">> setup-task-workspace: copied $f ← $MAIN_REPO/$f" >&2
+  done
+  if [[ "$copied" == 0 ]]; then
+    echo ">> setup-task-workspace: WARN — no env.json/config.json in $MAIN_REPO; worktree has NO secrets" >&2
+    return 0
+  fi
+  # Enforce the standard agent login: every new run starts on the roster's
+  # default role (the `agent` account), regardless of master config drift.
+  # YOLO auto-login re-asserts this account on every app relaunch. The roster is
+  # local-only (~/.config/edge-secrets/test-accounts.json) so account names never
+  # land in the synced tree. YOLO_* lives in config.json on develop, env.json on
+  # older branches; pin both when present.
+  for f in env.json config.json; do
+    [[ -f "$WT/$f" ]] || continue
     node -e '
       const fs = require("fs"); const [p, rosterPath] = process.argv.slice(1);
       const roster = JSON.parse(fs.readFileSync(rosterPath, "utf8"));
@@ -291,12 +308,10 @@ ensure_env_json() {
       const env = JSON.parse(fs.readFileSync(p, "utf8"));
       env.YOLO_USERNAME = acct.username; env.YOLO_PIN = acct.pin;
       fs.writeFileSync(p, JSON.stringify(env, null, 2) + "\n");
-    ' "$WT/env.json" "$HOME/.config/edge-secrets/test-accounts.json" 2>/dev/null \
-      && echo ">> setup-task-workspace: env.json YOLO login pinned to the default roster account" >&2 \
-      || echo ">> setup-task-workspace: WARN — could not pin YOLO login (roster file missing or env.json unreadable; env.json left as copied)" >&2
-  else
-    echo ">> setup-task-workspace: WARN — $MAIN_REPO/env.json not found; worktree has NO secrets" >&2
-  fi
+    ' "$WT/$f" "$HOME/.config/edge-secrets/test-accounts.json" 2>/dev/null \
+      && echo ">> setup-task-workspace: $f YOLO login pinned to the default roster account" >&2 \
+      || echo ">> setup-task-workspace: WARN — could not pin YOLO login in $f (roster file missing or $f unreadable; left as copied)" >&2
+  done
 }
 
 # ── Copy testconfig.json from the main checkout (same rm-then-copy pattern) ───
@@ -427,7 +442,7 @@ else
 fi
 cat /tmp/setup-wt.log >&2
 
-# ── Copy env.json from the main checkout (real file; survives `configure`) ─────
+# ── Copy env.json / config.json / keys.json / edgeKey.json (real files; survive `configure`) ─
 ensure_env_json
 
 # ── Copy testconfig.json (swap-partner API creds) when the repo has one ────────

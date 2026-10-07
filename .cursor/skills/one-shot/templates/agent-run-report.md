@@ -79,7 +79,7 @@ _No judge call yet._
          sim build flavor; the maestro flow(s) run (path) and whether driven via MCP
          exploration or a single yaml proof run; any /debugger breakpoints used.
        - Environment: sim UDID + slot, roster account used and any mid-test switch
-         (via env.json), funding (asset + amount, any swap-to-fund a major), and any
+         (via config.json), funding (asset + amount, any swap-to-fund a major), and any
          provider forced + whether reverted.
        - Evidence: the proof screenshot paths (`/tmp/agent-proof-<gid>-NN-slug.png`)
          and confirmation they are attached to the PR; name the success-scene frame.
@@ -149,7 +149,7 @@ _None observed._
 ## Orchestration Issues
 <!-- cat: orchestration -->
 <!-- Friction with the autonomous harness itself (NOT the task code): worktree /
-     env.json / sim / metro / ports / resume / tmux / wakeup / resource limits /
+     config.json / sim / metro / ports / resume / tmux / wakeup / resource limits /
      auth in the spawned env. Enough detail to reproduce or fix. -->
 _None observed._
 

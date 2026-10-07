@@ -28,7 +28,6 @@ done
 log() { $QUIET || echo ">> pr-evidence-rehost: $*" >&2; }
 
 RN="${REPO#*/}"; DEST="assets/$RN/pr-$PR"
-[[ -n "$PREFIX" ]] || PREFIX="$(printf '%s' "$RN" | sed 's/^edge-//; s/[^a-z0-9]//g' | cut -c1-6)$PR"
 MAN=$(gh api "repos/$ASSETS_REPO/contents/$DEST/manifest.json?ref=$ASSETS_BRANCH" --jq '.content' 2>/dev/null | base64 -d) \
   || { echo "no manifest for $REPO#$PR" >&2; exit 3; }
 [[ -n "$MAN" ]] || { echo "no manifest for $REPO#$PR" >&2; exit 3; }
@@ -48,8 +47,12 @@ log "${#TODO[@]} frame(s) to host (of $(node -e 'console.log(JSON.parse(require(
 for p in "${TODO[@]}"; do
   i=$((i+1)); f="$TMP/$(basename "$p")"
   curl -sf --max-time 60 "https://raw.githubusercontent.com/$ASSETS_REPO/$ASSETS_BRANCH/$p" -o "$f" || { log "WARN download failed: $p"; continue; }
-  slug=$(basename "$p" .png | sed -E 's/^[0-9]{8}-[0-9]{6}-//; s/^agent-proof-[0-9]+-//; s/^[0-9]+-//' | cut -c1-18 | tr -c 'a-zA-Z0-9-' '-' | sed 's/-*$//')
-  key="$PREFIX/$(printf '%03d' "$i")-$slug-$(openssl rand -hex 3).png"
+  # pr-evidence-table.js owns the key shape, shared with pr-attach-screenshots.sh.
+  key=$(node -e '
+    const m=require(process.env.HOME+"/.cursor/skills/pr-create/scripts/pr-evidence-table.js")
+    const [repoName,pr,prefix,file,n]=process.argv.slice(1)
+    process.stdout.write(m.bucketKey({repoName,pr,prefix,file,n:Number(n)}))
+  ' "$RN" "$PR" "$PREFIX" "$p" "$i")
   url=$("$UPLOADER" --key "$key" "$f" 2>/dev/null | tail -1) || { log "WARN upload failed: $p"; continue; }
   printf '%s\t%s\n' "$p" "$url" >> "$TMP/map.tsv"
   rm -f "$f"

@@ -502,7 +502,7 @@ if [[ "$IS_FIXUP" == "true" && "$REORDER" != "false" ]]; then
     FIXUP_TARGET="$(git rev-parse --verify -q "${FIXUP}^{commit}" 2>/dev/null || true)"
   else
     FIXUP_HEADLINE="$(git log -1 --format=%s | sed -E 's/^(fixup! )+//')"
-    FOLD_UPSTREAM=$("$HOME/.cursor/skills/git-default-branch.sh" 2>/dev/null || echo "origin/master")
+    FOLD_UPSTREAM=$("$HOME/.cursor/skills/git-branch-base.sh" 2>/dev/null || echo "origin/master")
     FOLD_BASE="$(git merge-base "$FOLD_UPSTREAM" HEAD 2>/dev/null || true)"
     # %H is 40 chars, so the subject starts at column 42; literal comparison,
     # never a dynamic regex (subjects carry regex metacharacters).

@@ -922,7 +922,8 @@ function listRetiredSessions() {
 //   resume-task) when a prior transcript exists, else fresh-spawns. So phase statuses are
 //   progress-only (set by the running agent), never a manual re-engagement trigger, and
 //   this watchdog stays out of re-engagement entirely (see the header BOUNDARY note).
-// Every orch claude is launched with maestro-mcp.json. Its server is the lazy
+// A claude whose lane includes Android is launched with maestro-mcp.json
+// (spawn-test-session.sh --lanes). Its server is the lazy
 // proxy (maestro-mcp-lazy.js), which runs a `maestro mcp --device <udid>` JVM
 // (~160 MB, ~50 threads) from a maestro tool call until 10 idle minutes pass,
 // so a retiree can still be carrying one. At
@@ -1487,9 +1488,12 @@ function main() {
   // Surface silent death of the memory gate (detection only).
   checkMonitorHeartbeat()
 
-  // Garbage-collect state for sessions that no longer exist
+  // Garbage-collect state for sessions that no longer exist. A live retiree keeps
+  // its entry: it holds the idle baseline pruneRetiredSessions() compares against
+  // on the next tick, and without it the idle_reap_hours clock restarts every tick.
+  const retiredNames = new Set(listRetiredSessions().map((s) => s.name))
   for (const key of Object.keys(state.sessions)) {
-    if (!sessions.includes(key)) delete state.sessions[key]
+    if (!sessions.includes(key) && !retiredNames.has(key)) delete state.sessions[key]
   }
 
   saveState(state)

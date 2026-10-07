@@ -16,17 +16,20 @@ already encodes, params and gotchas included.
 
 | Flow | Params | Does |
 |---|---|---|
-| `common/login-if-needed.yaml` | (YOLO env) | Land in a logged-in account, incl. PIN entry |
-| `common/dismiss-startup-modals.yaml` | - | Clear survey/notification/update modals |
-| `common/select-swap-pair.yaml` | SRC_ASSET, DST_ASSET, MANUAL_PATH, SRC_WALLET, DST_WALLET, FIAT_AMOUNT, PROVIDER | Swap deep link sets the pair (MANUAL_PATH: Exchange tab → pick wallets via Search Wallets) → amount → quote (+ provider force, amount-field eraseText gotcha) |
-| `common/find-wallet.yaml` | SEARCH_TERM, MATCH_INDEX | Assets tab → search → open a wallet's detail scene (Receive/Send/Trade) |
+| `common/login-if-needed.yaml` | PIN_DIGIT, EXPECT_USERNAME, HOME_MARKER (iOS: `xcuitest-run.sh --login-role <role>` sets the first two from the roster and masks them) | PIN login only when the PIN scene shows. With EXPECT_USERNAME set, a PIN scene on another account fails within 5s and no digit is tapped |
+| `common/relaunch-and-login.yaml` | PIN_DIGIT, EXPECT_USERNAME, HOME_MARKER | Stop and launch the app (never `clearState`), LogBox toast, login, startup modals, home scene. The launch wait ends on the PIN scene, the home scene or the full login scene (a failure, within 1s) |
+| `common/dismiss-logbox-banner.yaml` | LOGBOX_TOAST | Close React Native's LogBox toast (debug builds; label is "! " plus the newest log line). No-op when absent. Run it again right before a tap or swipe on the bottom 50pt of a scene: the toast returns on every new warning or error |
+| `common/dismiss-startup-modals.yaml` | - | Clear survey/notification/update modals (runs `dismiss-logbox-banner` first) |
+| `common/select-swap-pair.yaml` | SRC_ASSET, DST_ASSET, MANUAL_PATH, SRC_WALLET, DST_WALLET, SRC_ROW_ID, DST_ROW_ID, FIAT_AMOUNT, PROVIDER | Swap deep link sets the pair (MANUAL_PATH: Exchange tab → pick wallets via Search Wallets) → amount → quote (+ provider force, amount-field eraseText gotcha). The quote wait ends on the quote OR the "Exchange Error" card, 25s ceiling, and the flow fails within 1s of the error card |
+| `common/find-wallet.yaml` | SEARCH_TERM, MATCH_INDEX, ROW_ID | Assets tab → search → open a wallet's detail scene (Receive/Send/Trade). ROW_ID (`walletListRow.<wallet name>.<code>`) picks the exact row when the search text matches several wallets |
 | `common/open-settings.yaml` | - | Side menu → Settings list (compose your own subpage nav after) |
-| `common/confirm-slider.yaml` | - | The confirm slider gesture (SOLVED — never re-derive) |
-| `common/ramp-set-region-fiat.yaml` | COUNTRY_ROW/SEARCH, STATE_ROW/SEARCH, FIAT_ROW/SEARCH | Set ramp region + fiat from Buy/Sell scene (row selectors are the COMBINED row string, e.g. "United States of America US") |
-| `common/send-to-address.yaml` | CURRENCY_CODE, ADDRESS, AMOUNT, WALLET_SEARCH, MANUAL_PATH | Payment-redirect link → pre-filled Send scene → confirm slider (no CURRENCY_CODE, or MANUAL_PATH: Assets → wallet → Send → address → amount) |
+| `common/confirm-slider.yaml` | SUCCESS_TEXT, SUCCESS_TIMEOUT | The confirm slider gesture (SOLVED — never re-derive) → success marker. Fails 3s after a slide that did not register, and within 1s of the slider re-arming after a rejected action |
+| `common/ramp-set-region-fiat.yaml` | COUNTRY_ROW/SEARCH, STATE_ROW/SEARCH, FIAT_ROW/SEARCH, REGION_BUTTON | Set ramp region + fiat from Buy/Sell scene (row selectors are the COMBINED row string, e.g. "United States of America US", "Netherlands NL", "EUR Euro"). The region button has no testID and its label is the current region's short name: pass REGION_BUTTON (a regex, e.g. `.*Netherlands.*`) when the account's region is outside the default list. Region is ACCOUNT state: restore it in the same run |
+| `common/send-to-address.yaml` | CURRENCY_CODE, ADDRESS, AMOUNT, WALLET_SEARCH, MANUAL_PATH, SLIDE | Payment-redirect link → pre-filled Send scene → confirm slider (no CURRENCY_CODE, or MANUAL_PATH: Assets → wallet → Send → address → amount). `SLIDE=false` stops on the armed slider and moves nothing: the proof for any change before the broadcast |
 | `common/create-throwaway-account.yaml` | NEW_USERNAME, NEW_PASSWORD, NEW_PIN, NEW_WALLETS, VERIFY_ACCOUNT_INFO | Login scene → new empty account, logged in (never `clearState`). For tests that would dirty a roster account's SYNCED state |
 | `common/delete-throwaway-account.yaml` | DELETE_USERNAME, DELETE_PASSWORD | Deletes the logged-in account. REQUIRED before the run ends for every throwaway the run created (throwaways are single-use) |
-| `buy-quote-input.yaml` / `buy-quote.yaml` | BUY_ASSET, MANUAL_PATH (see file) | Canonical Buy $500 proof flow; opens Buy by deep link (MANUAL_PATH: Buy tab) |
+| `buy-quote-input.yaml` / `buy-quote.yaml` | PIN_DIGIT, EXPECT_USERNAME, BUY_AMOUNT, BUY_ASSET, MANUAL_PATH, FIAT_CODE (see file) | Canonical Buy 500 proof flow; opens Buy by deep link (MANUAL_PATH: Buy tab). The amount field reads "Amount <fiat>" and the fiat follows the account's ramp region: FIAT_CODE pins it, unset takes any. Fails within 1s on an account with no ramp region ("Select your region") |
+| `swap-drive.yaml` | every `select-swap-pair` param, PIN_DIGIT, EXPECT_USERNAME, RELAUNCH, QUOTE_SCREENSHOT, CONFIRM, SUCCESS_TEXT, SUCCESS_TIMEOUT | A whole swap drive in ONE runner invocation: relaunch → login → modals → pair and amount → quote → frame → (CONFIRM=true only) slider. Default ends on the live quote and moves nothing. About 50s to a BTC→ETH quote, against one runner start (about 6s of setup each) per stage |
 | `swap-quote-input.yaml` / `swap-confirm.yaml` | (see file) | Maya swap quote + confirm pair. Local library only (`.syncignore`), not in the repo: compose `common/select-swap-pair.yaml` + `common/confirm-slider.yaml` instead |
 
 Wrote a NEW sequence a future task will plausibly need? Propose it for the
@@ -52,7 +55,7 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   $10 floor is the safe default assumption.)
 - **Test-account ROSTER (exhaustive — search no further)** lives in the
   LOCAL-ONLY file `~/.config/edge-secrets/test-accounts.json`: roles `agent`
-  (**the default YOLO login**, pinned into every worktree env.json by workspace
+  (**the default YOLO login**, pinned into every worktree config.json by workspace
   init; 2FA ON, its password + OTP key are in the `credsFile` the roster names,
   so its 2FA is never a user-only-credential wall; set `YOLO_OTP_KEY` from that
   file if a login asks for the code), `primary` (heavily funded, cluttered with
@@ -70,20 +73,25 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   affiliate attribution (`installerId` / `CreationReason.json`), Exchange
   Settings and mixnet toggles all sync to the account, so exercising them on a
   roster account thrashes every parallel session. Create an empty one with
-  `common/create-throwaway-account.yaml` and log in the normal env.json way.
+  `common/create-throwaway-account.yaml` and log in the normal config.json way.
   They are SINGLE-USE: delete each one you created with
   `common/delete-throwaway-account.yaml` before the run ends, and never write
   its username or password anywhere (no ledger, report, PR, or skill). The
   flow's random username and password guarantee uniqueness
   (`references/throwaway-accounts.md`).
-- **HOW to switch accounts: edit env.json, do NOT drive the UI.** The canonical
-  switch is: set `YOLO_USERNAME`/`YOLO_PIN` in the WORKTREE's `env.json` (a
+- **HOW to switch accounts: edit config.json, do NOT drive the UI.** The canonical
+  switch is: set `YOLO_USERNAME`/`YOLO_PIN` in the WORKTREE's `config.json` (a
   local-only, gitignored copy) to the target roster account, then
   `xcrun simctl terminate <udid> co.edgesecure.app` + `launch` — YOLO auto-login
   lands you in that account on startup. Seconds, deterministic, no side-menu /
   account-dropdown churn (an agent burned 20+ min fumbling that dropdown).
   Drive the in-app account switcher ONLY when you must preserve live in-app
   state across the switch (rare).
+  For the default role use `scripts/pin-agent-login.sh <checkout>` (it prints
+  roles, never values); after either edit run `metro-fresh.sh --file
+  config.json` before the relaunch, and drive with `xcuitest-run.sh
+  --login-role <role>` so a PIN scene on another account fails the flow
+  before any digit is tapped (drive.md `agent-account-first`).
 - **PINs:** look the PIN up in the roster file; never guess. Wrong-PIN retries trigger exponential
   lockout (465s → 914s → …), so never brute-force, and back off immediately on
   "Account locked".
@@ -208,8 +216,8 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
 - **NYM swap is testnet-only and EXECUTABLE today.** One side must be the `nym`
   asset (chainNetwork `sandbox`); the counter-asset comes from {bitcoin,
   litecoin, dash, zcash, cardano, sepolia}. The reliable in-sim pair is
-  **Sepolia ETH → NYM**. Needs (a) the NYM testnet `x-api-key` in `env.json`
-  `NYM_SWAP_INIT.apiKey`, and (b) Sepolia testnet ETH funded into the app's My
+  **Sepolia ETH → NYM**. Needs (a) the NYM testnet `x-api-key` in `keys.json`
+  `swapPlugins.nymswap.apiKey` (legacy `env.json` `NYM_SWAP_INIT.apiKey`), and (b) Sepolia testnet ETH funded into the app's My
   Sepolia wallet (no in-app faucet — fund the wallet's receive address from a
   pre-funded Sepolia key via a public Sepolia RPC). Live floor 0.005 ETH; a
   ~0.0066 ETH swap clears it.
@@ -235,13 +243,19 @@ Promoted from the 3-way login-perf run (2026-07-21, Samsung Galaxy S9, task
 
 - **Android emulator + slot Metro:** an RN debug build on an emulator connects
   to the dev server at `10.0.2.2:8081` (the emulator's host-loopback alias) and
-  IGNORES `adb reverse`, so per-slot Metro ports do not reach it that way.
-  Slot-safe fix: leave Metro on the slot port and run a tiny host-side TCP
-  forwarder from `127.0.0.1:8081` to the slot port. Only one slot can hold
-  8081 — check `lsof -nP -iTCP:8081 -sTCP:LISTEN` first and skip the forwarder
-  if taken. Symptom when unfixed: red "Unable to load script" + repeating
-  logcat `Failed to connect to /10.0.2.2:8081`. (Promoted 2026-07-29, run
-  1216901482732656.)
+  IGNORES `adb reverse`. Point the app at the slot's Metro instead:
+  `~/.cursor/skills/build-and-test/scripts/android-dev-server.sh --serial <emulator-NNNN> --port "$AGENT_METRO_PORT"`
+  (writes RN's per-app `debug_http_host` pref, then relaunches). Re-run it after
+  a fresh install or `pm clear`. Do NOT run a host-side `127.0.0.1:8081`
+  forwarder: 8081 is host-global, so a second emulator loads the other slot's
+  bundle with no error. Symptom when unpointed: red "Unable to load script" +
+  repeating logcat `Failed to connect to /10.0.2.2:8081`.
+- **Android screens that never go idle (the password modal):** maestro `tapOn`
+  and `uiautomator dump` hang there, and one `adb shell input text` call drops
+  characters. Locate targets from `adb exec-out screencap -p` or a dump taken
+  before the modal opened, focus with `adb shell input tap <x> <y>`, and type
+  with `~/.cursor/skills/build-and-test/scripts/android-type-text.sh --serial <emulator-NNNN> --env <VAR>`
+  (one character per call; secrets stay in the env var).
 
 - **Builds**: `gradlew` lives under `android/`, not repo root; `sfw ./gradlew`
   fails (spawn ENOENT) — run gradle directly (it spawns `node`, not npx, so the
@@ -333,8 +347,42 @@ default 8081), who is listening there and from which directory, and a verdict:
   loads THAT bundle, no error anywhere). Kill the squatter and start YOUR Metro
   on the port the app already reads. Never redirect the app instead.
 - **NO_METRO** — start your Metro on the app's effective port.
-- **OK** — only now is it a reload/cache question: cold-launch first, then
-  `--reset-cache` (a hook requires a fresh triage marker before cache resets).
+- **OK** — only now is it a reload/cache question. Ask whether that Metro
+  sees your edit:
+
+  ```bash
+  ~/.cursor/skills/build-and-test/scripts/metro-fresh.sh --port "$AGENT_METRO_PORT" [--file <repo-relative path> ...]
+  ```
+
+  Metro learns of edits from watchman. The script first checks that watchman
+  still observes the checkout (a cookie file must be seen within 5s), then
+  that Metro serves each edited `src/` file (or each `--file`); a `.json`
+  module is compared with disk value for value.
+  - `VERDICT=FRESH`: cold-launch the app (terminate + launch) to load the edit.
+  - `VERDICT=STALE watcher=stalled root=<dir>`: watchman stopped observing that
+    root, so Metro keeps serving every module as it was before the stall, with
+    no error. Stop that Metro (`lsof -nP -iTCP:<port> -sTCP:LISTEN -t` gives
+    the pid), `watchman watch-del <dir>`, start Metro on the same port WITHOUT
+    `--reset-cache`, re-run the check, then cold-launch.
+  - `VERDICT=STALE stale=<n>`: a served `.json` differs from disk with a live
+    watcher. Restart that Metro without `--reset-cache` and re-check;
+    `--reset-cache` is the last step, only when a restarted Metro still
+    reports STALE (a hook requires a fresh triage marker before cache resets).
+  A source map proves nothing here: Metro fills `sourcesContent` from disk at
+  request time, so the map matches disk while the served module is stale.
+- **After any JS or config edit made while Metro is running** (a provider
+  force, a log hook, a testID, a `config.json` login pin), run `metro-fresh.sh`
+  BEFORE relaunching the app. A stale Metro serves the old module with no
+  error, and the drive then tests the code you just replaced. The runner
+  (`xcuitest-run.sh`) does not run this check: it costs up to 5s per run on a
+  stalled root and most runs follow no edit. The edit is the trigger.
+- **The YOLO login pin is a bundled module.** `config.json` (`env.json` on
+  older branches) is read at bundle time. A checkout that skipped workspace
+  init (the primary checkout a Task-shape run builds from) has no agent pin:
+  `scripts/pin-agent-login.sh <checkout>` writes it, `metro-fresh.sh --file
+  config.json` proves Metro serves it, a cold launch signs in. A relaunch that
+  stays on another account's PIN scene after a pin is this staleness, not a
+  login bug.
 
 Hard rules enforced by hooks: hand-writing `RCT_jsLocation` is blocked
 (packager pinning belongs to ios-rn-build.sh's cached-launch path, which pins +
@@ -384,7 +432,7 @@ debugging screenshots of the wrong device.
   rebuild between frames. (Promoted 2026-07-29, run 1210166111258621.)
 - **Crawl the code and run `/debugger` EARLY**, not as a last resort. A grinding
   UI loop is the most expensive probe there is. "Why is X missing/failing" is
-  usually answerable from source (settings store, plugin registration, env.json
+  usually answerable from source (settings store, plugin registration, config.json/keys.json
   flags) or one `/debugger` breakpoint — minutes, vs. an hour of taps.
 - **Feature-enablement check (the Rango lesson):** when a provider/feature you
   expect simply ISN'T THERE (no quotes from it, not in the list), FIRST suspect a
@@ -423,12 +471,60 @@ debugging screenshots of the wrong device.
 
 ## Driving the app (mechanics)
 - **Compose, don't re-derive.** Reusable subflows live in this skill's
-  `maestro/common/` (`login-if-needed`, `dismiss-startup-modals`,
-  `select-swap-pair`, `confirm-slider`). Copy them next to your task flow and
-  `runFlow` them. The gui repo also has its own heavyweight `maestro/common/`
+  `maestro/common/` (the flow table at the top lists every one). Copy them next
+  to your task flow and `runFlow` them. The gui repo also has its own heavyweight `maestro/common/`
   (verification suite) — reference for selectors, but dev flows stay OURS/local.
 - **The confirm slider** is solved: `common/confirm-slider.yaml`. Do not spend
   calls re-deriving the gesture.
+- **A slide that did not register is a finding, never a retry.** The flow fails
+  when "Slide to Confirm" still shows 3s after the swipe. Do NOT swipe again:
+  a second slide on a value-moving scene can send twice if the first one
+  registered late. Read the swipe step's log line (from and to points, thumb
+  frame before and after), `--inspect` the scene for what covers the thumb, fix
+  that cause, then run the slider step once more.
+- **Wait on every terminal marker at once.** A wait that names only the success
+  text sits out its whole timeout when the app shows the failure instead. Put
+  both in one selector (`visible: "Powered by .*|Exchange Error"`), then assert
+  the success text with a 1s timeout so the failure ends the flow there. Size
+  the ceiling to the slowest real success, not to a round number.
+- **A long wait never follows a tap directly.** After a tap that should leave
+  a scene, first prove the scene moved with a check of 5s or less (the tapped
+  control is gone, or the next scene's first marker shows), then wait for the
+  slow thing. A swallowed tap then fails in 5s instead of at the end of a
+  300s wait. The check names every state the next scene can open in (a
+  picker-closed check that waits for "Search Wallets" to leave fails when the
+  next scene has that field too). The interpreter prints a lint line before
+  step 1 for a tap followed by a wait over 20s with no check between.
+- **Absence checks: a short `notVisible` wait, not `assertNotVisible`.** On the
+  interpreter `assertNotVisible` on text that IS visible holds about 17s
+  before it fails; `extendedWaitUntil: {notVisible: ..., timeout: 2000}` fails
+  in 2s. A `runFlow: when: visible:` whose condition is false costs about 0.5s
+  on an idle scene and 5 to 7s while the app is busy (a quote loading, a
+  region list saving), so order optional blocks after the scene settles.
+- **Exchange scene, error frames.** The "Exchange Error" card renders under
+  the keyboard after Next: wait on the text, never on a frame, and take the
+  proof frame after the keyboard is gone. The "Stealth Swap" label is part of
+  its switch's touch target: a tap on the label flips the switch, so never use
+  that label as a neutral place to tap or as a scroll anchor.
+- **Wallet pickers and wallet lists: tap by row id.** Picker rows are
+  `walletPickerRow.<wallet name>.<code>`; Assets rows are
+  `walletListRow.<wallet name>.<code>`. A label regex misses rows whose label
+  has extra text (network tags such as Arc), and after typing in the search
+  field the picker's footer covers the lower rows, so type the search text
+  first and then tap the id (`SRC_ROW_ID` / `DST_ROW_ID` / `ROW_ID`).
+- **Send and Receive scenes have no tab bar.** A flow that ends there backs
+  out (`chevronBack`) to the wallet scene before it taps Buy, Sell or
+  Exchange. Each payment deep link pushes ONE more Send scene: after two link
+  runs, one back tap shows an identical Send scene and the tap step reports
+  plain ok, so check for the tab bar after backing out, never count taps.
+- **Flow script state lives on `output`.** A `var` declared in one
+  `evalScript` or `runScript` step is undefined in the next step; assign to
+  `output.<name>`. Header env values are strings (`${X || "default"}`), and a
+  YAML plain scalar cannot hold `: ` (quote any ternary).
+- **Port lookups: `lsof`, never `pgrep -fl`.** `lsof -nP -iTCP:<port>
+  -sTCP:LISTEN -t` prints the listening pid and nothing else. `pgrep -fl` and
+  `ps` with argv print every matching process's full command line into the
+  transcript, and those command lines can hold credentials.
 - **Swipes generally: percentages, short strokes, never re-derived.** Vertical
   scrolling is `swipe: start: "50%, 70%"  end: "50%, 30%"` — always percentage
   coordinates (slot sims differ in scale; absolute pixels are why hand-derived
@@ -443,7 +539,7 @@ debugging screenshots of the wrong device.
   `EdgeModal`); the dimmed backdrop is not addressable by text. (Promoted
   2026-07-29, run 1211050361847785.)
 - **Do not drive the PIN keypad with `common/login-if-needed.yaml` when the
-  worktree `env.json` has `YOLO_*` set:** auto-login enters digits concurrently
+  worktree `config.json` has `YOLO_*` set:** auto-login enters digits concurrently
   and the subflow fails on digit 3. Wait for the logged-in shell, or drive the
   already-running app. (Promoted 2026-07-29, run 1213213636561471.)
 - **Enroll/un-enroll sim biometry without the Simulator UI:**
@@ -457,17 +553,23 @@ debugging screenshots of the wrong device.
   module-level `firstRun` flag in `LoginScene.tsx`, consumed once per bundle
   load, so side-menu logout LANDS on the login scene and stays. To land there
   straight from launch, null BOTH `YOLO_USERNAME` and `YOLO_PIN` in the
-  worktree `env.json` (nulling only the username hits a light-account fallback
+  worktree `config.json` (nulling only the username hits a light-account fallback
   that still auto-logs-in), then terminate + launch; restore after. (Promoted
   2026-07-29, run 1215939017452141.)
-- **Drive a deep link with `openLink` on the XCUITest interpreter.** It hands
-  the URL to the running app directly (`edge://` and `https://edge.app/...`
-  alike) with no "Open in Edge?" dialog, from any scene, and the committed
-  flows use it by default. It returns before the app navigates: wait on the
-  target scene's text. Avoid `simctl openurl` and Maestro's own `openLink` on
+- **Drive a deep link with `openLink` on the XCUITest interpreter, in its
+  `edge://` form.** A custom-scheme link reaches the running app in under a
+  second with no "Open in Edge?" dialog, from any scene, whether this
+  invocation launched the app or only attached to it, and the committed flows
+  use it by default. An `https://edge.app/...` link works only in an invocation
+  whose `launchApp` started the app and fails at once otherwise. The app
+  normalizes `https://deep.edge.app/<path>` and `https://return.edge.app/<path>`
+  to `edge://<path>`, and `https://edge.app/redirect/<x>` shares its parser
+  with `edge://redirect/<x>`, so write the `edge://` form (check
+  `src/util/DeepLinkParser.ts` for any other `https://edge.app` path). It returns before the app navigates: wait on the target scene's
+  text. Avoid `simctl openurl` and Maestro's own `openLink` on
   iOS: the first raises the "Open in Edge?" system dialog, which can background
-  the app when tapped, and the second fails to deliver. `ENV.YOLO_DEEP_LINK`
-  in the worktree `env.json` (read by `DeepLinkingManager`, then
+  the app when tapped, and the second fails to deliver. `YOLO_DEEP_LINK`
+  in the worktree `config.json` (read by `DeepLinkingManager`, then
   `simctl terminate` + `launch`) is only for a link that must arrive at cold
   start. When the account holds several wallets for the linked asset the app
   raises its own wallet picker; the flows handle it by wallet name. (Replaced
@@ -544,11 +646,16 @@ debugging screenshots of the wrong device.
   `<app>/edge-exchange-plugins.bundle/edge-exchange-plugins.js` in the installed
   `.app`, then relaunch — the WebView reloads the plugin bundle from the resource
   on launch. Parallel-safe (per-slot `.app`).
-- **Force a provider + pick a quotable pair.** To route a swap through a specific
-  DEX provider, disable competitors in **Settings → Exchange Settings** (per-account
-  state). A small same-chain stablecoin→native amount may not quote on
-  Maya/Thorchain (price-impact/min); a cross-chain destination (e.g. token→BTC)
-  quotes reliably and exercises the same source-side token-spend code.
+- **Force a provider + pick a quotable pair.** To route a swap through one
+  provider, edit the gui checkout's `src/util/corePlugins.ts` `swapPlugins` map:
+  set every other provider to `false` and keep the target's `*_INIT` (drive.md
+  `force-swap-provider-locally`; local only, never committed, revert before any
+  commit). Then `metro-fresh.sh`, then cold-launch. Never toggle **Settings →
+  Exchange Settings** for this: it is account-synced and persists into every
+  other session on that roster account; read it only to diagnose why a
+  provider is absent. A small same-chain stablecoin→native amount may not quote
+  on Maya/Thorchain (price-impact/min); a cross-chain destination (e.g.
+  token→BTC) quotes reliably and exercises the same source-side token-spend code.
 - **Create-wallet entry points.** The Wallets bottom tab is labeled **"Assets"**;
   the create-wallet entry is the header `addButton` (testID) — use it instead of
   scrolling a long wallet list. YOLO auto-login (agent roster account) lands logged-in
@@ -572,7 +679,7 @@ debugging screenshots of the wrong device.
   searching "Bitcoin SV" in "Choose Wallets to Add" shows no creatable result — a
   ready proxy for verifying the keys-only exclusion mechanism when the real asset
   (e.g. Botanix) can't run in the sim.
-- **`BOTANIX_INIT` is `false` by default in env.json; enabling it crashes the
+- **`BOTANIX_INIT` (develop: `config.json` `corePlugins.botanix`) is `false` by default; enabling it crashes the
   debug build on launch.** So Botanix is absent from `account.currencyConfig` in
   normal builds and never appears in create-wallet regardless of `keysOnlyMode` —
   exercise the gate via the bitcoinsv proxy above, not Botanix itself.

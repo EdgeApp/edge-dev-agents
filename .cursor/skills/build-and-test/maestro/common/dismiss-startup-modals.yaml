@@ -5,6 +5,8 @@ appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
 ---
+# A debug build's LogBox toast covers the tab bar and swallows taps there.
+- runFlow: dismiss-logbox-banner.yaml
 # "Verify your password" (PasswordReminderModal) covers the scene when the
 # account is due a password check, and can also open when a tap meant for
 # something else lands on the password notification card. Its close button
@@ -22,13 +24,20 @@ env:
       visible: "Security is Our Priority"
     commands:
       - tapOn: "Cancel"
+# The title is a regex to the Maestro CLI, so the "?" is escaped.
 - runFlow:
     when:
-      visible: "How Did You Discover Edge?"
+      visible: "How Did You Discover Edge\\?"
     commands:
       - tapOn: "Dismiss"
+# Notification-permission and survey prompts that end in "Not Now" or "Later".
 - runFlow:
     when:
-      visible: "Claim Your Web3 Handle"
+      visible: "Not Now"
     commands:
       - tapOn: "Not Now"
+- runFlow:
+    when:
+      visible: "Later"
+    commands:
+      - tapOn: "Later"

@@ -68,6 +68,13 @@ ta "Bash ungated .sh then a gated .sh" 2 '{"tool_name":"Bash","session_id":"SESS
 ta "Bash gated .sh then an ungated .sh" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > ~/.config/agent-watcher/hooks/g.sh <<EOF\nx\nEOF\ncat > /tmp/b.sh <<EOF\ny\nEOF"}}'
 ta "Bash two ungated .sh writes" 0 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > /tmp/a.sh <<EOF\nx\nEOF\ncat > /tmp/b.sh <<EOF\ny\nEOF"}}'
 ta "Bash grep of a hook writing to /tmp" 0 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"grep -n foo ~/.config/agent-watcher/hooks/x.sh > /tmp/out.txt"}}'
+# The in-place vector reads only the sed/perl simple command: a script RUN later
+# in the same command is not its target.
+ta "Bash sed -i on scratch yaml, then run a skill script" 0 '{"tool_name": "Bash", "session_id": "SESS", "cwd": "/tmp", "tool_input": {"command": "sed -i \"\" \"s/a/b/\" /tmp/flow.yaml && ~/.cursor/skills/build-and-test/scripts/xcuitest-run.sh --flow /tmp/flow.yaml"}}'
+ta "Bash sed -i; newline; run a skill script" 0 '{"tool_name": "Bash", "session_id": "SESS", "cwd": "/tmp", "tool_input": {"command": "S=/tmp/s; sed -i \"\" \"s/x/y/\" $S/a.yaml\n~/.cursor/skills/build-and-test/scripts/xcuitest-run.sh --flow $S/a.yaml | tail -3"}}'
+ta "Bash run a hook script, then sed -i on a .ts" 0 '{"tool_name": "Bash", "session_id": "SESS", "cwd": "/tmp", "tool_input": {"command": "~/.config/agent-watcher/log-attempt.sh --help | head; sed -i \"\" \"s/a/b/\" src/x.ts"}}'
+ta "Bash sed -i with a pipe inside the quoted expr on a hook" 2 '{"tool_name": "Bash", "session_id": "SESS", "cwd": "/tmp", "tool_input": {"command": "cd /tmp && sed -i \"\" \"s|a|b|\" ~/.config/agent-watcher/hooks/x.sh && echo done"}}'
+ta "Bash env-prefixed perl -pi on a skill script" 2 '{"tool_name": "Bash", "session_id": "SESS", "cwd": "/tmp", "tool_input": {"command": "LC_ALL=C perl -pi -e \"s/a/b/\" ~/.cursor/skills/foo/scripts/do.sh"}}'
 
 echo "== lint-md-on-write"
 t "Edit 300-char entry" 2 $L <<< "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$CL\",\"old_string\":\"x\",\"new_string\":\"$LONG\"}}"

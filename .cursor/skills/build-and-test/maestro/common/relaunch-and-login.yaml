@@ -1,0 +1,37 @@
+# common/relaunch-and-login.yaml: restart the app and land on the logged-in
+# home scene with the startup modals cleared. The entry sequence nearly every
+# task flow starts with.
+# PARAMS:
+#   PIN_DIGIT, EXPECT_USERNAME  see common/login-if-needed.yaml. On iOS pass
+#                `xcuitest-run.sh --login-role <role>` and neither param.
+#   HOME_MARKER  text that proves the home scene is up. Default "Assets".
+# ACCOUNT: the app signs in by itself when the checkout's YOLO login is pinned
+# (scripts/pin-agent-login.sh) and Metro serves that pin (scripts/metro-fresh.sh
+# --file config.json). The PIN taps are the fallback for an unpinned build.
+# NEVER add `clearState: true` to the launch: it wipes the roster accounts.
+# ENDINGS NAMED: the launch wait ends on the PIN scene, the home scene (YOLO
+# auto-login) or the full login scene (no PIN account on the device). The last
+# is a failure and stops the flow within 1s instead of after the home wait.
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  # `${KEY || default}` so a caller's runFlow env wins over the default.
+  PIN_DIGIT: ${PIN_DIGIT || "0"}
+  EXPECT_USERNAME: ${EXPECT_USERNAME || ""}
+  HOME_MARKER: ${HOME_MARKER || "Assets"}
+---
+- launchApp
+- extendedWaitUntil:
+    visible: ${"Exit PIN|Create account|" + HOME_MARKER}
+    timeout: 40000
+- assertNotVisible: "Create account"
+- runFlow:
+    file: login-if-needed.yaml
+    env:
+      PIN_DIGIT: ${PIN_DIGIT}
+      EXPECT_USERNAME: ${EXPECT_USERNAME}
+      HOME_MARKER: ${HOME_MARKER}
+- extendedWaitUntil:
+    visible: ${HOME_MARKER}
+    timeout: 60000
+- runFlow: dismiss-startup-modals.yaml

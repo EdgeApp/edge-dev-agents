@@ -5,9 +5,26 @@ appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
 ---
+# An error alert dropdown lies over the header and takes the side-menu tap.
+- runFlow:
+    when:
+      visible:
+        id: "alertDropdownClose"
+    commands:
+      - tapOn:
+          id: "alertDropdownClose"
+      - extendedWaitUntil:
+          notVisible:
+            id: "alertDropdownClose"
+          timeout: 5000
 - tapOn:
     id: "sideMenuButton"
 - extendedWaitUntil:
     visible: "Settings"
     timeout: 15000
 - tapOn: "Settings"
+# Scene-advanced check: the Settings list opens on its "Account: <username>"
+# header, which the side menu does not show.
+- extendedWaitUntil:
+    visible: "Account: .*"
+    timeout: 10000

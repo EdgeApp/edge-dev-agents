@@ -4,7 +4,7 @@
 #
 # ENTRY STATE: the LOGIN scene (the one with Username / Password / "Create
 # account"). On a slot sim the app auto-logs-in, so get there first:
-#   1. null BOTH "YOLO_USERNAME" and "YOLO_PIN" in the worktree env.json
+#   1. null BOTH "YOLO_USERNAME" and "YOLO_PIN" in the worktree config.json
 #      (nulling only the username hits a light-account fallback that still
 #      auto-logs-in), then `simctl terminate` + `launch`
 #   2. the app lands on the PIN scene for the last account — this flow taps
@@ -29,7 +29,7 @@
 #                 username/password/PIN echo back. Default off: it is the gui
 #                 suite's job, and the assert chain is the brittlest part.
 #
-# OUTPUTS (for composing common/delete-account.yaml)
+# OUTPUTS (for composing common/delete-throwaway-account.yaml)
 #   output.newAccountUsername / output.newAccountPassword / output.newAccountPin
 #
 # NOTES
@@ -41,6 +41,12 @@
 # - The captcha (ALTCHA) and the modal gauntlet are all conditional here. The
 #   gui suite asserts them; a dev flow that hard-asserts them breaks whenever
 #   the copy or the captcha rollout changes.
+# - Every wait over 20s sits behind a short scene-advanced check, so a swallowed
+#   tap fails in seconds at the tap, not minutes later at the slow wait.
+# - Script state lives on `output`, never in `var`: the Maestro CLI runs each
+#   evalScript in its own scope, so a `var` from one step is undefined in the
+#   next. The wallet diff is computed before the account exists, so a bad
+#   NEW_WALLETS value fails with nothing to clean up.
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
@@ -57,6 +63,15 @@ env:
 - evalScript: ${output.newAccountUsername = NEW_USERNAME}
 - evalScript: ${output.newAccountPassword = NEW_PASSWORD}
 - evalScript: ${output.newAccountPin = NEW_PIN}
+- evalScript: ${output.twWanted = JSON.parse(NEW_WALLETS || "[]")}
+- evalScript: ${output.twDefaults = JSON.parse(DEFAULT_WALLETS)}
+- evalScript: ${output.twDrop = output.twDefaults.filter(d => NEW_WALLETS !== "" && !output.twWanted.includes(d))}
+- evalScript: ${output.twAdd = output.twWanted.filter(w => !output.twDefaults.includes(w))}
+- evalScript: ${output.twDropIndex = 0}
+- evalScript: ${output.twAddIndex = 0}
+
+# A debug build's LogBox toast covers the bottom of the scene and swallows taps.
+- runFlow: dismiss-logbox-banner.yaml
 
 # Reach the login scene from wherever the app landed.
 - runFlow:
@@ -77,6 +92,11 @@ env:
     visible: "Create account"
     timeout: 20000
 - tapOn: "Create account"
+# Scene-advanced check: the login scene's password field is gone.
+- extendedWaitUntil:
+    notVisible:
+      id: "passwordFormField"
+    timeout: 10000
 
 # Choose Username. The captcha may or may not appear; it self-solves.
 - extendedWaitUntil:
@@ -134,11 +154,21 @@ env:
 - waitForAnimationToEnd:
     timeout: 5000
 - tapOn: "Confirm"
+# Scene-advanced check: the terms scene is gone.
+- extendedWaitUntil:
+    notVisible: "Review: Terms of Use.*"
+    timeout: 10000
 
 # Account creation runs on the server; the Create button fades in after.
+# One wait for both endings: a creation the server did not complete drops the
+# app back on the terms scene (with an error toast), so that scene ends the
+# wait too and the step after it fails within 1s.
+- extendedWaitUntil:
+    visible: "View account information.*|Review: Terms of Use.*"
+    timeout: 90000
 - extendedWaitUntil:
     visible: "View account information.*"
-    timeout: 90000
+    timeout: 1000
 - runFlow:
     when:
       true: ${VERIFY_ACCOUNT_INFO}
@@ -153,22 +183,31 @@ env:
 - waitForAnimationToEnd:
     timeout: 8000
 - tapOn: "Create"
-- waitForAnimationToEnd:
-    timeout: 20000
+- extendedWaitUntil:
+    notVisible: "Tap the dropdown below to review your account information"
+    timeout: 5000
+    optional: true
 - runFlow:
     when:
       visible: "Tap the dropdown below to review your account information"
     commands:
       - tapOn: "Create"
-      - waitForAnimationToEnd:
-          timeout: 20000
+- extendedWaitUntil:
+    notVisible: "Tap the dropdown below to review your account information"
+    timeout: 10000
 
 # iOS shows the notification-permission modal before the wallet picker.
+- extendedWaitUntil:
+    visible: "Security is Our Priority|Choose Wallets to Add"
+    timeout: 20000
 - runFlow:
     when:
       visible: "Security is Our Priority"
     commands:
       - tapOn: "Cancel"
+      - extendedWaitUntil:
+          notVisible: "Security is Our Priority"
+          timeout: 10000
 
 # Wallet picker. With NEW_WALLETS unset the app's defaults are kept.
 - extendedWaitUntil:
@@ -178,44 +217,52 @@ env:
     when:
       true: ${NEW_WALLETS}
     commands:
-      - evalScript: ${var wallets = JSON.parse(NEW_WALLETS)}
-      - evalScript: ${var defaults = JSON.parse(DEFAULT_WALLETS)}
-      - evalScript: ${var dropDefaults = defaults.filter(d => !wallets.includes(d))}
-      - evalScript: ${var addWallets = wallets.filter(w => !defaults.includes(w))}
-      - evalScript: ${var dropIndex = 0}
       - repeat:
-          times: ${dropDefaults.length}
+          times: ${output.twDrop.length}
           commands:
-            - tapOn: ${".*" + dropDefaults[dropIndex]}
-            - evalScript: ${dropIndex++}
-      - evalScript: ${var addIndex = 0}
+            - tapOn: ${".*" + output.twDrop[output.twDropIndex]}
+            - evalScript: ${output.twDropIndex++}
       - repeat:
-          times: ${addWallets.length}
+          times: ${output.twAdd.length}
           commands:
             - tapOn: "Search Wallets"
             - eraseText: 30
-            - inputText: ${addWallets[addIndex]}
+            - inputText: ${output.twAdd[output.twAddIndex]}
             - tapOn:
-                text: ${".*" + addWallets[addIndex]}
+                text: ${".*" + output.twAdd[output.twAddIndex]}
                 index: 1
-            - evalScript: ${addIndex++}
+            - evalScript: ${output.twAddIndex++}
 - tapOn:
     id: "nextButton"
+# The Next tap can be swallowed with no error. Prove the picker closed before
+# the long wallet-creation wait: a short check, one retry, then a hard gate.
+- extendedWaitUntil:
+    notVisible:
+      id: "nextButton"
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: "nextButton"
+    commands:
+      - tapOn:
+          id: "nextButton"
+- extendedWaitUntil:
+    notVisible:
+      id: "nextButton"
+    timeout: 10000
 
-# Landed in the new account. Creating the default wallets takes 70s-3min on a
-# slot sim, hence the long wait.
+# Landed in the new account. Home mounts at once and shows the balance card
+# with or without wallets, so this is the scene check only; it says nothing
+# about wallet creation.
 # SELECTOR: it must be the `.*Total Balance.*` REGEX. Maestro matches the whole
 # text node, and Home renders the balance as one node ("Total Balance $ 0.00
 # USD"), so the bare string never matches — it fails at ANY timeout, on a screen
 # that plainly shows the words.
 - extendedWaitUntil:
     visible: ".*Total Balance.*"
-    timeout: 300000
-- runFlow:
-    when:
-      visible: "Claim Your Web3 Handle"
-    commands:
-      - tapOn: "Not Now"
+    timeout: 20000
 - runFlow:
     when:
       visible: "How Did You Discover Edge\\?"
@@ -226,4 +273,28 @@ env:
       visible: "Security is Our Priority"
     commands:
       - tapOn: "Cancel"
-- assertVisible: ".*Total Balance.*"
+# Wallet creation runs in the background after Home mounts (70s-3min on a slot
+# sim) and Home looks the same whether it worked. The Assets tab shows the
+# outcome: a wallet row ("My <asset>") when the first wallet lands, or the
+# lasting "Alert!" dropdown the app raises when a key call fails. One wait for
+# both endings; the step after it fails within 1s when the alert is what showed.
+# Skipped when the caller asked for no wallets.
+- runFlow:
+    when:
+      true: ${NEW_WALLETS === "" || output.twWanted.length > 0}
+    commands:
+      - tapOn: "Assets"
+      # Scene-advanced check: the wallet list's search footer.
+      - extendedWaitUntil:
+          visible: ".*Search Wallets.*"
+          timeout: 10000
+      - extendedWaitUntil:
+          visible: "My .*|.*Alert!.*"
+          timeout: 300000
+      - extendedWaitUntil:
+          visible: "My .*"
+          timeout: 1000
+      - tapOn: "Home"
+- extendedWaitUntil:
+    visible: ".*Total Balance.*"
+    timeout: 10000

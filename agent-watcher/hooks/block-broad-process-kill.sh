@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # block-broad-process-kill.sh — PreToolUse(Bash).
-# Pattern kills are box-wide on a shared machine. Every orch task claude runs with
-# `--mcp-config ~/.config/agent-watcher/maestro-mcp.json`, so full-argv matching hits
-# them: on 2026-09-22 (00:40:52Z) a finalizing session's cleanup ran
+# Pattern kills are box-wide on a shared machine. A task claude launched with
+# `--mcp-config ~/.config/agent-watcher/maestro-mcp.json` (Android lanes, and at
+# the time below every lane) has `maestro` in its argv, so full-argv matching hits
+# it: on 2026-09-22 (00:40:52Z) a finalizing session's cleanup ran
 # `pkill -f 'maestro'` and killed every task claude on eddy (two active runs plus
 # five retired panes); the watchdog does not revive, so the work stopped silently.
 #
@@ -52,8 +53,8 @@ fi
 [ -n "$REASON" ] || exit 0
 cat >&2 <<MSG
 BLOCKED (block-broad-process-kill): $REASON. Kill by explicit PID only.
-This machine runs many sessions at once, and every orch task claude carries
-maestro-mcp.json in its argv, so a pattern kill takes down other agents'
+This machine runs many sessions at once, and other agents' processes carry
+shared names in their argv, so a pattern kill takes down other agents'
 sessions, sims, Metro, and the orch daemons.
   1. List candidates:  pgrep -fl '<pattern>'
   2. Kill the specific PIDs you started (Metro on YOUR port, YOUR maestro child):

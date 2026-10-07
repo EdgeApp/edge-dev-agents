@@ -108,7 +108,7 @@ Use the report to answer the original question (why this value, what code path, 
 
 Use this when the target runs in edge-core-js's plugin WebView (per `pick-the-right-method`); Hermes CDP can't reach it. You instrument the dep's source (served by its `DEBUG_*` webpack dev-server, which hot-reloads), have it POST runtime data to a tiny local server, then drive the app and read the captured log. Confirmed in the Rango/Sonic investigation: it revealed Edge's swap engine never calls the plugin's `fetchSwapQuote` at all (only the factory-load diag fired, never the public-method-entry diag), proving the plugin was filtered upstream rather than a bug in the plugin.
 
-Prerequisite: the dep must be linked via its `DEBUG_*` dev-server (e.g. `DEBUG_EXCHANGES=true` in the gui `env.json` + the dep's `yarn start` on :8083) so your source edits are what the WebView loads. See `/build-and-test`'s `gui-dependency-integration` and `[[dep-linking-debug-flags]]`.
+Prerequisite: the dep must be linked via its `DEBUG_*` dev-server (e.g. `DEBUG_EXCHANGES=true` in the gui `config.json` + the dep's `yarn start` on :8083) so your source edits are what the WebView loads. See `/build-and-test`'s `gui-dependency-integration` and `[[dep-linking-debug-flags]]`.
 
 ### 5a. Start the capture server (per-slot port + paths — parallel-agent safe)
 

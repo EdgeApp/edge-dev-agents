@@ -205,6 +205,11 @@
           "type": "command"
         },
         {
+          "command": "~/.config/agent-watcher/hooks/redirect-settings-writes.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
           "command": "~/.config/agent-watcher/hooks/lint-md-on-write.sh",
           "timeout": 30,
           "type": "command"
@@ -242,6 +247,11 @@
         {
           "command": "~/.config/agent-watcher/hooks/require-skill-for-file.sh",
           "timeout": 15,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/redirect-settings-writes.sh",
+          "timeout": 10,
           "type": "command"
         },
         {

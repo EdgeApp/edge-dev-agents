@@ -32,6 +32,8 @@ final class FlowRunnerTests: XCTestCase {
       return
     }
 
+    for warning in FlowPreflight.warnings(in: document) { print("[edge-flow] lint: \(warning)") }
+
     let options = RunOptions(environment: environment)
     EdgeQuiescence.install()
     print("[edge-flow] start \(flowName.lastPathComponent) cap=\(options.quiescenceCap)s animations=\(options.animations)")

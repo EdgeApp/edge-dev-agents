@@ -88,10 +88,10 @@ Only update for fully landed PRs:
 Do NOT update for: skipped PRs, addressed-but-not-re-reviewed PRs, or GUI-dep repos not published.
 
 <sub-step name="env.json gate (before any update)">
-A task whose landed diff requires a build-server `env.json` change is NOT done when it merges — the new config value must exist on the build server before QA can verify. For each landed GUI PR, check its diff for `src/envConfig.ts` ADDITIONS (`gh pr diff <n> --repo EdgeApp/edge-react-gui | grep '^+.*_INIT'` or equivalent). If a PR adds env keys:
+A task whose landed diff requires a build-server config change is NOT done when it merges — the new config value must exist on the build server before QA can verify. For each landed GUI PR, check its diff for ADDITIONS to the config schema: `src/configKeysSchema.ts` on develop-based PRs (`config.json`/`keys.json`, plus new plugin-map entries such as a `corePlugins`/`swapPlugins` key the code now reads), `src/envConfig.ts` on staging/master-based PRs (legacy `env.json` `*_INIT`). `gh pr diff <n> --repo EdgeApp/edge-react-gui --name-only` shows whether either file changed; read the `+` lines of those files in `gh pr diff <n> --repo EdgeApp/edge-react-gui`. If a PR adds config keys:
 - Do NOT move that task's Board State.
-- Surface it in the final report (and as an Asana comment on the task in orchestrated runs): name the exact key path(s) needed, e.g. `NYM_SWAP_INIT.apiKey`.
-Removals are fine (cleaners strip unknown env.json fields); only additions gate.
+- Surface it in the final report (and as an Asana comment on the task in orchestrated runs): name the exact key path(s) and file needed, e.g. `keys.json` `swapPlugins.nymswap.apiKey`.
+Removals are fine (cleaners strip unknown fields); only additions gate.
 </sub-step>
 
 <sub-step name="Extract Asana task GIDs">

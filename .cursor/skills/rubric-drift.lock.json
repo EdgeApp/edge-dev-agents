@@ -64,7 +64,7 @@
       ]
     },
     "file:agent-run-report.md": {
-      "hash": "0d7308c4316b",
+      "hash": "df421b4e0721",
       "dims": [
         "A18",
         "A20",
@@ -138,7 +138,7 @@
       ]
     },
     "pr-create:attach-test-evidence": {
-      "hash": "528d3b152d3f",
+      "hash": "69989fa8760e",
       "dims": [
         "A13"
       ]
@@ -234,7 +234,7 @@
       ]
     },
     "build-and-test:gui-dependency-integration": {
-      "hash": "63130c2458bb",
+      "hash": "98b23b85fbe3",
       "dims": [
         "A21"
       ]
@@ -246,7 +246,7 @@
       ]
     },
     "file:asana-watcher.js": {
-      "hash": "cc3904a3ff5b",
+      "hash": "6c8cd62c2e7c",
       "dims": [
         "O1"
       ]
@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "4bd22ef977ad",
+      "hash": "437acf50c720",
       "dims": [
         "O4",
         "O5",
@@ -273,7 +273,7 @@
       ]
     },
     "file:setup-task-workspace.sh": {
-      "hash": "f46ca6642936",
+      "hash": "5b4db8573a52",
       "dims": [
         "O8"
       ]
@@ -363,7 +363,7 @@
       ]
     },
     "build-and-test:funded-test-accounts": {
-      "hash": "abdb13652443",
+      "hash": "de294b34a4f9",
       "dims": [
         "A27"
       ]
@@ -423,7 +423,7 @@
       ]
     },
     "build-and-test:preflight-before-build-decisions": {
-      "hash": "489c79c737ba",
+      "hash": "459e1f69213f",
       "dims": [
         "A29"
       ]
@@ -539,7 +539,7 @@
       ]
     },
     "file:tdd-doc-links.sh": {
-      "hash": "4dcbd8d7c7b6",
+      "hash": "f69f1e424e4a",
       "dims": [
         "A31"
       ]
@@ -564,7 +564,7 @@
       ]
     },
     "file:lint-commit.sh": {
-      "hash": "4ca68dfe2ee6",
+      "hash": "9dd80b357ef8",
       "dims": [
         "A12"
       ]
@@ -612,7 +612,7 @@
       ]
     },
     "file:tdd-stamp.sh": {
-      "hash": "041a2968e4d9",
+      "hash": "0df36cf7a9c9",
       "dims": [
         "A31"
       ]
@@ -685,7 +685,7 @@
       ]
     },
     "pr-create:evidence-dispositions": {
-      "hash": "1984ef57bed7",
+      "hash": "1b9dce97dc41",
       "dims": [
         "A13"
       ]
@@ -727,7 +727,7 @@
       ]
     },
     "one-shot:report-both-sides": {
-      "hash": "5106c9fbec45",
+      "hash": "32abb324f157",
       "dims": [
         "A18"
       ]
@@ -736,6 +736,18 @@
       "hash": "bca2a798209d",
       "dims": [
         "A15"
+      ]
+    },
+    "one-shot:post-record-to-own-pr": {
+      "hash": "bedda6881b63",
+      "dims": [
+        "A36"
+      ]
+    },
+    "pr-review:rejected-on-own-prs": {
+      "hash": "a1ccad3c5509",
+      "dims": [
+        "A36"
       ]
     }
   },
@@ -873,8 +885,8 @@
       "hash": "ae8c4248ab5a"
     },
     "build-and-test:maestro-flows-are-shortcuts": {
-      "reason": "2026-10-02: flow-authoring and exploration guidance (iOS exploration moved to xcuitest-run --inspect/--steps); the drive outcome it leads to is graded by testing-depth",
-      "hash": "c5b87cc46f20"
+      "reason": "2026-10-07: the iOS remainder the interpreter cannot read or drive now goes to the maestro CLI because only Android-lane sessions carry the maestro MCP; guidance only, the drive outcome is graded by testing-depth",
+      "hash": "2cc7b3648d62"
     },
     "build-and-test:proof-screenshots-for-pr": {
       "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged; screenshot evidence graded by A13",
@@ -1512,10 +1524,6 @@
       "reason": "2026-09-18: tool pointer; misuse is mechanically blocked by block-raw-gh-writes.sh and the script's own lint/author gates",
       "hash": "1b8815f4af80"
     },
-    "one-shot:no-posting": {
-      "reason": "2026-09-21: mechanically enforced by ~/.config/agent-watcher/hooks/block-raw-gh-writes.sh (gh pr comment/review and comment-endpoint API writes are blocked); a post from the self-review phase is a hook regression, noted in A36's grounding",
-      "hash": "5cef6de697fe"
-    },
     "pr-land:broken-develop-gate": {
       "reason": "2026-09-22: mechanically enforced: pr-land-prepare.sh calls develop-buildable.sh and exits 3; the operator-only --allow-broken-develop flag is visible in a run transcript if a rubric dimension is later wanted",
       "hash": "975547054852"
@@ -1577,8 +1585,8 @@
       "hash": "1d516f2f48de"
     },
     "task-run:review-field-routes": {
-      "reason": "2026-09-26: graded at completion by completion-judge J1 (rubric.md Task-deliverable agent_review clause); a run that skips the reviews fails the judge",
-      "hash": "c7dc9b74daa9"
+      "reason": "2026-10-06: 2026-10-06: graded at completion by completion-judge J1 (rubric.md Task-deliverable agent_review clause); findings-comment shape change (link the review, list rejections only on non-owned PRs) is report content, not a judged gate",
+      "hash": "5841fd13cd47"
     },
     "asana-task-update:qa-subtasks": {
       "reason": "2026-10-02: mechanically enforced by asana-task-update.sh (QA_SUBTASKS_REQUIRED gate, QA_NOT_PLAIN check)",
@@ -1603,6 +1611,10 @@
     "build-and-test:ios-flows-run-on-xcuitest": {
       "reason": "2026-10-02: driver choice for running a flow; the drive outcome is graded by testing-depth and proof rules, not by which runner executed the yaml (re-ack: pointer to inspect/steps modes)",
       "hash": "1498de7c87dd"
+    },
+    "build-and-test:app-config-files": {
+      "reason": "2026-10-06: reference map of where gui config lives per branch; the copy it describes is graded under O8 workspace-status-contract",
+      "hash": "95d60549a6c0"
     }
   },
   "excluded_skills": {

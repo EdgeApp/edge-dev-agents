@@ -7,16 +7,28 @@
 #   SEARCH_TERM — text typed into "Search Wallets" (e.g. "Ethereum", "Dash")
 #   MATCH_INDEX — index into filtered results when SEARCH_TERM matches >1
 #                 wallet (default 0 — the top/first result)
+#   ROW_ID      — exact row to open after the search text is typed:
+#                 `walletListRow.<wallet name>.<code>` (e.g.
+#                 `walletListRow.My Bitcoin 3.BTC`). Use it when the account
+#                 holds several wallets the search text matches. Unset keeps
+#                 the SEARCH_TERM + MATCH_INDEX pick.
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
-  SEARCH_TERM: "Bitcoin"
-  MATCH_INDEX: "0"
+  # `${KEY || default}` so a caller's runFlow env wins over the default.
+  SEARCH_TERM: ${SEARCH_TERM || "Bitcoin"}
+  MATCH_INDEX: ${MATCH_INDEX || "0"}
+  ROW_ID: ${ROW_ID || ""}
 ---
+# Home is still mounting cards in the first seconds after a login and a tab
+# tap in that window is swallowed with no error, so settle first.
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn: "Assets"
+# Scene-advanced check: the wallet list's search footer.
 - extendedWaitUntil:
     visible: "Search Wallets"
-    timeout: 20000
+    timeout: 5000
 - tapOn: "Search Wallets"
 # The search text survives navigation; clear it or inputText appends.
 - eraseText: 40
@@ -26,12 +38,26 @@ env:
       visible: "Not Now"
     commands:
       - tapOn: "Not Now"
-- extendedWaitUntil:
-    visible: ".*${SEARCH_TERM}.*"
-    timeout: 15000
-- tapOn:
-    text: ".*${SEARCH_TERM}.*"
-    index: ${MATCH_INDEX}
+- runFlow:
+    when:
+      true: ${ROW_ID != ''}
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: ${ROW_ID}
+          timeout: 15000
+      - tapOn:
+          id: ${ROW_ID}
+- runFlow:
+    when:
+      true: ${ROW_ID == ''}
+    commands:
+      - extendedWaitUntil:
+          visible: ".*${SEARCH_TERM}.*"
+          timeout: 15000
+      - tapOn:
+          text: ".*${SEARCH_TERM}.*"
+          index: ${MATCH_INDEX}
 - extendedWaitUntil:
     visible: "Receive"
     timeout: 15000

@@ -1,0 +1,32 @@
+# common/dismiss-logbox-banner.yaml: close React Native's LogBox toast on a
+# debug build. Its label is "! " plus the newest log line: "! Open debugger to
+# view warnings." after launch, or the text of a warning or error raised later
+# ("! Each child in a list should have a unique 'key' prop..."). The toast sits
+# over the bottom 50pt of the screen and swallows taps and swipes aimed at
+# whatever is under it (the onboarding "Sign in" link, bottom buttons, the PIN
+# pad's last row, the confirm slider).
+# Conditional, so it is safe to run on any scene and on a release build.
+# Compose via:  - runFlow: common/dismiss-logbox-banner.yaml
+# It returns after each launch and whenever the app logs a new warning or
+# error, so run it again right before a tap or swipe on the bottom of a scene.
+#
+# WHY A POINT: the toast is react-native's own component. Its close button has
+# no testID and no label, and the toast body opens a DevTools window on the
+# host when tapped, so the tap lands at the right end of the toast's frame,
+# where the close button is.
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  # A label that starts with "! ". `[\\s\\S]` because a log line can hold newlines.
+  LOGBOX_TOAST: ${LOGBOX_TOAST || "! [\\s\\S]*"}
+---
+- runFlow:
+    when:
+      visible: ${LOGBOX_TOAST}
+    commands:
+      - tapOn:
+          text: ${LOGBOX_TOAST}
+          point: "95%,50%"
+      - extendedWaitUntil:
+          notVisible: ${LOGBOX_TOAST}
+          timeout: 5000

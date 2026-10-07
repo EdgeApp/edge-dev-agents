@@ -88,7 +88,7 @@ if [[ "$MODE" == "--fold" ]]; then
   if git -C "$REPO" diff --quiet HEAD -- "$DOC_REL" 2>/dev/null && git -C "$REPO" cat-file -e "HEAD:$DOC_REL" 2>/dev/null; then
     echo ">> tdd-stamp: $DOC_REL already committed with this stamp; nothing to fold"; exit 0
   fi
-  UPSTREAM="$("$HOME/.cursor/skills/git-default-branch.sh" -C "$REPO" 2>/dev/null || echo "origin/master")"
+  UPSTREAM="$("$HOME/.cursor/skills/git-branch-base.sh" -C "$REPO" 2>/dev/null || echo "origin/master")"
   MB="$(git -C "$REPO" merge-base "$UPSTREAM" HEAD 2>/dev/null || true)"
   FIRST="$(git -C "$REPO" rev-list --reverse "${MB:+$MB..}HEAD" 2>/dev/null | head -1)"
   [[ -n "$FIRST" ]] || { echo "tdd-stamp: no branch commit to fold the doc into (upstream $UPSTREAM)" >&2; exit 1; }

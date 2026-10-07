@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # cleanup-task-workspace.sh — Reverse of setup-task-workspace.sh.
 #
-# Removes a per-task worktree, its Xcode DerivedData, deletes its env.json copy,
+# Removes a per-task worktree, its Xcode DerivedData, deletes its app config copies (env.json, config.json, keys.json, edgeKey.json),
 # and deletes the agent branch if it's safe (the branch matches our `agent/<gid>` convention).
 # Used by session-watchdog.js during the completion sweep and by gc-worktrees.sh.
 #
@@ -63,12 +63,14 @@ fi
 # back; do it while the path still resolves.
 "$HOME/.config/agent-watcher/derived-data-reap.sh" --under "$WT" >&2 || true
 
-# Delete the env.json copy first so we scrub the plaintext secrets even if the
-# worktree-remove below fails and the dir lingers. (-e: it's now a real file, not
-# a symlink; older worktrees may still have a symlink — rm -f handles both.)
-if [[ -e "$WT/env.json" || -L "$WT/env.json" ]]; then
-  rm -f "$WT/env.json" && echo ">> cleanup-task-workspace: removed env.json" >&2
-fi
+# Delete the app config copies first so we scrub the plaintext secrets even if the
+# worktree-remove below fails and the dir lingers. (-e: they're now real files, not
+# symlinks; older worktrees may still have an env.json symlink — rm -f handles both.)
+for f in env.json config.json keys.json edgeKey.json; do
+  if [[ -e "$WT/$f" || -L "$WT/$f" ]]; then
+    rm -f "$WT/$f" && echo ">> cleanup-task-workspace: removed $f" >&2
+  fi
+done
 
 # Remove the worktree (force — it may have build artifacts / uncommitted state).
 if [[ -d "$MAIN_REPO/.git" ]]; then

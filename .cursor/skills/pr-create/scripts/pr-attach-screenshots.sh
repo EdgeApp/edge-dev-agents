@@ -2,10 +2,25 @@
 # pr-attach-screenshots.sh — Publish test-evidence screenshots into a PR body.
 #
 # GitHub has NO official API for uploading images into a PR, so this uploads the
-# images to a dedicated assets branch in the (public) infra repo via the Git Data
-# API — keeping binary blobs OUT of the product repos' history — then renders
-# them as ONE batch-grouped table inside the PR BODY, between invisible HTML
-# sentinels. raw.githubusercontent.com URLs render inline on public repos.
+# images to the orch's object bucket (~/git/site-orch/upload-asset.sh) and
+# renders them as ONE batch-grouped table inside the PR BODY, between invisible
+# HTML sentinels.
+#
+# HOSTING: pixels go to the bucket and never into a git history. A git blob is
+# permanent once pushed (deleting the file leaves it reachable by commit sha), so
+# a frame that turns out to show a secret could not be withdrawn from the assets
+# branch; a bucket object can be deleted. Bucket URLs also render on PRIVATE
+# repos, where GitHub's image proxy cannot fetch raw.githubusercontent.com.
+# Only the per-PR manifest (text: scenes, batches, urls) is committed to the
+# assets branch of the infra repo, which keeps one place that says what a PR's
+# table holds. A manifest entry's `path` is the frame's identity (stamped
+# filename); for a bucket-hosted frame no blob exists at it, and `url` is where
+# the image is.
+#
+# No bucket (uploader missing or unconfigured) exits 1 before anything is
+# written. EVIDENCE_HOST=branch selects the old behavior, image blobs on the
+# assets branch served from raw.githubusercontent.com, for a machine that has no
+# bucket; it is never a fallback the script picks on its own.
 #
 # A BATCH is one invocation of this script at one head sha: the build those
 # frames were shot against. Re-running at the SAME head sha grows that batch in
@@ -20,7 +35,7 @@
 # data loss if the script guesses, and stale pixels if it keeps everything, so it
 # guesses at neither: it refuses until every retiring frame has a decision.
 #   --carry-forward <scene>  the frame is still true at the new head. Re-points
-#                            the existing blob into the new batch: no simulator,
+#                            the hosted frame into the new batch: no simulator,
 #                            no recapture, no re-upload.
 #   --retire <scene>         the change invalidated it.
 # A frame re-shot in this same invocation needs no flag; supplying it IS the
@@ -60,6 +75,7 @@ set -euo pipefail
 
 ASSETS_REPO="EdgeApp/edge-dev-agents"
 ASSETS_BRANCH="agent-pr-assets"
+UPLOADER="${EVIDENCE_UPLOADER:-$HOME/git/site-orch/upload-asset.sh}"
 export TABLE_JS="$HOME/.cursor/skills/pr-create/scripts/pr-evidence-table.js"
 
 REPO=""; PR=""; HACK_NOTE=""
@@ -85,6 +101,16 @@ ANY_HACKED=false
 [[ -n "$("$(dirname "$0")/hacked-frames.sh" "${IMAGES[@]:-}")" ]] && ANY_HACKED=true
 if $ANY_HACKED && [[ -z "$HACK_NOTE" ]]; then
   echo "HACKED image(s) present: pass --hack-note '<one short line: WHAT was hacked>' (e.g. --hack-note 'hard-coded the empty-state branch true in WalletList') so the PR banner is specific. See build-and-test hack-verify-visual-changes." >&2
+  exit 1
+fi
+
+# ── Where the pixels go (see HOSTING in the header) ───────────────────────────
+# Decided before any read or write, so a missing bucket costs nothing.
+HOST=bucket
+if [[ "${EVIDENCE_HOST:-bucket}" == "branch" ]]; then
+  HOST=branch
+elif [[ ${#IMAGES[@]} -gt 0 ]] && { [[ ! -x "$UPLOADER" ]] || ! "$UPLOADER" --check; }; then
+  echo "no asset bucket: $UPLOADER is missing or unconfigured, nothing uploaded. Configure it, or set EVIDENCE_HOST=branch to store image blobs on the public assets branch instead." >&2
   exit 1
 fi
 
@@ -149,7 +175,7 @@ gh api "repos/$ASSETS_REPO/contents/$MANIFEST_PATH?ref=$ASSETS_BRANCH" --jq '.co
 [[ -s "$WORK/old.json" ]] || echo '{"version":2,"entries":[]}' > "$WORK/old.json"
 
 # ── Batch decision + disposition gate, BEFORE any upload ──────────────────────
-# A refusal here costs no blobs and no commits on the assets branch.
+# A refusal here costs no uploads and no commits on the assets branch.
 SUPPLIED="[]"
 if [[ ${#IMAGES[@]} -gt 0 ]]; then
   SUPPLIED=$(node -e '
@@ -261,17 +287,36 @@ for f in "${IMAGES[@]:-}"; do
   UPLOADS+=("$f")
 done
 
-# ── Upload blobs + build one commit containing all images + the manifest ──────
+# ── Upload the frames, then build one commit holding the manifest ─────────────
+# Bucket uploads come first and any failure exits before the manifest commit, so
+# the manifest never names a frame that is not hosted. An object uploaded ahead
+# of a failed run is orphaned under an unguessable key; the re-run uploads anew.
 HEAD_ASSETS=$(gh api "repos/$ASSETS_REPO/git/ref/heads/$ASSETS_BRANCH" --jq .object.sha)
 BASE_TREE=$(gh api "repos/$ASSETS_REPO/git/commits/$HEAD_ASSETS" --jq .tree.sha)
 
 ENTRIES="[]"
 PATHS="[]"
+URLS="{}"
+N=0
 for f in "${UPLOADS[@]:-}"; do
   [[ -n "$f" ]] || continue
   base="$(basename "$f")"; base="${base#scaled-}"
   safe="$(printf '%s' "$base" | tr -c 'A-Za-z0-9._-' '-')"
   path="$DEST_DIR/$STAMP-$safe"
+  if [[ "$HOST" == "bucket" ]]; then
+    N=$((N+1))
+    key=$(node -e '
+      const m = require(process.env.TABLE_JS)
+      const [repoName, pr, file, n] = process.argv.slice(1)
+      process.stdout.write(m.bucketKey({ repoName, pr, file, n: Number(n) }))
+    ' "$REPO_NAME" "$PR" "$base" "$N")
+    url=$("$UPLOADER" --key "$key" "$f" | tail -1) || { echo "bucket upload failed: $base (manifest and PR body untouched)" >&2; exit 1; }
+    [[ "$url" == https://* ]] || { echo "bucket upload returned no url for $base (manifest and PR body untouched)" >&2; exit 1; }
+    URLS=$(node -e 'const [j,p,u]=process.argv.slice(1);const o=JSON.parse(j);o[p]=u;console.log(JSON.stringify(o))' "$URLS" "$path" "$url")
+    PATHS=$(node -e 'const [j,p]=process.argv.slice(1);const a=JSON.parse(j);a.push(p);console.log(JSON.stringify(a))' "$PATHS" "$path")
+    log "uploaded $base → bucket $key"
+    continue
+  fi
   tmp="$WORK/blob.json"
   node -e '
     const fs=require("fs");
@@ -292,15 +337,17 @@ done
 node -e '
   const fs = require("fs")
   const m = require(process.env.TABLE_JS)
-  const [manPath, gatePath, pathsJson, hackNote, headSha, actionsJson, retireJson, nowIso, outPath] = process.argv.slice(1)
+  const [manPath, gatePath, pathsJson, hackNote, headSha, actionsJson, retireJson, nowIso, outPath, urlsJson] = process.argv.slice(1)
   const old = JSON.parse(fs.readFileSync(manPath, "utf8"))
   const gate = JSON.parse(fs.readFileSync(gatePath, "utf8"))
   const retire = JSON.parse(retireJson).filter(Boolean)
+  const urls = JSON.parse(urlsJson)
   const batchAt = gate.batchAt
 
   const fresh = JSON.parse(pathsJson).map(p => {
     const meta = m.parseName(p.split("/").pop())
-    return { path: p, ...meta, subject: null, hackNote: meta.hacked ? (hackNote || null) : null, batchAt, headSha, addedAt: nowIso }
+    const e = { path: p, ...meta, subject: null, hackNote: meta.hacked ? (hackNote || null) : null, batchAt, headSha, addedAt: nowIso }
+    return urls[p] ? { ...e, url: urls[p] } : e
   })
   let merged = m.mergeManifest(old, [...gate.carried, ...fresh])
 
@@ -316,7 +363,7 @@ node -e '
   fs.writeFileSync(outPath, JSON.stringify(manifest, null, 2))
   const retired = dropped.reduce((n, b) => n + b.entries.length, 0)
   if (retired) console.error(">> pr-attach-screenshots: retired " + retired + " frame(s) from " + dropped.length + " superseded batch(es)")
-' "$WORK/old.json" "$WORK/gate.json" "$PATHS" "$HACK_NOTE" "$HEAD_SHA" "$ACTIONS" "$RETIRE_JSON" "$NOW_UTC" "$WORK/new.json"
+' "$WORK/old.json" "$WORK/gate.json" "$PATHS" "$HACK_NOTE" "$HEAD_SHA" "$ACTIONS" "$RETIRE_JSON" "$NOW_UTC" "$WORK/new.json" "$URLS"
 
 node -e 'const fs=require("fs");const [c,o]=process.argv.slice(1);fs.writeFileSync(o,JSON.stringify({content:fs.readFileSync(c).toString("base64"),encoding:"base64"}))' "$WORK/new.json" "$WORK/mblob.json"
 MSHA=$(gh api "repos/$ASSETS_REPO/git/blobs" --input "$WORK/mblob.json" --jq .sha)
@@ -332,7 +379,7 @@ node -e '
 ' "$BASE_TREE" "$ENTRIES" "$WORK/tree.json"
 NEW_TREE=$(gh api "repos/$ASSETS_REPO/git/trees" --input "$WORK/tree.json" --jq .sha)
 NEW_COMMIT=$(gh api "repos/$ASSETS_REPO/git/commits" \
-  -f message="evidence: $REPO_NAME#$PR (${#UPLOADS[@]} new, $CARRIED_N carried)" \
+  -f message="evidence: $REPO_NAME#$PR (${#UPLOADS[@]} new on $HOST, $CARRIED_N carried)" \
   -f tree="$NEW_TREE" -f "parents[]=$HEAD_ASSETS" --jq .sha)
 gh api -X PATCH "repos/$ASSETS_REPO/git/refs/heads/$ASSETS_BRANCH" -f sha="$NEW_COMMIT" >/dev/null
 log "committed $NEW_COMMIT to $ASSETS_BRANCH"

@@ -1,26 +1,48 @@
 # common/login-if-needed.yaml — PIN-login ONLY when the PIN screen is showing.
 # Safe under YOLO auto-login (app usually lands already logged in: the gate makes
 # this a no-op) and after a relaunch that returns to the PIN screen.
-# PARAMS: PIN_DIGIT (single digit tapped 4x; every roster PIN is one digit
-#   repeated, so pass that digit; look the PIN up by role in
-#   ~/.config/edge-secrets/test-accounts.json).
+# PARAMS:
+#   PIN_DIGIT        single digit tapped 4x (every roster PIN is one digit
+#                    repeated).
+#   EXPECT_USERNAME  account the PIN scene must show before any digit is
+#                    tapped. Unset skips the check.
+#   HOME_MARKER      text of the logged-in home scene. Default "Assets".
+# On iOS pass `xcuitest-run.sh --login-role <role>`: it sets PIN_DIGIT and
+# EXPECT_USERNAME from the roster and masks both in the step log. A username
+# or a PIN is never written into a flow file.
+# ACCOUNT GUARD: the PIN scene shows the last-used account, which is not
+# always the one the caller means. With EXPECT_USERNAME set, a PIN scene on
+# another account fails the flow within 5s and no digit is tapped. The check
+# also passes on HOME_MARKER, because YOLO auto-login can leave the PIN scene
+# while the check runs.
 # GOTCHA: taps MUST stay spaced (waitToSettleTimeoutMs) — fast taps drop digits →
 # wrong PIN → exponential lockout. Never tighten these.
 # YOLO auto-login can finish mid-entry and leave the PIN screen, so each tap
-# is gated on the PIN screen still showing.
+# is gated on the PIN screen still showing. The screen can also go between a
+# gate and its tap, so each tap is `optional`: one that finds no keypad is
+# skipped after the 7s optional lookup and the closing check rules.
+# The last step is the scene-advanced check: the PIN screen must be gone within
+# 15s. A dropped digit, a wrong PIN or a lockout fails there, so no caller's
+# long wait for the home scene runs out its clock on a PIN screen.
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
   # `${KEY || default}` so a caller's runFlow env wins over the default.
   PIN_DIGIT: ${PIN_DIGIT || "0"}
+  EXPECT_USERNAME: ${EXPECT_USERNAME || ""}
+  HOME_MARKER: ${HOME_MARKER || "Assets"}
 ---
 - runFlow:
     when:
-      visible: "Exit PIN"
+      true: ${EXPECT_USERNAME != ''}
     commands:
-      - tapOn:
-          text: ${PIN_DIGIT}
-          waitToSettleTimeoutMs: 900
+      - runFlow:
+          when:
+            visible: "Exit PIN"
+          commands:
+            - extendedWaitUntil:
+                visible: ${EXPECT_USERNAME + "|" + HOME_MARKER}
+                timeout: 5000
 - runFlow:
     when:
       visible: "Exit PIN"
@@ -28,6 +50,7 @@ env:
       - tapOn:
           text: ${PIN_DIGIT}
           waitToSettleTimeoutMs: 900
+          optional: true
 - runFlow:
     when:
       visible: "Exit PIN"
@@ -35,6 +58,15 @@ env:
       - tapOn:
           text: ${PIN_DIGIT}
           waitToSettleTimeoutMs: 900
+          optional: true
+- runFlow:
+    when:
+      visible: "Exit PIN"
+    commands:
+      - tapOn:
+          text: ${PIN_DIGIT}
+          waitToSettleTimeoutMs: 900
+          optional: true
 - runFlow:
     when:
       visible: "Exit PIN"
@@ -42,3 +74,7 @@ env:
       - tapOn:
           text: ${PIN_DIGIT}
           waitToSettleTimeoutMs: 1500
+          optional: true
+- extendedWaitUntil:
+    notVisible: "Exit PIN"
+    timeout: 15000

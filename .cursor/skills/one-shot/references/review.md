@@ -10,9 +10,9 @@
 
 <rule id="fix-through-the-fixup-path">Apply surviving findings through the normal fixup path, never with a bare `git commit`: pick the target commit per pr-address's "Determine fixup target" sub-step, then `~/.cursor/skills/lint-commit.sh --fixup <target-sha> --for auto -m "<what changed and which finding it answers>"`, grouped one fixup per target per pr-address `one-fixup-per-target-per-turn`. `--for auto` is the right kind: a self-review finding is a self-found defect, so it bundles with reviewer-bot fixups exactly as those do. The fold-mode oracle inside `lint-commit.sh` decides fold-vs-preserve on its own; never pass a mode.</rule>
 
-<rule id="no-posting">Nothing from this phase reaches GitHub. There is no PR yet, and on a followup run where one exists, review findings still reach a human through the run report only. Posting belongs to `/pr-review` (its `unified-entry` rule), which this phase does not invoke.</rule>
+<rule id="post-record-to-own-pr">The phase's record reaches GitHub ONLY on a PR we author, as one `COMMENT` review whose body is pr-review's curation-record block (pr-review step 5): a `Fixed before review` list (each line naming the commit subject the fix folded into) and a `Rejected in curation` list (each with its evidence), deduped per pr-review `rejected-on-own-prs`. The `agent_review` field is the posting direction, so pr-review's `posting-gate` orch default does not hold it back. It posts through `github-pr-review.sh submit` (step 4.5f), never as inline comments, and only once the PR head carries the phase's fixes: right after phase 5 opens the PR on a first run; on a followup with an open PR, after the push that carries the fixes, or at once when nothing was fixed. A phase that found nothing, or could not run, posts nothing. On a PR we do not author (`non-owner-pr-completion`), nothing from this phase is posted; the record lives in the run report.</rule>
 
-<rule id="report-both-sides">The run report's Testing section names the variant that ran, what was fixed (with the fixup target), and what was rejected (with the evidence). A phase that ran and found nothing says so; only a phase the field skipped is silent.</rule>
+<rule id="report-both-sides">The run report's Testing section names the variant that ran and the counts fixed and rejected, and links the review posted per `post-record-to-own-pr` instead of repeating its lists; it carries the full lists (fixes with their fixup target, rejections with their evidence) only when nothing was posted. The phase posts no Asana comment; the PR review and the run report are its record. A phase that ran and found nothing says so; only a phase the field skipped is silent.</rule>
 
 </rules>
 
@@ -50,11 +50,23 @@ Then re-verify at the SAME bar a reviewer-thread fix carries (watch.md step 6 po
 </step>
 
 <step id="4.5e" name="Record">
-Update `/tmp/agent-state-<gid>.md` (Decisions and Verified) and carry both lists into the run report per `report-both-sides`.
+Update `/tmp/agent-state-<gid>.md` (Decisions and Verified) with both lists, and mark the record `post: pending` when `post-record-to-own-pr` owes a post. Carry them into the run report per `report-both-sides`.
+</step>
+
+<step id="4.5f" name="Post the record (our own PR only)">
+Runs at the point `post-record-to-own-pr` names (phase 5 calls back here on a first run). Write the review JSON to a file, pre-check it, then submit:
+
+```bash
+~/.cursor/skills/pr-review/scripts/github-pr-review.sh context --pr <number> --owner <owner> --repo <repo> > /tmp/agent-selfreview-ctx-<gid>.json
+~/.cursor/skills/pr-review/scripts/github-pr-review.sh submit --check-only --pr <number> --owner <owner> --repo <repo> --sha <headSha> < /tmp/agent-selfreview-<gid>.json
+~/.cursor/skills/pr-review/scripts/github-pr-review.sh submit --pr <number> --owner <owner> --repo <repo> --sha <headSha> < /tmp/agent-selfreview-<gid>.json
+```
+
+The payload is `{"event": "COMMENT", "body": "<curation-record blocks>"}`, with `author == me` and the dedupe checked against `reviews[]` in the context output. Flip the state file's mark to `post: done <review-url>`.
 </step>
 
 <edge-cases>
 <case name="Field absent on the task">`asana-review-field.sh` returns the fleet default for an unset field, so an ordinary non-agent task without the field behaves exactly like the default. No special handling.</case>
-<case name="Followup run with an open PR">The phase still runs when the field asks for it, and on a re-armed task an `agent_review` value the operator just set is what re-enters it, per followup.md `field-deltas-are-re-entry`. The fold-mode oracle answers `preserve` if a human is mid-review, so fixes stay visible as `fixup!` commits and reach the remote through the sanctioned finalize path rather than this phase.</case>
+<case name="Followup run with an open PR">The phase still runs when the field asks for it, and on a re-armed task an `agent_review` value the operator just set is what re-enters it, per followup.md `field-deltas-are-re-entry`. The fold-mode oracle answers `preserve` if a human is mid-review, so fixes stay visible as `fixup!` commits and reach the remote through the sanctioned finalize path rather than this phase; step 4.5f posts after that push.</case>
 <case name="Workflow fails or returns nothing">A review that cannot run is not a blocker: record it in the report and continue to PR creation. The field asked for a review, not for a gate.</case>
 </edge-cases>

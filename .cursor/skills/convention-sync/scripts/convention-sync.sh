@@ -184,7 +184,13 @@ EXTRA_FILES=(
 # on user→repo, and merged back on repo→user / bootstrap by replacing ONLY the
 # `.hooks` key of the local settings.json — every other key stays untouched.
 # The projecting machine is canonical for the whole block (no per-hook merge).
+# When ~/.claude/settings.canonical.json exists (settings-guard.sh installed),
+# it is the file both directions use: a claude process can rewrite
+# settings.json from a stale in-memory copy, so exporting settings.json could
+# push a clobbered block, and restoring into it would be reverted by the guard.
+# The guard copies the canonical block into settings.json.
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+[[ -f "$HOME/.claude/settings.canonical.json" ]] && CLAUDE_SETTINGS="$HOME/.claude/settings.canonical.json"
 HOOKS_REL="claude-settings/hooks.json"
 extra_json="[]"
 dropped_hooks_json="[]"

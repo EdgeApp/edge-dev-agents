@@ -137,7 +137,7 @@ fi
 
 # 2. Task name → session label.
 TOKEN="$(jq -r '.asana_token // empty' "$DIR/credentials.json" 2>/dev/null || true)"
-NAME=""; DELIVERABLE="PR"; NEEDS_SIM=1
+NAME=""; DELIVERABLE="PR"; NEEDS_SIM=1; _LANES=""
 if [[ -n "$TOKEN" ]]; then
   _T="$(curl -s -H "Authorization: Bearer $TOKEN" "https://app.asana.com/api/1.0/tasks/$TASK_GID?opt_fields=name,custom_fields.gid,custom_fields.enum_value.name,custom_fields.multi_enum_values.name" 2>/dev/null || true)"
   NAME="$(printf '%s' "$_T" | jq -r '.data.name // empty' 2>/dev/null || true)"
@@ -191,7 +191,7 @@ if [[ -n "$SESSION_ID" ]]; then
     --slot-index "$SLOT_IDX" --task-gid "$TASK_GID" \
     --sim-udid "$SIM_UDID" --metro-port "$METRO_PORT" \
     --worktree-path "$HOME/git" --resume "$SESSION_ID" --label "$LABEL" \
-    --deliverable "$DELIVERABLE"
+    --deliverable "$DELIVERABLE" --lanes "$_LANES"
 fi
 
 # FRESH-SPAWN FOLLOWUP (transcript past the degradation threshold): boot a new
@@ -203,7 +203,8 @@ echo ">> resume-task: spawning ${SESSION_PREFIX}${TASK_GID} FRESH (artifact-anch
 "$DIR/spawn-test-session.sh" $YOLO \
   --slot-index "$SLOT_IDX" --task-gid "$TASK_GID" \
   --sim-udid "$SIM_UDID" --metro-port "$METRO_PORT" \
-  --worktree-path "$HOME/git" --label "$LABEL" --deliverable "$DELIVERABLE"
+  --worktree-path "$HOME/git" --label "$LABEL" --deliverable "$DELIVERABLE" \
+  --lanes "$_LANES"
 
 # Prompt-sending is the CALLER's job, exactly as on the resume path: the
 # watcher sends /one-shot to revisit spawns itself (with its RC-ready wait and

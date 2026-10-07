@@ -195,9 +195,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# The repo's default branch, from the one shared resolver.
-resolve_default_upstream() {
-  "$HOME/.cursor/skills/git-default-branch.sh" 2>/dev/null || echo "origin/master"
+# The ref this branch is measured from (its open PR's base, else the repo
+# default), from the one shared resolver.
+resolve_branch_base() {
+  "$HOME/.cursor/skills/git-branch-base.sh" 2>/dev/null || echo "origin/master"
 }
 
 # Fill BASE from --base, --merge-base-with, or the default upstream's merge base.
@@ -207,7 +208,7 @@ resolve_base() {
     exit 1
   fi
   [[ -n "$BASE" ]] && return 0
-  [[ -n "$MERGE_BASE_WITH" ]] || MERGE_BASE_WITH="$(resolve_default_upstream)"
+  [[ -n "$MERGE_BASE_WITH" ]] || MERGE_BASE_WITH="$(resolve_branch_base)"
   BASE="$(git merge-base "$MERGE_BASE_WITH" HEAD 2>/dev/null || true)"
   if [[ -z "$BASE" ]]; then
     echo "Error: Could not determine merge-base with '$MERGE_BASE_WITH'" >&2
@@ -271,7 +272,7 @@ run_self_rewrite() {
   if [[ "$WHOLE_BRANCH" == "true" ]]; then
     # Audit form: every branch commit is a candidate; the reference set is
     # filled per candidate below (the branch commits before it).
-    up="${UPSTREAM:-$(resolve_default_upstream)}"
+    up="${UPSTREAM:-$(resolve_branch_base)}"
     merge_base="$(git merge-base "$up" HEAD 2>/dev/null || true)"
     if [[ -z "$merge_base" ]]; then
       printf '{"status":"no-merge-base","upstream":"%s","candidates":0,"flagged":[]}\n' "$up"
@@ -290,7 +291,7 @@ run_self_rewrite() {
     candidates="$(printf '%s\n' "$cherry" | awk '$1=="+"{print $2}')"
     # Commits reachable from the remote branch are published too (blame can land
     # on them when the local branch was never rewritten).
-    merge_base="$(git merge-base "$(resolve_default_upstream)" "$up" 2>/dev/null || true)"
+    merge_base="$(git merge-base "$(resolve_branch_base)" "$up" 2>/dev/null || true)"
     if [[ -n "$merge_base" ]]; then
       published="$(printf '%s\n%s\n' "$published" "$(git rev-list "$merge_base..$up" 2>/dev/null || true)")"
     fi

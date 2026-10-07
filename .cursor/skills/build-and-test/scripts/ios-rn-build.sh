@@ -224,29 +224,8 @@ ensure_metro_ready_and_pin() {
 # change, keep the fast path for JS-only changes. We stamp the hash into the app's
 # DATA container at build time; the stamp clones along with the app via APFS, so a
 # slot clone inherits the master's stamp and a JS-only change still fast-paths.
-native_deps_hash() {
-  # MIGRATION WARNING: changing this hash's FORMAT invalidates every stamp in
-  # the fleet, and slots clone fresh from the MASTER each spawn — so without
-  # restamping the master sim's app container (and the standing pool clones),
-  # every run full-rebuilds forever, not once (the 2026-07-24 sonnet batch).
-  # After any format change: write the new hash to .agent-native-build-stamp in
-  # the master + pool sims' app data containers, computed from a CLEAN develop
-  # checkout (pod install rewrites the hermes-engine checksum, so a post-build
-  # dirty lock hashes differently than the pristine lock worktrees start with).
-  #
-  # Podfile.lock catches pod-level native drift. Webview bundle assets catch the
-  # OTHER native-embedded surface: edge-* packages ship built webview bundles
-  # under android/src/main/assets (embedded on iOS too), and a dep update
-  # (updot/pin swap) rewrites them WITHOUT touching Podfile.lock — a Metro JS
-  # reload can never refresh a native-embedded asset, so the cached fast path
-  # shipped a stale plugin webview on the 2026-07-22 swapter run. Hash both.
-  {
-    if [[ -f ios/Podfile.lock ]]; then shasum -a 256 ios/Podfile.lock; else echo "no-podfile-lock"; fi
-    for p in node_modules/edge-*/android/src/main/assets; do
-      [[ -d "$p" ]] && find "$p" -name "*.js" -o -name "*.wasm"
-    done | LC_ALL=C sort | xargs shasum -a 256 2>/dev/null
-  } | shasum -a 256 | cut -c1-16
-}
+# native_deps_hash lives in lib/native-deps-hash.sh (shared with slot-preflight.sh).
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/native-deps-hash.sh"
 app_stamp_path() {
   local data; data="$(xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" data 2>/dev/null || true)"
   [[ -n "$data" ]] && printf '%s/.agent-native-build-stamp' "$data"

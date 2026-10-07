@@ -15,7 +15,7 @@ referral/affiliate attribution (`installerId`, `CreationReason.json`), Exchange
 Settings, Privacy/mixnet toggles, wallet lists. The roster accounts (see
 `~/.config/edge-secrets/test-accounts.json`) stay for FUNDED work.
 
-Log in the usual way: set `YOLO_USERNAME`/`YOLO_PIN` in the worktree `env.json`,
+Log in the usual way: set `YOLO_USERNAME`/`YOLO_PIN` in the worktree `config.json`,
 then `simctl terminate` + `launch`. Restore the roster account when done.
 
 If the test funded the throwaway, sweep the funds back to a roster account

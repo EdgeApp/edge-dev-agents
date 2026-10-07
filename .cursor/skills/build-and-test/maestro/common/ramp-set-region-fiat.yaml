@@ -1,22 +1,31 @@
 # common/ramp-set-region-fiat.yaml
 # Sets the ramp region + fiat from the Buy/Sell scene. Row selectors must be the
 # COMBINED row string ("United States of America US"), not the inner label.
+# PARAMS: COUNTRY_SEARCH / COUNTRY_ROW, STATE_SEARCH / STATE_ROW (used only
+#   when the country lists states), FIAT_SEARCH / FIAT_ROW, and REGION_BUTTON:
+#   a regex for the label the region button shows NOW (it has no testID). The
+#   default covers an unset region and five common ones; pass the current
+#   country's short name for any other, e.g. ".*Netherlands.*".
+# The region is account state. On a roster account, run the flow a second time
+# with the original values before the run ends.
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
-  COUNTRY_SEARCH: "United States"
-  COUNTRY_ROW: "United States of America US"
-  STATE_SEARCH: "California"
-  STATE_ROW: "California CA"
-  FIAT_SEARCH: "USD"
-  FIAT_ROW: "USD United States Dollar"
+  # `${KEY || default}` so a caller's runFlow env wins over the default.
+  COUNTRY_SEARCH: ${COUNTRY_SEARCH || "United States"}
+  COUNTRY_ROW: ${COUNTRY_ROW || "United States of America US"}
+  STATE_SEARCH: ${STATE_SEARCH || "California"}
+  STATE_ROW: ${STATE_ROW || "California CA"}
+  FIAT_SEARCH: ${FIAT_SEARCH || "USD"}
+  FIAT_ROW: ${FIAT_ROW || "USD United States Dollar"}
+  REGION_BUTTON: ${REGION_BUTTON || ".*(Select your region|USA|Germany|United Kingdom|Canada|Australia).*"}
 ---
 # With the amount keyboard up, the first tap only dismisses the keyboard.
 - retry:
     maxRetries: 2
     commands:
       - tapOn:
-          text: ".*(Select your region|USA|Germany|United Kingdom|Canada|Australia).*"
+          text: ${REGION_BUTTON}
       - extendedWaitUntil:
           visible: "Search region"
           timeout: 5000

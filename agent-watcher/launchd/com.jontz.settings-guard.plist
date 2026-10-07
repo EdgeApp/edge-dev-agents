@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.jontz.settings-guard</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__HOME__/.config/agent-watcher/settings-guard.sh</string>
+  </array>
+  <!-- settings.json is replaced by rename on every save, so the directory is
+       watched as well as the files; StartInterval is the backstop and the
+       retry for restarts that waited out a busy session. -->
+  <key>WatchPaths</key>
+  <array>
+    <string>__HOME__/.claude/settings.json</string>
+    <string>__HOME__/.claude/settings.canonical.json</string>
+    <string>__HOME__/.claude</string>
+  </array>
+  <key>StartInterval</key><integer>300</integer>
+  <key>ThrottleInterval</key><integer>5</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/tmp/settings-guard.out</string>
+  <key>StandardErrorPath</key><string>/tmp/settings-guard.err</string>
+  <key>ProcessType</key><string>Background</string>
+</dict>
+</plist>

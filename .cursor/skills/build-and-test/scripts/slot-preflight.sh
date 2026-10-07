@@ -18,6 +18,8 @@
 
 set -uo pipefail
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/native-deps-hash.sh"
+
 UDID="${AGENT_SIM_UDID:-}"
 BUNDLE_ID="co.edgesecure.app"
 PORT="${AGENT_METRO_PORT:-8081}"
@@ -56,7 +58,9 @@ else
 fi
 
 # 2. Metro port: free, OURS (a metro serving this repo), or SQUATTED (another process).
-PORT_PID="$(lsof -ti tcp:"$PORT" 2>/dev/null | head -1 || true)"
+# The LISTEN filter matters: without it a client of Metro (a debugger tab in
+# Chrome, the app itself) can sort first and read as a squatter.
+PORT_PID="$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)"
 if [[ -z "$PORT_PID" ]]; then
   echo "METRO: port $PORT free — ios-rn-build.sh will start Metro"
 else
@@ -76,15 +80,11 @@ if [[ -z "$DATA_DIR" ]]; then
   bump full-rebuild
 else
   echo "APP: installed"
-  # 4. Native drift: installed app's stamp vs the worktree's ios/Podfile.lock.
+  # 4. Native drift: installed app's stamp vs the worktree's native_deps_hash.
   #    (Same stamp ios-rn-build.sh writes; clones inherit it from the master via APFS.)
   STAMP_FILE="$DATA_DIR/.agent-native-build-stamp"
   HAVE="$(cat "$STAMP_FILE" 2>/dev/null || echo "no-stamp")"
-  if [[ -f "$REPO_DIR/ios/Podfile.lock" ]]; then
-    WANT="$(shasum -a 256 "$REPO_DIR/ios/Podfile.lock" | cut -c1-16)"
-  else
-    WANT="no-podfile-lock"
-  fi
+  WANT="$(native_deps_hash "$REPO_DIR")"
   if [[ "$HAVE" == "$WANT" ]]; then
     echo "NATIVE: stamp match ($HAVE) — JS bundles live from Metro; NO rebuild needed"
   elif [[ "$HAVE" == "no-stamp" ]]; then

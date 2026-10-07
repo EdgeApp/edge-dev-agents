@@ -6,7 +6,8 @@
 #
 # 1. SLOT MODE (parallel agent lane) — triggered by --slot-index:
 #      spawn-test-session.sh --yolo --slot-index <N> --task-gid <gid> \
-#        --sim-udid <udid> --metro-port <port> --worktree-path <path> --label "<rc-label>"
+#        --sim-udid <udid> --metro-port <port> --worktree-path <path> --label "<rc-label>" \
+#        --lanes "<agent_lane names, comma-separated>"
 #    The wrapper bash exports $AGENT_SIM_UDID and $AGENT_METRO_PORT so build-and-test
 #    and debugger scripts inherit the slot's sim + Metro port transparently, and cwd
 #    is the slot's worktree (NOT ~/git). Session is named claude-asana-<task-gid>.
@@ -36,6 +37,7 @@ WORKTREE_PATH=""
 LABEL=""
 RESUME_ID=""
 DELIVERABLE=""
+LANES=""
 POSITIONAL=()
 
 while [[ $# -gt 0 ]]; do
@@ -49,6 +51,7 @@ while [[ $# -gt 0 ]]; do
     --label)          LABEL="$2";          shift 2 ;;
     --resume)         RESUME_ID="$2";      shift 2 ;;
     --deliverable)    DELIVERABLE="$2";    shift 2 ;;
+    --lanes)          LANES="$2";          shift 2 ;;
     *) POSITIONAL+=("$1"); shift ;;
   esac
 done
@@ -91,12 +94,14 @@ YOLO_FLAG=""
 # Chrome extension (off by default; the agent box must have Chrome + the extension
 # running for it to actually connect).
 CHROME_FLAG="--chrome "
-# Maestro MCP: gives agents interactive sim-driving tools (tap/swipe/hierarchy/
-# screenshot) on a PERSISTENT driver — no ~2-min `maestro test` startup per probe.
-# Exploration goes through these tools; the repeatable proof run stays a yaml flow.
-# Agents must select the device matching $AGENT_SIM_UDID via the MCP device tools.
+# Maestro MCP: interactive device-driving tools (tap/swipe/hierarchy/screenshot) on
+# a PERSISTENT driver, with no ~2-min `maestro test` startup per probe. Only a
+# session whose agent_lane selection (--lanes) includes an Android lane gets it.
+# iOS runs explore and drive on the XCUITest interpreter (xcuitest-run.sh) and
+# no-device runs drive nothing, so there the server is one idle node proxy per
+# session for the session's whole life, retired sessions included.
 MCP_FLAG=""
-[[ -f "$HOME/.config/agent-watcher/maestro-mcp.json" ]] && \
+[[ ",$LANES," == *",Android"* && -f "$HOME/.config/agent-watcher/maestro-mcp.json" ]] && \
   MCP_FLAG="--mcp-config $HOME/.config/agent-watcher/maestro-mcp.json "
 # Model + effort pin: what spawned sessions START on (a human can still flip a LIVE
 # session per-turn via the RC/desktop picker). Resolution order, both flags:
@@ -283,7 +288,7 @@ fi
 
 echo "Spawned tmux session: $SESSION${YOLO:+ (yolo)}"
 if [[ -n "$SLOT_INDEX" ]]; then
-  echo "  slot $SLOT_INDEX  |  cwd $CWD  |  sim ${SIM_UDID:-none}  |  metro ${METRO_PORT:-8081}"
+  echo "  slot $SLOT_INDEX  |  cwd $CWD  |  sim ${SIM_UDID:-none}  |  metro ${METRO_PORT:-8081}  |  maestro-mcp $([[ -n "$MCP_FLAG" ]] && echo yes || echo no)"
 fi
 echo "  Attach locally: tmux attach -t $SESSION"
 echo "  Kill session:   tmux kill-session -t $SESSION"

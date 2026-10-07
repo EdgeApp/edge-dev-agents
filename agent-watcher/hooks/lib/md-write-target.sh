@@ -22,8 +22,9 @@
 #              write gate, since nothing above sees a path inside a script.
 # The operator must be preceded by whitespace or start-of-line: prose like
 # '<repo>/README.md' inside a heredoc otherwise reads as a redirect. The
-# in-place branch takes the LAST bare path token in the command, since sed and
-# perl put the file after the expression.
+# in-place branch reads only the simple command that runs sed/perl (split on
+# unquoted ; & | ( ) and newlines) and takes its LAST bare path token, since sed
+# and perl put the file after the expression.
 #
 # A QUOTED redirect/tee target ('cat > "$D/x.md"', "tee '/tmp/x.md'") is blank
 # in the mention-stripped view, so the operator positions found there are mapped
@@ -105,7 +106,29 @@ if (hits.length) process.stdout.write(hits.join("\n"));
     | grep -oE "(^|[[:space:]])(>>?|tee([[:space:]]+-a)?)[[:space:]]*\"?'?[^\"'[:space:];|&]*${tail}" \
     | sed -E "s/^[[:space:]]*(>>?|tee([[:space:]]+-a)?)[[:space:]]*[\"']?//" | _pick || true)
   if [ -z "$targets" ] && printf '%s' "$cmd" | grep -qE "(^|[[:space:]|;&(])(sed[[:space:]]+(-[a-zA-Z]*)?-i|perl[[:space:]]+(-[a-zA-Z]*)?-[a-zA-Z]*i)"; then
-    targets=$(printf '%s' "$cmd" \
+    # Only the simple command that runs the editor names its file: split on
+    # unquoted ; & | ( ) and newlines, keep the segments whose command word is
+    # sed/perl with an in-place flag, one per line. Taking path tokens from the
+    # whole command instead read 'sed -i ... x.yaml && ./run.sh' as a write to
+    # run.sh.
+    local inplace
+    inplace=$(node -e '
+const cmd = process.argv[1];
+const segs = []; let cur = "", q = "";
+for (let i = 0; i < cmd.length; i++) {
+  const c = cmd[i];
+  if (q) { cur += c; if (c === q) q = ""; else if (q === "\"" && c === "\\") cur += cmd[++i] ?? ""; continue; }
+  if (c === "\x27" || c === "\"") { q = c; cur += c; continue; }
+  if (c === "\\") { cur += c + (cmd[++i] ?? ""); continue; }
+  if (/[;&|()\n]/.test(c)) { segs.push(cur); cur = ""; continue; }
+  cur += c;
+}
+segs.push(cur);
+const re = /^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:\S*\/)?(sed\s+(-[a-zA-Z]*)?-i|perl\s+(-[a-zA-Z]*)?-[a-zA-Z]*i)/;
+const out = segs.filter((s) => re.test(s)).map((s) => s.replace(/\s+/g, " "));
+if (out.length) process.stdout.write(out.join("\n") + "\n");
+' "$cmd" 2>/dev/null) || inplace="$cmd"
+    targets=$(printf '%s' "$inplace" \
       | grep -oE "(^|[[:space:]])\"?'?[^\"'[:space:];|&]*${tail}([[:space:]]|$|;|\\|)" \
       | sed -E "s/^[[:space:]]*[\"']?//; s/[[:space:];|]+$//" | _pick_last || true)
   fi

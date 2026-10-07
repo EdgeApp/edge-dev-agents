@@ -161,8 +161,10 @@ flowchart TD
   `code-review-sonnet` workflow, one level per field value. The phase runs
   after local verification and before PR creation: findings are judged against
   the diff, survivors are fixed as fixups folded into the commits they belong
-  to, rejections are recorded with their evidence in the run report, and
-  nothing is posted to GitHub.
+  to, and rejections are recorded with their evidence. On a PR the run
+  authors, the fixed and rejected lists post as one body-only `COMMENT` review
+  once the PR head carries the fixes, and the run report links it; on any other
+  PR nothing is posted and the report carries the lists.
 - **Which Asana fields a run sees.** A task is homed on several boards, and a
   task read lists every board's fields. Runs read and write only the
   Engineering Board's fields (Priority, LOE, Repo, Category, Release, Build,
@@ -254,11 +256,12 @@ just a viewport.
   effort flags) and launches it with `tmux new-session -d`. When claude exits
   the wrapper prints the exit time and drops to a shell, so the pane and its
   scrollback survive for diagnosis.
-- **Maestro MCP.** Every session's maestro MCP server is
+- **Maestro MCP.** Only a session whose `agent_lane` includes Android is
+  launched with the maestro MCP server (`spawn-test-session.sh --lanes`); iOS
+  and no-device runs carry none. The server is
   `agent-watcher/maestro-mcp-lazy.js`, a stdio proxy that answers the MCP
   handshake from a cache, starts the maestro JVM on the first tool call, and
-  stops it with its iOS driver after 10 idle minutes. A session that never
-  drives with maestro holds no JVM.
+  stops it with its iOS driver after 10 idle minutes.
 - **Resume poking.** `claude --resume` on a prior transcript shows an
   interactive menu that would wedge a hands-off session, so the spawner polls
   the pane and answers it with send-keys (Down+Enter: FULL resume; the
@@ -287,7 +290,12 @@ just a viewport.
 - **No self-respawn.** A session never kills or relaunches its own pane;
   `resume-task.sh` and `resume-agent.sh` are watcher/operator tools and
   refuse to run from inside their target. The `no-self-respawn.sh` hook
-  enforces the agent side.
+  enforces the agent side. The one exception is an operator or anchor
+  session restarting itself through `restart-session-in-place.sh`, launched
+  with `tmux run-shell -b` so it runs outside the pane: it waits for the
+  session to go idle, kills it, resumes the same conversation with the same
+  flags in the same pane, and prompts it to continue pending work. The hook
+  blocks it in orch runs.
 - **Discussion sessions and briefs.** `spawn-chat-session.sh` starts a fresh
   session (a `chat-<slug>` discussion, or a named anchor with `--anchor`) and
   hands it a brief. The brief is copied to
@@ -443,7 +451,8 @@ starts (status leads the work), never as a side effect of a terminal action.
 
 The hands-off contract and the quality bars are enforced by deterministic
 Claude Code hooks, not merely documented. Registrations live in
-`~/.claude/settings.json` and are distributed as the `claude-settings/hooks.json`
+`~/.claude/settings.canonical.json` (settings-guard.sh keeps
+`~/.claude/settings.json` in step with it) and are distributed as the `claude-settings/hooks.json`
 projection (see [Distribution](#distribution-what-syncs)); the scripts live in
 `agent-watcher/hooks/`. Hook BODIES are re-read from disk on every fire, so a
 script fix reaches every live session immediately; only registration changes
@@ -637,11 +646,35 @@ the app.
   XCUITest interpreter runs the same flow YAML on the slot sim with no host
   port (`--flow`), prints the current screen's elements with testID, label,
   frame and hittable state (`--inspect`), and runs inline steps against the
-  live app (`--steps`). iOS exploration uses it; the maestro MCP stays for
-  Android and for screens outside the app under test.
+  live app (`--steps`). iOS exploration uses it; a screen outside the app
+  under test goes to the maestro CLI, and the maestro MCP is Android-only.
+  Each tap is compared against the screen after it, and a tap that changed
+  nothing says so in its step line (`--tap-check`); typing falls back from the
+  focused element to the on-screen keys to key events (`--typing`);
+  `--login-role <role>` signs the flow in as a roster role, refuses to tap a
+  PIN on another account's PIN scene, and masks the username and digits.
+- **Build decisions** (`build-and-test/scripts/slot-preflight.sh`): one call
+  prints whether the slot needs no build, a JS-only launch or a full rebuild.
+  It and `ios-rn-build.sh` take the native stamp from one function
+  (`scripts/lib/native-deps-hash.sh`: `Podfile.lock` plus the embedded webview
+  bundles, with pod install's hermes checksum rewrite put back before
+  hashing), so the two never disagree about drift.
+- **Stale bundle and login checks.** `scripts/metro-fresh.sh` answers whether
+  the Metro on a port sees edits to its checkout (watchman still observing,
+  served `.json` modules equal to disk); `scripts/pin-agent-login.sh` pins a
+  checkout's auto-login to the roster's default role and prints roles, never
+  values.
+- **Android helpers.** `scripts/android-dev-server.sh` points one emulator's
+  debug app at its slot's Metro port through the app's own dev-server
+  setting, so no host-global 8081 forwarder is shared between slots;
+  `scripts/android-type-text.sh` types one character per `adb` call on screens
+  that drop characters, reading secrets from an env var.
 - **Flow library** (`build-and-test/maestro/common/`): parameterized,
-  reusable maestro flows (login, wallet find, send-to-address, swap pair
-  selection, ramp region/fiat, throwaway-account lifecycle, slider confirm).
+  reusable maestro flows (login, `relaunch-and-login.yaml`, wallet find,
+  send-to-address, swap pair selection, ramp region/fiat, throwaway-account
+  lifecycle, slider confirm, `dismiss-logbox-banner.yaml` for the debug-build
+  toast that swallows taps at the bottom of a scene). Every wait names each
+  ending it can reach, and a long wait never directly follows a tap.
   Task-specific flows an agent writes mid-run stay local and are excluded from
   sync; recurring sequences get promoted into the library through eval
   curation.
@@ -738,7 +771,8 @@ reproducible from a single clone + `./bootstrap.sh`:
 - **`agent-watcher/launchd/`**: templates for every `com.jontz.*` launchd job
   (watcher, watchdog, reanchor sweep, checkout refresh, sim pool refresh
   `launchd/com.jontz.sim-pool-refresh.plist` which owns the master rebuild and pool
-  refill so no spawn waits on them, guards, Jev shadow drain) plus
+  refill so no spawn waits on them, guards, the settings guard
+  `launchd/com.jontz.settings-guard.plist`, Jev shadow drain) plus
   `install-launchd.sh`, which renders `__HOME__` and `__NODE_BIN__`, writes
   `~/Library/LaunchAgents`, and loads each job, skipping any whose program is
   not on the machine. The templates are the source of truth; the installed
@@ -746,7 +780,8 @@ reproducible from a single clone + `./bootstrap.sh`:
   `lib/launchd-env.sh` for their PATH, so a job definition never has to carry
   tool paths.
 - **`claude-settings/hooks.json`**: a PROJECTION of the `.hooks` key of
-  `~/.claude/settings.json`. Hook scripts ship in the agent-watcher tree;
+  `~/.claude/settings.canonical.json` (`~/.claude/settings.json` on a machine
+  without one; settings-guard.sh copies the canonical block into it). Hook scripts ship in the agent-watcher tree;
   without this projection they would be installed but never fire.
   User-to-repo sync exports the key; repo-to-user and `bootstrap.sh` merge it
   back replacing ONLY `.hooks`, so model/theme and other machine-local
@@ -990,7 +1025,8 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`lib/task-fields.sh`](agent-watcher/lib/task-fields.sh) | The field registry reader: segment snapshots by gid (other boards' same-named fields never count), the field-delta rule (run parameters tagged, `never_delta` dropped, the orch's own writes dropped) and the judge's field line; the registry is `asana-config.json` `custom_fields` + `task_fields` |
 | [`lib/judge-log.sh`](agent-watcher/lib/judge-log.sh) | The completion judge's provenance log location and its one operator-override line writer |
 | [`lib/worktree-root.sh`](agent-watcher/lib/worktree-root.sh), [`lib/worktree-root.js`](agent-watcher/lib/worktree-root.js) | The per-task worktree root: `AGENT_WORKTREE_ROOT`, else config `watcher.worktrees_root`, else `~/git/.agent-worktrees` |
-| [`git-default-branch.sh`](.cursor/skills/git-default-branch.sh) | A repo's default branch for every script that measures from it: origin/HEAD, else ask the remote once, else main, master, develop |
+| [`git-default-branch.sh`](.cursor/skills/git-default-branch.sh) | A repo's default branch, the ref a NEW PR targets: origin/HEAD, else ask the remote once, else main, master, develop |
+| [`git-branch-base.sh`](.cursor/skills/git-branch-base.sh) | The ref the current branch is measured from (first commit, fixup targets, autosquash, doc fingerprints): its open PR's base, else the default branch, so a stacked branch never folds into its parent's commits |
 | [`hacked-frames.sh`](.cursor/skills/pr-create/scripts/hacked-frames.sh) | Which proof frames are hack-forced, by `pr-evidence-table.js`'s whole-token `HACKED` rule; used by the report gate, the screenshot attach and the judge's evidence bundle |
 | [`log-attempt.sh`](agent-watcher/log-attempt.sh) | Append truthful attempt-log entries |
 | [`set-tested.sh`](agent-watcher/set-tested.sh) | Set the task's tested field from run evidence |

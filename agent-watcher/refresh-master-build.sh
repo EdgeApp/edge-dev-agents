@@ -171,8 +171,8 @@ if ! $FORCE && [[ -n "$FAILED_SHA" && "$FAILED_SHA" == "$TARGET_SHA" ]]; then
   log "develop ${TARGET_SHA:0:9} already failed to build (memo in marker) — staying on last-good master ${HAVE_SHA:0:9}; a new develop commit or --force retries"; exit 0
 fi
 
-# Native-change probe straight from the ref (no working-tree mutation yet). Matches
-# ios-rn-build.sh's native_deps_hash (shasum -a 256 of ios/Podfile.lock, first 16).
+# Native-change probe straight from the ref (no working-tree mutation yet).
+# This marker is its own key (the committed lock at the ref); it is NOT the app stamp, which build-and-test/scripts/lib/native-deps-hash.sh owns.
 TARGET_PODHASH="$(git -C "$REPO_DIR" show "$DEVELOP_REF:ios/Podfile.lock" 2>/dev/null | shasum -a 256 | cut -c1-16 || true)"
 [[ -n "$TARGET_PODHASH" ]] || TARGET_PODHASH="no-podfile-lock"
 

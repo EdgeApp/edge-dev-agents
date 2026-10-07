@@ -3,6 +3,11 @@
 # this instead of re-solving it.
 # PARAMS:
 #   SUCCESS_TEXT — terminal success marker to wait for (default "Congratulations!")
+#   SUCCESS_TIMEOUT — ms to wait for it after the slide registers (default 45000)
+#     Pass the label of the scene the action ends on. A Send ends on the
+#     "Transaction Success" modal; the scene under it shows no "Transaction
+#     Details" label while the modal is up, so that text never matches and
+#     the wait runs its full clock after a send that broadcast.
 # HOW IT WORKS: the slider thumb carries testID `confirmSliderThumb` (added
 # via testids-over-coordinates); an id-anchored swipe drives it. If the id is NOT
 # present on this branch (selector resolves nothing), FIRST add the missing
@@ -11,19 +16,39 @@
 #   `maestro hierarchy` → find the slider node's bounds → absolute-coordinate
 #   swipe from thumb-center to the left edge (duration ~1500ms).
 # NOTE: swipe direction is LEFT (thumb starts at right edge in this design).
+# A MISSED SLIDE STOPS THE FLOW: a slide that registered flips the label off
+# "Slide to Confirm" at once (SafeSlider's completed state shows the spinner),
+# so the label still showing 3s after the gesture means it did not register and
+# the notVisible step fails. Do not re-swipe from the caller. The swipe step
+# logs its from/to points and the thumb's frame before and after: read those,
+# find why the gesture missed, and fix that. A scene whose handler resets the
+# slider synchronously (a modal raised over it) also fails that step; compose
+# the gesture inline for such a scene.
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
-  SUCCESS_TEXT: "Congratulations!"
+  # `${KEY || default}` so a caller's runFlow env wins over the default.
+  SUCCESS_TEXT: ${SUCCESS_TEXT || "Congratulations!"}
+  SUCCESS_TIMEOUT: ${SUCCESS_TIMEOUT || 45000}
 ---
 - extendedWaitUntil:
     visible: "Slide to Confirm"
     timeout: 15000
+# A LogBox toast over the slider swallows the swipe (debug builds).
+- runFlow: dismiss-logbox-banner.yaml
 - swipe:
     from:
       id: "confirmSliderThumb"
     direction: LEFT
     duration: 1500
 - extendedWaitUntil:
+    notVisible: "Slide to Confirm"
+    timeout: 3000
+# One wait for both outcomes: the success marker, or the slider re-armed by a
+# rejected action. The step after it fails within 1s on the second.
+- extendedWaitUntil:
+    visible: "${SUCCESS_TEXT}|Slide to Confirm"
+    timeout: ${SUCCESS_TIMEOUT}
+- extendedWaitUntil:
     visible: ${SUCCESS_TEXT}
-    timeout: 120000
+    timeout: 1000

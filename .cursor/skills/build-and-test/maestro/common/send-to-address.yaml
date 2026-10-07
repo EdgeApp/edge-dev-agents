@@ -1,14 +1,27 @@
 # common/send-to-address.yaml
 # Open a Send scene with address and amount filled in -> confirm slider.
+# The slide MOVES FUNDS. SLIDE: "false" stops on the armed slider, which is the
+# proof for any task whose change is before the broadcast.
 # With CURRENCY_CODE set, one payment-redirect deep link does it from any scene:
-# `https://edge.app/redirect/payment/?baseCurrencyCode=..&depositWalletAddress=..&baseCurrencyAmount=..`.
+# `edge://redirect/payment/?baseCurrencyCode=..&depositWalletAddress=..&baseCurrencyAmount=..`.
 # Params:
 #   CURRENCY_CODE  currency code for the link (`btc`, `usdc`). Unset, the flow
-#                  takes the manual path.
-#   ADDRESS, AMOUNT  recipient and amount (on the link, in units of the currency).
+#                  takes the manual path. Set with MANUAL_PATH, it names the
+#                  unit of AMOUNT.
+#   ADDRESS, AMOUNT  recipient and amount, in units of the currency on the link
+#                  and on the manual path with CURRENCY_CODE set. The manual
+#                  path without CURRENCY_CODE types AMOUNT into the field the
+#                  amount modal opens on, which is fiat.
 #   WALLET_SEARCH  text typed into Search Wallets to find the sending wallet:
 #                  always on the manual path, and on the link when the account
 #                  holds several wallets for the code and the app asks which.
+#   SLIDE          "false" ends the flow on "Slide to Confirm" without sliding.
+#                  Default "true" slides once; a slide that did not register
+#                  fails the flow 3s later and is never repeated.
+#                  The flow ends when the slide registers. A caller that
+#                  needs the broadcast waits for "Transaction Success|Slide to
+#                  Confirm", then asserts "Transaction Success" (the modal a
+#                  sent transaction raises).
 #   MANUAL_PATH    "true" forces Assets -> wallet -> Send -> address -> amount,
 #                  for a task whose change is on the wallet scene, the address
 #                  modal or the amount entry.
@@ -19,12 +32,13 @@ env:
   CURRENCY_CODE: ${CURRENCY_CODE || ""}
   MANUAL_PATH: ${MANUAL_PATH || ""}
   WALLET_SEARCH: ${WALLET_SEARCH || ""}
+  SLIDE: ${SLIDE || "true"}
 ---
 - runFlow:
     when:
       true: ${MANUAL_PATH != 'true' && CURRENCY_CODE != ''}
     commands:
-      - openLink: "https://edge.app/redirect/payment/?baseCurrencyCode=${CURRENCY_CODE}&depositWalletAddress=${ADDRESS}&baseCurrencyAmount=${AMOUNT}"
+      - openLink: "edge://redirect/payment/?baseCurrencyCode=${CURRENCY_CODE}&depositWalletAddress=${ADDRESS}&baseCurrencyAmount=${AMOUNT}"
       - extendedWaitUntil: {visible: "Slide to Confirm|Select Wallet", timeout: 30000}
       # Several wallets hold the code (ETH on each L2): the app asks which.
       - runFlow:
@@ -35,15 +49,31 @@ env:
             # The search field holds the typed text, so it is match 0.
             - extendedWaitUntil: {visible: {text: ".*${WALLET_SEARCH}.*", index: 1}, timeout: 15000}
             - tapOn: {text: ".*${WALLET_SEARCH}.*", index: 1}
+            # Scene-advanced check: a pick that landed closes the picker.
+            - extendedWaitUntil: {notVisible: "Select Wallet", timeout: 5000}
 - runFlow:
     when:
       true: ${MANUAL_PATH == 'true' || CURRENCY_CODE == ''}
     commands:
-      - extendedWaitUntil: {visible: "Assets", timeout: 90000}
+      # Entry wait, every ending named: the tab bar of a signed-in account, the
+      # login scene of an app that signed nobody in ("Create account"), or the
+      # PIN scene. A pinned login passes through the PIN scene in 5 to 8s, so
+      # that one gets its own bounded wait; a PIN scene that stays fails there.
+      - extendedWaitUntil: {visible: "Assets|Create account|Exit PIN", timeout: 30000}
+      - runFlow:
+          when: {visible: "Exit PIN"}
+          commands:
+            - extendedWaitUntil: {notVisible: "Exit PIN", timeout: 20000}
+            - extendedWaitUntil: {visible: "Assets|Create account", timeout: 15000}
+      - extendedWaitUntil: {visible: "Assets", timeout: 1000}
       - runFlow: {when: {visible: "Not Now"}, commands: [{tapOn: "Not Now"}]}
       - runFlow: {when: {visible: {id: "modal-close-button"}}, commands: [{tapOn: {id: "modal-close-button"}}]}
+      # Home is still mounting cards in the first seconds after a login and a
+      # tab tap in that window is swallowed with no error, so settle first.
+      - waitForAnimationToEnd: {timeout: 5000}
       - tapOn: "Assets"
-      - extendedWaitUntil: {visible: "Search Wallets", timeout: 20000}
+      # Scene-advanced check: the wallet list's search footer.
+      - extendedWaitUntil: {visible: "Search Wallets", timeout: 5000}
       - tapOn: "Search Wallets"
       # The search text survives navigation; clear it or inputText appends.
       - eraseText: 40
@@ -59,7 +89,31 @@ env:
       - tapOn: "Next"
       - extendedWaitUntil: {visible: "Enter Value", timeout: 15000}
       - tapOn: "Enter Value"
+      # Scene-advanced check: the amount modal is up.
+      - extendedWaitUntil: {visible: "Done", timeout: 5000}
+      # The modal opens on the fiat field with the currency amount on the row
+      # above it; a tap on that row swaps them. With CURRENCY_CODE set the flow
+      # swaps, so AMOUNT is in units of the currency here as on the link.
+      - runFlow:
+          when:
+            true: ${CURRENCY_CODE != ''}
+          commands:
+            - runFlow:
+                when: {visible: "0 ${CURRENCY_CODE.toUpperCase()}"}
+                commands:
+                  - tapOn: "0 ${CURRENCY_CODE.toUpperCase()}"
+                  - extendedWaitUntil: {notVisible: "0 ${CURRENCY_CODE.toUpperCase()}", timeout: 3000}
       - inputText: ${AMOUNT}
       - tapOn: "Done"
 - extendedWaitUntil: {visible: "Slide to Confirm", timeout: 15000}
-- swipe: {from: {id: "confirmSliderThumb"}, direction: LEFT, duration: 1500}
+# A LogBox toast over the slider swallows the swipe (debug builds).
+- runFlow: dismiss-logbox-banner.yaml
+- runFlow:
+    when:
+      true: ${SLIDE == 'true'}
+    commands:
+      - swipe: {from: {id: "confirmSliderThumb"}, direction: LEFT, duration: 1500}
+      # A slide that registered flips the label at once. Still showing after 3s
+      # means it missed: stop there, read the swipe line of the step log, and
+      # fix the cause. Never slide again from the caller.
+      - extendedWaitUntil: {notVisible: "Slide to Confirm", timeout: 3000}

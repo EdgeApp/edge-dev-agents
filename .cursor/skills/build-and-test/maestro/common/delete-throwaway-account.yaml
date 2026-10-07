@@ -3,8 +3,11 @@
 # not accumulate on the sim image (every leftover account shows up in the login
 # scene's dropdown forever).
 #
-# ENTRY STATE: logged into the account you want gone. Deletion is irreversible;
-# never point this at a roster account (any username in
+# ENTRY STATE: logged into the account you want gone, on a scene with the
+# header menu button, or on the create flow's "Choose Wallets to Add" picker
+# (where a create run that stopped early leaves the app; the picker has no
+# header, so this flow leaves it first). Deletion is irreversible; never point
+# this at a roster account (any username in
 # ~/.config/edge-secrets/test-accounts.json).
 #
 # PARAMS
@@ -24,6 +27,39 @@ env:
   DELETE_USERNAME: ${DELETE_USERNAME || output.newAccountUsername}
   DELETE_PASSWORD: ${DELETE_PASSWORD || output.newAccountPassword}
 ---
+- runFlow: dismiss-logbox-banner.yaml
+- runFlow:
+    when:
+      visible: "Choose Wallets to Add"
+    commands:
+      - tapOn:
+          id: "nextButton"
+      - extendedWaitUntil:
+          notVisible:
+            id: "nextButton"
+          timeout: 10000
+      # Home mounts at once, with or without wallets.
+      - extendedWaitUntil:
+          visible: ".*Total Balance.*"
+          timeout: 20000
+# Entry gate: a scene without the header menu button fails here by name.
+- extendedWaitUntil:
+    visible:
+      id: "sideMenuButton"
+    timeout: 15000
+# An error alert (a failed wallet creation raises one) lies over the header and
+# takes the menu tap, so it is closed first.
+- runFlow:
+    when:
+      visible:
+        id: "alertDropdownClose"
+    commands:
+      - tapOn:
+          id: "alertDropdownClose"
+      - extendedWaitUntil:
+          notVisible:
+            id: "alertDropdownClose"
+          timeout: 5000
 - tapOn:
     id: "sideMenuButton"
 - extendedWaitUntil:
@@ -61,6 +97,11 @@ env:
     timeout: 20000
 - inputText: ${DELETE_USERNAME}
 - pressKey: Enter
+# The modal stays up while the server deletes the account, so no short check
+# can tell a swallowed Enter from a deletion in progress. The wait is short
+# instead (deletion takes about 2s) and names both endings; the assert turns
+# the failure ending into a failed step.
 - extendedWaitUntil:
-    visible: ${"Account " + DELETE_USERNAME + " deleted"}
-    timeout: 45000
+    visible: ${"Account " + DELETE_USERNAME + " deleted|Username does not match"}
+    timeout: 20000
+- assertVisible: ${"Account " + DELETE_USERNAME + " deleted"}

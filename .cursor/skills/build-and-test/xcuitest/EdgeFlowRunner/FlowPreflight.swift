@@ -8,7 +8,14 @@ enum FlowPreflight {
   static let selectorKeys: Set<String> = ["text", "id", "index", "enabled"]
   static let conditionKeys: Set<String> = ["visible", "notVisible", "true", "platform"]
   static let configKeys: Set<String> = ["appId", "env", "name", "tags", "jsEngine"]
-  static let tapKeys: Set<String> = ["point", "waitToSettleTimeoutMs", "retryTapIfNoChange"]
+  static let tapKeys: Set<String> = ["point", "waitToSettleTimeoutMs", "retryTapIfNoChange", "failIfNoChange"]
+  /// Commands that send input, and the wait length past which a wait placed
+  /// directly after one is reported by `warnings`.
+  static let inputCommands: Set<String> = ["tapOn", "longPressOn", "swipe", "pressKey"]
+  static let longWaitMs: Double = 20000
+  /// Steps that neither send input nor check the scene; the lint looks past
+  /// them when it pairs a wait with the step before it.
+  static let passiveCommands: Set<String> = ["waitForAnimationToEnd", "takeScreenshot", "evalScript"]
   static let pressKeys: Set<String> = ["enter", "backspace", "home", "back"]
 
   /// Argument keys each command accepts in map form (plus `common`).
@@ -52,6 +59,46 @@ enum FlowPreflight {
     var found: [String] = []
     check(flow: flow, into: &found)
     return found
+  }
+
+  /// Lint, never a failure: each long `extendedWaitUntil` that directly
+  /// follows an input step. A swallowed tap raises no error, so such a wait
+  /// finds out only by running its whole clock; a short scene-advanced check
+  /// between the two finds out in seconds.
+  static func warnings(in flow: [String: Any]) -> [String] {
+    var found: [String] = []
+    lint(commands: flow["commands"] as? [Any] ?? [], flowName: name(of: flow), into: &found)
+    return found
+  }
+
+  private static func entry(_ command: Any) -> (name: String, map: [String: Any])? {
+    if let bare = command as? String { return (bare, [:]) }
+    guard let map = command as? [String: Any], map.count == 1, let pair = map.first else { return nil }
+    return (pair.key, pair.value as? [String: Any] ?? [:])
+  }
+
+  /// The input command a step ends on, looking through runFlow/retry/repeat.
+  private static func trailingInput(_ command: Any) -> String? {
+    guard let (name, map) = entry(command) else { return nil }
+    if inputCommands.contains(name) { return name }
+    let nested = (map["_flow"] as? [String: Any])?["commands"] as? [Any] ?? map["commands"] as? [Any]
+    return nested?.last.flatMap(trailingInput)
+  }
+
+  private static func lint(commands: [Any], flowName: String, into found: inout [String]) {
+    for (offset, command) in commands.enumerated() {
+      guard let (name, map) = entry(command) else { continue }
+      if let flow = map["_flow"] as? [String: Any] {
+        lint(commands: flow["commands"] as? [Any] ?? [], flowName: Self.name(of: flow), into: &found)
+      } else if let nested = map["commands"] as? [Any] {
+        lint(commands: nested, flowName: flowName, into: &found)
+      }
+      guard name == "extendedWaitUntil", let ms = (map["timeout"] as? NSNumber)?.doubleValue, ms > longWaitMs else { continue }
+      var previous = offset - 1
+      while previous >= 0, let passive = entry(commands[previous])?.name, passiveCommands.contains(passive) { previous -= 1 }
+      guard previous >= 0, let input = trailingInput(commands[previous]) else { continue }
+      found.append("\(flowName) #\(offset + 1): a \(Int(ms / 1000))s wait directly follows \(input); put a short scene-advanced check between them")
+    }
   }
 
   private static func name(of flow: [String: Any]) -> String {

@@ -18,6 +18,12 @@
 #                             Used on the manual path, for a side with no asset
 #                             param, and when the link raises the app's picker
 #                             (the account holds several wallets for the asset)
+#   SRC_ROW_ID / DST_ROW_ID — id (a regex) of the picker row to tap after
+#                             the search text is typed. Default
+#                             `walletPickerRow\..*`, the first filtered row.
+#                             Pass `walletPickerRow.<wallet name>.<code>`
+#                             (e.g. `walletPickerRow.My Bitcoin 3.BTC`) when
+#                             the search text matches more than one row.
 #   FIAT_AMOUNT             — fiat number typed into the amount field
 #   PROVIDER                — exact provider name to force (e.g. "Maya Protocol").
 #                             Forcing works by SELECTING it in the provider sheet;
@@ -29,6 +35,12 @@
 #                             Exchange, which is account-synced and thrashes under
 #                             parallel sessions.
 # GOTCHA: amount field retains prior text — eraseText before input.
+# EVERY TAP THAT LEAVES A SCENE is followed by a 5s check that the scene moved,
+# before any longer wait on the slow thing.
+# QUOTE WAIT: ends on "Powered by .*" (a quote) or "Exchange Error" (every
+# provider rejected the pair or amount), 25s ceiling; the flow fails on the
+# error card. To capture a rejection on purpose, stop the caller's own steps
+# at Next and wait for "Exchange Error" there.
 # 2026-07-24 consolidation: added the "Search Wallets" step both wallet-picker
 # blocks were missing — 5 corpus flows across 3 sessions independently
 # re-derived this whole file from scratch because waiting for the wallet text
@@ -45,6 +57,8 @@ env:
   MANUAL_PATH: ${MANUAL_PATH || ""}
   SRC_WALLET: ${SRC_WALLET || "Bitcoin"}
   DST_WALLET: ${DST_WALLET || "Ethereum"}
+  SRC_ROW_ID: ${SRC_ROW_ID || "walletPickerRow\\..*"}
+  DST_ROW_ID: ${DST_ROW_ID || "walletPickerRow\\..*"}
   FIAT_AMOUNT: ${FIAT_AMOUNT || "16"}
   PROVIDER: ${PROVIDER || ""}
 ---
@@ -80,6 +94,9 @@ env:
       visible: "Select Source Wallet"
     commands:
       - tapOn: "Select Source Wallet"
+      - extendedWaitUntil:
+          visible: "Search Wallets"
+          timeout: 5000
       - tapOn: "Search Wallets"
       - inputText: ${SRC_WALLET}
       - runFlow:
@@ -87,21 +104,31 @@ env:
             visible: "Not Now"
           commands:
             - tapOn: "Not Now"
-      # The search field holds the typed text, so it is always match 0; the
-      # rows' labels contain the wallet name, so match 1 is the first row.
+      # Rows are picked by id, never by label: a row's label is balance and
+      # wallet name ("ETH 0 $2,694 My Ether"), which need not contain the
+      # search text ("Ethereum") that filtered it in.
       - extendedWaitUntil:
           visible:
-            text: ".*${SRC_WALLET}.*"
-            index: 1
+            id: ${SRC_ROW_ID}
+            index: 0
           timeout: 15000
       - tapOn:
-          text: ".*${SRC_WALLET}.*"
-          index: 1
+          id: ${SRC_ROW_ID}
+          index: 0
+      # Scene-advanced check: a pick that landed settles this side. (The app
+      # may raise the other side's picker at once, so "Search Wallets" can
+      # still be on screen.)
+      - extendedWaitUntil:
+          notVisible: "Select Source Wallet"
+          timeout: 5000
 - runFlow:
     when:
       visible: "Select Receiving Wallet"
     commands:
       - tapOn: "Select Receiving Wallet"
+      - extendedWaitUntil:
+          visible: "Search Wallets"
+          timeout: 5000
       - tapOn: "Search Wallets"
       - inputText: ${DST_WALLET}
       - runFlow:
@@ -109,16 +136,23 @@ env:
             visible: "Not Now"
           commands:
             - tapOn: "Not Now"
-      # The search field holds the typed text, so it is always match 0; the
-      # rows' labels contain the wallet name, so match 1 is the first row.
+      # Rows are picked by id, never by label: a row's label is balance and
+      # wallet name ("ETH 0 $2,694 My Ether"), which need not contain the
+      # search text ("Ethereum") that filtered it in.
       - extendedWaitUntil:
           visible:
-            text: ".*${DST_WALLET}.*"
-            index: 1
+            id: ${DST_ROW_ID}
+            index: 0
           timeout: 15000
       - tapOn:
-          text: ".*${DST_WALLET}.*"
-          index: 1
+          id: ${DST_ROW_ID}
+          index: 0
+      # Scene-advanced check: a pick that landed settles this side. (The app
+      # may raise the other side's picker at once, so "Search Wallets" can
+      # still be on screen.)
+      - extendedWaitUntil:
+          notVisible: "Select Receiving Wallet"
+          timeout: 5000
 - extendedWaitUntil:
     visible: "Tap to edit"
     timeout: 15000
@@ -127,10 +161,28 @@ env:
     index: 0
 - eraseText
 - inputText: ${FIAT_AMOUNT}
+# The scene rejects an amount above the wallet balance inline ("Insufficient
+# Funds") and disables Next; a tap on it then does nothing. Fail here with the
+# reason named, before the tap. (A 2s wait, not assertNotVisible: the assert
+# holds for 17s before it fails.)
+- extendedWaitUntil:
+    notVisible: "Insufficient Funds"
+    timeout: 2000
 - tapOn: "Next"
+# Scene-advanced check: a Next tap that landed raises the "Hang tight" search
+# scene at once (or already shows its result), so a swallowed tap fails here in
+# 5s instead of running out the quote clock.
+- extendedWaitUntil:
+    visible: "Hang tight|Powered by .*|Exchange Error"
+    timeout: 5000
+# One wait for both outcomes, so a rejected quote ends it as fast as a quote
+# does; the step after it fails within 1s when the error card is what showed.
+- extendedWaitUntil:
+    visible: "Powered by .*|Exchange Error"
+    timeout: 25000
 - extendedWaitUntil:
     visible: "Powered by .*"
-    timeout: 45000
+    timeout: 1000
 - runFlow:
     when:
       true: ${PROVIDER != ''}
@@ -146,6 +198,13 @@ env:
                 timeout: 10000
             - tapOn:
                 text: ${PROVIDER}
+            # Scene-advanced check: a pick that landed closes the sheet.
+            - extendedWaitUntil:
+                notVisible: "Select Swap Provider"
+                timeout: 5000
+            - extendedWaitUntil:
+                visible: "Powered by .*|Exchange Error"
+                timeout: 25000
             - extendedWaitUntil:
                 visible: "Powered by .*"
-                timeout: 45000
+                timeout: 1000

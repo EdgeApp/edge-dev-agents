@@ -1,11 +1,24 @@
-# Maestro flow: Edge iOS "Buy" $500 quote — end-to-end proof screenshot.
+# Maestro flow: Edge iOS "Buy" 500 quote — end-to-end proof screenshot.
 #
-# Target: the iPhone 16 Pro Max / iOS 18 simulator that holds the pre-provisioned
-# roster account `qa-b` (see ~/.config/edge-secrets/test-accounts.json: region
-# California/USA). The flow quotes into a BTC wallet, so confirm the logged-in account has one. The Edge
-# app must already be installed (build + install steps are in build-and-test/references/build.md).
+# Target: a simulator with the app installed (build + install steps are in
+# build-and-test/references/build.md) and a roster account signed in or on its
+# PIN scene. The default drive account is the roster's `agent` role
+# (~/.config/edge-secrets/test-accounts.json); on iOS pass
+# `xcuitest-run.sh --login-role <role>`. The flow quotes into a BTC wallet, so
+# the account needs one, and a ramp region (common/ramp-set-region-fiat.yaml).
 #
 # Run: maestro test ~/.cursor/skills/build-and-test/maestro/buy-quote.yaml
+#
+# PARAMS: PIN_DIGIT, EXPECT_USERNAME (common/login-if-needed.yaml), BUY_AMOUNT,
+#   SCREENSHOT_PATH, FIAT_CODE (fiat code the amount field must show; the field
+#   reads "Amount <code>" and the code follows the account's ramp region; unset,
+#   any code passes).
+# ENDINGS NAMED: the launch wait ends on the PIN scene, the tab bar (YOLO
+# auto-login already done) or the full login scene (nobody signed in: fails
+# within 1s). The Buy scene wait ends on the amount form or on "Select your
+# region" (no ramp region: fails within 1s). The quote wait ends on the rate
+# line, "Buy Unavailable" (no provider serves the region, fiat and asset) or
+# "Unexpected Error"; the flow fails within 1s on the last two.
 #
 # Notes / gotchas baked into this flow:
 #   * PIN digit taps are spaced with waitToSettleTimeoutMs. Edge's RN keypad drops
@@ -14,40 +27,43 @@
 #   * This debug build has an intermittent RN Fabric text-measure crash on the Buy
 #     (Ramp) scene (RCTTextLayoutManager / folly EvictingCacheMap SIGABRT). The
 #     scene renders healthy for several seconds first, so we enter the amount and
-#     screenshot promptly. If it crashes before the quote, just re-run.
+#     screenshot as soon as the rate shows. If it crashes before the quote, just
+#     re-run.
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
-  PIN_DIGIT: "1"        # test account PIN is 1111 -> tap "1" four times
-  BUY_AMOUNT: "500"
-  SCREENSHOT_PATH: /tmp/agent-mvp-buy-quote-screenshot
+  # `${KEY || default}` so a caller's runFlow env wins over the default.
+  # The digit is tapped four times; every roster PIN is one digit repeated.
+  PIN_DIGIT: ${PIN_DIGIT || "1"}
+  EXPECT_USERNAME: ${EXPECT_USERNAME || ""}
+  BUY_AMOUNT: ${BUY_AMOUNT || "500"}
+  FIAT_CODE: ${FIAT_CODE || "[A-Z]+"}
+  SCREENSHOT_PATH: ${SCREENSHOT_PATH || "/tmp/agent-mvp-buy-quote-screenshot"}
 ---
 - launchApp
 
-# --- PIN login (account already provisioned on this simulator) ---
+# --- login (account already provisioned on this simulator) ---
 - extendedWaitUntil:
-    visible: "Exit PIN"
+    visible: "Exit PIN|Create account|Buy"
     timeout: 40000
+- extendedWaitUntil:
+    notVisible: "Create account"
+    timeout: 1000
 # YOLO auto-login can finish mid-entry, so the taps go through the gated
-# login-if-needed flow instead of four unconditional taps.
+# login-if-needed flow instead of four unconditional taps. It ends on its own
+# check that the PIN scene is gone.
 - runFlow:
     file: common/login-if-needed.yaml
     env:
       PIN_DIGIT: ${PIN_DIGIT}
+      EXPECT_USERNAME: ${EXPECT_USERNAME}
+      HOME_MARKER: "Buy"
 
 # --- wait for the main tab bar, then dismiss optional post-login modals ---
 - extendedWaitUntil:
     visible: "Buy"
     timeout: 30000
-- runFlow:
-    when: { visible: "Security is Our Priority" }
-    commands: [{ tapOn: "Cancel" }]
-- runFlow:
-    when: { visible: "How Did You Discover Edge?" }
-    commands: [{ tapOn: "Dismiss" }]
-- runFlow:
-    when: { visible: "Claim Your Web3 Handle" }
-    commands: [{ tapOn: "Not Now" }]
+- runFlow: common/dismiss-startup-modals.yaml
 
 # --- navigate to the Buy (Buy Crypto) scene ---
 # The tab bar stays hidden for up to ~20s after login while "Buy" is already
@@ -58,23 +74,36 @@ env:
     commands:
       - tapOn: "Buy"
       - extendedWaitUntil:
-          visible: "Amount USD"
+          visible: "Amount [A-Z]+|Select your region"
           timeout: 10000
+# The fiat field renders above the crypto one ("Amount BTC"), so it is match 0.
+- extendedWaitUntil:
+    visible:
+      text: ${"Amount " + FIAT_CODE}
+      index: 0
+    timeout: 1000
 
-# --- enter the $500 fiat amount ---
+# --- enter the fiat amount ---
 # NOTE: do NOT call `hideKeyboard` here — on this debug build it forces a re-layout
-# that reliably triggers the RN Fabric text-measure SIGABRT. The USD + converted-BTC
+# that reliably triggers the RN Fabric text-measure SIGABRT. The fiat + converted-BTC
 # fields and the exchange-rate line are all above the keyboard, so leave it up.
-- tapOn: "Amount USD"
+- tapOn:
+    text: ${"Amount " + FIAT_CODE}
+    index: 0
 # The Buy scene remembers the last amount; clear it or inputText appends.
 - eraseText: 20
 - inputText: ${BUY_AMOUNT}
 
-# --- let the live quote resolve, then capture ---
-# waitForAnimationToEnd diffs screenshots until the quote ("Amount BTC" value +
-# "1 BTC = <rate> USD") has rendered.
-- waitForAnimationToEnd:
-    timeout: 8000
+# --- wait for the live quote, then capture ---
+# One wait for every ending: the rate line ("1 BTC = <rate> <fiat>", or with
+# an estimate sign), the "Buy Unavailable" card or an error card. The step
+# after it fails within 1s when a card is what showed.
+- extendedWaitUntil:
+    visible: "1 .+ [=≈] .+|Buy Unavailable|Unexpected Error"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "1 .+ [=≈] .+"
+    timeout: 1000
 - takeScreenshot: ${SCREENSHOT_PATH}
 # NOTE: this single in-flow screenshot is best-effort — it races the intermittent
 # crash. For a GUARANTEED resolved-quote capture, run capture-buy-quote.sh, which

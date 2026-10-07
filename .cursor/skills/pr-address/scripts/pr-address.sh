@@ -793,7 +793,7 @@ case "$CMD" in
     ;;
 
   autosquash)
-    DEFAULT_UPSTREAM=$("$HOME/.cursor/skills/git-default-branch.sh")
+    DEFAULT_UPSTREAM=$("$HOME/.cursor/skills/git-branch-base.sh")
     ~/.cursor/skills/git-branch-ops.sh autosquash --merge-base-with "$DEFAULT_UPSTREAM"
     ;;
 

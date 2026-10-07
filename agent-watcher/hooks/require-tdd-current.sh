@@ -61,9 +61,9 @@ done
 [ -n "$DOC" ] && [ -n "$REPO_DIR" ] || exit 0
 
 BASE=$(git -C "$REPO_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || echo "origin/develop")
-# The branch's FIRST commit is measured from the DEFAULT branch, not @{upstream}
+# The branch's FIRST commit is measured from its BASE branch, not @{upstream}
 # (after a push, origin/<branch>..HEAD would name the first unpushed commit).
-DEFAULT_UPSTREAM=$("$HOME/.cursor/skills/git-default-branch.sh" -C "$REPO_DIR" 2>/dev/null || echo HEAD)
+DEFAULT_UPSTREAM=$("$HOME/.cursor/skills/git-branch-base.sh" -C "$REPO_DIR" 2>/dev/null || echo HEAD)
 FIRST_SHA=$(git -C "$REPO_DIR" rev-list --reverse "$(git -C "$REPO_DIR" merge-base "$DEFAULT_UPSTREAM" HEAD 2>/dev/null || echo HEAD)..HEAD" 2>/dev/null | head -1)
 STAMP_SH="$HOME/.cursor/skills/tdd/scripts/tdd-stamp.sh"
 DOC_REL="${DOC#$REPO_DIR}"; DOC_REL="${DOC_REL#/}"

@@ -20,7 +20,8 @@
 # Usage:
 #   capture-buy-quote.sh [--out <path>] [--flow <path-to-maestro-yaml>] \
 #                        [--bundle-id <id>] [--quote-secs N] [--window-secs N] [--cycles N] \
-#                        [--device <udid>] [--driver-port N] [--driver xcuitest|maestro]
+#                        [--device <udid>] [--driver-port N] [--driver xcuitest|maestro] \
+#                        [--login-role <role>]
 #
 # Defaults:
 #   --out         /tmp/agent-mvp-buy-quote-screenshot.png
@@ -33,6 +34,11 @@
 #   --driver-port $AGENT_METRO_PORT+1000 when set (per-slot maestro driver port,
 #                 keeps parallel slots' iOS drivers off each other), else unset
 #   --driver      xcuitest (xcuitest-run.sh; needs a device) or maestro
+#   --login-role  roster role the flow signs in as (xcuitest driver only; passed
+#                 to xcuitest-run.sh, which hands the flow that account's PIN
+#                 digit and username guard and masks both). Default: the
+#                 roster's defaultRole. The maestro driver runs the flow with
+#                 its own PIN_DIGIT default.
 #
 # Device pinning: with multiple sims booted (parallel orch slots), an unpinned
 # maestro attaches to an arbitrary device and `simctl io booted` photographs an
@@ -57,6 +63,8 @@ CYCLES=5
 DEVICE="${AGENT_SIM_UDID:-}"
 DRIVER_PORT=""
 DRIVER="xcuitest"
+LOGIN_ROLE=""
+ROSTER="$HOME/.config/edge-secrets/test-accounts.json"
 [[ -n "${AGENT_METRO_PORT:-}" ]] && DRIVER_PORT=$((AGENT_METRO_PORT + 1000))
 
 while [[ $# -gt 0 ]]; do
@@ -70,6 +78,7 @@ while [[ $# -gt 0 ]]; do
     --device)      DEVICE="$2";      shift 2 ;;
     --driver-port) DRIVER_PORT="$2"; shift 2 ;;
     --driver)      DRIVER="$2";      shift 2 ;;
+    --login-role)  LOGIN_ROLE="$2";  shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -80,6 +89,13 @@ SIMCTL_DEVICE="${DEVICE:-booted}"
 MAESTRO_ARGS=()
 [[ -n "$DEVICE" ]]      && MAESTRO_ARGS+=(--device "$DEVICE")
 [[ -n "$DRIVER_PORT" ]] && MAESTRO_ARGS+=(--driver-host-port "$DRIVER_PORT")
+
+# The drive account is the roster's default role unless the caller names one.
+if [[ -z "$LOGIN_ROLE" && -r "$ROSTER" ]]; then
+  LOGIN_ROLE="$(jq -r '.defaultRole // empty' "$ROSTER" 2>/dev/null || true)"
+fi
+XCUITEST_ARGS=()
+[[ -n "$LOGIN_ROLE" ]] && XCUITEST_ARGS+=(--login-role "$LOGIN_ROLE")
 
 case "$DRIVER" in
   xcuitest) [[ -n "$DEVICE" ]] || { echo "--driver xcuitest needs --device or \$AGENT_SIM_UDID" >&2; exit 1; } ;;
@@ -97,7 +113,7 @@ alive() { xcrun simctl spawn "$SIMCTL_DEVICE" launchctl list 2>/dev/null | grep 
 for ((cycle = 1; cycle <= CYCLES; cycle++)); do
   if [[ "$DRIVER" == xcuitest ]]; then
     echo "[capture] cycle $cycle/$CYCLES: xcuitest-run.sh $FLOW (device: $DEVICE) ..."
-    "$SCRIPT_DIR/xcuitest-run.sh" --flow "$FLOW" --udid "$DEVICE" >"$TMP/driver.log" 2>&1 || true
+    "$SCRIPT_DIR/xcuitest-run.sh" --flow "$FLOW" --udid "$DEVICE" ${XCUITEST_ARGS[@]+"${XCUITEST_ARGS[@]}"} >"$TMP/driver.log" 2>&1 || true
   else
     echo "[capture] cycle $cycle/$CYCLES: maestro ${MAESTRO_ARGS[*]:-} $FLOW (simctl device: $SIMCTL_DEVICE) ..."
     maestro ${MAESTRO_ARGS[@]+"${MAESTRO_ARGS[@]}"} test "$FLOW" >"$TMP/driver.log" 2>&1 || true

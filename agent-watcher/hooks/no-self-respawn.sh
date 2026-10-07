@@ -45,6 +45,13 @@ CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentio
       deny "launching/looping another claude (\`${CMD:0:60}…\`)"
       exit 2
     fi
+    # restart-session-in-place.sh is the operator-session self-restart; its
+    # sanctioned launch is quoted inside `tmux run-shell -b "…"`, which the
+    # mention-stripped view blanks, so match the raw command.
+    if printf '%s' "$CMD" | grep -q 'restart-session-in-place\.sh'; then
+      deny "restart-session-in-place.sh (an anchor/discussion-session tool)"
+      exit 2
+    fi
     ;;
 esac
 exit 0

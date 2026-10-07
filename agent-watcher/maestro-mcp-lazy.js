@@ -2,9 +2,9 @@
 // maestro-mcp-lazy.js -- stdio MCP proxy that runs the maestro MCP JVM only
 // while a session is driving with it.
 //
-// Every orch claude is launched with maestro-mcp.json, and most sessions never
-// call a maestro tool (land, review and Task runs; iOS runs that drive on the
-// XCUITest interpreter). The JVM costs ~160 MB idle and ~1.3 GB with its iOS
+// A claude whose lane includes Android is launched with maestro-mcp.json
+// (spawn-test-session.sh --lanes), and it calls a maestro tool for a small part
+// of its life. The JVM costs ~160 MB idle and ~1.3 GB with its iOS
 // driver up (JVM + xcodebuild + the driver runner app on the sim). This proxy
 // answers the MCP handshake and tools/list from a cache, starts the JVM on the
 // first real call, and stops it (with its driver) after MAESTRO_MCP_IDLE_SECS
