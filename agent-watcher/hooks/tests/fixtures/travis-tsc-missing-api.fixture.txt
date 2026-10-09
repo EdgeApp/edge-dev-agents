@@ -1,0 +1,10 @@
+✖ 1911 problems (0 errors, 1911 warnings)
+The command "npm run lint" exited with 0.
+src/components/scenes/MigrateWalletCompletionScene.tsx(456,20): error TS2551: Property 'makeMaxSpend' does not exist on type 'EdgeCurrencyWallet'. Did you mean 'makeSpend'?
+src/components/scenes/SendScene2.tsx(1593,49): error TS2551: Property 'makeMaxSpend' does not exist on type 'EdgeCurrencyWallet'. Did you mean 'makeSpend'?
+src/components/scenes/SendScene2.tsx(1595,13): error TS18048: 'maxEdgeTransaction' is possibly 'undefined'.
+The command "npx tsc" exited with 2.
+Test Suites: 88 passed, 88 total
+Tests:       517 passed, 517 total
+The command "npm test" exited with 0.
+Done. Your build exited with 1.

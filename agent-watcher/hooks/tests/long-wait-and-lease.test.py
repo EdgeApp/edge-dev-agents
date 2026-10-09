@@ -102,7 +102,6 @@ write_exec(f'{stub}/gh', r'''
 case "$*" in
   *"pr checks"*) echo '[{"name":"build","bucket":"pending"}]' ;;
   *headRefOid*) echo "${STUB_HEAD:-abc123}" ;;
-  *isDraft,commits*) echo '{"d":false,"m":"feat: x"}' ;;
   *"--json state,mergeStateStatus"*) echo '{"state":"OPEN","mergeStateStatus":"BLOCKED","statusCheckRollup":[{"status":"IN_PROGRESS"}],"reviewDecision":""}' ;;
   *) exit 1 ;;
 esac
@@ -110,8 +109,13 @@ esac
 
 # Scripts under test source shared libs from $HOME; give the fixture HOME the real ones.
 os.makedirs(os.path.join(home, '.config', 'agent-watcher'), exist_ok=True)
+# A COPY, never a symlink to the real directory: this test overwrites and removes
+# lib/node-modules-freshness.sh further down, and through a directory symlink
+# that edit lands on the live lib every orchestrated run sources.
+REAL_LIB = os.path.join(HOME_REAL, '.config', 'agent-watcher', 'lib')
+REAL_LIB_BEFORE = sorted(os.listdir(REAL_LIB))
 if not os.path.exists(os.path.join(home, '.config', 'agent-watcher', 'lib')):
-    os.symlink(os.path.join(HOME_REAL, '.config', 'agent-watcher', 'lib'), os.path.join(home, '.config', 'agent-watcher', 'lib'))
+    shutil.copytree(REAL_LIB, os.path.join(home, '.config', 'agent-watcher', 'lib'), symlinks=True)
 
 ENV = dict(os.environ, HOME=home, XDG_STATE_HOME=state, LWL_MARKS=marks,
            PATH=f'{stub}:{os.environ["PATH"]}', AGENT_SESSION_UUID='owner-A')
@@ -312,5 +316,7 @@ finally:
             os.remove(os.path.join('/tmp', f))
     shutil.rmtree(tmp, ignore_errors=True)
 
+check('the real lib directory is untouched by this run', sorted(os.listdir(REAL_LIB)) == REAL_LIB_BEFORE,
+      f'before={REAL_LIB_BEFORE} after={sorted(os.listdir(REAL_LIB))}')
 print(f'\n{"FAILED: " + ", ".join(fails) if fails else "all passed"}')
 sys.exit(1 if fails else 0)

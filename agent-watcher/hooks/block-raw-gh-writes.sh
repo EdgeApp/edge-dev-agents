@@ -7,9 +7,9 @@
 # substitution failure class (agent that never read the skill improvises the
 # raw command and skips every gate wired into the script).
 #
-# Three trigger classes:
-#   1. `gh pr create` WITHOUT --draft  -> pr-create.sh (draft dep PRs are
-#      sanctioned raw, per one-shot dep-pr-draft-vs-bump / pre-pr-gate header)
+# Four trigger classes:
+#   1. `gh pr create`, with any flags -> pr-create.sh. No raw form is
+#      sanctioned: every PR opens through the funnel, ready for review.
 #   2. `gh pr comment` / `gh pr review` -> pr-address.sh / github-pr-review.sh
 #   3. `gh pr edit` carrying --body/--body-file/--title -> the PR body is the
 #      test-evidence surface (pr-evidence-table.js sentinels) and a prose
@@ -85,16 +85,13 @@ block() {
 
 # Class 1+2: gh pr subcommands at execution position in the stripped view.
 if printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])gh[[:space:]]+pr[[:space:]]+create([[:space:]]|$)'; then
-  printf '%s' "$CMD_M" | grep -q -- '--draft' || block "raw \`gh pr create\` is forbidden in agent sessions (only \`--draft\` dep PRs are sanctioned raw). PR creation goes through /pr-create's pr-create.sh: it enforces the test-evidence gate, lints the body per /no-slop, injects the Asana link, and attaches the PR to the task. Read ~/.cursor/skills/pr-create/SKILL.md and use its script."
+  block "raw \`gh pr create\` is forbidden in agent sessions, with any flags. PR creation goes through /pr-create's pr-create.sh: it enforces the test-evidence gate, lints the body per /no-slop, injects the Asana link, and attaches the PR to the task. Read ~/.cursor/skills/pr-create/SKILL.md and use its script."
 fi
 if printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])gh[[:space:]]+pr[[:space:]]+(comment|review)([[:space:]]|$)'; then
   block "raw \`gh pr comment\`/\`gh pr review\` is forbidden in agent sessions — outbound PR prose goes through the linted funnels: /pr-address's pr-address.sh (reply, comment, mark-addressed) or /pr-review's github-pr-review.sh (review submit). Both lint per /no-slop and keep the addressed-marker arithmetic the Complete gate reads. Read the owning SKILL.md and use its script."
 fi
 
-# Class 3: gh api writes to comment/review endpoints. Trigger = endpoint shape
-# anywhere in the raw command (endpoints sit inside quotes) AND an actual
-# `gh api` invocation AND a write marker in the stripped view. gh api defaults
-# to POST when -f/-F fields are present.
+# Class 3: gh pr edit carrying a body or title.
 if printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])gh[[:space:]]+pr[[:space:]]+edit([[:space:]]|$)' && \
    printf '%s' "$CMD_M" | grep -qE '(^|[[:space:]])--(body|body-file|title)([[:space:]]|=|$)'; then
   block "raw \`gh pr edit --body/--body-file/--title\` is forbidden — the PR body carries the test-evidence table between its sentinels, and a raw rewrite can drop it and skips the no-slop prose lint. Use instead:
@@ -105,6 +102,10 @@ if printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])gh[[:space:]]+pr[[:space:
 Structural edits (--add-label, --base, --add-reviewer) are not blocked."
 fi
 
+# Class 4: gh api writes to comment/review endpoints. Trigger = endpoint shape
+# anywhere in the raw command (endpoints sit inside quotes) AND an actual
+# `gh api` invocation AND a write marker in the stripped view. gh api defaults
+# to POST when -f/-F fields are present.
 if echo "$CMD" | grep -qE '(issues|pulls)/[0-9]+/(comments|reviews)|issues/comments/[0-9]+|pulls/comments/[0-9]+'; then
   if printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])gh[[:space:]]+api([[:space:]]|$)' && \
      printf '%s' "$CMD_M" | grep -qE '(^|[[:space:]])(-f|-F|--field|--raw-field|--input)([[:space:]]|$|=)|--method[[:space:]=]+(POST|PATCH|DELETE)|-X[[:space:]]+(POST|PATCH|DELETE)'; then

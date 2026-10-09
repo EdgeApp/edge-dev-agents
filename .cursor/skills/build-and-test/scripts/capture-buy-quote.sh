@@ -36,7 +36,7 @@
 #   --driver      xcuitest (xcuitest-run.sh; needs a device) or maestro
 #   --login-role  roster role the flow signs in as (xcuitest driver only; passed
 #                 to xcuitest-run.sh, which hands the flow that account's PIN
-#                 digit and username guard and masks both). Default: the
+#                 digit and username guard). Default: the
 #                 roster's defaultRole. The maestro driver runs the flow with
 #                 its own PIN_DIGIT default.
 #

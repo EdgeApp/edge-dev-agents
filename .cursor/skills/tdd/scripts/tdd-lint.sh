@@ -325,6 +325,9 @@ rm -f /tmp/tdd-glossary-check.$$
 # openers) — see no-slop-lint.sh for tiers and the v2 semantic-judge note.
 RC2=0
 "$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh" "$FILE" || RC2=$?
-if [ "$RC" -ne 0 ] || [ "$RC2" -ne 0 ] || [ "$RC3" -ne 0 ]; then exit 1; fi
+# Orch reporting conventions (passing-suite totals, ...), the second shared lint.
+RC4=0
+"$HOME/.cursor/skills/orch-prose-lint.sh" "$FILE" || RC4=$?
+if [ "$RC" -ne 0 ] || [ "$RC2" -ne 0 ] || [ "$RC3" -ne 0 ] || [ "$RC4" -ne 0 ]; then exit 1; fi
 echo "LINT_OK"
 exit 0

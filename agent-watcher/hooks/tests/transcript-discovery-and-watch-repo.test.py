@@ -143,8 +143,7 @@ if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
   case " $STUB_PRS " in *" $R#$NUM "*) ;; *) echo "no PR #$NUM in $R" >&2; exit 1 ;; esac
   case "$ARGS" in
     *headRefOid*) echo "deadbeefcafe1234" ;;
-    *isDraft,commits*) echo "{\"d\":${STUB_IS_DRAFT:-false},\"m\":\"feat: fixture\"}" ;;
-    *isDraft*) echo "${STUB_IS_DRAFT:-false}" ;;
+    *labels*) printf '%s\n' "${STUB_LABELS:-}" ;;
     *) echo "$NUM" ;;
   esac
   exit 0
@@ -277,10 +276,59 @@ p = watch(['--pr', '6021', '--repo', 'EdgeApp/edge-react-gui', '--task-gid', GID
 check('every reviewer missing with no review on HEAD: both named unavailable',
       'Cursor Bugbot(no check-run)' in p.stdout and 'Cursor Security(no check-run)' in p.stdout, p.stdout)
 
-p = watch(['--pr', '6021', '--repo', 'EdgeApp/edge-react-gui', '--task-gid', GID],
-          checks=NEITHER, STUB_REVIEW_COUNT=0, STUB_IS_DRAFT='true')
-check('draft PR: reviewers skipping by design read as draft-reviewer-skipped',
-      'draft-reviewer-skipped' in p.stdout and 'reviewer-unavailable' not in p.stdout, p.stdout)
+# ------------------------------------------------- dep-publish sanction ---
+# watch-pr asks the sanction script only for a labeled PR with a red check, and
+# only its `valid` verdict (exit 0) turns that red into green-dep-sanctioned.
+TRAVIS_RED = json.dumps([{'name': 'Travis CI - Pull Request', 'bucket': 'fail'},
+                         {'name': 'Cursor Bugbot', 'bucket': 'pass'},
+                         {'name': 'Cursor Security Agent: Security Reviewer', 'bucket': 'pass'}])
+TRAVIS_RED_NO_BOTS = json.dumps([{'name': 'Travis CI - Pull Request', 'bucket': 'fail'}])
+sanction = os.path.join(bindir, 'sanction-stub')
+sanction_log = os.path.join(wdir, 'sanction.log')
+with open(sanction, 'w') as fh:
+    fh.write('#!/usr/bin/env bash\necho "$*" >> "$STUB_SANCTION_LOG"\necho "$STUB_SANCTION_LINE"\nexit "${STUB_SANCTION_RC:-0}"\n')
+os.chmod(sanction, 0o755)
+VALID = 'SANCTION: valid awaiting="edge-core-js@2.45.0" excused="Travis CI - Pull Request" kind=types'
+
+
+def sanctioned(checks, **extra):
+    if os.path.exists(sanction_log):
+        os.remove(sanction_log)
+    p = watch(['--pr', '6021', '--repo', 'EdgeApp/edge-react-gui', '--task-gid', GID], checks=checks,
+              DEP_SANCTION=sanction, STUB_SANCTION_LOG=sanction_log, **extra)
+    p.sanction_calls = open(sanction_log).read() if os.path.exists(sanction_log) else ''
+    return p
+
+
+p = sanctioned(TRAVIS_RED, STUB_LABELS='awaiting-dep-publish', STUB_SANCTION_LINE=VALID)
+check('labeled PR, red Travis, sanction valid: green-dep-sanctioned naming the check and the package',
+      p.returncode == 0
+      and 'RESULT: green-dep-sanctioned (Travis CI - Pull Request; awaiting edge-core-js@2.45.0)' in p.stdout
+      and '--ignore-prefix block-wip-pr' in p.sanction_calls, p.stdout + p.stderr)
+
+p = sanctioned(TRAVIS_RED_NO_BOTS, STUB_LABELS='awaiting-dep-publish', STUB_SANCTION_LINE=VALID, STUB_REVIEW_COUNT=0)
+check('the sanction excuses CI only: a missing reviewer is still reported on the same RESULT',
+      p.returncode == 0 and 'RESULT: green-dep-sanctioned' in p.stdout
+      and 'reviewer-unavailable:Cursor Bugbot(no check-run)' in p.stdout, p.stdout)
+
+p = sanctioned(TRAVIS_RED, STUB_LABELS='awaiting-dep-publish', STUB_SANCTION_RC=3,
+               STUB_SANCTION_LINE='SANCTION: expired published="edge-core-js@2.45.0"')
+check('sanction expired (dependency published): the failure stands, exit 1',
+      p.returncode == 1 and 'EXPIRED' in p.stderr and 'RESULT' not in p.stdout, p.stdout + p.stderr)
+
+p = sanctioned(TRAVIS_RED, STUB_LABELS='awaiting-dep-publish', STUB_SANCTION_RC=4,
+               STUB_SANCTION_LINE='SANCTION: unconfirmed check="Travis CI - Pull Request" reason="`npm test` failed"')
+check('sanction unconfirmed (a test failure): the failure stands, exit 1',
+      p.returncode == 1 and 'not a missing-package failure' in p.stderr, p.stdout + p.stderr)
+
+p = sanctioned(TRAVIS_RED, STUB_LABELS='bug', STUB_SANCTION_LINE=VALID)
+check('unlabeled PR with a red check: plain failure, the sanction script is never asked',
+      p.returncode == 1 and 'FAILED check(s): Travis CI - Pull Request' in p.stderr and p.sanction_calls == '',
+      p.stdout + p.stderr + p.sanction_calls)
+
+p = sanctioned(GREEN, STUB_LABELS='awaiting-dep-publish', STUB_SANCTION_LINE=VALID)
+check('labeled PR with nothing red: plain green, the sanction script is never asked',
+      p.returncode == 0 and 'RESULT: green\n' in p.stdout and p.sanction_calls == '', p.stdout + p.sanction_calls)
 
 for f in (WAIVER,):
     if os.path.exists(f):

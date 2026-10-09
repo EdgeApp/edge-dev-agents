@@ -29,6 +29,20 @@ const { spawnSync } = require("child_process");
 const https = require("https");
 const path = require("path");
 
+// The token normally arrives from the shell profile; a session not launched
+// from a shell (the desktop app) has none, so fall back to the credentials file.
+if (!process.env.ASANA_TOKEN) {
+  try {
+    const t = JSON.parse(
+      require("fs").readFileSync(
+        require("os").homedir() + "/.config/agent-watcher/credentials.json",
+        "utf8"
+      )
+    ).asana_token;
+    if (t) process.env.ASANA_TOKEN = t;
+  } catch {}
+}
+
 const rawArgs = process.argv.slice(2);
 const edgeAppRepos = [
   "edge-react-gui",

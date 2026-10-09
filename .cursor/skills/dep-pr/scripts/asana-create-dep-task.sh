@@ -42,6 +42,10 @@ if [[ -z "$PARENT_GID" || -z "$TASK_NAME" ]]; then
   exit 1
 fi
 
+# The token normally arrives from the shell profile; a session not launched from
+# a shell (the desktop app) has none, so fall back to the credentials file.
+: "${ASANA_TOKEN:=$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null)}"
+export ASANA_TOKEN
 if [[ -z "${ASANA_TOKEN:-}" ]]; then
   echo "Error: ASANA_TOKEN not set" >&2
   exit 1

@@ -17,7 +17,21 @@
 # is passed; the reason is posted as a comment so QA sees why the list is empty.
 #
 # Description writes: --set-current-state rewrites the agent-maintained tail;
-# --set-notes replaces the whole description only before any run touches the task.
+# --set-notes replaces the prose above it while agent_status is unset or Complete.
+#
+# PR links: a task linking PRs from more than one repo carries each PR on its own
+# subtask. A flat --attach-pr (no --create-subtask) exits 1 when the task already
+# links a PR from a different repo, and prints the subtask command. --detach-pr
+# <url> removes the --task's own link(s) to that PR. With --create-subtask
+# --attach-pr in the same call it runs last and only once the attach succeeded,
+# so one call moves a flat link onto a new subtask.
+#
+# Repo field: update-status.sh syncs it from the task's PRs at Complete
+# (sync-repo-field.sh). A PR link added or removed AFTER that would leave it
+# stale, so a successful --attach-pr / --detach-pr re-runs the sync when the
+# task is already Complete. The task is --task itself, or its parent when --task
+# has no agent_status of its own (a per-PR subtask). A run still in flight is
+# left to its own Complete, and a call carrying --set-repos sets the field itself.
 set -euo pipefail
 
 QA_SUBTASK_PREFIX="QA: "
@@ -27,6 +41,8 @@ DO_ATTACH=false
 PR_URL=""
 PR_TITLE=""
 PR_NUMBER=""
+
+DETACH_PR_URL=""
 
 DO_ATTACH_FILE=false
 ATTACH_FILE_PATH=""
@@ -65,6 +81,7 @@ while [[ $# -gt 0 ]]; do
     --subtask-notes) SUBTASK_NOTES_FILE="$2"; shift 2 ;;
     --no-manual-qa) NO_MANUAL_QA="$2"; shift 2 ;;
     --attach-pr) DO_ATTACH=true; shift ;;
+    --detach-pr) DETACH_PR_URL="$2"; shift 2 ;;
     --pr-url) PR_URL="$2"; shift 2 ;;
     --pr-title) PR_TITLE="$2"; shift 2 ;;
     --pr-number) PR_NUMBER="$2"; shift 2 ;;
@@ -102,7 +119,7 @@ if [[ -z "$TASK_GID" ]]; then
   exit 1
 fi
 
-if ! $CREATE_SUBTASK && ! $DO_ATTACH && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$MOVE_TO_SECTION" ]] && [[ -z "$SET_PRIORITY" ]] && [[ -z "$SET_RELEASE" ]] && [[ -z "$SET_DEVELOPER_GID" ]] && [[ -z "$SET_REPOS" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$SET_NOTES_FILE" ]] && [[ -z "$COMMENT_FILE" ]] && [[ -z "$DELETE_COMMENT_GID" ]] && [[ -z "$EDIT_COMMENT_GID" ]]; then
+if ! $CREATE_SUBTASK && ! $DO_ATTACH && [[ -z "$DETACH_PR_URL" ]] && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$MOVE_TO_SECTION" ]] && [[ -z "$SET_PRIORITY" ]] && [[ -z "$SET_RELEASE" ]] && [[ -z "$SET_DEVELOPER_GID" ]] && [[ -z "$SET_REPOS" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$SET_NOTES_FILE" ]] && [[ -z "$COMMENT_FILE" ]] && [[ -z "$DELETE_COMMENT_GID" ]] && [[ -z "$EDIT_COMMENT_GID" ]]; then
   echo "Error: No operations specified" >&2
   exit 1
 fi
@@ -156,6 +173,8 @@ fi
 # integration is disabled. If the secret is still missing, skip the widget call
 # with a warning rather than failing — the canonical Asana ↔ PR link lives in the
 # PR body (injected by /pr-create) and downstream skills do not need the widget.
+ATTACH_REQUESTED=$DO_ATTACH
+ATTACH_OK=false
 if $DO_ATTACH && [[ -z "${ASANA_GITHUB_SECRET:-}" ]]; then
   echo ">> PR attach: skipped (ASANA_GITHUB_SECRET not set; widget integration not configured)" >&2
   DO_ATTACH=false
@@ -225,11 +244,49 @@ qa_plain_language_check() {
     });
   ')"
   if [[ -n "$hits" ]]; then
-    echo "Error: QA_NOT_PLAIN: '${QA_SUBTASK_PREFIX}' subtasks are read by non-technical testers (pr-land qa-subtasks-before-handoff). Remove the developer detail below; name the build by app version:" >&2
+    echo "Error: QA_NOT_PLAIN: '${QA_SUBTASK_PREFIX}' subtasks are read by non-technical testers (writing rules: pr-land references/qa-writeup.md). Remove the developer detail below; name the build by app version:" >&2
     printf '%s\n' "$hits" >&2
     exit 1
   fi
 }
+
+# pr_repo <url>: prints the lowercased owner/repo of a GitHub PR URL, or nothing.
+pr_repo() {
+  [[ "$1" =~ ^https://github\.com/([^/]+/[^/]+)/pull/[0-9]+ ]] && printf '%s' "${BASH_REMATCH[1]}" | tr '[:upper:]' '[:lower:]'
+  return 0
+}
+
+# task_pr_links <task_gid>: prints "<attachment gid><TAB><url>" for each PR link
+# on the task (the widget attach lands as an external attachment whose view_url
+# is the PR URL).
+# Call it as `x="$(task_pr_links <gid>)" || exit 1`: a failed listing must end
+# the script, and an exit inside a process substitution would not.
+task_pr_links() {
+  asana_request "PR links" "$ASANA_API/tasks/$1/attachments?opt_fields=resource_subtype,view_url" \
+    -H "Authorization: Bearer $ASANA_TOKEN" || return 1
+  printf '%s' "$ASANA_RESPONSE" | jq -r '.data[]? | select(.resource_subtype == "external") | select((.view_url // "") | test("^https://github\\.com/[^/]+/[^/]+/pull/[0-9]+")) | [.gid, (.view_url | sub("/+$"; ""))] | @tsv'
+}
+
+# Flat attach of a second repo: refused before any write (see header).
+if $DO_ATTACH && ! $CREATE_SUBTASK; then
+  NEW_REPO="$(pr_repo "$PR_URL")"
+  if [[ -n "$NEW_REPO" ]]; then
+    HELD_LINKS="$(task_pr_links "$TASK_GID")" || exit 1
+    while IFS=$'\t' read -r _ held_url; do
+      [[ -n "$held_url" && "$(pr_repo "$held_url")" != "$NEW_REPO" ]] || continue
+      {
+        echo ">> PR attach: REFUSED. Task $TASK_GID already links $held_url, a different repo than $NEW_REPO."
+        echo "   A task with PRs from more than one repo carries each PR on its own subtask:"
+        echo "   asana-task-update.sh --task $TASK_GID --create-subtask --subtask-name \"<repo> #<num>: <title>\" --attach-pr --pr-url $PR_URL --pr-title \"<title>\" --pr-number <num>"
+        echo "   Move the PR already on the task the same way, adding --detach-pr $held_url to its call."
+      } >&2
+      exit 1
+    done <<< "$HELD_LINKS"
+  fi
+fi
+
+# --detach-pr acts on the task named by --task, never on a subtask this call creates.
+ROOT_TASK_GID="$TASK_GID"
 
 # --create-subtask: create a subtask under --task, print its gid, and re-point
 # TASK_GID to it so any --attach-pr/--set-board-state in the SAME invocation lands on
@@ -364,10 +421,54 @@ if $DO_ATTACH; then
   elif [[ "$ATTACH_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
     ATTACH_STATUS=$(python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0].get('result','unknown'))" <"$ATTACH_BODY_FILE" 2>/dev/null || echo "ok (unparseable)")
     echo ">> PR attach: $ATTACH_STATUS"
+    ATTACH_OK=true
   else
     echo ">> PR attach: failed (HTTP $ATTACH_HTTP_CODE): $(cat "$ATTACH_BODY_FILE")" >&2
   fi
   rm -f "$ATTACH_BODY_FILE"
+fi
+
+if [[ -n "$DETACH_PR_URL" ]]; then
+  if $ATTACH_REQUESTED && ! $ATTACH_OK; then
+    echo ">> PR detach: skipped, the attach in this call did not succeed; $DETACH_PR_URL is still linked on $ROOT_TASK_GID" >&2
+    exit 1
+  fi
+  DETACH_WANT="$(printf '%s' "${DETACH_PR_URL%/}" | tr '[:upper:]' '[:lower:]')"
+  DETACHED=0
+  ROOT_LINKS="$(task_pr_links "$ROOT_TASK_GID")" || exit 1
+  while IFS=$'\t' read -r link_gid link_url; do
+    [[ -n "$link_gid" && "$(printf '%s' "$link_url" | tr '[:upper:]' '[:lower:]')" == "$DETACH_WANT" ]] || continue
+    asana_request "PR detach" -X DELETE "$ASANA_API/attachments/$link_gid" \
+      -H "Authorization: Bearer $ASANA_TOKEN" || exit 1
+    DETACHED=$((DETACHED + 1))
+  done <<< "$ROOT_LINKS"
+  if [[ $DETACHED -eq 0 ]]; then
+    echo ">> PR detach: FAILED, task $ROOT_TASK_GID has no link to $DETACH_PR_URL" >&2
+    exit 1
+  fi
+  echo ">> PR detach: removed $DETACHED link(s) to $DETACH_PR_URL from $ROOT_TASK_GID"
+fi
+
+# Repo re-sync after a PR link change on a Complete task (see header).
+# Best-effort like the Complete-time call: a failure warns and never fails the
+# link change that already landed.
+REPO_SYNC="$HOME/.config/agent-watcher/sync-repo-field.sh"
+if { $ATTACH_OK || [[ ${DETACHED:-0} -gt 0 ]]; } && [[ -z "$SET_REPOS" && -x "$REPO_SYNC" ]]; then
+  task_agent_status() { "$HOME/.cursor/skills/asana-field-value.sh" "$1" "agent_status" 2>/dev/null || echo unknown; }
+  SYNC_GID="$ROOT_TASK_GID"
+  SYNC_STATUS="$(task_agent_status "$SYNC_GID")"
+  if [[ "$SYNC_STATUS" == none ]]; then
+    SYNC_GID=""
+    if asana_request "Repo sync (parent read)" "$ASANA_API/tasks/$ROOT_TASK_GID?opt_fields=parent.gid" \
+      -H "Authorization: Bearer $ASANA_TOKEN"; then
+      SYNC_GID="$(printf '%s' "$ASANA_RESPONSE" | jq -r '.data.parent.gid // empty')"
+    fi
+    [[ -n "$SYNC_GID" ]] && SYNC_STATUS="$(task_agent_status "$SYNC_GID")"
+  fi
+  if [[ -n "$SYNC_GID" && "$SYNC_STATUS" == complete ]]; then
+    "$REPO_SYNC" --task-gid "$SYNC_GID" 2>&1 \
+      || echo ">> Repo sync: WARN, sync-repo-field.sh failed; run it by hand: $REPO_SYNC --task-gid $SYNC_GID" >&2
+  fi
 fi
 
 # assert_own_comment <story_gid>
@@ -431,6 +532,7 @@ if [[ -n "$COMMENT_FILE" ]]; then
   [[ -f "$COMMENT_FILE" ]] || { echo "Error: --comment-file not found: $COMMENT_FILE" >&2; exit 1; }
   CM_BODY="$(cat "$COMMENT_FILE")"
   [[ -n "${CM_BODY//[[:space:]]/}" ]] || { echo "Error: --comment-file is empty: $COMMENT_FILE" >&2; exit 1; }
+  [[ ! -x "$HOME/.cursor/skills/orch-prose-lint.sh" ]] || "$HOME/.cursor/skills/orch-prose-lint.sh" "$COMMENT_FILE" >&2 || { echo ">> Comment: REJECTED (reporting-convention lint, orch-prose-lint.sh). Rewrite the lines above and retry." >&2; exit 1; }
   CM_ORCH=false
   "$HOME/.config/agent-watcher/orch-run-context.sh" 2>/dev/null && CM_ORCH=true
   CM_NOISE_LIB="$HOME/.config/agent-watcher/hooks/lib/reviewer-outage-noise.sh"
@@ -787,40 +889,49 @@ if [[ -n "$MOVE_TO_SECTION" ]]; then
   fi
 fi
 
-# --set-notes <file>: replace the WHOLE description of a task no run has touched
-# yet (a Refinement draft being revised). Refused once agent_status is set or the
-# notes carry a CURRENT STATE section: from then on the description is the
-# operator's spec plus the orch's tail, and only --set-current-state writes it.
-# Same comms gate and authorship marking as asana-task-create.sh.
+# --set-notes <file>: replace the description's prose on a task no run is
+# working: agent_status unset (a Refinement draft, a subtask) or Complete (a
+# blocked completion included). Refused at Pending and every phase status, where
+# a run reads the description as its spec. An existing CURRENT STATE section is
+# kept below the new prose; --set-current-state owns it. Same comms gate and
+# authorship marking as asana-task-create.sh, plus the QA plain-language check
+# when the task is a "QA: " subtask.
 if [[ -n "$SET_NOTES_FILE" ]]; then
   [[ -f "$SET_NOTES_FILE" ]] || { echo "Error: --set-notes file not found: $SET_NOTES_FILE" >&2; exit 1; }
   [[ -n "$(tr -d '[:space:]' < "$SET_NOTES_FILE")" ]] || { echo "Error: --set-notes file is empty: $SET_NOTES_FILE" >&2; exit 1; }
+  if grep -qF "$CURRENT_STATE_DELIM" "$SET_NOTES_FILE"; then
+    echo "Error: --set-notes file must not carry a CURRENT STATE section (an existing one is kept; --set-current-state rewrites it)" >&2; exit 1
+  fi
 
   SN_STATUS="$("$HOME/.cursor/skills/asana-field-value.sh" "$TASK_GID" "agent_status")" || {
     echo ">> NOTES: FAILED (could not read agent_status for task $TASK_GID)" >&2; exit 1; }
-  if [[ "$SN_STATUS" != "none" ]]; then
-    echo "Error: --set-notes refused: task $TASK_GID has agent_status=$SN_STATUS (a run has touched it; use --set-current-state for the tail)" >&2
-    exit 1
-  fi
-  asana_request "NOTES" "$ASANA_API/tasks/$TASK_GID?opt_fields=notes" \
+  case "$(printf '%s' "$SN_STATUS" | tr '[:upper:]' '[:lower:]')" in
+    none|complete) ;;
+    *)
+      echo "Error: --set-notes refused: task $TASK_GID has agent_status=$SN_STATUS (a run is queued or in flight; write the description once the task is Complete)" >&2
+      exit 1 ;;
+  esac
+  asana_request "NOTES" "$ASANA_API/tasks/$TASK_GID?opt_fields=name,notes" \
     -H "Authorization: Bearer $ASANA_TOKEN" || exit 1
-  if printf '%s' "$ASANA_RESPONSE" | jq -r '.data.notes // ""' | grep -qF "$CURRENT_STATE_DELIM"; then
-    echo "Error: --set-notes refused: task $TASK_GID has a CURRENT STATE section (use --set-current-state for the tail)" >&2
-    exit 1
-  fi
+  SN_NAME="$(printf '%s' "$ASANA_RESPONSE" | jq -r '.data.name // ""')"
+  SN_TAIL="$(printf '%s' "$ASANA_RESPONSE" | jq -r '.data.notes // ""' \
+    | awk -v d="$CURRENT_STATE_DELIM" 'index($0, d) > 0 { on = 1 } on { print }')"
 
   "$HOME/.cursor/skills/asana-notes-comms-gate.sh" "$SET_NOTES_FILE" "$COMMS_AUTH" || exit 1
 
+  [[ ! -x "$HOME/.cursor/skills/orch-prose-lint.sh" ]] || "$HOME/.cursor/skills/orch-prose-lint.sh" "$SET_NOTES_FILE" >&2 || { echo "Error: --set-notes fails the reporting-convention lint (orch-prose-lint.sh). Rewrite the lines above and retry." >&2; exit 1; }
   SN_BODY="$(cat "$SET_NOTES_FILE")"
+  [[ "$SN_NAME" != "$QA_SUBTASK_PREFIX"* ]] || qa_plain_language_check "$SN_NAME" "$SN_BODY"
   SN_MARKER="$HOME/.config/agent-watcher/agent-authored-text.sh"
   if [[ -x "$SN_MARKER" ]]; then
     SN_BODY="$(printf '%s' "$SN_BODY" | "$SN_MARKER")"
   fi
+  [[ -z "$SN_TAIL" ]] || SN_BODY="$(printf '%s\n\n%s' "$SN_BODY" "$SN_TAIL")"
   asana_request "NOTES" -X PUT "$ASANA_API/tasks/$TASK_GID" \
     -H "Authorization: Bearer $ASANA_TOKEN" \
     -H "Content-Type: application/json" \
     -d "$(jq -n --arg n "$SN_BODY" '{data:{notes:$n}}')" || exit 1
-  echo ">> NOTES: description replaced on task $TASK_GID"
+  echo ">> NOTES: description replaced on task $TASK_GID${SN_TAIL:+ (CURRENT STATE section kept)}"
 fi
 
 # --set-current-state <file>: rewrite ONLY the agent-maintained tail of the task
@@ -832,6 +943,7 @@ fi
 if [[ -n "$SET_CURRENT_STATE_FILE" ]]; then
   [[ -f "$SET_CURRENT_STATE_FILE" ]] || {
     echo "Error: --set-current-state file not found: $SET_CURRENT_STATE_FILE" >&2; exit 1; }
+  [[ ! -x "$HOME/.cursor/skills/orch-prose-lint.sh" ]] || "$HOME/.cursor/skills/orch-prose-lint.sh" "$SET_CURRENT_STATE_FILE" >&2 || { echo "Error: --set-current-state fails the reporting-convention lint (orch-prose-lint.sh). Rewrite the lines above and retry." >&2; exit 1; }
   CS_BODY="$(cat "$SET_CURRENT_STATE_FILE")"
   [[ -n "${CS_BODY//[[:space:]]/}" ]] || {
     echo "Error: --set-current-state file is empty: $SET_CURRENT_STATE_FILE" >&2; exit 1; }

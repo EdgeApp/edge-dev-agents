@@ -443,6 +443,11 @@
           "command": "~/.config/agent-watcher/hooks/operator-hold-prompt.sh",
           "timeout": 10,
           "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/settings-stale-notice.sh",
+          "timeout": 10,
+          "type": "command"
         }
       ]
     }

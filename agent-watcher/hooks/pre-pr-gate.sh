@@ -22,8 +22,9 @@
 # Formerly require-test-evidence-before-pr.sh; renamed 2026-08-13 when the
 # dedup scan broadened its role (name-tracks-scope).
 #
-# Scope: no-ops unless AGENT_TASK_GID is set. Draft dependency PRs created with
-# `gh pr create --draft` are not gated (per one-shot's dep-pr-draft-vs-bump).
+# Scope: no-ops unless AGENT_TASK_GID is set. pr-create.sh is the only way a PR
+# opens (block-raw-gh-writes.sh blocks raw `gh pr create`), so every PR an
+# orchestrated run creates passes this gate.
 # Exit 0 = allow. Exit 2 = block (stderr is fed back to the model).
 set -euo pipefail
 

@@ -16,7 +16,7 @@ already encodes, params and gotchas included.
 
 | Flow | Params | Does |
 |---|---|---|
-| `common/login-if-needed.yaml` | PIN_DIGIT, EXPECT_USERNAME, HOME_MARKER (iOS: `xcuitest-run.sh --login-role <role>` sets the first two from the roster and masks them) | PIN login only when the PIN scene shows. With EXPECT_USERNAME set, a PIN scene on another account fails within 5s and no digit is tapped |
+| `common/login-if-needed.yaml` | PIN_DIGIT, EXPECT_USERNAME, HOME_MARKER (iOS: `xcuitest-run.sh --login-role <role>` sets the first two from the roster) | PIN login only when the PIN scene shows. With EXPECT_USERNAME set, a PIN scene on another account fails within 5s and no digit is tapped |
 | `common/relaunch-and-login.yaml` | PIN_DIGIT, EXPECT_USERNAME, HOME_MARKER | Stop and launch the app (never `clearState`), LogBox toast, login, startup modals, home scene. The launch wait ends on the PIN scene, the home scene or the full login scene (a failure, within 1s) |
 | `common/dismiss-logbox-banner.yaml` | LOGBOX_TOAST | Close React Native's LogBox toast (debug builds; label is "! " plus the newest log line). No-op when absent. Run it again right before a tap or swipe on the bottom 50pt of a scene: the toast returns on every new warning or error |
 | `common/dismiss-startup-modals.yaml` | - | Clear survey/notification/update modals (runs `dismiss-logbox-banner` first) |
@@ -58,17 +58,18 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   (**the default YOLO login**, pinned into every worktree config.json by workspace
   init; 2FA ON, its password + OTP key are in the `credsFile` the roster names,
   so its 2FA is never a user-only-credential wall; set `YOLO_OTP_KEY` from that
-  file if a login asks for the code), `primary` (heavily funded, cluttered with
-  leftover assets), `qa-a`, and `qa-b` (region California/USA). Each entry carries username, PIN, and notes. Refer to
-  accounts BY ROLE in anything synced, committed, or posted (skills, PRs,
-  reports, Asana): usernames and PINs never leave that file. The sim image also
+  file if a login asks for the code), `funds` (heavily funded, cluttered with
+  leftover assets), `qa-a`, and `qa-b` (region California/USA). Each entry carries username, PIN, and notes. Use the
+  account's real name in chat, run reports, Asana and local logs; use the ROLE
+  in anything public (funding.md `funded-test-accounts`). The sim image also
   contains many junk/leftover accounts — they are NOT test accounts; never trawl
   beyond the roster. **Tests run on the agent account, which acquires assets
-  only by swapping** (build-and-test `funded-test-accounts` owns the order and
-  the all-providers requote); no sends into it from other roster accounts.
-  The test moves off the agent account only when it holds nothing that clears
-  a provider floor for a route to the asset, or needs another account's own
-  state.
+  only by swapping** (build-and-test `agent-account-acquires-by-swap` owns the
+  order, the multi-hop route and the all-providers requote); no sends into it
+  from other roster accounts. A test moves off the agent account only when no
+  route, multi-hop included, clears a provider floor, or when it needs what
+  only another account has: an old or large-UTXO wallet, many wallets,
+  account-specific state, ramps KYC.
 - **THROWAWAY accounts for tests that dirty SYNCED state.** `activePromotions`,
   affiliate attribution (`installerId` / `CreationReason.json`), Exchange
   Settings and mixnet toggles all sync to the account, so exercising them on a
@@ -88,7 +89,7 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   Drive the in-app account switcher ONLY when you must preserve live in-app
   state across the switch (rare).
   For the default role use `scripts/pin-agent-login.sh <checkout>` (it prints
-  roles, never values); after either edit run `metro-fresh.sh --file
+  each file's account and role); after either edit run `metro-fresh.sh --file
   config.json` before the relaunch, and drive with `xcuitest-run.sh
   --login-role <role>` so a PIN scene on another account fails the flow
   before any digit is tapped (drive.md `agent-account-first`).
@@ -106,31 +107,32 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   `create-missing-destination-wallet`). A receive-side wallet needs no funds,
   so skip the roster search. A missing destination wallet is never a blocker or
   a concession.
-- **RETIRED 2026-09-23: the "SQLite crash on wallet creation" (Asana
-  1215619633542395) and its `piratechain: false` corePlugins mitigation.** The
-  crash lived in the OLD `react-native-piratechain` module, which gui #6021
-  replaced with `react-native-pirate-wallet` (on develop 2026-09-21). Retest on
-  an unmodified develop build (0c4d2e9) with 4 active ARRR + 3 active ZEC
-  wallets on one account: 8 cold launches plus ~25 min of background sync, zero
-  Pirate Chain crashes. Do not flip `piratechain: false`. A crash with
-  `RNPiratechain` or `PirateSdk_mainnet` frames means the app binary predates
-  #6021: rebuild from current develop.
-- **ZEC crash: Rust-panic SIGABRT at app start (still live on develop).**
+- **Pirate Chain wallets need no crash mitigation.** Do not flip
+  `piratechain: false` in corePlugins: develop runs Pirate Chain on
+  `react-native-pirate-wallet`, which is stable with several active ARRR and
+  ZEC wallets on one account. A crash with `RNPiratechain` or
+  `PirateSdk_mainnet` frames means the app binary predates that module:
+  rebuild from current develop.
+- **If the app aborts at start with a ZEC Rust panic (SIGABRT): disable the
+  zcash plugin as a local hack, unless the task involves ZEC.** Set
+  `zcash: false` in the gui worktree's `src/util/corePlugins.ts` (it is
+  hardcoded `true` there, so `config.json` cannot turn it off) and relaunch.
+  The edit is a workaround, UNCOMMITTED and never in a PR: revert it before
+  any commit, as build-and-test `single-asset-plugin-trim` requires of every
+  local plugin edit. When the task does involve ZEC, leave the plugin on and
+  relaunch on hit: the retry survives.
   (`Edge-*.ips` faulting stack: `RNZcash.initialize` → `ZcashRustBackend.initializeRust`
   → `zcashlc_init_on_load` → `unwrap_failed` → `rust_panic` → abort).
   `ZcashRustBackend` (`react-native-zcash`) guards its one-time Rust init with
   a NON-thread-safe static bool; when a login starts several ZEC wallet engines
-  concurrently, two initializers can race and the loser panics. The
-  2026-09-23 retest above hit it on 1 of 8 cold launches. It is a PRODUCT bug
-  and a boot-time race: relaunch on hit, the retry survives. It is never a
-  reason to archive, avoid, or limit ZEC or ARRR wallets; there is no wallet
-  count limit on any account.
+  concurrently, two initializers can race and the loser panics. It is a
+  PRODUCT bug and a boot-time race. It is never a reason to archive ZEC or
+  ARRR wallets on the account; there is no wallet count limit on any account.
 - **SYNCED-SETTINGS HYGIENE:** Privacy Settings mixnet
   toggles (`networkPrivacy: 'nym'`, toggled ON by NYM/mixfetch test plans)
   sync to every session on the account — a toggle left on routes that
   network's RPC through the flaky NYM mixnet for EVERY subsequent run and
-  surfaces as engine error drop-downs at login (2026-07-30 fleet-wide
-  incident: Sonic found left on; author uncaptured). NYM mixfetch and the
+  surfaces as engine error drop-downs at login, fleet-wide. NYM mixfetch and the
   send scene's mixnet spinner are UNRELATED to the Houdini stealth feature
   (HoudiniSwap private routing) — do not conflate them. Turn OFF every
   mixnet toggle your test enabled before the run ends.
@@ -206,8 +208,7 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   documented build crash interrupted a genuine funded attempt). "Prototype",
   "unvetted code", "might lose funds" are anticipated risks, not blockers — run
   the test.
-- **SideShift is US-geo-blocked from this host's egress IP** (found 2026-06-12,
-  Asana 1214800712844381): in-app quotes and the confirm slider render, but
+- **SideShift is US-geo-blocked from this host's egress IP**: in-app quotes and the confirm slider render, but
   shift CREATION is denied at ANY amount — the denial is geographic, not a
   floor/funding problem, so do not burn the slot retrying amounts or pairs. An
   executed SideShift shift needs non-US egress (VPN/proxy), which the slot does
@@ -224,22 +225,24 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
 - **Breez Spark Lightning sends: the Spark balance is SEPARATE from the BTC
   wallet's on-chain UTXOs and starts at 0.** To test a send you must fund the
   Spark wallet first: send on-chain BTC to its `bc1p` Taproot deposit address,
-  wait 1 block, Spark auto-claims on sync. The Taproot deposit needs the
-  edge-currency-plugins eager-`initEccLib` fix (PR #450) — link it the
-  PARALLEL-SAFE way (`updot`/build into the worktree's `node_modules`), NOT the
-  fixed-port debug dev-server (see the slot-safety caveat under "Driving the
-  app"). Size sends ≤ ~60 sats from a single freshly-claimed leaf
+  wait 1 block, Spark auto-claims on sync. If that send to the `bc1p` address
+  throws `No ECC Library provided`, the installed edge-currency-plugins
+  initializes ECC lazily (`initEccLib` only inside `getECPair` in
+  `src/common/utxobased/keymanager/keymanager.ts`): link the eager-init fix
+  from its branch `jon/fix/taproot-initecclib-eager` the PARALLEL-SAFE way
+  (`updot`/build into the worktree's `node_modules`), NOT the fixed-port debug
+  dev-server (see the slot-safety caveat under "Driving the app"). Size sends ≤ ~60 sats from a single freshly-claimed leaf
   (leaf-headroom). Mint the receive invoice and verify receipt out-of-band with
   the `@breeztech/breez-sdk-spark` node SDK.
-- **Primary-account funding snapshot (2026-07-02, re-verify balances before relying):**
-  My Bitcoin (BTC) is EMPTY — a BTC Send triggers the wallet-empty modal. Funded:
-  My Base 4 (0.35 ETH, ~$600), My Zano (~$460), L3USD on Fantom (~$240),
-  My MAYAChain (CACAO). EVM chains block a SECOND send while one is unconfirmed —
-  wait for confirmation before chaining sends. (2026-07-09 eval, Houdini run)
+- **Balances are read on the account, never from notes.** No balance list is
+  kept here, since every run moves them. Read the wallet list on the agent
+  account, then swap there to fund or create what the test needs
+  (build-and-test `agent-account-acquires-by-swap`). A Send from an empty
+  wallet raises the wallet-empty modal. EVM chains block a SECOND send while
+  one is unconfirmed — wait for confirmation before chaining sends.
 
 ## Android physical device
-Promoted from the 3-way login-perf run (2026-07-21, Samsung Galaxy S9, task
-1216773266141895 — full method and raw data in its report gist).
+Working knowledge for the physical test device (a Samsung Galaxy S9).
 
 - **Android emulator + slot Metro:** an RN debug build on an emulator connects
   to the dev server at `10.0.2.2:8081` (the emulator's host-loopback alias) and
@@ -279,11 +282,11 @@ Promoted from the 3-way login-perf run (2026-07-21, Samsung Galaxy S9, task
   The unlock PIN is operator-only and is NOT the Edge account PIN space
   (`0000`/`1111`) — do not guess it, a wrong-guess streak escalates to lockout
   and eventually a factory wipe, taking the provisioned account with it. When
-  the device is locked, the whole android errand (including "is the primary
+  the device is locked, the whole android errand (including "is the test
   account logged in?", which needs the UI) is blocked on a user-only credential
   (one-shot `yolo-true-blockers` (b)); say so and move on rather than grinding.
   Ask the operator to unlock and leave the screen on, or to disable the lock on
-  the test device. (Hit 2026-08-03, task 1216926437132721.)
+  the test device.
 
 - **QR login, sim → physical device** (the provisioning errand above, once the
   device is unlocked): the LOGGED-IN device scans the QR that the logging-in
@@ -313,13 +316,11 @@ Promoted from the 3-way login-perf run (2026-07-21, Samsung Galaxy S9, task
   then `sfw npx patch-package` — skips a full reinstall for a single-dep change.
   NEVER in the shared main checkout: `refresh-master-build.sh` builds the master
   sim from `~/git/<repo>`, and every slot sim is an APFS clone of that image, so
-  an unpublished package there ships fleet-wide. It happened (2026-07-21):
-  wallet-cache v2 core was copied into `~/git/edge-react-gui`, the next master
-  build embedded it, and unrelated PR runs hit
-  `wallet.otherMethods.getFioAddresses is not a function` for two days (v2 core
-  under clean GUI JS, whose engine-readiness gating is still unmerged). Tell:
-  a hand-copied package has no `_resolved` in its package.json — the master
-  refresh now preflights that and runs `npm ci` instead of baking it. If you do
+  an unpublished package there ships fleet-wide: the next master build embeds
+  it, and unrelated runs then fail on API mismatches between that package and
+  clean GUI JS. Tell: a hand-copied package has no `_resolved` in its
+  package.json — the master refresh preflights that and runs `npm ci` instead
+  of baking it. If you do
   dirty the main checkout, restore it with `sfw npm ci` there.
 - **Flashlight** (get.flashlight.dev) ships x86_64-only on macOS: needs
   Rosetta 2 (`softwareupdate --install-rosetta --agree-to-license`).
@@ -327,7 +328,7 @@ Promoted from the 3-way login-perf run (2026-07-21, Samsung Galaxy S9, task
 ## Navigation
 - **Gift Card Marketplace (EdgeSpend):** reachable in-app from Home → 'Spend
   Crypto' tile → the EdgeSpend list → 'Purchase New'. Requires a non-light account
-  (the agent and primary accounts qualify) and `ENV.PLUGIN_API_KEYS.phaze.apiKey` set. Real Phaze
+  (the agent and funds accounts qualify) and `ENV.PLUGIN_API_KEYS.phaze.apiKey` set. Real Phaze
   productIds for a per-brand test come from `GET <phaze baseUrl>/gift-cards/full/US`
   with header `API-Key: <key>` (the on-disk `brands-us.json` cache is encrypted and
   unreadable, so hit the API for live ids).
@@ -390,8 +391,8 @@ terminates + relaunches so it takes effect); cache resets without a fresh triage
 are blocked. And when MCP screenshots contradict what the logs say the app is
 doing (e.g. "won't foreground" while JS runs), verify with direct
 `xcrun simctl io <udid> screenshot` before building theories — the maestro
-daemon can drift to another sim, and the 2026-07-22 swapter run spent an hour
-debugging screenshots of the wrong device.
+daemon can drift to another sim, and its screenshots then show the wrong
+device.
 
 ## Investigate cheap before driving the UI
 - **Scoped tasks: trim the plugin set to the task's WORKING SET before the
@@ -429,7 +430,7 @@ debugging screenshots of the wrong device.
   it with the app already on the target scene, capture, then swap the code
   variant (`git checkout <ref> -- <file>` and re-apply the hack) for a matched
   before/after pair from the same running app and live data. No relaunch, no
-  rebuild between frames. (Promoted 2026-07-29, run 1210166111258621.)
+  rebuild between frames.
 - **Crawl the code and run `/debugger` EARLY**, not as a last resort. A grinding
   UI loop is the most expensive probe there is. "Why is X missing/failing" is
   usually answerable from source (settings store, plugin registration, config.json/keys.json
@@ -437,7 +438,7 @@ debugging screenshots of the wrong device.
 - **Feature-enablement check (the Rango lesson):** when a provider/feature you
   expect simply ISN'T THERE (no quotes from it, not in the list), FIRST suspect a
   setting: a swap provider can be disabled in **Settings → Exchange Settings**,
-  which is PER-ACCOUNT state (differs between the qa-b and primary accounts). Use this
+  which is PER-ACCOUNT state (differs between the qa-b and funds accounts). Use this
   only to DIAGNOSE (read it from code/state or ONE screenshot) — do NOT toggle it.
 - **FORCE a provider via the LOCAL corePlugins hack, NEVER the in-app Exchange
   Settings.** To isolate one swap provider, edit the gui worktree's
@@ -462,12 +463,12 @@ debugging screenshots of the wrong device.
   BIP-137/message-signing correctness, byte-compare the gui transform against
   `bitcoinjs-message`'s `segwitType` output over many random keys — dependency is
   already present, and identity over N keys proves external-verifier compatibility
-  better than staring at one signature. (2026-07-09 eval, CEX-signing run)
+  better than staring at one signature.
 - **Houdini routes are verifiable fund-free via the partner API:**
   `GET https://api-partner.houdiniswap.com/v2/tokens?chain=<chain>&mainnet=true&pageSize=100`
   then `GET /v2/quotes?amount=<x>&from=<id>&to=<id>`. A same-asset cross-chain pair
   may legitimately return only dex/standard (no private route) — that's an answer,
-  not a failure. (2026-07-09 eval, Houdini run)
+  not a failure.
 
 ## Driving the app (mechanics)
 - **Compose, don't re-derive.** Reusable subflows live in this skill's
@@ -532,30 +533,26 @@ debugging screenshots of the wrong device.
   one long fling (momentum overshoots list targets). Start the gesture ON the
   scrollable content: a stroke from the screen edge is an edge-swipe and opens
   the drawer instead of scrolling. Any swipe you find yourself deriving twice
-  is a `[flow]` proposal for `common/`. (Piratechain 2026-07-29: repeated
-  hand-derived vertical-swipe and slider failures.)
+  is a `[flow]` proposal for `common/`.
 - **The "Verify your password" modal auto-opens on some launches and blocks
   navigation.** Dismiss with `tapOn: id: "modal-close-button"` (testID exists on
-  `EdgeModal`); the dimmed backdrop is not addressable by text. (Promoted
-  2026-07-29, run 1211050361847785.)
+  `EdgeModal`); the dimmed backdrop is not addressable by text.
 - **Do not drive the PIN keypad with `common/login-if-needed.yaml` when the
   worktree `config.json` has `YOLO_*` set:** auto-login enters digits concurrently
   and the subflow fails on digit 3. Wait for the logged-in shell, or drive the
-  already-running app. (Promoted 2026-07-29, run 1213213636561471.)
+  already-running app.
 - **Enroll/un-enroll sim biometry without the Simulator UI:**
   `xcrun simctl spawn <udid> notifyutil -s com.apple.BiometricKit.enrollmentChanged 1`
   then `notifyutil -p com.apple.BiometricKit.enrollmentChanged` (0 to
   un-enroll, `-g` reads). The app reads biometry type ONCE at startup into
   `state.touch.biometryType`, so terminate + launch after flipping; reload is
-  not enough. Parallel-safe (per-simulator). (Promoted 2026-07-29, run
-  1215939017452141.)
+  not enough. Parallel-safe (per-simulator).
 - **Reaching the login scene on a slot sim:** YOLO auto-login fires from a
   module-level `firstRun` flag in `LoginScene.tsx`, consumed once per bundle
   load, so side-menu logout LANDS on the login scene and stays. To land there
   straight from launch, null BOTH `YOLO_USERNAME` and `YOLO_PIN` in the
   worktree `config.json` (nulling only the username hits a light-account fallback
-  that still auto-logs-in), then terminate + launch; restore after. (Promoted
-  2026-07-29, run 1215939017452141.)
+  that still auto-logs-in), then terminate + launch; restore after.
 - **Drive a deep link with `openLink` on the XCUITest interpreter, in its
   `edge://` form.** A custom-scheme link reaches the running app in under a
   second with no "Open in Edge?" dialog, from any scene, whether this
@@ -572,21 +569,18 @@ debugging screenshots of the wrong device.
   in the worktree `config.json` (read by `DeepLinkingManager`, then
   `simctl terminate` + `launch`) is only for a link that must arrive at cold
   start. When the account holds several wallets for the linked asset the app
-  raises its own wallet picker; the flows handle it by wallet name. (Replaced
-  2026-10-01, run 1219043297854606.)
+  raises its own wallet picker; the flows handle it by wallet name.
 - **Nested `runFlow` with `env:` may NOT override a subflow's own `env:`
   defaults** (maestro 2.x, this host): `select-swap-pair` ran its built-in
   `.*Bitcoin.*` while the parent passed `.*Litecoin.*`, and `inputText` logged
   the literal `${SRC_WALLET}`. When a composed flow behaves as if it ignored
   your params, check this BEFORE debugging selectors; inlining the subflow body
-  with literal values is the reliable workaround. (Promoted 2026-08-06, run
-  1216571782597915.)
+  with literal values is the reliable workaround.
 - **A `.*<term>.*` regex in a wallet picker can match the SEARCH FIELD's own
   text instead of the wallet row** — the picker silently stays open and the next
   tap lands somewhere unintended (it set the source wallet to the intended
   DESTINATION asset). Anchor wallet-row taps on the wallet NAME ("My Doge"),
-  never a substring that also appears in what you just typed. (Promoted
-  2026-08-06, run 1216571782597915.)
+  never a substring that also appears in what you just typed.
 - **The maestro MCP daemon and the maestro CLI fight over one sim's XCUITest
   driver.** The wrapper pins the daemon to `$AGENT_SIM_UDID` on driver port
   `$AGENT_METRO_PORT + 2000`, but when the CLI starts its own driver on `+1000`
@@ -595,7 +589,7 @@ debugging screenshots of the wrong device.
   that it is a driver collision, not a crash. Before a CLI proof run on a sim
   you explored through the MCP, kill that slot's daemon and its
   `xcodebuild test-without-building` child (match both on YOUR udid, never
-  another slot's), then run the CLI. (Promoted 2026-08-06, run 1216251688512498.)
+  another slot's), then run the CLI.
   `scripts/xcuitest-run.sh` does this itself: it kills the daemon PIDs matched
   on `--udid` and terminates the maestro driver app before its own drive. The
   MCP server does not come back after that kill: the session loses its maestro
@@ -605,7 +599,6 @@ debugging screenshots of the wrong device.
   `Powered by Maya ProtocolTap to Change Provider`, so the exact match never
   hits while `"Powered by .*"` does. Anchor quote-ready waits on
   `Slide to Confirm` instead — it appears only once a quote resolves.
-  (Promoted 2026-07-29, run 1216518039073159.)
 - **Driver economics:** each `maestro test` invocation pays ~2 min driver
   startup. For EXPLORATION (finding selectors, poking screens) use the **maestro
   MCP tools** (persistent driver, per-command tap/swipe/hierarchy/screenshot;
@@ -664,16 +657,15 @@ debugging screenshots of the wrong device.
   wallets → wallet "Send" → address tile "Enter" (regex `.*Enter.*`) → type a
   LOWERCASE 0x address (lowercase sidesteps EIP-55 checksum rejection) → "Next".
   The SafeSlider confirm thumb carries testID `confirmSliderThumb`, so
-  `common/confirm-slider.yaml` resolves without coordinate taps. (2026-07-09 eval)
+  `common/confirm-slider.yaml` resolves without coordinate taps.
 - **edge-exchange-plugins JS fix, in-app verification:** after `npm run prepare`,
   copy `dist/edge-exchange-plugins.js` + `dist/898.chunk.js` + `dist/195.chunk.js`
-  over `<app>/edge-exchange-plugins.bundle/`, relaunch, and confirm the INSTALLED
-  bundle no longer contains the old symbol before crediting the fix. (2026-07-09 eval)
+  over `<app>/edge-exchange-plugins.bundle/`, relaunch, and confirm the old
+  symbol is absent from the INSTALLED bundle before crediting the fix.
 
 ## Asset & provider specifics
-- **The primary account holds a funded My MAYAChain (CACAO) wallet (~$150).** Usable for
-  real Maya swap execution (e.g. CACAO→BTC). Maya is the only provider for CACAO
-  pairs, so no provider forcing is needed for CACAO sources.
+- **Maya is the only provider for CACAO pairs,** so a CACAO source (e.g.
+  CACAO→BTC) executes a real Maya swap with no provider forcing.
 - **keys-only create-wallet exclusion — proxy without the target asset:**
   `bitcoinsv` is hardcoded-enabled in `corePlugins.ts` AND `keysOnlyMode: true`, so
   searching "Bitcoin SV" in "Choose Wallets to Add" shows no creatable result — a
@@ -688,23 +680,23 @@ debugging screenshots of the wrong device.
   Platform check). A helper it calls must not reference a module-level `const`
   declared AFTER `SPECIAL_CURRENCY_INFO`, or it hits the temporal dead zone at
   import.
-- **TON send/sync tests need no swap-to-fund:** the primary account holds funded
-  "My Toncoin" (~3.4 TON) and "My Toncoin 2"; a wallet-to-wallet self-send at
-  ~0.0064 TON exercises pending→confirmed reconciliation. (2026-07-09 eval)
+- **TON send/sync tests:** a wallet-to-wallet self-send between two TON
+  wallets on the account at ~0.0064 TON exercises pending→confirmed
+  reconciliation.
 - **TON public endpoint rate-limits under parallel slots:** toncenter.com/api/v2
   429s ("Ratelimit exceed") on repeated /sendBoc + /estimateFee; it rejects BEFORE
   any txid is saved (no corruption). Cool down 2-3 min and retry; a clean fee
-  estimate is the recovery signal. (2026-07-09 eval, TON run)
+  estimate is the recovery signal.
 - **Maya/Thorchain pending-metadata tests: confirm the FIRST fresh quote.** The
   60s timeout is on the quote re-fetch, not the broadcast — slide immediately,
-  don't let the quote expire. The primary account's USDT(Ethereum)→ETH is a reliable
-  executable Maya token-source pair; min ~5.21 USDT. (2026-07-09 eval)
+  don't let the quote expire. USDT(Ethereum)→ETH is a reliable
+  executable Maya token-source pair; min ~5.21 USDT.
 - **SideShift geo-gate is per-request from the CURRENT egress — re-verify fresh
   each run:** `curl https://sideshift.ai/api/v2/permissions` →
   `{"createShift":<bool>}`; `POST /api/v2/quotes` returns ACCESS_DENIED when
-  blocked. A non-US VPN exit flips createShift true. (2026-07-09 eval)
+  blocked. A non-US VPN exit flips createShift true.
 - **Xgram executable-pair recipe:** only XMR pairs are enabled for Edge's key
   (BTC/LTC/BCH/TRX/SOL ↔ XMR); floors ~$50-100 equivalent (SOL→XMR min 0.62 SOL,
   XMR→BTC min 0.159 XMR, TRX→XMR min 67 TRX — discover live via BELOW_LIMIT).
   SOL→XMR from My Solana → My Monero executes reliably; the confirm slider needs a
-  coordinate swipe on the quote scene. (2026-07-09 eval)
+  coordinate swipe on the quote scene.

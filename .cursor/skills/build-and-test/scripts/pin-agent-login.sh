@@ -12,8 +12,9 @@
 # are handled when present. The app reads them at bundle time: after a pin run
 # `metro-fresh.sh --file config.json`, then relaunch (YOLO auto-login signs in).
 #
-# Output: one line per file, `<file>: <role>|unpinned|not-a-roster-account`,
-# then `PINNED=<role>` or `CHECK=ok|drift`. Never prints a username or PIN.
+# Output: one line per file, `<file>: <username> (<role>)|unpinned|<username>
+# (not-a-roster-account)`, then `PINNED=<username> (<role>)` or
+# `CHECK=ok|drift`.
 # Exit: 0 = pinned to the default role (or --check found it so)
 #       1 = --check found a file unpinned or on another account
 #       2 = usage error, roster missing, or no config file in the checkout
@@ -48,23 +49,25 @@ const roleOf = name => {
   const hit = Object.keys(roster.roster).find(r => roster.roster[r].username === name)
   return hit == null ? "not-a-roster-account" : hit
 }
+const show = name => (name == null || name === "" ? "unpinned" : name + " (" + roleOf(name) + ")")
 const files = ["config.json", "env.json"].filter(f => fs.existsSync(path.join(dir, f)))
 if (files.length === 0) { console.error("pin-agent-login: no config.json or env.json in " + dir); process.exit(2) }
 let drift = false
 for (const f of files) {
   const p = path.join(dir, f)
   const env = JSON.parse(fs.readFileSync(p, "utf8"))
-  const before = roleOf(env.YOLO_USERNAME)
+  const beforeName = env.YOLO_USERNAME
+  const before = roleOf(beforeName)
   if (check === "true") {
-    console.log(f + ": " + before)
+    console.log(f + ": " + show(env.YOLO_USERNAME))
     if (before !== role) drift = true
     continue
   }
   env.YOLO_USERNAME = acct.username
   env.YOLO_PIN = acct.pin
   fs.writeFileSync(p, JSON.stringify(env, null, 2) + "\n")
-  console.log(f + ": " + before + " -> " + role)
+  console.log(f + ": " + show(beforeName) + " -> " + show(acct.username))
 }
 if (check === "true") { console.log("CHECK=" + (drift ? "drift" : "ok")); process.exit(drift ? 1 : 0) }
-console.log("PINNED=" + role)
+console.log("PINNED=" + show(acct.username))
 ' "$DIR" "$ROSTER" "$CHECK"

@@ -36,6 +36,9 @@ YOUR STANDING VERDICT (`myStanding` in the context output) carries over between 
 - `--quick` — skip the deep workflow; parent review only (step 4b).
 - `--level <low|medium|high|xhigh|max>` — depth of the deep workflow (default `high`). The level IS the fan-out agents' reasoning effort; see the model note in step 4a.
 - `angles=N` — override the workflow's correctness-angle count (1-5) independently of level; passed through verbatim.
+- `model=sonnet|opus|haiku|inherit` — the workflow's fan-out model (default `sonnet`); passed through verbatim.
+- `effort=low|medium|high|xhigh|max|inherit` — the workflow's fan-out reasoning effort (default: the level's own); passed through verbatim.
+- Convention: dashed flags (`--quick`, `--level`, `--comment`) are this skill's; `key=value` tokens are the workflow's and reach it unchanged in step 4a's `args`.
 - `--comment` / `--no-comment` — posting config per `posting-gate`.
 </flags>
 

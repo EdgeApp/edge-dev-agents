@@ -1,0 +1,9 @@
+✖ 1845 problems (0 errors, 1845 warnings)
+The command "yarn lint" exited with 0.
+src/components/scenes/HoudiniPrivateSendScene.tsx(6,3): error TS2305: Module '"edge-core-js"' has no exported member 'EdgeSwapToAddressInfo'.
+src/components/scenes/HoudiniPrivateSendScene.tsx(207,9): error TS2322: Type '{ fromWallet: EdgeCurrencyWallet; fromTokenId: EdgeTokenId; toTokenId: EdgeTokenId; toAddressInfo: EdgeSwapToAddressInfo; nativeAmount: string; quoteFor: "from"; }' is not assignable to type 'EdgeSwapRequest'.
+The command "yarn tsc" exited with 2.
+Test Suites: 87 passed, 87 total
+Tests:       511 passed, 511 total
+The command "yarn test" exited with 0.
+Done. Your build exited with 1.

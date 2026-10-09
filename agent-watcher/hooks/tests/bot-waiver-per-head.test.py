@@ -39,7 +39,7 @@ case "$*" in
   "api user"*) echo me ;;
   *"reviews("*) echo "${STUB_REVIEW_COUNT:-0}" ;;
   "api graphql"*) cat <<EOF
-{"data":{"repository":{"pullRequest":{"state":"OPEN","isDraft":false,"headRefOid":"$STUB_HEAD","author":{"login":"me"},"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+{"data":{"repository":{"pullRequest":{"state":"OPEN","headRefOid":"$STUB_HEAD","author":{"login":"me"},"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
 EOF
   ;;
   *check-runs*) echo "$STUB_CHECK_RUNS" ;;

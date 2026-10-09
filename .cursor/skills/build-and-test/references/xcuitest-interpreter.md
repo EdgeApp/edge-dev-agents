@@ -35,7 +35,7 @@ and source hash (`scripts/xcuitest-build.sh`, cached under
 | `copyTextFrom` / `pasteText` | `copyTextFrom` takes a selector and stores the element's text (title, else value, else placeholder, else label), also as `maestro.copiedText` for `evalScript` and `${}`. `pasteText` types it, and types nothing when nothing was copied |
 | `hideKeyboard` | Maestro's iOS behavior: nothing when no keyboard is up, else a short swipe up from the screen center, then a short swipe left if the keyboard is still there. Fails when the keyboard survives both, which Maestro also does; tap a non-interactive element in that case |
 | `back` | Accepted and does nothing, the same as Maestro on iOS |
-| `scroll` / `scrollUntilVisible` / `swipe` | `scrollUntilVisible`: `element`, `direction`, `timeout`, `visibilityPercentage`, `centerElement`, `waitToSettleTimeoutMs`. With `centerElement`, an element that is on screen but outside the center band is dragged by its own distance from the screen center (Maestro repeats the full swipe, which can carry the element past the band and off screen). `swipe`: `from` + `direction`, or `start` / `end` points (`"50%,80%"`), `duration`. The step's log line carries the resolved from and to points and, for a `from` element, its frame before the drag and after it settles (`gone` when it no longer resolves): the data to read when a gesture reports ok but the app did not react |
+| `scroll` / `scrollUntilVisible` / `swipe` | `scrollUntilVisible`: `element`, `direction`, `timeout`, `visibilityPercentage`, `centerElement`, `waitToSettleTimeoutMs`. With `centerElement`, an element that is on screen but outside the center band is dragged by its own distance from the screen center (Maestro repeats the full swipe, which can carry the element past the band and off screen). `swipe`: `from` + `direction`, or `start` / `end` points (`"50%,80%"`), `duration`. The step's log line carries the resolved from and to points and, for a `from` element, its frame before the drag and after it settles (`gone` when it does not resolve): the data to read when a gesture reports ok but the app did not react |
 | `repeat` / `retry` | `repeat`: `times`, `while`. `retry`: `maxRetries`, `file` or `commands` |
 | `evalScript` | Full JavaScript (JavaScriptCore). `output.*` persists for the whole run |
 | `waitForAnimationToEnd` | Two consecutive identical screenshots, `timeout` default 15s |
@@ -72,10 +72,8 @@ the run.
 `--login-role <role>` reads that role's account from the local roster and
 passes it to the flow as env `EXPECT_USERNAME` and `PIN_DIGIT`.
 `common/login-if-needed.yaml` then fails within 5s, before any digit is
-tapped, when the PIN scene shows another account. The output masks the
-username (`<role account>`) and the tapped digits (`<digit>`), in step lines
-and in inspect output. The raw `xcodebuild.log` in `RUN_DIR` is unmasked and
-stays on this box.
+tapped, when the PIN scene shows another account. Step lines and inspect
+output show the account name and the tapped digits as they are.
 
 ## Inspect and probe
 

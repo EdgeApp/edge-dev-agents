@@ -5,6 +5,7 @@ Governs steps 3-4 of `/pr-land` (prepare and push), and every CHANGELOG or code 
 <rule id="changelog-conflicts">CHANGELOG conflicts (any section, including staging): Agent resolves semantically, scripts verify the result. NEVER narrated: a CHANGELOG conflict happens on nearly every land and resolves mechanically, so it earns zero words in chat, comments, or reports — conflict mentions during a land are reserved for NON-trivial (code) conflicts per `code-conflicts`, and upfront conflict status is banned everywhere (writing-style; `block-upfront-conflict-probe.sh`).</rule>
 <rule id="verification">Verification is mandatory. On the DEFAULT path a PR is gated twice: first locally (Step 3 prepare runs `verify-repo.sh` before the branch is pushed and auto-merge is armed), then by GitHub's REQUIRED status checks (auto-merge will not merge until they pass). Do NOT also merge locally on this path — GitHub owns the merge; the agent watches CI to completion (see Step 5). On the local fallback path, verification is built into `pr-land-merge.sh`, no bypass. Either way a PR never lands without green checks. Every local verification (prepare, merge, publish) first waits via `wait-for-quiet-load.sh` for machine load, minus this session's own process tree, to fall below twice the CPU count (bounded; it never blocks a land), because test suites carry fixed per-test timeouts that unrelated load trips and a run must not wait out load it generates itself. A verification failure consisting ONLY of test timeouts is a load failure, not a code failure: re-run the same step (the wait runs again); the two-attempt remediation bound of `auto-fix-verification-failures` counts attempts made at quiet load. Any failure with an assertion or compile error is a real failure and follows the normal bound.</rule>
 <rule id="broken-develop-gate">A base branch the master-build memo marks unbuildable (`~/.config/agent-watcher/develop-buildable.sh` exit 3: `origin/develop` HEAD equals `failed_sha` in `master-build.json`) is not landed onto. `pr-land-prepare.sh` refuses such a PR before touching the checkout (status `base_unbuildable`, exit 3 when nothing else was ready); report it as "base branch unbuildable, land the fix first" and stop the train for that repo. `--allow-broken-develop` is operator-only, for the one PR that IS the fix: an orch run never passes it and reports the refusal instead. The gate opens by itself once develop moves.</rule>
+<rule id="dep-sanction-at-land">A PR labeled `awaiting-dep-publish` has CI that cannot pass until a dependency publishes (one-shot `dep-blocked-pr-vs-bump`); landing is where that sanction ends. Immediately before preparing ANY PR (step 3, or step 8 for a deferred GUI PR, by which point step 6 has published its dependency), run `~/.cursor/skills/dep-publish-sanction.sh check --repo <owner/repo> --pr <n>` and act on its exit code. `5` = no sanction: an ordinary PR. `0` or `4` = the dependency is still unpublished: do NOT prepare or land the PR; report it under "Not landed (awaiting dependency publish)" with the awaited package from the verdict line. `3` = the dependency has published: land the PR normally, on a base branch that already carries the bump (step 7 of this run, or an earlier land; a missing bump shows up as a prepare verification failure). `1` = npm or GitHub unreachable: retry once, then skip the PR and report it. For a PR that read `3`, remove the sanction right after its step 4 push with `~/.cursor/skills/dep-publish-sanction.sh clear --repo <owner/repo> --pr <n>`, then arm as usual; auto-merge still waits for green CI. A label left on a PR whose dependency has published is a defect, so clear it even when the PR then fails to land.</rule>
 </rules>
 
 <scripts description="This phase's companion scripts and their exit codes. Any exit code not listed here or in the core table = STOP and report (`unexpected-exit`).">
@@ -12,6 +13,7 @@ Governs steps 3-4 of `/pr-land` (prepare and push), and every CHANGELOG or code 
 | Script | Purpose |
 |--------|---------|
 | `pr-land-prepare.sh` | Rebase + conflict detection + verification |
+| `~/.cursor/skills/dep-publish-sanction.sh` | `check`: is this PR waiting on an unpublished dependency. `clear`: remove the `awaiting-dep-publish` label and body line (`dep-sanction-at-land`) |
 | `verify-repo.sh` | Verification (CHANGELOG + code; lint scoped to changed files when `--base` given; accommodates both Unreleased-style and legacy versions-only CHANGELOG formats; prepare invokes it with `--require-changelog`, so every landed PR must include a CHANGELOG entry) |
 | `changelog-union-merge.sh` | Mechanically resolve a CHANGELOG rebase/cherry-pick conflict (union, dedupe, type-order). Shared with /develop-staging, which adds whole-section merging behind `--release-merge`; pr-land never passes that flag |
 | `wait-for-quiet-load.sh` | Blocks (bounded) until the 1-min load average, minus this session's own process tree, is at or below 2 x CPUs; called by every verification path, exits 0 always |
@@ -19,6 +21,7 @@ Governs steps 3-4 of `/pr-land` (prepare and push), and every CHANGELOG or code 
 | Script | Exit 0 | Exit 1 | Exit 2 | Exit 3 | Exit 4 |
 |--------|--------|--------|--------|--------|--------|
 | `pr-land-prepare.sh` | Ready | All failed | - | Base branch unbuildable (`broken-develop-gate`) | - |
+| `dep-publish-sanction.sh check` | Still unpublished (skip the PR) | npm or GitHub unreachable | Usage | Published (land, then `clear`) | Still unpublished (skip the PR) |
 | `verify-repo.sh` | Pass | Code fail | CHANGELOG fail | - | - |
 | `changelog-union-merge.sh` | Resolved (+continued) | No markers / continue failed | Usage | - | - |
 
@@ -32,7 +35,7 @@ Governs steps 3-4 of `/pr-land` (prepare and push), and every CHANGELOG or code 
 | `verification_failed` | verify-repo.sh failed | Read `failedStep` + `logPath` from the JSON; inspect the log tail (`tail -40 <logPath>`); fix only if trivially in-scope, else report. Special case `failedStep: "CHANGELOG entry existence check"` — prepare REQUIRES every landed PR to have updated CHANGELOG.md: add a correctly-formatted entry for the PR's change (under `## Unreleased`, or the topmost version section in legacy versions-only repos), amend it onto the branch, and re-run prepare. Only if an entry is genuinely unwarranted (e.g. CI-only change), ask the user whether to land without one. |
 | `install_failed` | Dependency install failed | Read the error: a Socket Firewall HTML page ("Please connect to Socket Firewall") is a transient proxy outage — retry the prepare ONCE, then report. Runtime-setup steps in `scripts.prepare` are already stripped during verification installs (see `verification-prepare-cmd.sh`), so a persistent failure is a real install problem: report, do not retry further. |
 | `autosquash_failed` | Fixup autosquash rebase failed (aborted) | Report; branch likely needs manual history repair. |
-| `checkout_failed` | Fetch/checkout failed | Report the git error. Note: dirty trees no longer cause this — they are auto-stashed (see `dirty-tree-policy`). |
+| `checkout_failed` | Fetch/checkout failed | Report the git error. A dirty tree never causes this: it is auto-stashed (see `dirty-tree-policy`). |
 | `clone_failed` | Initial clone failed | Report; check repo name/access. |
 
 **Dirty-tree policy (`dirty-tree-policy`):** prepare operates on the PRIMARY checkout at `~/git/<repo>` (or a worktree already holding the branch) — NOT a scratch clone — so it can collide with in-progress local work. If the tree is dirty at checkout, prepare auto-stashes it (including untracked) under a labeled stash `pr-land-autostash <ISO-date> (was on <branch>)` and reports it in the per-PR JSON (`autostash`) and the summary. ALWAYS surface auto-stashes to the user in your final report — the stash is their uncommitted work; recovery is `git stash list | grep pr-land-autostash` then `git stash pop <ref>`.
@@ -41,6 +44,8 @@ Governs steps 3-4 of `/pr-land` (prepare and push), and every CHANGELOG or code 
 
 <step id="3" name="Prepare Branches">
 When the `defer-gui` rule applies (mixed batch), feed only `nonGuiPrs` into `pr-land-prepare.sh`. GUI PRs enter prepare in step 8.
+
+First run the `dep-sanction-at-land` check on each PR about to be prepared and leave out the ones still waiting on a dependency (`dep-publish-sanction.sh check` exit 5 = no sanction on the PR, the usual case).
 
 ONE tool call per batch:
 
@@ -66,7 +71,7 @@ Each entry in `prepared[i].placementWarnings` carries a `reason` that selects it
 
 **`reason: "staging-task-under-unreleased"`** — the task's Build field is `staging` (operator intent) but the entry sits under `## Unreleased (develop)`. Deterministic, NO user ask (a yolo run has no one to ask, and the field already IS the decision): use the Edit tool to move the entry line(s) into the `## X.Y.Z (staging)` section, preserving `added → changed → deprecated → fixed → removed → security` ordering, then amend the top commit and re-run prepare exactly as in step 2 of the interactive case below. This is what keeps develop's changelog honest — without the move, the fix ships in the staging release but both branches list it as unreleased, and it double-appears in the NEXT version's notes.
 
-**`reason: "released-section"`** — the PR added CHANGELOG entries under a DATED released heading (e.g. `## 4.46.0 (2026-03-20)`) instead of `## Unreleased (develop)` or `## X.Y.Z (staging)`. This usually means the author placed the entry under the then-current released version but the PR actually targets a later unreleased version. A judgment call:
+**`reason: "released-section"`** — the PR added CHANGELOG entries under a DATED released heading (e.g. `## 4.46.0 (<date>)`) instead of `## Unreleased (develop)` or `## X.Y.Z (staging)`. This usually means the author placed the entry under the then-current released version but the PR actually targets a later unreleased version. A judgment call:
 
 Do NOT push (step 4) until the user decides. For each warning, show the user the `line`, `section`, and `text`, then ask exactly:
 ```

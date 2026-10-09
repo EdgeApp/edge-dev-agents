@@ -13,7 +13,7 @@
 #   one push per address round (2026-07-31 bugbot credit gate: reviewer bots
 #   bill per push, and mid-pass pushes buy reviews of known-incomplete HEADs).
 #   Raw `git push` is blocked only when the review-mode oracle says PRESERVE;
-#   pre-review pushes (the amend+watch loop on a draft) resolve to
+#   pre-review pushes (the amend+watch loop) resolve to
 #   autosquash/none and stay raw and free.
 #
 #   OPERATOR-APPROVED REWRITE: the operator can authorize a history rewrite on

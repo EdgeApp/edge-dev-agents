@@ -405,7 +405,8 @@ flowchart TD
 
   PR["Reviewing: /pr-create (verify green, clean tree,
   template, evidence; Asana attach; multi-repo
-  subtasks; draft dep PRs excluded from gate)"] --> WATCH
+  subtasks; every PR opens ready, a dependency-blocked
+  one under the awaiting-dep-publish label)"] --> WATCH
   WATCH["watch-pr bounded poll; bots must be
   SUCCESS (NEUTRAL = findings -> /bugbot);
   fixes via amend + force-with-lease"] --> GATE
@@ -546,7 +547,7 @@ done.
 | | `require-subtasks-for-multi-repo-pr.sh` | Multi-repo PR sets attach subtask-per-PR, never flat onto the main task |
 | | `require-clean-run-report.sh` | Report attach: template form, prose lint (with judge), traceability frontmatter auto-fill, stable ordinals, one doc per segment, no dead GitHub citations |
 | | `block-raw-thread-resolve.sh` | Review threads resolve through the reply-first scripts, never raw GraphQL |
-| | `block-raw-gh-writes.sh` | Raw `gh pr create` (non-draft), `gh pr comment`/`review`, and `gh api` comment/review writes go through the linted companion scripts |
+| | `block-raw-gh-writes.sh` | Every raw `gh pr create`, `gh pr comment`/`review`, and `gh api` comment/review write goes through the linted companion scripts |
 | | `block-upfront-conflict-probe.sh` | PR mergeability is a landing-time concern; no upfront probes |
 | | `ensure-tdd-pr-link.sh` | PR bodies carry the TDD link when one is owed |
 | | `no-push-after-complete.sh` | No branch/PR mutation once the task is Complete (post-Complete rework must re-arm) |
@@ -556,7 +557,7 @@ done.
 | | `block-coordinate-taps.sh` | No blind coordinate taps; drive by accessibility ids or text |
 | | `block-sim-wipe.sh` | No sim erase/wipe (pooled sims carry funded test accounts) |
 | | `require-bundle-triage.sh` | Stale-bundle symptoms get triaged before deeper debugging |
-| Prose gates | `lint-md-on-write.sh` | Mechanical no-slop lint on markdown written outside the internal allowlist (full on Write, fragment on Edit/heredoc) |
+| Prose gates | `lint-md-on-write.sh` | Mechanical no-slop lint on markdown written outside the internal allowlist (full on Write, fragment on Edit/heredoc). Skill and rule prose (`SKILL.md`, `references/*.md`, `rules/*.mdc`) is also counted for incident narration (dates, 16-digit ids, "NOTE since", "no longer", "used to"), and a write that raises the count is blocked; `agent-eval/references/era.md` is the exempt home for dated rulings |
 | | `slack-prose-gate.sh` | Outbound Slack text passes the shared lint with the judge tier; brevity nudge over ~900 chars; operator-quoted text posts verbatim, unlinted |
 | Hygiene / injectors | `no-interactive-prompt.sh` | No AskUserQuestion in hands-off runs; pick the defensible default |
 | | `no-self-respawn.sh` | No ScheduleWakeup/CronCreate/`claude --resume` self-respawn |
@@ -652,7 +653,7 @@ the app.
   nothing says so in its step line (`--tap-check`); typing falls back from the
   focused element to the on-screen keys to key events (`--typing`);
   `--login-role <role>` signs the flow in as a roster role, refuses to tap a
-  PIN on another account's PIN scene, and masks the username and digits.
+  PIN on another account's PIN scene.
 - **Build decisions** (`build-and-test/scripts/slot-preflight.sh`): one call
   prints whether the slot needs no build, a JS-only launch or a full rebuild.
   It and `ios-rn-build.sh` take the native stamp from one function
@@ -662,8 +663,13 @@ the app.
 - **Stale bundle and login checks.** `scripts/metro-fresh.sh` answers whether
   the Metro on a port sees edits to its checkout (watchman still observing,
   served `.json` modules equal to disk); `scripts/pin-agent-login.sh` pins a
-  checkout's auto-login to the roster's default role and prints roles, never
-  values.
+  checkout's auto-login to the roster's default role and prints each file's
+  account as `<username> (<role>)`.
+- **One account by default.** Drives run on the roster's `agent` role, which
+  funds its wallets and creates new ones by swapping (multi-hop included).
+  Another roster account is only for what that one cannot supply: an old or
+  large-UTXO wallet, many-wallet performance, account-specific state, ramps
+  KYC.
 - **Android helpers.** `scripts/android-dev-server.sh` points one emulator's
   debug app at its slot's Metro port through the app's own dev-server
   setting, so no host-global 8081 forwarder is shared between slots;
@@ -698,7 +704,7 @@ finding carrying a citation an auditor can open.
   PRs, Asana state, attempt log, friction block (hook blocks, tool errors,
   compactions), version stamps, release receipt.
 - **`/agent-eval`** grades process compliance and outcome honesty against the
-  agent-behavior rubric (dimensions A1-A36: status hygiene, completion
+  agent-behavior rubric (dimensions A1-A37: status hygiene, completion
   honesty, report discipline, testing depth, tested-field accuracy, deferral
   validity, self-review discipline, and more). A profile run reads only its rows
   (`scripts/rubric-slice.sh <profile>`); dated expectations live in one era
@@ -1000,6 +1006,8 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`no-slop-judge.sh`](.cursor/skills/no-slop/scripts/no-slop-judge.sh) | The haiku judge stage (cached, fail-open) |
 | [`tdd-lint.sh`](.cursor/skills/tdd/scripts/tdd-lint.sh) | TDD form lint (calls the shared prose lint) |
 | [`install-deps.sh`](.cursor/skills/install-deps.sh) | Install dependencies and run project prepare steps |
+| [`orch-prose-lint.sh`](.cursor/skills/orch-prose-lint.sh) | Reporting conventions for text an agent posts about its own work (first check: passing-suite totals; name failing tests and new cases instead). Called beside the prose lint by the run-report gate, `pr-create.sh`, `pr-prose-edit.sh`, `tdd-lint.sh`, `asana-task-update.sh` and the Asana MCP hook |
+| [`dep-publish-sanction.sh`](.cursor/skills/dep-publish-sanction.sh) | The sanction for a PR whose CI cannot pass until a dependency publishes: `apply` adds the `awaiting-dep-publish` label and an `Awaiting publish: <pkg>@<version>` body line, `check` rules whether the red CI is a missing-package failure of a still-unpublished package (`watch-pr.sh` then reports `green-dep-sanctioned`; reviewer bots and threads gate as usual), `clear` removes both at land. Any publish of the package after `apply` expires it |
 | [`rubric-drift.sh`](.cursor/skills/rubric-drift.sh) | Anchor tracking between eval rubrics and the rules/scripts they grade against |
 | [`mermaid-png.sh`](.cursor/skills/mermaid-png.sh) | Render one mermaid diagram to a cropped PNG (headless Chrome) for SendUserFile from CLI sessions |
 

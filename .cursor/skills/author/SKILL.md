@@ -35,7 +35,7 @@ A rule exists to change what an agent decides. When the outcome cannot vary — 
 - Prose IS still needed when the agent must supply judgment the mechanism can't: which flag to pass, when the step applies, what a non-obvious verdict means.
 Test: "if the agent read nothing about this, would the outcome differ?" No → no prose.</principle>
 
-<principle id="no-incident-narration">Rules carry the imperative, never the incident that motivated it. No audit statistics, no dated incident tags ("the FooProvider run, 2031-01-05"), no history of how a behavior used to work. The evidence trail lives in eval reports and git history; a rule that narrates its origin grows on every incident and buries its own imperative. When patching a rule after an incident, write the counter-imperative the incident taught — not the incident.</principle>
+<principle id="no-incident-narration">Rules carry the imperative, never the incident that motivated it. No audit statistics, no dated incident tags ("the FooProvider run, 2031-01-05"), no history of how a behavior used to work. The evidence trail lives in eval reports and git history; a rule that narrates its origin grows on every incident and buries its own imperative. When patching a rule after an incident, write the counter-imperative the incident taught — not the incident. A dated ruling worth keeping as a record goes in agent-eval's `references/era.md`, the one file that holds them.</principle>
 
 <principle id="rationale-once">A rationale is stated ONCE, in the rule that owns it; dependent rules cross-reference the id without restating the why. Restated rationale is the main way related rules balloon in lockstep.</principle>
 
@@ -144,6 +144,10 @@ When revising an existing command, **every item below is mandatory** — not a s
 1. Read the full file before making changes
 2. Check for duplicated logic across other commands — consolidate if found
 2b. **Delete prose a mechanism already determines** (`no-prose-for-mechanical`): for each rule you touch, ask whether a hook/script now fully decides the outcome. If so, remove the rule, move the explanation into the mechanism's header, and `--ack` it in rubric-drift. Adding a mechanism WITHOUT deleting the prose it replaces is how skills accrete dead weight.
+2c. **Write the end state, and sweep the skill for the old one**: when a change replaces a behavior, rewrite every rule it touches as the NEW behavior stated outright, never as a transition from the old one (no "now", "since", "replaces", "instead of the previous"). Then sweep the SAME skill for text still describing the old behavior and bring each hit to the new state in this change: its `SKILL.md`, every `references/*.md` and template, and its `scripts/` (headers, usage lines, messages a caller reads).
+   ```bash
+   rg -n "<old-behavior term>" ~/.cursor/skills/<skill>/
+   ```
 3. **Check behavioral dependencies**: Search for other commands, skills, and rules that perform similar operations or share domain overlap with the one being edited. If command A has a step that is a lightweight version of command B's core behavior (e.g., `/pr-land` addressing comments vs `/pr-address`), verify that A's step is consistent with B's rules — missing rules in A are likely bugs.
    - Extract domain-specific verbs and nouns from the step being edited (e.g., a step about handling PR comments yields: `comment`, `reply`, `resolve`, `address`, `fixup`, `thread`)
    - Search each term across commands, skills, and rules:

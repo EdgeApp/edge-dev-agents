@@ -12,15 +12,15 @@ import os, subprocess, sys, tempfile
 
 LIB = os.path.expanduser('~/.config/agent-watcher/hooks/lib/reviewer-outage-noise.sh')
 NOISE = [
-    'Reviewer bots still have not run on gui#6066. It is a draft, so Travis and the bots do not run as check-runs on it.',
+    'Reviewer bots still have not run on gui#6066. Travis and the bots posted no check-runs on it.',
     'Testing gap: Cursor Bugbot did not run on the new HEAD (dc0b8682): no check-run and no review.',
     'The bugbot credit this round was saving went unspent. Worth a re-gate when quota returns.',
-    'Cursor Bugbot still has not reviewed PR 6066 at dc0b8682, unchanged since the ready-flip.',
+    'Cursor Bugbot still has not reviewed PR 6066 at dc0b8682, unchanged since the last push.',
     'Reviewer bot unavailable: cursor posted no check-run on the ready HEAD.',
     'Bugbot is out of quota, so this PR carries no automated review.',
 ]
 CLEAN = [
-    'un-draft + re-gate after edge-core-js publishes',
+    'CI is red under the awaiting-dep-publish label until edge-core-js publishes',
     'Bugbot flagged the null check on line 40 as High; fixed in the fixup.',
     'The reviewer bots completed clean on HEAD; two cursor threads resolved.',
     'Rejected review finding: the merged handleBack drops the exit path.',

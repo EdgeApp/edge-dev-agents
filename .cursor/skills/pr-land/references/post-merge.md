@@ -1,7 +1,8 @@
 Governs steps 9, 9b and 10 of `/pr-land` (staging cherry-pick, late bot findings sweep, Asana QA handoff); the core step map points here.
 
 <rules description="Non-negotiable constraints, binding exactly as if written in the core SKILL.md.">
-<rule id="qa-subtasks-before-handoff">The QA handoff carries its own checklist: before `--set-board-state "QA Verification"`, write one subtask per MANUAL verification item, titled `QA: <what a human verifies>`. The reader is a non-technical tester who never opens GitHub: write title and body from their side of the screen, in app screen, button and asset names. Body = which build to test, named the way a tester finds it (the app version from the task's Release field, plus a build number when known); steps; expected result; device/platform; what to report back; and one plain line on what was already checked ("already checked on an iPhone simulator"), drawn from the PR body's Testing section, the run report's Testing and Not-tested lines, and the task's `tested` field. A technical caveat that changes what the tester sees is written as the observation ("the fee can show slightly high for some tokens"), never its cause. `asana-task-update.sh` refuses developer detail in a `QA:` title or body (exit 1 `QA_NOT_PLAIN`, offending lines on stderr): rewrite those lines in tester terms and re-run. Plain notes only: no CURRENT STATE section, no agent markers. Items a sim drive or CI already proved are NOT repeated; what goes in is what only a human on a device can confirm (real funds, hardware, push, App Store builds, visual judgment, the Not-tested list). Nothing to verify by hand is stated with `--no-manual-qa "<reason>"`, never by skipping. `asana-task-update.sh` enforces the gate (exit 2 `QA_SUBTASKS_REQUIRED`) and `asana-get-context.sh` hides `QA:` subtasks from every run, so an orchestrated run never treats them as scope.</rule>
+<rule id="qa-subtasks-before-handoff">The QA handoff carries its own checklist: before `--set-board-state "QA Verification"`, each landed task gets one subtask per MANUAL verification item, titled `QA: <what a human verifies>`. Nothing to verify by hand is stated with `--no-manual-qa "<reason>"`, never by skipping. `asana-task-update.sh` enforces the gate (exit 2 `QA_SUBTASKS_REQUIRED`) and refuses developer detail in a `QA:` title or body (exit 1 `QA_NOT_PLAIN`, offending lines on stderr); `asana-get-context.sh` hides `QA:` subtasks from every run, so an orchestrated run never treats them as scope.</rule>
+<rule id="qa-writeups-by-opus-subagent">The `QA:` items are WRITTEN by a subagent on Opus, never by the landing session: one Agent call per task with `model: "opus"`. Deciding what a human must verify takes reading what actually landed, and the landing session has only driven scripts. The subagent's whole contract (what to read, what counts as an item, the tester voice, the body shape, the output format) lives in `references/qa-writeup.md`: the subagent reads that file; the landing session does NOT, and passes only the task gid and the landed PRs. The landing session creates the subtasks from the subagent's files unedited; it does not draft, trim or add items. A result whose `READ:` line misses a landed PR has not done the job: re-run the subagent.</rule>
 </rules>
 
 <scripts description="This phase's companion scripts and their exit codes. Any exit code not listed here or in the core table = STOP and report (`unexpected-exit`).">
@@ -109,15 +110,24 @@ Review the `missing` array, report any entries lacking an Asana link, and skip t
 </sub-step>
 
 <sub-step name="Manual QA subtasks">
-For each task in `.tasks`, per `qa-subtasks-before-handoff`: write each manual item to a file and create its subtask (one call per item):
+For each task in `.tasks`, per `qa-writeups-by-opus-subagent`, spawn one Agent call with `model: "opus"` and this prompt, filled in:
+
+```
+Read ~/.cursor/skills/pr-land/references/qa-writeup.md and follow it exactly; it is your full brief.
+Task gid: <task_gid>
+Landed PRs (repo#number | merge sha | local checkout):
+- <repo>#<n> | <merge-sha> | ~/git/<repo>
+```
+
+It returns one `<n> | QA: <title>` line per item (bodies in `/tmp/qa-<task_gid>-<n>.md`) and a `READ:` line. Create each subtask from those (one call per item):
 
 ```bash
 ~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
   --task <task_gid> \
-  --create-subtask --subtask-name "QA: <what a human verifies>" --subtask-notes /tmp/qa-<task_gid>-<n>.md
+  --create-subtask --subtask-name "QA: <title>" --subtask-notes /tmp/qa-<task_gid>-<n>.md
 ```
 
-A landed task with nothing for a human to check passes `--no-manual-qa "<reason>"` on the handoff call below instead.
+Exit 1 `QA_NOT_PLAIN` → send the offending lines back to the SAME subagent (SendMessage) to rewrite the file, then re-run the call. `NO_MANUAL_QA: <reason>` → pass `--no-manual-qa "<reason>"` on the handoff call below instead. Put each task's `READ:` line in the step 11 summary.
 </sub-step>
 
 <sub-step name="Update tasks">
@@ -130,7 +140,7 @@ For each task in `.tasks`, run:
   --unassign
 ```
 
-Writes to the new Board State 🤖 field. The legacy Status field is no longer updated.
+Writes to the Board State 🤖 field. The legacy Status field is not updated.
 
 **Exit codes per call:**
 - `0` = success

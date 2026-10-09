@@ -14,7 +14,7 @@
       ]
     },
     "one-shot:agent-status-on-pending-task": {
-      "hash": "22e8b4be2290",
+      "hash": "82f3d3abaab9",
       "dims": [
         "A4"
       ]
@@ -27,7 +27,7 @@
       ]
     },
     "one-shot:pr-watch-bounded-poll": {
-      "hash": "a3c980236d0a",
+      "hash": "e89d5ff71e7a",
       "dims": [
         "A5"
       ]
@@ -39,7 +39,7 @@
       ]
     },
     "one-shot:yolo-execution": {
-      "hash": "aa2f06865d51",
+      "hash": "ebd67c462de7",
       "dims": [
         "A7"
       ]
@@ -52,19 +52,19 @@
       ]
     },
     "one-shot:yolo-stop-at-pr": {
-      "hash": "676ad1743270",
+      "hash": "964755ae51f6",
       "dims": [
         "A8"
       ]
     },
     "one-shot:report-as-attachment": {
-      "hash": "fd12479aa5cb",
+      "hash": "990c914c91e4",
       "dims": [
         "A9"
       ]
     },
     "file:agent-run-report.md": {
-      "hash": "df421b4e0721",
+      "hash": "9ec8ed99f975",
       "dims": [
         "A18",
         "A20",
@@ -78,7 +78,7 @@
       ]
     },
     "one-shot:multi-repo-subtasks": {
-      "hash": "3259a2344433",
+      "hash": "2aa8b0c11ecb",
       "dims": [
         "A10"
       ]
@@ -168,7 +168,7 @@
       ]
     },
     "pr-land:publish-gating": {
-      "hash": "f508ce8ab2cc",
+      "hash": "e21b2ab76200",
       "dims": [
         "A15"
       ]
@@ -180,7 +180,7 @@
       ]
     },
     "pr-land:asana-last": {
-      "hash": "721e2f89af5c",
+      "hash": "e601c0235a09",
       "dims": [
         "A15"
       ]
@@ -204,19 +204,19 @@
       ]
     },
     "one-shot:finalize-gate": {
-      "hash": "e888a1795a95",
+      "hash": "0ce78cc421c6",
       "dims": [
         "A3"
       ]
     },
     "one-shot:reviewer-bots": {
-      "hash": "301dab68665f",
+      "hash": "7507f71cc9c3",
       "dims": [
         "A3"
       ]
     },
     "one-shot:followup-scope-is-the-deliverable": {
-      "hash": "269f1080708d",
+      "hash": "56b9d321e405",
       "dims": [
         "A23"
       ]
@@ -234,13 +234,13 @@
       ]
     },
     "build-and-test:gui-dependency-integration": {
-      "hash": "98b23b85fbe3",
+      "hash": "596b42bdd540",
       "dims": [
         "A21"
       ]
     },
     "build-and-test:test-drives-the-real-action": {
-      "hash": "a1d1d2d8d484",
+      "hash": "ddd116590081",
       "dims": [
         "A21"
       ]
@@ -279,13 +279,13 @@
       ]
     },
     "one-shot:followup-reopens-status": {
-      "hash": "54bfc1a7c0e3",
+      "hash": "a70cd19402b8",
       "dims": [
         "A24"
       ]
     },
     "one-shot:ignore-refired-one-shot": {
-      "hash": "b80174469a3f",
+      "hash": "c3dfef375b26",
       "dims": [
         "A1"
       ]
@@ -363,7 +363,7 @@
       ]
     },
     "build-and-test:funded-test-accounts": {
-      "hash": "de294b34a4f9",
+      "hash": "83f93add8437",
       "dims": [
         "A27"
       ]
@@ -375,13 +375,13 @@
       ]
     },
     "build-and-test:slot-sim-is-the-clone": {
-      "hash": "a1753820dc10",
+      "hash": "fd53a2b0b187",
       "dims": [
         "O10"
       ]
     },
     "one-shot:cheese-build-on-green": {
-      "hash": "9d6763c1d6d9",
+      "hash": "9267b8aa3c28",
       "dims": [
         "A28"
       ]
@@ -405,7 +405,7 @@
       ]
     },
     "one-shot:land-on-approval": {
-      "hash": "6ad44ff286e3",
+      "hash": "e59855bdaa7c",
       "dims": [
         "A8"
       ]
@@ -417,7 +417,7 @@
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "9fd8f70f192e",
+      "hash": "98640bd8e17e",
       "dims": [
         "A9"
       ]
@@ -447,7 +447,7 @@
       ]
     },
     "cheese:orch-pins-required": {
-      "hash": "2cb4f6dd39eb",
+      "hash": "896d06c16b45",
       "dims": [
         "A28"
       ]
@@ -501,7 +501,7 @@
       ]
     },
     "one-shot:pr-body-current-before-complete": {
-      "hash": "7ddb4c007665",
+      "hash": "02b3962148e4",
       "dims": [
         "A31"
       ]
@@ -521,7 +521,7 @@
       ]
     },
     "pr-address:one-push-per-round": {
-      "hash": "fd3d2bfac1cc",
+      "hash": "27235771dacb",
       "dims": [
         "A24"
       ]
@@ -679,7 +679,7 @@
       ]
     },
     "one-shot:set-tested-field": {
-      "hash": "3ac88a279063",
+      "hash": "7bc33466d512",
       "dims": [
         "A22"
       ]
@@ -691,7 +691,7 @@
       ]
     },
     "one-shot:field-deltas-are-re-entry": {
-      "hash": "bb2c291d54d4",
+      "hash": "4c1759483cfb",
       "dims": [
         "A1"
       ]
@@ -721,7 +721,7 @@
       ]
     },
     "file:block-raw-gh-writes.sh": {
-      "hash": "c2aab4b94026",
+      "hash": "c4333cbc75de",
       "dims": [
         "A36"
       ]
@@ -748,6 +748,108 @@
       "hash": "a1ccad3c5509",
       "dims": [
         "A36"
+      ]
+    },
+    "one-shot:on-complete-actions": {
+      "hash": "c88c63f1e948",
+      "dims": [
+        "A37"
+      ]
+    },
+    "build-and-test:missed-input-is-a-finding": {
+      "hash": "3cb26dbf933c",
+      "dims": [
+        "A21"
+      ]
+    },
+    "one-shot:force-land-is-not-a-ci-bypass": {
+      "hash": "16178b28d946",
+      "dims": [
+        "A8"
+      ]
+    },
+    "one-shot:land-dep-publish-boundary": {
+      "hash": "db683e9d8264",
+      "dims": [
+        "A8"
+      ]
+    },
+    "one-shot:comments-before-attachment": {
+      "hash": "110b9bfb650e",
+      "dims": [
+        "A9"
+      ]
+    },
+    "one-shot:completion-comment-exception-only": {
+      "hash": "7a106daf890d",
+      "dims": [
+        "A9"
+      ]
+    },
+    "one-shot:report-frontmatter-honesty": {
+      "hash": "d22146bbebcd",
+      "dims": [
+        "A9"
+      ]
+    },
+    "one-shot:followup-addresses-review-threads": {
+      "hash": "ac016021b683",
+      "dims": [
+        "A24"
+      ]
+    },
+    "one-shot:reviewer-bot-coverage": {
+      "hash": "bd8861dd1f26",
+      "dims": [
+        "A3"
+      ]
+    },
+    "one-shot:review-threads-block": {
+      "hash": "b83b8ff5761d",
+      "dims": [
+        "A3"
+      ]
+    },
+    "one-shot:comment-asks-by-addressee": {
+      "hash": "0a9c2858a235",
+      "dims": [
+        "A23"
+      ]
+    },
+    "one-shot:descope-only-after-attempt": {
+      "hash": "d04f55cde1fb",
+      "dims": [
+        "A23"
+      ]
+    },
+    "file:orch-prose-lint.sh": {
+      "hash": "cb7b7d45fbb1",
+      "dims": [
+        "A9"
+      ]
+    },
+    "build-and-test:agent-account-acquires-by-swap": {
+      "hash": "f32cbd5e8292",
+      "dims": [
+        "A27"
+      ]
+    },
+    "build-and-test:dep-linking-toolbox": {
+      "hash": "e245648eae07",
+      "dims": [
+        "A21"
+      ]
+    },
+    "one-shot:dep-blocked-pr-vs-bump": {
+      "hash": "cfa035abb7ab",
+      "dims": [
+        "A3"
+      ]
+    },
+    "pr-land:dep-sanction-at-land": {
+      "hash": "4686219fcd04",
+      "dims": [
+        "A15"
       ]
     }
   },
@@ -885,8 +987,8 @@
       "hash": "ae8c4248ab5a"
     },
     "build-and-test:maestro-flows-are-shortcuts": {
-      "reason": "2026-10-07: the iOS remainder the interpreter cannot read or drive now goes to the maestro CLI because only Android-lane sessions carry the maestro MCP; guidance only, the drive outcome is graded by testing-depth",
-      "hash": "2cc7b3648d62"
+      "reason": "2026-10-08: two topics split out verbatim into explore-on-interpreter-prove-on-flow and playbook-and-flow-proposals; guidance only, the drive outcome is graded by testing-depth",
+      "hash": "5fd4676ebc17"
     },
     "build-and-test:proof-screenshots-for-pr": {
       "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged; screenshot evidence graded by A13",
@@ -1004,10 +1106,6 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "c9e17c6df17e"
     },
-    "one-shot:dep-pr-draft-vs-bump": {
-      "reason": "2026-07-31: draft-state disambiguation note (2026-07-31 credit gate); classification test unchanged, graded via A3 draft-dev prescription",
-      "hash": "a5e1cbb6e724"
-    },
     "one-shot:task-gid-for-pr-body-link": {
       "reason": "2026-07-14: prose-only edit: dropped the deleted standup skill from the downstream-consumers list; rule behavior unchanged",
       "hash": "37b18491b019"
@@ -1017,16 +1115,16 @@
       "hash": "5a4cc8f3f454"
     },
     "one-shot:ignore-watchdog-revive-ping": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "c7a0784aa196"
+      "reason": "2026-10-08: one phrase reworded; liveness handling is covered by orch-eval, not an agent-eval dimension",
+      "hash": "397a8a34447f"
     },
     "one-shot:yolo-no-silent-downgrade": {
-      "reason": "2026-09-10: rewired 2026-09-10 to the completion judge; the downgrade case is graded by A32/O9 and the judge J2/J5",
-      "hash": "5e183ab239dd"
+      "reason": "2026-10-08: wording tightened, incident example removed; the downgrade case is still graded by A32/O9 and the judge J2/J5",
+      "hash": "ecfd157b1711"
     },
     "one-shot:bugbot-in-watch": {
-      "reason": "2026-07-31: two-phase ready-flip wording; bot gate itself unchanged, graded via A3",
-      "hash": "c52082b06712"
+      "reason": "2026-10-08: restated NEUTRAL rationale replaced by a cross-reference to reviewer-bot-coverage (anchored under A3); the bot gate itself is graded via A3",
+      "hash": "2d06469d91d4"
     },
     "pr-address:use-companion-script": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1465,8 +1563,8 @@
       "hash": "a552c99de9cc"
     },
     "one-shot:description-current-state": {
-      "reason": "2026-08-28: 2026-08-28: write-path change only (raw curl+PUT mechanics replaced by asana-task-update.sh --set-current-state, which now owns the delimiter, the strip-and-replace and the authorship marking); the graded expectation — refresh the section when delivered scope diverges, never touch operator prose — is unchanged from the prior ack",
-      "hash": "1a417915bdab"
+      "reason": "2026-10-08: punctuation only; the graded expectation is unchanged",
+      "hash": "b87fcd81394d"
     },
     "one-shot:mid-run-state-file": {
       "reason": "2026-08-06: same concurrent effort as description-current-state; state-file quality is transcript-visible only — candidate A-dimension owed by that effort",
@@ -1489,8 +1587,8 @@
       "hash": "371607070274"
     },
     "asana-task-update:current-state-owns-the-tail": {
-      "reason": "2026-09-30: scope wording only: now names the tail writer for tasks a run has touched; orch behavior unchanged",
-      "hash": "c837b554c078"
+      "reason": "2026-10-08: scope wording only: names the tail writer and the only description write while a run is queued or in flight; orch behavior unchanged",
+      "hash": "9661e93a03f4"
     },
     "pr-address:retract-your-own-noise": {
       "reason": "2026-09-26: mechanically scoped: delete-pending-review is author-scoped and only for an operator discard; submit adopts drafts; no eval judgment",
@@ -1553,8 +1651,8 @@
       "hash": "c7360bd58918"
     },
     "one-shot:run-rules": {
-      "reason": "2026-09-25: run-rules is a pointer rule to references/run-rules.md; content change is the added usage-pause rule, covered by orch-eval O4",
-      "hash": "332fd076ba4f"
+      "reason": "2026-10-08: pointer rule to references/run-rules.md; the edit only names claude-calls-on-subscription in its id list, and each listed rule is graded under its own dimension",
+      "hash": "756e1e58f1a4"
     },
     "task-run:no-pr-no-worktree": {
       "reason": "2026-09-24: operator declined a rubric dimension for task-run 2026-09-24",
@@ -1589,32 +1687,80 @@
       "hash": "5841fd13cd47"
     },
     "asana-task-update:qa-subtasks": {
-      "reason": "2026-10-02: mechanically enforced by asana-task-update.sh (QA_SUBTASKS_REQUIRED gate, QA_NOT_PLAIN check)",
-      "hash": "53f0c32bcda2"
+      "reason": "2026-10-08: mechanically enforced by asana-task-update.sh (QA_SUBTASKS_REQUIRED gate; QA_NOT_PLAIN check); writing rules owned by pr-land references/qa-writeup.md",
+      "hash": "bb0a526c5259"
     },
     "pr-land:qa-subtasks-before-handoff": {
-      "reason": "2026-10-02: existence gated by asana-task-update.sh (QA_SUBTASKS_REQUIRED); plain-language enforced by its QA_NOT_PLAIN check; item quality not an eval dimension per operator ruling 2026-09-26",
-      "hash": "f60d851331a2"
+      "reason": "2026-10-08: existence gated by asana-task-update.sh (QA_SUBTASKS_REQUIRED); plain language by its QA_NOT_PLAIN check; writing rules moved to references/qa-writeup.md",
+      "hash": "011891c2fa81"
     },
     "one-shot:claude-calls-on-subscription": {
       "reason": "2026-09-27: operator standing preference 2026-09-27; a missed case surfaces as a blocked completion or an API bill, both visible without an eval dimension",
       "hash": "0d826fe90f7f"
-    },
-    "asana-task-update:set-notes-before-first-run": {
-      "reason": "2026-09-30: mechanically enforced by asana-task-update.sh: refused once agent_status is set, so orch runs can never use it",
-      "hash": "57d04822b25f"
     },
     "task-run:landing-task": {
       "reason": "2026-10-01: permission-only routing rule; A15 grades the /pr-land run it permits",
       "hash": "b187b1601553"
     },
     "build-and-test:ios-flows-run-on-xcuitest": {
-      "reason": "2026-10-02: driver choice for running a flow; the drive outcome is graded by testing-depth and proof rules, not by which runner executed the yaml (re-ack: pointer to inspect/steps modes)",
-      "hash": "1498de7c87dd"
+      "reason": "2026-10-08: one citation repointed to explore-on-interpreter-prove-on-flow; driver choice is not graded, the drive outcome is",
+      "hash": "2de4b066b018"
     },
     "build-and-test:app-config-files": {
       "reason": "2026-10-06: reference map of where gui config lives per branch; the copy it describes is graded under O8 workspace-status-contract",
       "hash": "95d60549a6c0"
+    },
+    "build-and-test:asset-priority": {
+      "reason": "2026-10-07: 2026-10-07: baked default for which asset to drive when the task names none; guidance only, the drive outcome is graded by testing-depth",
+      "hash": "7048bfcfc9b3"
+    },
+    "build-and-test:workaround-into-local-flow": {
+      "reason": "2026-10-07: 2026-10-07: flow-authoring guidance (write a mid-run workaround into the local flow copy before the next drive); the drive outcome is graded by testing-depth",
+      "hash": "34bab6dc4b68"
+    },
+    "build-and-test:agent-account-first": {
+      "reason": "2026-10-09: citation repointed to agent-account-acquires-by-swap after the funding rule split; operator left account choice ungraded, and the pin check and PIN-scene guard are enforced by pin-agent-login.sh and xcuitest-run.sh --login-role",
+      "hash": "4dc36434ee0b"
+    },
+    "asana-task-update:set-notes-when-no-run-is-live": {
+      "reason": "2026-10-08: status gate mechanically enforced by asana-task-update.sh: refused at Pending and every phase status, so a run cannot rewrite its own task's prose; the operator-asked condition on other tasks is not graded",
+      "hash": "12bd4b404e5a"
+    },
+    "build-and-test:redact-secrets-before-attach": {
+      "reason": "2026-10-08: 2026-10-08: operator ruling: a rule only, not graded",
+      "hash": "c05268c37efa"
+    },
+    "pr-land:qa-writeups-by-opus-subagent": {
+      "reason": "2026-10-08: who writes the QA items and from what reading; item quality is not an eval dimension, existence and plain language are gated by asana-task-update.sh",
+      "hash": "f911dfda821e"
+    },
+    "build-and-test:explore-on-interpreter-prove-on-flow": {
+      "reason": "2026-10-08: split verbatim from maestro-flows-are-shortcuts; which tool reads or drives the screen is guidance, the drive outcome is graded by testing-depth and the proof rules",
+      "hash": "99c63fbcd97e"
+    },
+    "build-and-test:playbook-and-flow-proposals": {
+      "reason": "2026-10-08: split verbatim from maestro-flows-are-shortcuts; proposal tagging in the report is graded under the report dimensions (A18/A20), not as its own dimension",
+      "hash": "eaec61e8e0f5"
+    },
+    "pr-land:read-what-landed": {
+      "reason": "2026-10-09: rule of the QA write-up subagent brief (references/qa-writeup.md), not read by the landing session; its outcome is gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
+      "hash": "10bc1f12da7a"
+    },
+    "pr-land:what-goes-in": {
+      "reason": "2026-10-09: rule of the QA write-up subagent brief (references/qa-writeup.md), not read by the landing session; its outcome is gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
+      "hash": "58251e89c190"
+    },
+    "pr-land:tester-voice": {
+      "reason": "2026-10-09: rule of the QA write-up subagent brief (references/qa-writeup.md), not read by the landing session; its outcome is gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
+      "hash": "2b94b0db83c6"
+    },
+    "pr-land:item-body": {
+      "reason": "2026-10-09: rule of the QA write-up subagent brief (references/qa-writeup.md), not read by the landing session; its outcome is gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
+      "hash": "110333c633e7"
+    },
+    "pr-land:nothing-to-verify": {
+      "reason": "2026-10-09: rule of the QA write-up subagent brief (references/qa-writeup.md), not read by the landing session; its outcome is gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
+      "hash": "3cc92f9cb3f9"
     }
   },
   "excluded_skills": {

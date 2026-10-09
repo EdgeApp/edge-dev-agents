@@ -57,12 +57,26 @@ ta "Write an agent-watcher hook" 2 '{"tool_name":"Write","session_id":"SESS","to
 ta "Write an agent-watcher lib .js" 2 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/.config/agent-watcher/hooks/lib/x.js","content":"x"}}'
 ta "Write the repo distribution copy" 2 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/git/edge-dev-agents/.cursor/skills/foo/SKILL.md","content":"x"}}'
 ta "Write an unrelated /tmp script" 0 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/tmp/scratch.sh","content":"x"}}'
-ta "Write a doc inside a skill dir" 0 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/.cursor/skills/foo/references/x.md","content":"x"}}'
+ta "Write a references slice" 2 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/.cursor/skills/foo/references/x.md","content":"x"}}'
+ta "Edit a references slice" 2 '{"tool_name":"Edit","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/.cursor/skills/foo/references/x.md","old_string":"a","new_string":"b"}}'
+ta "Write a skill doc outside references (no row)" 0 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/.cursor/skills/foo/templates/x.md","content":"x"}}'
 ta "Write a png in the hooks dir" 0 '{"tool_name":"Write","session_id":"SESS","tool_input":{"file_path":"/Users/eddy/.config/agent-watcher/hooks/x.png","content":"x"}}'
 ta "Bash heredoc into a hook" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > ~/.config/agent-watcher/hooks/x.sh <<EOF\necho hi\nEOF"}}'
 ta "Bash sed -i on a SKILL.md" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"sed -i \"\" s/a/b/ ~/.cursor/skills/foo/SKILL.md"}}'
 ta "Bash quoted $D target" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"D=\"$HOME/.config/agent-watcher/hooks\"; cat > \"$D/new.sh\" <<EOF\nx\nEOF"}}'
 ta "Bash python heredoc writing a hook" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"python3 - <<PY\nopen(\"/Users/eddy/.config/agent-watcher/hooks/z.sh\",\"w\").write(\"x\")\nPY"}}'
+# The references row makes every Bash .md write a probed target; only a path
+# under a skill's references/ matches a row.
+ta "Bash heredoc into a references slice" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > ~/.cursor/skills/foo/references/x.md <<EOF\nhi\nEOF"}}'
+ta "Bash sed -i on a references slice" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"sed -i \"\" s/a/b/ ~/.cursor/skills/foo/references/x.md"}}'
+ta "Bash python heredoc writing a references slice" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"python3 - <<PY\nopen(\"/Users/eddy/.cursor/skills/foo/references/x.md\",\"w\").write(\"x\")\nPY"}}'
+ta "Bash heredoc to an unrelated .md" 0 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > /tmp/notes.md <<EOF\nhi\nEOF"}}'
+ta "Bash sed -i on a repo README.md" 0 '{"tool_name":"Bash","session_id":"SESS","cwd":"/Users/eddy/git/edge-core-js","tool_input":{"command":"sed -i \"\" s/a/b/ README.md"}}'
+ta "Bash unrelated .md then a references slice" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > /tmp/a.md <<EOF\nx\nEOF\ncat > ~/.cursor/skills/foo/references/b.md <<EOF\ny\nEOF"}}'
+# A leading cd moves relative targets: the write lands in the skill dir, not the session cwd.
+ta "Bash cd into a skill dir, then sed -i SKILL.md" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cd ~/.cursor/skills/foo && sed -i \"\" s/a/b/ SKILL.md"}}'
+ta "Bash cd into a skill dir; python writing references/x.md" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cd /Users/eddy/.cursor/skills/foo; python3 - <<PY\nopen(\"references/x.md\",\"w\").write(\"x\")\nPY"}}'
+ta "Bash cd into a repo, then heredoc README.md" 0 '{"tool_name":"Bash","session_id":"SESS","cwd":"/Users/eddy/.cursor/skills/foo","tool_input":{"command":"cd /Users/eddy/git/edge-core-js && cat > README.md <<EOF\nhi\nEOF"}}'
 # An ungated write before a gated one must not clear the command (all-targets).
 ta "Bash ungated .sh then a gated .sh" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > /tmp/a.sh <<EOF\nx\nEOF\ncat > ~/.cursor/skills/foo/scripts/b.sh <<EOF\ny\nEOF"}}'
 ta "Bash gated .sh then an ungated .sh" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > ~/.config/agent-watcher/hooks/g.sh <<EOF\nx\nEOF\ncat > /tmp/b.sh <<EOF\ny\nEOF"}}'

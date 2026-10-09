@@ -68,6 +68,31 @@
 #     only skill that must itself read clean is no-slop (operator ruling
 #     2026-09-04). The no-slop exception above still wins.
 #
+# SKILL AND RULE NARRATION (author `no-incident-narration`): a write to skill
+# or rule prose (`skills/<name>/SKILL.md`, `skills/<name>/references/*.md`,
+# `rules/*.mdc` under ~/.cursor or its ~/.claude/skills alias) is checked for
+# incident narration BEFORE the allowlist, which would otherwise skip those
+# paths. A rule states the imperative in its end state, so these are counted:
+#   - a YYYY-MM-DD date
+#   - a 16-digit id (a task gid)
+#   - "NOTE since", "no longer", and "used to" (the passive "is/are/be used
+#     to ..." is purpose, not history, and is not counted)
+# Rules are single long lines, so the check compares COUNTS, never lines, and
+# blocks only an increase: an edit never has to strip what the file already
+# carried, and it cannot add more.
+#   Write  total matches in the new content minus the file on disk
+#   Edit   total matches in new_string minus old_string
+#   Bash   the result of an in-place or interpreter write is not knowable from
+#          the command, so each matched literal in the command text is compared
+#          with the file on disk and only the excess counts: a sed that deletes
+#          a date names a literal the file has (allowed), one that inserts a new
+#          date names a literal it lacks (blocked). Text a command reads from
+#          another file is invisible here.
+# Exempt: agent-eval/references/era.md, the append-only home for dated rulings.
+# No escape hatch: the remedy is rewording, and a literal that is live
+# configuration (a field or project gid a script reads) belongs in
+# asana-config.json or the script, not in rule prose.
+#
 # Fail-open on every infra error: a lint outage must never block file writes.
 # Exit 2 = block (stderr -> model). Not gid-gated: interactive sessions post
 # PRs and Slack messages too (same reasoning as slack-prose-gate.sh).
@@ -76,6 +101,98 @@ set -uo pipefail
 INPUT=$(cat)
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
 case "$TOOL" in Write|Edit|Bash) ;; *) exit 0 ;; esac
+
+# ---- Skill and rule narration (see header) ----------------------------------
+is_skill_prose() { # $1 = absolute path; exit 0 = narration-checked
+  case "$1" in
+    */agent-eval/references/era.md) return 1 ;;
+    */.cursor/skills/*/SKILL.md|*/.cursor/skills/*/references/*.md|*/.cursor/rules/*.mdc) return 0 ;;
+    */.claude/skills/*/SKILL.md|*/.claude/skills/*/references/*.md) return 0 ;;
+  esac
+  return 1
+}
+# narration_added <mode> <new-file> <old-file>: prints "<n> <literal, ...>".
+# mode total = all matches in new minus all in old; mode excess = per literal,
+# occurrences in new beyond those in old.
+narration_added() {
+  perl -e '
+my ($mode, $newf, $oldf) = @ARGV;
+sub slurp { my $f = shift; return "" unless defined $f && -f $f; local $/; open(my $h, "<", $f) or return ""; my $t = <$h>; return defined $t ? $t : "" }
+sub hits { my $t = shift; my @h;
+  push @h, $1 while $t =~ /(?<![0-9])((?:19|20)[0-9]{2}-[01][0-9]-[0-3][0-9])(?![0-9])/g;
+  push @h, $1 while $t =~ /(?<![0-9])([0-9]{16})(?![0-9])/g;
+  push @h, "NOTE since" while $t =~ /\bnote\s+since\b/gi;
+  push @h, "no longer" while $t =~ /\bno\s+longer\b/gi;
+  push @h, "used to" while $t =~ /(?<!\bis )(?<!\bare )(?<!\bbe )(?<!\bwas )(?<!\bwere )(?<!\bbeen )(?<!\bbeing )(?<!\bnot )\bused\s+to\b/gi;
+  return @h }
+my (%n, %o); my @new = hits(slurp($newf)); my @old = hits(slurp($oldf));
+$n{$_}++ for @new; $o{$_}++ for @old;
+my @lits = grep { $n{$_} > ($o{$_} // 0) } sort keys %n;
+my $count = 0;
+if ($mode eq "total") { $count = @new - @old } else { $count += $n{$_} - ($o{$_} // 0) for @lits }
+$count = 0 if $count < 0;
+print "$count " . join(", ", @lits);
+' "$1" "$2" "$3" 2>/dev/null || true
+}
+narration_gate() { # $1 target, $2 mode, $3 new text, $4 old text ("@<path>" = that file)
+  local target="$1" mode="$2" newf oldf out n
+  newf=$(mktemp /tmp/lint-narr-new.XXXXXX) || return 0
+  printf '%s\n' "$3" > "$newf"
+  case "$4" in
+    @*) oldf="${4#@}" ;;
+    *)  oldf=$(mktemp /tmp/lint-narr-old.XXXXXX) || { rm -f "$newf"; return 0; }
+        printf '%s\n' "$4" > "$oldf" ;;
+  esac
+  out=$(narration_added "$mode" "$newf" "$oldf")
+  rm -f "$newf"; case "$4" in @*) ;; *) rm -f "$oldf" ;; esac
+  n="${out%% *}"
+  case "$n" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$n" -gt 0 ] || return 0
+  echo "BLOCKED: this write adds incident narration to $target (author \`no-incident-narration\`): +$n match(es): ${out#* }. Skill and rule prose states the END STATE: the imperative, with no dates, no task or PR ids, and no account of how the behavior worked before (\"no longer\", \"used to\", \"NOTE since\"). Rewrite the sentence as what to do now. A dated ruling worth keeping as a record goes in ~/.cursor/skills/agent-eval/references/era.md; the evidence trail lives in eval reports and history. Text the file already carried is not counted, so nothing has to be stripped first." >&2
+  exit 2
+}
+case "$TOOL" in
+  Write)
+    N_TARGET=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
+    if [ -n "$N_TARGET" ] && is_skill_prose "$N_TARGET"; then
+      narration_gate "$N_TARGET" total "$(printf '%s' "$INPUT" | jq -r '.tool_input.content // empty' 2>/dev/null || true)" "@$N_TARGET"
+    fi
+    ;;
+  Edit)
+    N_TARGET=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
+    if [ -n "$N_TARGET" ] && is_skill_prose "$N_TARGET"; then
+      narration_gate "$N_TARGET" total "$(printf '%s' "$INPUT" | jq -r '.tool_input.new_string // empty' 2>/dev/null || true)" \
+        "$(printf '%s' "$INPUT" | jq -r '.tool_input.old_string // empty' 2>/dev/null || true)"
+    fi
+    ;;
+  Bash)
+    N_CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
+    N_CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)
+    # Prefilter: resolving write targets spawns node, so only commands that can
+    # reach skill or rule prose pay for it.
+    case "$N_CMD $N_CWD" in
+      *skills/*|*rules/*|*.mdc*)
+        if [ -f "$HOME/.config/agent-watcher/hooks/lib/md-write-target.sh" ]; then
+          . "$HOME/.config/agent-watcher/hooks/lib/md-write-target.sh"
+          N_CMD_M=$(printf '%s' "$N_CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$N_CMD")
+          N_INLINE=""
+          printf '%s' "$N_CMD_M" | grep -qE "(^|[[:space:]|;&(])(python3?|node)[[:space:]]+(-[[:space:]]*<<|-c[[:space:]]|-e[[:space:]])" && N_INLINE=1
+          N_TARGET=""
+          for n_ext in md mdc; do
+            N_HITS=$(bash_write_target "$N_CMD_M" "$N_CWD" "$n_ext" "$N_CMD" all)
+            [ -z "$N_HITS" ] && [ -n "$N_INLINE" ] && N_HITS=$(bash_write_target "$N_CMD" "$N_CWD" "$n_ext" "$N_CMD" all)
+            while IFS= read -r n_hit; do
+              [ -n "$n_hit" ] || continue
+              if is_skill_prose "$n_hit"; then N_TARGET="$n_hit"; break; fi
+            done <<< "$N_HITS"
+            [ -n "$N_TARGET" ] && break
+          done
+          [ -n "$N_TARGET" ] && narration_gate "$N_TARGET" excess "$N_CMD" "@$N_TARGET"
+        fi
+        ;;
+    esac
+    ;;
+esac
 
 LINT="$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh"
 [ -x "$LINT" ] || exit 0

@@ -37,6 +37,11 @@
 # before the target, then the hook environment. An unresolvable target keeps
 # its literal text (joined to cwd), so gates keep treating it as a write.
 #
+# A leading `cd <dir>` (first line, followed by `;`, `&&` or a newline) moves
+# every relative target after it, so `cd ~/notes && cat > x.md` resolves to
+# ~/notes/x.md rather than to the session cwd. Only that leading form is read;
+# a `cd` deeper in the command leaves relative targets on the session cwd.
+#
 # bash_write_target <cmd> [cwd] [ext] [raw-cmd] [mode]
 #   Prints the absolute target path (empty when the command writes no matching
 #   file). <ext> defaults to 'md'; pass a full basename such as 'CHANGELOG.md'
@@ -53,7 +58,17 @@ _MD_WRITE_TARGET_LIB="$(dirname "${BASH_SOURCE[0]}")"
 
 bash_write_target() {
   local cmd="$1" cwd="${2:-}" ext="${3:-md}" raw="${4:-$1}" mode="${5:-first}"
-  local target="" resolved="" word_pos="" targets=""
+  local target="" resolved="" word_pos="" targets="" lead_cd=""
+  lead_cd=$(printf '%s\n' "$raw" | sed -nE '1s/^[[:space:]]*cd[[:space:]]+"?([^"[:space:];&|]+)"?[[:space:]]*(;|&&|$).*/\1/p' | tr -d "'")
+  if [ -n "$lead_cd" ]; then
+    lead_cd="${lead_cd/#\~/$HOME}"
+    lead_cd="${lead_cd//\$HOME/$HOME}"
+    case "$lead_cd" in
+      *'$'*) ;;                                   # unresolvable variable: keep the session cwd
+      /*) cwd="$lead_cd" ;;
+      *) cwd="${cwd:+$cwd/}$lead_cd" ;;
+    esac
+  fi
   # In 'all' mode every branch keeps its whole match list; 'first' keeps the one
   # each branch has always taken (the earliest, or the last for in-place edits,
   # where sed and perl put the file after the expression).

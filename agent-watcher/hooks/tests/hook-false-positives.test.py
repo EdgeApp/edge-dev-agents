@@ -516,10 +516,10 @@ def subtasks(tmp):
         check(f'subtasks {"blocks" if want else "passes"}: {label}', rc == want, f'rc={rc} {err[:120]}')
 
     run('pr-create without --asana-attach (default no attach)', 0,
-        f'{pc} --title "Fix x" --body-file /tmp/pr-body.md --asana-task {TEST_GID} --draft 2>&1 | tail -15')
+        f'{pc} --title "Fix x" --body-file /tmp/pr-body.md --asana-task {TEST_GID} 2>&1 | tail -15')
     run('pr-create --no-asana-attach', 0, f'{pc} --title x --no-asana-attach')
     run('pr-create --help', 0, f'git status --short && {pc} --help 2>&1 | head -20')
-    run('grep of pr-create.sh for flags', 0, f'grep -n "\\-\\-draft\\|--asana-attach\\|usage" {pc} | head -20')
+    run('grep of pr-create.sh for flags', 0, f'grep -n "\\-\\-base\\|--asana-attach\\|usage" {pc} | head -20')
     run('pr-create --asana-attach in a 2-repo run', 2, f'{pc} --title x --asana-attach --asana-task {TEST_GID}')
     run('timeout-wrapped pr-create --asana-attach in a 2-repo run', 2,
         f'timeout 120 {pc} --title x --asana-attach --asana-task {TEST_GID} 2>&1')

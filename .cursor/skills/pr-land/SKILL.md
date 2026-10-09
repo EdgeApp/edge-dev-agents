@@ -48,7 +48,7 @@ for r in <repo> [<repo>...] edge-react-gui; do ~/.cursor/skills/pr-land/scripts/
 ```
 Exit 75 on a repo = another session is landing there: wait and retry per `repo-land-mutex`. Re-run the same loop at the start of steps 6 and 8 (it renews; the expiry never shortens). Release it as the last action of the run on EVERY exit path (finished, partial, blocked, or stopped on an error): the same loop with `release --hold` in place of `acquire --hold --ttl 21600`. A hold left behind blocks the refreshers and every other land in those repos for up to 6 hours.</rule>
 <rule id="defer-gui">If the discovered PR set contains BOTH `edge-react-gui` PRs and at least one non-GUI PR, all GUI PRs are DEFERRED — they do NOT enter steps 3-7 (prepare/push/merge/publish/upgrade-dep). GUI PRs are processed in step 8 (new) after step 7's dep upgrades land on develop. If the batch is pure GUI or pure non-GUI, no deferral — proceed as normal.</rule>
-<rule id="asana-last">Asana updates are LAST, and they are PART OF THE LAND — a land is not finished until every fully-landed task got `--set-board-state "QA Verification" --unassign` (the handoff to QA). Do NOT update Asana tasks until ALL merges, publishes, and GUI dependency upgrades are complete. Only update status for PRs that are fully landed (merged, and if non-GUI: published + GUI deps updated). `agent_status = Complete` is a DIFFERENT field owned by one-shot and does NOT substitute for the board-state handoff: the 2026-07-27 login-ui land merged, published, bumped, set Complete, and left the task assigned and out of Verification because it returned to one-shot's finalize instead of finishing this step.</rule>
+<rule id="asana-last">Asana updates are LAST, and they are PART OF THE LAND — a land is not finished until every fully-landed task got `--set-board-state "QA Verification" --unassign` (the handoff to QA). Do NOT update Asana tasks until ALL merges, publishes, and GUI dependency upgrades are complete. Only update status for PRs that are fully landed (merged, and if non-GUI: published + GUI deps updated). `agent_status = Complete` is a DIFFERENT field owned by one-shot and does NOT substitute for the board-state handoff: returning to one-shot's finalize before this step leaves the task assigned and out of Verification.</rule>
 <rule id="build-field-routing">During discovery, resolve each linked task's Build field: `~/.cursor/skills/asana-build-field.sh <task-gid>`. `staging` → the PR is staging-targeted: pass `buildField: "staging"` for it in the step 3 prepare input (arming the `staging-task-under-unreleased` placement check, which moves a misplaced entry to the `(staging)` section mechanically — see step 3's placement-warning flow), and step 9 MUST cherry-pick its commits after merge even when its CHANGELOG entry sat under `## Unreleased` — a field/CHANGELOG disagreement is never a silent skip of the cherry-pick. A cheese value (anything the script's `--kind` mode classifies as `cheese`, never a list of names carried here) changes NOTHING about landing: land the task's FEATURE branch PR normally; a `test-*` branch is never a landing target (skip + report any discovered PR whose head branch matches `test-*`; see cheese `pointer-not-workspace`), and no re-cheese follows a land — CI builds wherever the landing happened (develop, or develop + staging).</rule>
 </rules>
 
@@ -133,6 +133,9 @@ Skipped (conflicts):
 
 Not published (outstanding PRs):
   ⚠ <repo> — N PRs skipped, publish deferred
+
+Not landed (awaiting dependency publish):
+  ⚠ <repo>#<number> (<branch>) — waits on <pkg>@<version>
 
 Already merged/closed at discovery:
   - <repo>#<number> — merged

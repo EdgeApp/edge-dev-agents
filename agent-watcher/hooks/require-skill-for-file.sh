@@ -20,6 +20,9 @@
 #                                                   typing a line by hand should
 #                                                   not eat a skill body)
 #   */.cursor/skills/*/SKILL.md   author     all   \
+#   */.cursor/skills/*/references/*.md author all   | (a skill's phase slices
+#                                                   | carry its rules exactly
+#                                                   | as SKILL.md does)
 #   */.cursor/rules/*.mdc         author     all    | the workflow itself: a
 #   */.cursor/skills/*.sh         author     all    | skill, rule, companion
 #   */.config/agent-watcher/*.sh  author     all    | script, hook (site-orch's
@@ -69,6 +72,7 @@ LIB="$HOME/.config/agent-watcher/hooks/lib"
 TABLE="*/AGENTS.md:agents-md:all
 */CHANGELOG.md:changelog:orch
 */.cursor/skills/*/SKILL.md:author:all
+*/.cursor/skills/*/references/*.md:author:all
 */.cursor/rules/*.mdc:author:all
 */.cursor/skills/*.sh:author:all
 */.config/agent-watcher/*.sh:author:all
@@ -80,6 +84,9 @@ TABLE="*/AGENTS.md:agents-md:all
 # What the Bash vector searches the command for, derived from the table so a new
 # row needs no second edit: a pattern ending in a literal name probes that name,
 # one ending in a glob probes its extension (bash_write_target takes either).
+# The references row makes `md` a probe, so every Bash .md write is resolved and
+# then matched against the table; a .md outside a skill's references/ matches
+# no row and passes.
 PROBES=""
 while IFS=: read -r _pat _ _; do
   [ -n "$_pat" ] || continue

@@ -46,7 +46,9 @@ _None observed._
      a one-line reason). This is the structured mirror of one-shot `finalize-gate`;
      the eval cross-checks every box against GitHub/Asana (a checked box that
      contradicts live state is a report-honesty finding). Per PRIMARY PR:
-       - [ ] CI checks green on HEAD (`gh pr checks`)
+       - [ ] CI checks green on HEAD (`gh pr checks`). Red only under the
+             `awaiting-dep-publish` sanction stays UNCHECKED, naming the excused
+             checks and the awaited `<pkg>@<version>`
        - [ ] every reviewer bot completed-clean on HEAD (SUCCESS; not NEUTRAL). A bot
              that did not run (quota, outage) stays UNCHECKED with its one-line
              reason here and is mentioned NOWHERE else in this report
@@ -75,7 +77,8 @@ _No judge call yet._
          success state (per build-and-test `test-drives-the-real-action`), e.g.
          "BTC->AVAX SideShift swap executed to the order-submitted scene." If it
          stopped short, name the exact step reached and why.
-       - Method: static checks run WITH results (tsc / jest / eslint / verify-repo);
+       - Method: static checks run (tsc / jest / eslint / verify-repo), naming any
+         failing test and each new case, never a passing total (blocked at attach by `orch-prose-lint.sh`);
          sim build flavor; the maestro flow(s) run (path) and whether driven via MCP
          exploration or a single yaml proof run; any /debugger breakpoints used.
        - Environment: sim UDID + slot, roster account used and any mid-test switch
@@ -135,7 +138,7 @@ _None observed._
        [debug]  debugging method that worked (e.g. CDP/debugger usage)
        [gotcha] surprising behavior, footgun, non-obvious constraint
        [playbook] PROPOSED sim-testing-playbook entry. SCOPE TIGHTLY (per
-                build-and-test maestro-flows-are-shortcuts): only SIM-TESTING
+                build-and-test playbook-and-flow-proposals): only SIM-TESTING
                 working knowledge (how to drive/fund/enable/verify a change in the
                 running app) that is a stable external fact AND parallel-safe (no
                 fixed-port/shared-resource recipe — propose the slot-safe variant or

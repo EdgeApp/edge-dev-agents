@@ -1,0 +1,9 @@
+✖ 1849 problems (0 errors, 1849 warnings)
+The command "npm run lint" exited with 0.
+The command "npx tsc" exited with 0.
+FAIL src/__tests__/scenes/SendScene2.ui.test.tsx
+FAIL src/__tests__/scenes/SendScene2.ui.test.tsx
+Test Suites: 1 failed, 86 passed, 87 total
+Tests:       497 passed, 497 total
+The command "npm test" exited with 1.
+Done. Your build exited with 1.

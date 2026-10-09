@@ -93,8 +93,8 @@ At this point, `origin/develop` contains the new dep-upgrade commits from step 7
 
 Re-run the `land-hold` acquire loop, then land the GUI PRs ONE AT A TIME (`same-repo-batching`), each through steps 3, 4 and step 5's DEFAULT auto-merge path:
 
-1. Feed the one PR into `pr-land-prepare.sh` (same invocation shape as step 3). On CHANGELOG conflict: `changelog-union-merge.sh <repoDir> --continue`, re-run prepare.
-2. Push with `~/.cursor/skills/git-branch-ops.sh push --force-with-lease --branch <branch>` (step 4).
+1. Run the `dep-sanction-at-land` check on the PR, then feed it into `pr-land-prepare.sh` (same invocation shape as step 3). On CHANGELOG conflict: `changelog-union-merge.sh <repoDir> --continue`, re-run prepare.
+2. Push with `~/.cursor/skills/git-branch-ops.sh push --force-with-lease --branch <branch>` (step 4). If the check read exit 3, clear the sanction now (`dep-sanction-at-land`).
 3. Arm with `pr-land-automerge.sh` (step 5.2, adding `--no-bugbot-wait` when discovery returned `noBugbotWait: true`).
 4. Watch with `pr-merge-watch.sh` (step 5.3) until `ALL_MERGED`; record its `mergeSha`.
 5. Next GUI PR: back to 1 (its prepare rebases onto the PR that just merged).

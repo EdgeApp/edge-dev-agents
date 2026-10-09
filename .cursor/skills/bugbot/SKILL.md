@@ -28,7 +28,7 @@ metadata:
 
 <arguments>
 Accepts either form:
-- `owner/repo#pr` (e.g. `EdgeApp/edge-reports-server#207`)
+- `owner/repo#pr` (e.g. `owner/repo#123`)
 - Discrete flags: `--owner <o> --repo <r> --pr <n>`
 
 Required. Parse and assign to `<OWNER>`, `<REPO>`, `<NUMBER>` for the steps below.
@@ -330,10 +330,10 @@ Ask Codex: "Create a standalone automation that runs every 5 minutes with prompt
 <edge-cases>
 <case name="Branch has uncommitted changes">Rely on `pr-address.sh ensure-branch` — it stashes automatically and reports `STASHED=true`. Surface that to the user so they know where their changes are.</case>
 <case name="Check-run is failure">Same handling as `neutral` with threads — bugbot just marked the findings blocking-severity rather than informational. Proceed through Step 4.</case>
-<case name="Bugbot re-ran and posted on an older SHA">After a push, the previous HEAD's check-run no longer matters — always query the LATEST HEAD SHA. The script's `sort_by(.started_at) | last` logic handles cases where bugbot posts multiple runs on the same SHA.</case>
+<case name="Bugbot re-ran and posted on an older SHA">After a push, the previous HEAD's check-run is irrelevant — always query the LATEST HEAD SHA. The script's `sort_by(.started_at) | last` logic handles cases where bugbot posts multiple runs on the same SHA.</case>
 <case name="Thread from a non-cursor[bot] author">Skip. This skill is scoped to bugbot. For mixed human/bot reviews, run `/pr-address` separately.</case>
 <case name="Empty PR / no check-runs ever">Step 2 returns `status: "none"`. Step 3 row 2 applies — report and wait. Bugbot has up to ~1 minute before it enqueues a scan.</case>
 <case name="Script exit 2 (PROMPT_GH_AUTH / PROMPT_GH_INSTALL)">Prompt the user to install/authenticate `gh`, STOP. Do not fall back to curl or manual API calls.</case>
 <case name="Cron tools are deferred / not loaded in the agent context">On Claude Code with `CronList`, `CronCreate`, `CronDelete` deferred, load them via `ToolSearch` with `query: "select:CronCreate,CronList,CronDelete"` before running Step 5. If loading fails, fall back to the Cursor/Codex path: emit the status line without scheduling and let the caller manage the Automation manually.</case>
-<case name="PR branch was deleted (PR merged/closed)">`ensure-branch` will fail. If Step 5 has already armed a cron, CronDelete it before exiting. Report the error and STOP — the scheduler no longer has anything useful to do.</case>
+<case name="PR branch was deleted (PR merged/closed)">`ensure-branch` will fail. If Step 5 has already armed a cron, CronDelete it before exiting. Report the error and STOP — the scheduler has nothing useful left to do.</case>
 </edge-cases>

@@ -365,6 +365,14 @@ if [ -n "$NOISE" ]; then
 $(printf '%s\n' "$NOISE" | sed 's/^/    /')
 "
 fi
+# 8. Orch reporting conventions (passing-suite totals, ...) via the shared
+#    orch-prose-lint.sh, the same script every other posting boundary calls.
+ORCHP="$("$HOME/.cursor/skills/orch-prose-lint.sh" "$REPORT" 2>/dev/null | grep '^HARD' | head -6 || true)"
+if [ -n "$ORCHP" ]; then
+  FAIL+="- Reporting-convention violations (orch-prose-lint.sh; rewrite the flagged lines):
+$(printf '%s\n' "$ORCHP" | sed 's/^/    /')
+"
+fi
 SLOP="$("$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh" "$REPORT" --semantic 2>/dev/null | grep '^HARD' | grep -v 'em dash' | head -6 || true)"
 if [ -n "$SLOP" ]; then
   FAIL+="- No-slop violations (banned vocabulary / count-announcement openers; rewrite the flagged lines):

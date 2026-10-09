@@ -1,0 +1,6 @@
+$ npm ci
+npm error code ETARGET
+npm error notarget No matching version found for edge-info-server@^99.14.0.
+npm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist.
+The command "npm ci" failed and exited with 1 during .
+Your build has been stopped.

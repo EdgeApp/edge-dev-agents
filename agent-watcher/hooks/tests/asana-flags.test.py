@@ -246,13 +246,17 @@ def pr_create(extra, attach_exit=0):
     return p, out, attach, gh
 
 
-p, out, attach, gh = pr_create(['--draft', '--asana-task', '4440001', '--asana-attach'])
+p, out, attach, gh = pr_create(['--asana-task', '4440001', '--asana-attach'])
 check('B1 one-shot invocation attaches', p.returncode == 0 and out and out.get('asana_attached') is True, p.stdout + p.stderr)
 check('B1 attach call carries task, PR url, number',
       '--task 4440001 --attach-pr --pr-url https://github.com/owner/repo/pull/42' in attach and '--pr-number 42' in attach, attach)
 
 p, out, attach, gh = pr_create(['--asana-attach', '--asana-task', '4440001'])
 check('B2 reverse flag order attaches', p.returncode == 0 and out and out.get('asana_attached') is True and '--task 4440001' in attach, p.stdout + p.stderr)
+
+p, out, attach, gh = pr_create(['--draft', '--asana-task', '4440001'])
+check('B2b --draft is not a flag: exits 2 before gh pr create',
+      p.returncode == 2 and 'unknown flag --draft' in p.stderr and 'pr create' not in gh, f'rc={p.returncode} gh={gh!r} {p.stderr}')
 
 p, out, attach, gh = pr_create(['--asana-attach'])
 check('B3 --asana-attach without --asana-task exits 2 before gh pr create',

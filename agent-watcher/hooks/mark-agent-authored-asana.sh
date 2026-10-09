@@ -42,6 +42,14 @@ if [ -n "$PROSE" ]; then
     jq -nc --arg r "BLOCKED: this Asana text narrates a reviewer-bot outage (quota / did not run). Operator ruling 2026-09-02: that state is ONE unchecked box in the run report's Finalize Gate with its reason, and appears nowhere else (no comment bullet, no re-gate note). Remove these lines and post again: $NOISE" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
     exit 0
   fi
+  # Orch reporting conventions (passing-suite totals, ...): same shared lint the
+  # script write path (asana-task-update.sh) and the other posting boundaries call.
+  OPL_TMP=$(mktemp); printf '%s\n' "$PROSE" > "$OPL_TMP"
+  OPL=$("$HOME/.cursor/skills/orch-prose-lint.sh" "$OPL_TMP" 2>/dev/null | head -4 || true); rm -f "$OPL_TMP"
+  if [ -n "$OPL" ]; then
+    jq -nc --arg r "BLOCKED: this Asana text fails the reporting-convention lint (orch-prose-lint.sh). Rewrite these lines and post again: $OPL" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
+    exit 0
+  fi
 fi
 
 # Rewrite every PRESENT prose field, top-level and inside the batch tools'

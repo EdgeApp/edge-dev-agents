@@ -14,7 +14,9 @@
 # so the managed options come off.
 #
 # Called by update-status.sh after a Complete write succeeds (so only a
-# completion that passed every gate syncs). Safe to run by hand.
+# completion that passed every gate syncs), and by asana-task-update.sh when a
+# PR link is attached or detached on a task that is already Complete. Safe to
+# run by hand.
 #
 # Usage: sync-repo-field.sh --task-gid <gid>
 # Exit: 0 synced or nothing to do; 1 the Asana write failed; 2 usage.

@@ -45,8 +45,8 @@ def hook(cmd, cwd='/Users/eddy/git/edge-react-gui'):
     return p.returncode, p.stderr
 
 
-def py_write(entry):
-    return ("cd /Users/eddy/git/edge-react-gui && python3 - <<'PY'\n"
+def py_write(entry, d='/Users/eddy/git/edge-react-gui'):
+    return (f"cd {d} && python3 - <<'PY'\n"
             "p='CHANGELOG.md'\n"
             "s=open(p).read()\n"
             "open(p,'w').write(s.replace('## Unreleased (develop)\\n', '## Unreleased (develop)\\n\\n" + entry + "\\n'))\n"
@@ -64,10 +64,13 @@ check('extractor: python read-only open() is not a write',
 rdir = tempfile.mkdtemp(prefix='cl-extract-')
 open(os.path.join(rdir, 'CHANGELOG.md'), 'w').write('# Changelog\n')
 check('extractor: exact basename filter',
-      target(py_write(LONG), rdir, 'CHANGELOG.md') == f'{rdir}/CHANGELOG.md' and target(py_write(LONG), rdir, 'README.md') == '')
+      target(py_write(LONG, rdir), rdir, 'CHANGELOG.md') == f'{rdir}/CHANGELOG.md' and target(py_write(LONG, rdir), rdir, 'README.md') == '')
+# A leading cd decides where a relative target lands, whatever the session cwd is.
+check('extractor: a leading cd moves a bare basename to that directory',
+      target(py_write(LONG, rdir), '/elsewhere', 'CHANGELOG.md') == f'{rdir}/CHANGELOG.md')
 shutil.rmtree(rdir)
 check('extractor: bare basename absent from the cwd is not a target',
-      target(py_write(LONG), '/r', 'CHANGELOG.md') == '')
+      target(py_write(LONG, '/r'), '/r', 'CHANGELOG.md') == '')
 rc, err = hook(py_write(LONG))
 check("gate: the run's exact python-heredoc write is BLOCKED", rc == 2 and '253 chars' in err, f'rc={rc} {err[:120]}')
 rc, err = hook(py_write(SHORT))

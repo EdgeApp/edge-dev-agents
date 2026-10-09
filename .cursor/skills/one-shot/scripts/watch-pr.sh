@@ -26,6 +26,16 @@
 # (pr-address.sh review-mode): mode=preserve + fixups present -> expected;
 # mode=autosquash -> the red is actionable (squash via pr-finalize-fixups.sh).
 #
+# DEP-PUBLISH SANCTION: a PR labeled `awaiting-dep-publish` has CI that cannot
+# pass until a dependency publishes. When a non-wip check fails on such a PR
+# this watch asks ~/.cursor/skills/dep-publish-sanction.sh `check`, the one
+# place the sanction is judged. `valid` excuses those failed CI checks and
+# nothing else: the watch keeps waiting on every other check, reviewer bots
+# included, and reports `green-dep-sanctioned`. `expired` (the dependency is
+# published), `unconfirmed` (the failure is not a missing-package failure) and
+# any error leave the failure a failure: exit 1. An unlabeled PR never reaches
+# the script. Landing paths are unaffected: pr-land requires full green.
+#
 # Usage: watch-pr.sh --pr <num> [--repo <owner/name>] [--task-gid <gid>]
 #                    [--budget-seconds 1800] [--interval 30]
 # The repo is never guessed: see REPO RESOLUTION below. Pass --repo whenever the
@@ -48,12 +58,19 @@
 #                                              squash to clear it; it goes green
 #                                              at finalize when pr-finalize-fixups
 #                                              legitimately squashes)
+#             RESULT: green-dep-sanctioned    (the only red is CI that cannot
+#                                              pass until a dependency
+#                                              publishes; see DEP-PUBLISH
+#                                              SANCTION below. Reviewer bots
+#                                              still gated; report the excused
+#                                              checks and the awaited package
+#                                              in the Finalize Gate)
 #       1   a check failed, Travis included (read `gh run view --log-failed`, fix)
-#       76  ZERO checks on the PR for NOCHECKS_GRACE seconds (default 300; a
-#             draft posts no bot check-runs, and `[skip travis]` suppresses Travis,
-#             so a misconfigured or draft PR can show nothing to wait on). Final
-#             line: RESULT: no-checks. The caller reports it as a CI-configuration
-#             problem; it is NOT a budget exhaustion and NOT a green.
+#       76  ZERO checks on the PR for NOCHECKS_GRACE seconds (default 300): the
+#             repo posts nothing on this branch, so there is nothing to wait
+#             on. Final line: RESULT: no-checks. The caller reports it as a
+#             CI-configuration problem; it is NOT a budget exhaustion and NOT a
+#             green.
 #       7   CONTINUE: this call hit its per-call cap (MAX_CALL, default 540s, under
 #             the Bash tool's 600s foreground limit) with checks still pending.
 #             Final line: RESULT: continue. Re-invoke the SAME command at once; the
@@ -220,15 +237,31 @@ source "$HOME/.config/agent-watcher/lib/reviewer-bots.sh" \
 WIP_GUARD_PATTERN="block-wip-pr"
 WIP_MODE=""  # cached review-mode verdict; fetched at most once per invocation
 
-# Backstop for the travis-draft-tag flow: a READY PR whose HEAD still carries
-# [skip travis] can never go Travis-green — the strip was skipped at the flip.
-# Print the warning to stderr (do not fail; the watch itself still gates everything else).
-TAGCHK=$(gh pr view "$PR" --repo "$REPO" --json isDraft,commits \
-  -q '{d: .isDraft, m: .commits[-1].messageHeadline}' 2>/dev/null || true)
-if [ -n "$TAGCHK" ] && [ "$(jq -r '.d' <<<"$TAGCHK")" = "false" ] \
-   && jq -r '.m' <<<"$TAGCHK" | grep -q '\[skip travis\]'; then
-  echo ">> watch-pr: WARNING — PR is READY but HEAD still carries [skip travis]; Travis will never build this HEAD. Run ~/.cursor/skills/one-shot/scripts/travis-draft-tag.sh strip, force-push, then re-watch." >&2
-fi
+# dep_sanctioned <failing check names>: exit 0 when the PR carries the
+# awaiting-dep-publish label and dep-publish-sanction.sh rules those failures a
+# missing-package failure. The verdict is cached for that failing set, so the
+# poll loop asks once per distinct set of red checks.
+DEP_SANCTION="${DEP_SANCTION:-$HOME/.cursor/skills/dep-publish-sanction.sh}"
+SANCTION_FOR=""    # the failing set the cached verdict belongs to
+SANCTION_LINE=""   # that verdict's `SANCTION: valid ...` line ("" = not excused)
+dep_sanctioned() {
+  if [ "$1" = "$SANCTION_FOR" ]; then [ -n "$SANCTION_LINE" ]; return; fi
+  SANCTION_FOR="$1"; SANCTION_LINE=""
+  [ -x "$DEP_SANCTION" ] || return 1
+  gh pr view "$PR" --repo "$REPO" --json labels -q '.labels[].name' 2>/dev/null \
+    | grep -qx 'awaiting-dep-publish' || return 1
+  local out rc=0
+  out=$("$DEP_SANCTION" check --repo "$REPO" --pr "$PR" --ignore-prefix "$WIP_GUARD_PATTERN") || rc=$?
+  out=$(printf '%s\n' "$out" | head -1)
+  case "$rc" in
+    0) SANCTION_LINE="$out"; return 0 ;;
+    3) echo ">> watch-pr: the awaiting-dep-publish sanction has EXPIRED ($out): its dependency is published, so this failure is real. Bump the dependency, rebase, and get CI green; the label comes off with dep-publish-sanction.sh clear." >&2 ;;
+    4) echo ">> watch-pr: the PR is labeled awaiting-dep-publish, but this failure is not a missing-package failure ($out). Fix it like any failed check." >&2 ;;
+    5) echo ">> watch-pr: the PR is labeled awaiting-dep-publish with no 'Awaiting publish: <pkg>@<version>' body line ($out), so nothing is excused. Record it with dep-publish-sanction.sh apply, or remove the label." >&2 ;;
+    *) echo ">> watch-pr: dep-publish-sanction.sh check exited $rc; the failure stands." >&2 ;;
+  esac
+  return 1
+}
 
 # wip_guard_expected: the wip-guard red is expected iff the branch actually
 # carries fixup! commits AND the squash oracle says preserve. Same oracle as
@@ -255,14 +288,13 @@ while :; do
   JSON=$(gh pr checks "$PR" --repo "$REPO" --json name,bucket,state 2>/dev/null || true)
   [ -n "$JSON" ] || JSON="[]"
   TOTAL=$(jq 'length' <<<"$JSON" 2>/dev/null || echo 0)
-  # ZERO checks: nothing has posted at all (draft PR, [skip travis] HEAD, or a
-  # repo whose CI never triggered for this branch). The green test below needs
-  # TOTAL > 0, so without this escape the watch waits out the whole budget and
-  # reports a false blocked (explorer run, 2026-09-11).
+  # ZERO checks: nothing has posted at all (a repo whose CI never triggered
+  # for this branch). The green test below needs TOTAL > 0, so without this
+  # escape the watch waits out the whole budget and reports a false blocked.
   if [ "$TOTAL" -eq 0 ]; then
     [ -n "$ZERO_SINCE" ] || ZERO_SINCE=$(date +%s)
     if [ $(( $(date +%s) - ZERO_SINCE )) -ge "$NOCHECKS_GRACE" ]; then
-      echo ">> watch-pr: NO checks on HEAD ${CUR_HEAD:0:8} after $((NOCHECKS_GRACE / 60))m — nothing to gate on. Is the PR a draft, does HEAD carry [skip travis], or does this repo run no CI on this branch?" >&2
+      echo ">> watch-pr: NO checks on HEAD ${CUR_HEAD:0:8} after $((NOCHECKS_GRACE / 60))m — nothing to gate on. Does this repo run CI on this branch?" >&2
       echo "RESULT: no-checks"
       exit 76
     fi
@@ -271,9 +303,14 @@ while :; do
   fi
   FAILS_REAL=$(jq -r --arg w "$WIP_GUARD_PATTERN" '[.[] | select(.bucket=="fail" or .bucket=="cancel") | .name | select(startswith($w) | not)] | join(", ")' <<<"$JSON" 2>/dev/null || true)
   FAILS_WIP=$(jq -r --arg w "$WIP_GUARD_PATTERN" '[.[] | select(.bucket=="fail" or .bucket=="cancel") | .name | select(startswith($w))] | join(", ")' <<<"$JSON" 2>/dev/null || true)
+  FAILS_SANCTIONED=""
   if [ -n "$FAILS_REAL" ]; then
-    echo ">> watch-pr: FAILED check(s): $FAILS_REAL" >&2
-    exit 1
+    if dep_sanctioned "$FAILS_REAL"; then
+      FAILS_SANCTIONED="$FAILS_REAL"
+    else
+      echo ">> watch-pr: FAILED check(s): $FAILS_REAL" >&2
+      exit 1
+    fi
   fi
   if [ -n "$FAILS_WIP" ] && ! wip_guard_expected; then
     echo ">> watch-pr: FAILED check(s): $FAILS_WIP (wip-guard, and review-mode is NOT preserve — squash the fixups via ~/.cursor/skills/pr-finalize-fixups.sh, never by raw rebase)" >&2
@@ -286,32 +323,26 @@ while :; do
     MISS_TEXT=$(jq -r '[.[] | select(.verdict == "unavailable") | "\(.bot)(\(.detail))"] | join(", ")' <<<"$VERDICTS" 2>/dev/null || true)
     REVIEWER_NOTE=""
     if [ -n "$MISS_TEXT" ]; then
-      # DRAFT PRs (the 2026-07-31 bugbot-credit gate): reviewer bots skip drafts
-      # BY DESIGN — absence is the gate working, not an outage. Distinct suffix
-      # so the caller knows the finalize path is `gh pr ready` + re-watch, and
-      # the Finalize Gate box is "pending ready-flip", not reviewer-unavailable.
-      IS_DRAFT=$(gh pr view "$PR" --repo "$REPO" --json isDraft -q .isDraft 2>/dev/null || echo false)
-      if [ "$IS_DRAFT" = "true" ]; then
-        REVIEWER_NOTE=" draft-reviewer-skipped($MISS_TEXT: bots skip drafts by design; run gh pr ready at finalize, then re-watch)"
-        echo ">> watch-pr: PR is DRAFT, so '$MISS_TEXT' skipping it is the credit gate working. CI is gated now; bots gate after 'gh pr ready' at finalize." >&2
-      else
-        # Genuinely unavailable reviewer on a READY PR: write the waiver the
-        # Complete gate's bot check honors, so an outage blocks nothing while
-        # staying on the audit trail (the eval reads this file's reason).
-        if [ -n "$TASK_GID" ]; then
-          printf 'reviewer-unavailable: %s posted no check-run/review on ready HEAD %s at %s (other checks complete)\n' \
-            "$MISS_TEXT" "${CUR_HEAD:0:12}" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "/tmp/agent-bot-unavailable-${TASK_GID}" 2>/dev/null || true
-        fi
-        REVIEWER_NOTE=" reviewer-unavailable:$MISS_TEXT(no review on HEAD)"
-        echo ">> watch-pr: $MISS_TEXT did not review HEAD. Proceed. Record it ONLY as the unchecked reviewer box in the run report's Finalize Gate; mention it nowhere else (operator ruling 2026-09-02)." >&2
+      # A reviewer that did not review this HEAD: write the waiver the
+      # Complete gate's bot check honors, so an outage blocks nothing while
+      # staying on the audit trail (the eval reads this file's reason).
+      if [ -n "$TASK_GID" ]; then
+        printf 'reviewer-unavailable: %s posted no check-run/review on ready HEAD %s at %s (other checks complete)\n' \
+          "$MISS_TEXT" "${CUR_HEAD:0:12}" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "/tmp/agent-bot-unavailable-${TASK_GID}" 2>/dev/null || true
       fi
+      REVIEWER_NOTE=" reviewer-unavailable:$MISS_TEXT(no review on HEAD)"
+      echo ">> watch-pr: $MISS_TEXT did not review HEAD. Proceed. Record it ONLY as the unchecked reviewer box in the run report's Finalize Gate; mention it nowhere else." >&2
     fi
     # A neutral reviewer check is a non-failure to the exit code but means the
     # reviewer posted findings (bugbot-in-watch): name it so the caller runs /bugbot.
     FINDINGS_TEXT=$(jq -r '[.[] | select(.verdict == "findings") | "\(.bot)(\(.detail))"] | join(", ")' <<<"$VERDICTS" 2>/dev/null || true)
     [ -n "$FINDINGS_TEXT" ] && echo ">> watch-pr: reviewer findings on HEAD: $FINDINGS_TEXT. Address them (/bugbot for cursor[bot]) before Complete." >&2
-    if [ -n "$FAILS_WIP" ]; then
-      echo ">> watch-pr: green except wip-guard ($FAILS_WIP): expected while fixups are PRESERVED for the active reviewer — do NOT squash to clear it" >&2
+    [ -n "$FAILS_WIP" ] && echo ">> watch-pr: green except wip-guard ($FAILS_WIP): expected while fixups are PRESERVED for the active reviewer — do NOT squash to clear it" >&2
+    if [ -n "$FAILS_SANCTIONED" ]; then
+      AWAITING=$(printf '%s' "$SANCTION_LINE" | sed -nE 's/.* awaiting="([^"]*)".*/\1/p')
+      echo ">> watch-pr: red only on CI excused by the awaiting-dep-publish sanction ($FAILS_SANCTIONED; awaiting $AWAITING). Reviewer bots and threads gate as usual." >&2
+      echo "RESULT: green-dep-sanctioned ($FAILS_SANCTIONED; awaiting $AWAITING${FAILS_WIP:+; wip-guard preserved: $FAILS_WIP}${PENDING_SLOW:+; still pending: $PENDING_SLOW})$REVIEWER_NOTE"
+    elif [ -n "$FAILS_WIP" ]; then
       echo "RESULT: green-wip-preserve ($FAILS_WIP)$REVIEWER_NOTE"
     elif [ -z "$PENDING_SLOW" ]; then
       echo "RESULT: green$REVIEWER_NOTE"

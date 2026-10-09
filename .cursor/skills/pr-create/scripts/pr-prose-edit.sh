@@ -64,6 +64,8 @@ if [[ -n "$BODY_FILE" ]]; then
   set +e; OUT=$("$LINT" "$TMP/body.md" --semantic); RC=$?; set -e
   if [[ $RC -eq 1 ]]; then echo "BLOCKED: body fails the shared prose lint:" >&2; echo "$OUT" >&2; exit 2; fi
   printf '%s\n' "$OUT" | grep '^WARN ' >&2 || true
+  set +e; OUT=$("$HOME/.cursor/skills/orch-prose-lint.sh" "$TMP/body.md"); RC=$?; set -e
+  if [[ $RC -eq 1 ]]; then echo "BLOCKED: body fails the reporting-convention lint (orch-prose-lint.sh):" >&2; echo "$OUT" >&2; exit 2; fi
 fi
 
 if [[ -n "$TITLE" ]]; then

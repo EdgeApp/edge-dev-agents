@@ -75,7 +75,12 @@ for sid in STEP_RE.findall(pre):
 
 # --- 4. step map and references agree ------------------------------------------
 cited = set(re.findall(r'references/([a-z-]+)\.md', core))
-for f in sorted({f[:-3] for f in ref_files} - cited):
+# A subagent brief is not a phase slice: the landing session must not read it, so
+# the step map must not name it. Such a file opens with "Brief for".
+briefs = {f[:-3] for f, t in texts if t.startswith('Brief for')}
+for f in sorted(briefs & cited):
+    fails.append('references/%s.md is a subagent brief, but the core step map names it as a phase reference' % f)
+for f in sorted({f[:-3] for f in ref_files} - cited - briefs):
     fails.append('references/%s.md exists but the core step map never names it' % f)
 for f in sorted(cited - {f[:-3] for f in ref_files}):
     fails.append('core step map points at references/%s.md, which does not exist' % f)

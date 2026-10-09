@@ -148,7 +148,7 @@ for wt in "$WT_ROOT"/*/; do
   line ""; line "### $repo (branch $branch)"
   base=""; prinfo=""
   if [ "$OFFLINE" != 1 ] && command -v gh >/dev/null 2>&1; then
-    prinfo=$(git -C "$wt" -c core.quotepath=off ls-remote --get-url >/dev/null 2>&1 && gh pr view --repo "$(git -C "$wt" remote get-url origin 2>/dev/null | sed -E 's#.*github.com[:/]##; s#\.git$##')" "$branch" --json url,state,isDraft,baseRefName,reviewDecision,statusCheckRollup 2>/dev/null | jq -c '{url,state,isDraft,baseRefName,reviewDecision,checks:([.statusCheckRollup[]? | {name:(.name // .context), status:(.conclusion // .state)}])}' 2>/dev/null || true)
+    prinfo=$(git -C "$wt" -c core.quotepath=off ls-remote --get-url >/dev/null 2>&1 && gh pr view --repo "$(git -C "$wt" remote get-url origin 2>/dev/null | sed -E 's#.*github.com[:/]##; s#\.git$##')" "$branch" --json url,state,labels,body,baseRefName,reviewDecision,statusCheckRollup 2>/dev/null | jq -c '{url,state,labels:[.labels[]?.name],awaiting_dep_publish:[(.body // "") | scan("(?m)^Awaiting publish: (\\S+)") | .[0]],baseRefName,reviewDecision,checks:([.statusCheckRollup[]? | {name:(.name // .context), status:(.conclusion // .state)}])}' 2>/dev/null || true)
     [ -n "$prinfo" ] && base=$(printf '%s' "$prinfo" | jq -r '.baseRefName // empty')
   fi
   [ -n "$prinfo" ] && line "pr: $prinfo" || line "pr: none found"

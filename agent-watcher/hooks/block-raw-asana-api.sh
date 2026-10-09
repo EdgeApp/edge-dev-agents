@@ -54,7 +54,7 @@ echo "BLOCKED: raw Asana API calls are forbidden in every session, chat included
   attachments: asana-task-update.sh --task <gid> --attach-file <path> --attach-name <name> (a same-name run report is replaced)
   subtasks: asana-task-update.sh --task <gid> --create-subtask --subtask-name \"<name>\"
   task DESCRIPTION (agent-maintained tail only): asana-task-update.sh --task <gid> --set-current-state <file>
-  task DESCRIPTION (whole, before any run touches the task): asana-task-update.sh --task <gid> --set-notes <file>
+  task DESCRIPTION (prose, while agent_status is unset or Complete): asana-task-update.sh --task <gid> --set-notes <file>
   followup-scope / watermark: ~/.config/agent-watcher/check-followup-scope.sh --task-gid <gid>
   status transitions: ~/.config/agent-watcher/update-status.sh
 Read the owning SKILL.md (task-review, asana-task-update) before using its script." >&2

@@ -43,8 +43,8 @@
 #      non-blocking (reply-only, per pr-address non-owner-reply-only). A non-owned
 #      thread whose LAST comment is ours is collapsed to an "awaiting owner"
 #      count instead of listed: printing only its root read our own addressed
-#      finding as open work on the next round (2026-09-24). Draft PRs
-#      are skipped (finalize-gate excludes draft dep PRs). Best-effort: gh/network
+#      finding as open work on the next round (2026-09-24). Every OPEN
+#      attached PR is swept. Best-effort: gh/network
 #      failure degrades to "unavailable", never fails the Asana enumeration.
 #   5. Print them, and write the marker /tmp/agent-followup-scope-<gid>.json recording
 #      what was fetched and when (the hook checks marker freshness against live
@@ -168,9 +168,9 @@ if command -v gh >/dev/null 2>&1; then
       OWNER=$(sed -E 's#https://github.com/([^/]+)/([^/]+)/pull/([0-9]+)#\1#' <<<"$url")
       RNAME=$(sed -E 's#https://github.com/([^/]+)/([^/]+)/pull/([0-9]+)#\2#' <<<"$url")
       NUM=$(sed -E 's#https://github.com/([^/]+)/([^/]+)/pull/([0-9]+)#\3#' <<<"$url")
-      PRJ=$(gh api graphql -f query="query{repository(owner:\"$OWNER\",name:\"$RNAME\"){pullRequest(number:$NUM){state isDraft headRefOid author{login} reviewDecision reviewThreads(first:100){nodes{isResolved comments(first:1){nodes{author{login} createdAt body}} last:comments(last:1){nodes{author{login}}}}}}}}" 2>/dev/null \
+      PRJ=$(gh api graphql -f query="query{repository(owner:\"$OWNER\",name:\"$RNAME\"){pullRequest(number:$NUM){state headRefOid author{login} reviewDecision reviewThreads(first:100){nodes{isResolved comments(first:1){nodes{author{login} createdAt body}} last:comments(last:1){nodes{author{login}}}}}}}}" 2>/dev/null \
         | jq -c --arg me "$GH_USER" --arg url "$url" '.data.repository.pullRequest
-          | select(.state == "OPEN" and (.isDraft | not))
+          | select(.state == "OPEN")
           | (.author.login == $me) as $owned
           | {url: $url, owned: $owned, head: .headRefOid, review_decision: (.reviewDecision // "none"),
              unresolved: [.reviewThreads.nodes[] | select(.isResolved | not)
@@ -306,7 +306,7 @@ fi
 if [[ "$GH_STATUS" == "ok" ]]; then
   PR_COUNT=$(jq 'length' <<<"$GH_SCOPE")
   if [[ "$PR_COUNT" -eq 0 ]]; then
-    echo ">>   github: no open non-draft PRs attached"
+    echo ">>   github: no open PRs attached"
   else
     jq -r '.[] | ">>   github: \(.url) [\(if .owned then "OWNED" else "not owned" end), reviewDecision: \(.review_decision)] — \(.unresolved | length) unresolved thread(s)"' <<<"$GH_SCOPE"
     jq -r '.[] | ([.unresolved[] | select(.awaiting_owner)] | length) as $ao

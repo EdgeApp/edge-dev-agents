@@ -8,8 +8,8 @@
 #                    tapped. Unset skips the check.
 #   HOME_MARKER      text of the logged-in home scene. Default "Assets".
 # On iOS pass `xcuitest-run.sh --login-role <role>`: it sets PIN_DIGIT and
-# EXPECT_USERNAME from the roster and masks both in the step log. A username
-# or a PIN is never written into a flow file.
+# EXPECT_USERNAME from the roster. A username or a PIN is never written into a
+# flow file: the library is published, and the roster is the one place they live.
 # ACCOUNT GUARD: the PIN scene shows the last-used account, which is not
 # always the one the caller means. With EXPECT_USERNAME set, a PIN scene on
 # another account fails the flow within 5s and no digit is tapped. The check

@@ -102,7 +102,7 @@ emit_run() {
       | jq -r '[.data[]?.view_url // empty | select(test("github.com/.*/pull/"))] | unique | .[0:2][]' 2>/dev/null \
       | while read -r pr; do
           local api; api=$(sed -E 's|https://github.com/([^/]+)/([^/]+)/pull/([0-9]+).*|repos/\1/\2/pulls/\3|' <<<"$pr")
-          local info; info=$(timeout 8 gh api "$api" --jq '"state=\(.state) draft=\(.draft) mergeable=\(.mergeable_state // "?")"' 2>/dev/null || echo "unreachable")
+          local info; info=$(timeout 8 gh api "$api" --jq '"state=\(.state) mergeable=\(.mergeable_state // "?")"' 2>/dev/null || echo "unreachable")
           echo "PR $pr: $info"
         done
   fi

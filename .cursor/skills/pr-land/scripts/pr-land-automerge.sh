@@ -10,7 +10,7 @@
 # finding lands on an already-merged PR, costing a second PR to fix what a fixup
 # would have covered. Required CI blocks the merge by itself, so arming early buys
 # nothing. Hence: bots complete first, then arm. Absence is NOT pending — a reviewer
-# that posted no check-run at all (quota, outage, draft) must never wedge a land, so
+# that posted no check-run at all (quota, outage) must never wedge a land, so
 # only a PENDING reviewer check-run holds arming back.
 #
 # Input (stdin JSON array): [{"repo":"edge-react-gui","prNumber":123}, ...]

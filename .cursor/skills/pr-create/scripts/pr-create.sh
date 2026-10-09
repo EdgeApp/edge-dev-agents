@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // pr-create.sh — Creates a PR for the current branch using gh CLI.
-// Usage: ./pr-create.sh [--title "PR title"] [--body-file <path>] [--draft]
-//                       [--base <ref>]
+// Usage: ./pr-create.sh [--title "PR title"] [--body-file <path>] [--base <ref>]
+//                       [--asana-task <gid>] [--asana-attach | --no-asana-attach]
+// Every PR opens ready for review.
 // Reads from git context: repo owner/name, current branch, default branch.
 // Outputs JSON with PR URL and number on success.
 //
@@ -22,7 +23,6 @@ const path = require("path");
 const args = process.argv.slice(2);
 let title = null;
 let bodyFile = null;
-let draft = false;
 let asanaTask = null;
 let baseArg = null;
 
@@ -35,7 +35,6 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === "--base" && args[i + 1]) baseArg = args[++i];
   else if (args[i] === "--asana-attach") asanaAttach = true;
   else if (args[i] === "--no-asana-attach") asanaAttach = false;
-  else if (args[i] === "--draft") draft = true;
   else if (args[i].startsWith("--")) {
     // FAIL LOUD on unknown flags. Silent swallowing is how the 2026-07-15 Maya
     // Dash task lost its PR attach: the caller passed --asana-attach when this
@@ -401,9 +400,21 @@ if (lint.status === 1) {
 } else if (lint.status === 0 && /^WARN /m.test(lint.stdout || "")) {
   console.error((lint.stdout || "").split("\n").filter((l) => l.startsWith("WARN ")).join("\n"));
 }
+// Orch reporting conventions (passing-suite totals, ...): the second shared
+// lint every posting boundary calls. Same refusal contract as the prose lint.
+const orchLint = spawnSync(
+  path.join(os.homedir(), ".cursor/skills/orch-prose-lint.sh"),
+  [tmpBody],
+  { encoding: "utf8" }
+);
+if (orchLint.status === 1) {
+  console.error("BLOCKED: PR body fails the reporting-convention lint (orch-prose-lint.sh). Fix these and re-run:");
+  console.error((orchLint.stdout || "").trim());
+  try { fs.unlinkSync(tmpBody); } catch {}
+  process.exit(2);
+}
 const ghArgs = ["pr", "create", "--title", title, "--body-file", tmpBody,
   "--base", baseBranch];
-if (draft) ghArgs.push("--draft");
 
 const result = spawnSync("gh", ghArgs, { encoding: "utf8" });
 try { fs.unlinkSync(tmpBody); } catch {}
@@ -452,7 +463,6 @@ console.log(
       title,
       base: baseBranch,
       head: branch,
-      draft,
       owner,
       repo,
     },
