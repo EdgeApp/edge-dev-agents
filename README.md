@@ -27,7 +27,8 @@ the repo copy should not keep a second `.cursor/README.md`.
 **Fresh machine (one command):** clone this repo and run the bootstrap. It
 installs everything (cursor skills/rules, the orchestration system, hook
 registrations, and workflows) into your home dir, seeds `credentials.json`
-from the example, and links skills:
+from the example and `~/.claude/settings.canonical.json` with the hook
+registrations, and links skills:
 
 ```bash
 git clone <this-repo> ~/git/edge-dev-agents && cd ~/git/edge-dev-agents && ./bootstrap.sh
@@ -792,7 +793,10 @@ reproducible from a single clone + `./bootstrap.sh`:
   User-to-repo sync exports the key; repo-to-user and `bootstrap.sh` merge it
   back replacing ONLY `.hooks`, so model/theme and other machine-local
   settings stay put, and an unconfigured machine can never blank the canonical
-  registrations.
+  registrations. `bootstrap.sh` writes the block to both files and creates the
+  canonical one when it is absent, so settings-guard.sh protects the
+  registrations from its first run on a new machine; other pinned keys (env,
+  attribution, permissions) are added to the canonical file per machine.
 - **`claude-workflows/`**: multi-agent Workflow scripts installed to
   `~/.claude/workflows` (currently `code-review-sonnet.js`, the deep
   multi-agent PR review harness `/pr-review` launches). The cleanup finder

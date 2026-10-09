@@ -6,6 +6,8 @@
 #   agent-watcher/      -> ~/.config/agent-watcher/   (orchestration code + config)
 #   claude-workflows/   -> ~/.claude/workflows/       (Workflow-tool scripts)
 #   bin/link-shared-memory.sh -> ~/.claude/link-shared-memory.sh
+#   claude-settings/hooks.json -> the .hooks key of ~/.claude/settings.json and
+#                         of ~/.claude/settings.canonical.json (created if absent)
 #   agent-watcher/launchd/*.plist -> ~/Library/LaunchAgents/ (rendered + loaded)
 # Then: links ~/.claude/skills -> ~/.cursor/skills, regenerates ~/.claude/CLAUDE.md,
 # and links any shared memory notes already in ~/.claude/memory-shared (they are
@@ -68,14 +70,27 @@ fi
 # ~/.claude/settings.json, replacing ONLY the .hooks key (model/theme/etc stay
 # machine-local). Without this the agent-watcher hook SCRIPTS installed in
 # step 2 are present but never fire. Written via temp+mv (no partial writes).
+#
+# The same block goes into ~/.claude/settings.canonical.json, the file
+# settings-guard.sh treats as the source of truth: it re-applies that file's
+# top-level keys to settings.json whenever a claude process rewrites it, and
+# does nothing while the file is absent. A fresh machine gets the file seeded
+# with the hooks key, so the guard protects the registrations from its first
+# run. A machine that already has one gets only its .hooks key replaced: left
+# alone, the guard would put the older registrations back over this step.
+# Every other key in the canonical file (env, attribution, permissions) is the
+# machine's own and is never touched; add a key there to pin it.
 if [[ -f "$REPO/claude-settings/hooks.json" ]]; then
   say "Merging hook registrations into ~/.claude/settings.json"
   mkdir -p "$HOME/.claude"
   SJ="$HOME/.claude/settings.json"
+  CJ="$HOME/.claude/settings.canonical.json"
+  # Local-only registrations live in the canonical file when there is one.
+  OLD_SRC="$SJ"; [[ -f "$CJ" ]] && OLD_SRC="$CJ"
   if [[ -f "$SJ" ]]; then
     # Whole-block replace: name any local-only registration it destroys (the
     # matcher is unrecoverable afterwards) and keep a timestamped backup.
-    DROPPED=$(jq -n --slurpfile new "$REPO/claude-settings/hooks.json" --slurpfile old "$SJ" '
+    DROPPED=$(jq -n --slurpfile new "$REPO/claude-settings/hooks.json" --slurpfile old "$OLD_SRC" '
       def flat: [ to_entries[] as $e | ($e.value // [])[] as $g | ($g.hooks // [])[] as $h
                   | {event: $e.key, matcher: ($g.matcher // ""), command: ($h.command // "")} ];
       ($new[0] | flat) as $n
@@ -93,6 +108,20 @@ if [[ -f "$REPO/claude-settings/hooks.json" ]]; then
     MERGED=$(jq -nS --slurpfile h "$REPO/claude-settings/hooks.json" '{hooks: $h[0]}')
   fi
   [[ -n "$MERGED" ]] && printf '%s\n' "$MERGED" > "$SJ.tmp.$$" && mv "$SJ.tmp.$$" "$SJ"
+
+  if [[ -f "$CJ" ]]; then
+    cp "$CJ" "$CJ.bak.$(date +%Y%m%d-%H%M%S)"
+    CMERGED=$(jq -S --slurpfile h "$REPO/claude-settings/hooks.json" '.hooks = $h[0]' "$CJ")
+    CSAY="Replaced the hooks key of ~/.claude/settings.canonical.json (other pinned keys kept)"
+  else
+    CMERGED=$(jq -nS --slurpfile h "$REPO/claude-settings/hooks.json" '{hooks: $h[0]}')
+    CSAY="Seeded ~/.claude/settings.canonical.json with the hook registrations (settings-guard.sh keeps settings.json equal to it)"
+  fi
+  if [[ -n "$CMERGED" ]]; then
+    printf '%s\n' "$CMERGED" > "$CJ.tmp.$$" && mv "$CJ.tmp.$$" "$CJ" && say "$CSAY"
+  else
+    warn "could not write ~/.claude/settings.canonical.json; settings-guard.sh stays inert until it exists"
+  fi
 fi
 
 # 5. Claude compat: ~/.claude/skills -> ~/.cursor/skills + regenerate CLAUDE.md
@@ -138,3 +167,4 @@ echo "Next steps:"
 echo "  1. Fill ~/.config/agent-watcher/credentials.json with your real asana_token (and asana_github_secret if used)."
 echo "  2. Install Node deps used by the orchestration if needed (jq, node)."
 echo "  3. Per repo where you want shared memory: ~/.claude/link-shared-memory.sh /path/to/repo"
+echo "  4. To pin more Claude settings across sessions (env, attribution, permissions), add the key to ~/.claude/settings.canonical.json."
