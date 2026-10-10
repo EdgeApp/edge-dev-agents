@@ -762,11 +762,32 @@ NODE
     "$CHANGELOG_RESOLVER" "$WT" --release-merge || die "CHANGELOG conflict is not mechanically resolvable, resolve it by hand in $WT"
     git -C "$WT" add CHANGELOG.md
   fi
+  # The tree as staged, before the repo's pre-commit hook sees it (see the
+  # restore below). Every conflict is resolved by here, so write-tree succeeds.
+  STAGED_TREE="$(git -C "$WT" write-tree)" || die "could not snapshot the staged merge tree"
   rc=0
   GIT_EDITOR=true git -C "$WT" merge --continue >>"$MERGE_LOG" 2>&1 || rc=$?
   if [ $rc -ne 0 ]; then
     tail -30 "$MERGE_LOG" >&2
     die "merge --continue failed (full log: $MERGE_LOG)"
+  fi
+
+  # `merge --continue` fires the repo's pre-commit hook, whose
+  # update-eslint-warnings step deletes every STAGED file from the warning list
+  # in eslint.config.mjs. A release merge stages develop's whole delta, so the
+  # hook strips entries develop still carries, staging leaves the cut with a
+  # different list than develop, and later cherry-picks of lint fixes conflict
+  # on the neighbouring lines. The merge commit carries the file as it was
+  # staged: put that back and amend. --no-verify, because the hook would strip
+  # it again; its tsc, lint and jest steps already passed on the stricter list.
+  # Only the hook's own rewrite is undone, so a staged file that differs from
+  # develop still reaches the parity gate as the drift it is.
+  HOOK_REWRITTEN="eslint.config.mjs"
+  if ! git -C "$WT" diff --quiet "$STAGED_TREE" HEAD -- "$HOOK_REWRITTEN"; then
+    git -C "$WT" checkout "$STAGED_TREE" -- "$HOOK_REWRITTEN" \
+      && git -C "$WT" commit --quiet --amend --no-edit --no-verify >>"$MERGE_LOG" 2>&1 \
+      || die "could not restore the staged $HOOK_REWRITTEN into the merge commit (full log: $MERGE_LOG)"
+    say "restored $HOOK_REWRITTEN as staged (the pre-commit hook rewrote it in the merge commit)"
   fi
 fi
 if [ -n "$HAD_CONFLICTS" ]; then
@@ -808,9 +829,9 @@ if [ -n "$BLOCKING" ]; then
     git -C "$WT" --no-pager diff "$TMP_DEV" -- "$p" | sed -n '1,40p' | sed 's/^/      /'
     echo
   done <<< "$BLOCKING"
-  echo "The repo's precommit chain regenerates eslint.config.mjs and"
-  echo "src/locales/strings on every commit, so either can appear here purely as"
-  echo "an artifact of the merge commit rather than as real drift."
+  echo "The repo's precommit chain regenerates src/locales/strings on every"
+  echo "commit, so that path can appear here purely as an artifact of the merge"
+  echo "commit rather than as real drift. Any other path is real drift."
   step Parity stopped "$(printf '%s' "$BLOCKING" | grep -c . ) non-CHANGELOG path(s) differ between $STAGING and $DEVELOP"
   finish parity-mismatch 2
 fi

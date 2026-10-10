@@ -1146,14 +1146,20 @@ function sweepDue(state, key, intervalMs, now) {
   return true
 }
 
-// Delete Xcode DerivedData folders whose workspace no longer exists. Worktree removal
-// already takes its own folder (cleanup-task-workspace.sh); this catches the rest:
-// crashes, hand-removed worktrees, scratch builds outside the worktree root.
+// Delete Xcode DerivedData folders whose workspace no longer exists, and the ones a
+// retained worktree or shadow has not built into for DERIVED_DATA_STALE_HOURS (a
+// finished run keeps its worktree for followups, and each holds ~5.5 GB of build
+// output). Worktree removal already takes its own folder (cleanup-task-workspace.sh);
+// this catches the rest: crashes, hand-removed worktrees, scratch builds outside the
+// worktree root, and idle retained worktrees. derived-data-reap.sh owns what is
+// exempt (in-use slots, the primary checkouts).
 // Detached: deleting several ~5 GB folders takes minutes and would stall the tick.
 const DERIVED_DATA_LOG = '/tmp/derived-data-reap.log'
+const DERIVED_DATA_STALE_HOURS = 24
 function sweepOrphanDerivedData() {
-  if (spawnDetached(path.join(DIR, 'derived-data-reap.sh'), ['--orphans'], DERIVED_DATA_LOG)) {
-    log(`[derived-data] orphan sweep started (detached; results in ${DERIVED_DATA_LOG})`)
+  const args = ['--orphans', '--stale-hours', String(DERIVED_DATA_STALE_HOURS)]
+  if (spawnDetached(path.join(DIR, 'derived-data-reap.sh'), args, DERIVED_DATA_LOG)) {
+    log(`[derived-data] orphan + stale sweep started (detached; results in ${DERIVED_DATA_LOG})`)
   }
 }
 

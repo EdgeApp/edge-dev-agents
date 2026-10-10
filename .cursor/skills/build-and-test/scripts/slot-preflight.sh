@@ -13,12 +13,14 @@
 #
 # Output: one VERDICT line per check (grep-able), then a final PLAN line:
 #   PLAN: ready | js-only | full-rebuild | install   — feed the matching ios-rn-build.sh
-#   invocation; no other build decision needed.
+#   invocation; no other build decision needed. `install` covers a stored build of
+#   the worktree's native state (lib/native-app-cache.sh): seconds, not a compile.
 # Exit: 0 always when the readout completes (the PLAN is the answer); 1 on usage error.
 
 set -uo pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/native-deps-hash.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/native-app-cache.sh"
 
 UDID="${AGENT_SIM_UDID:-}"
 BUNDLE_ID="co.edgesecure.app"
@@ -73,11 +75,26 @@ else
   fi
 fi
 
+# A stored build of this worktree's native state turns "needs a rebuild" into an
+# install: ios-rn-build.sh (run without --force-rebuild) installs it.
+# lib/native-app-cache.sh owns when a tree has a key and what a hit guarantees.
+STORED_KEY="$(native_app_cache_key "$REPO_DIR" || true)"
+STORED_APP=""
+[[ -n "$STORED_KEY" ]] && STORED_APP="$(native_app_cache_get "$BUNDLE_ID" "$STORED_KEY")"
+rebuild_or_install() { # <verdict prefix>
+  if [[ -n "$STORED_APP" ]]; then
+    echo "$1 — a build of this native state is stored ($STORED_KEY); it gets installed, NO rebuild"
+    bump install
+  else
+    echo "$1 — full rebuild required"
+    bump full-rebuild
+  fi
+}
+
 # 3. App installed on this sim?
 DATA_DIR="$(xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" data 2>/dev/null || true)"
 if [[ -z "$DATA_DIR" ]]; then
-  echo "APP: $BUNDLE_ID NOT installed on this sim"
-  bump full-rebuild
+  rebuild_or_install "APP: $BUNDLE_ID NOT installed on this sim"
 else
   echo "APP: installed"
   # 4. Native drift: installed app's stamp vs the worktree's native_deps_hash.
@@ -88,11 +105,9 @@ else
   if [[ "$HAVE" == "$WANT" ]]; then
     echo "NATIVE: stamp match ($HAVE) — JS bundles live from Metro; NO rebuild needed"
   elif [[ "$HAVE" == "no-stamp" ]]; then
-    echo "NATIVE: no stamp on installed app (pre-stamp build) — full rebuild to establish baseline"
-    bump full-rebuild
+    rebuild_or_install "NATIVE: no stamp on installed app (its native side is unknown)"
   else
-    echo "NATIVE: DRIFT (installed $HAVE vs worktree $WANT) — native deps changed; full rebuild required"
-    bump full-rebuild
+    rebuild_or_install "NATIVE: DRIFT (installed $HAVE vs worktree $WANT), native deps differ"
   fi
 fi
 
@@ -114,5 +129,13 @@ case "$PLAN" in
   ready)        echo "INVOKE: (none — app is current; start Metro via ios-rn-build only if not already running, then drive)" ;;
   full-rebuild) echo "INVOKE: $IRB --udid $UDID --bundle-id $BUNDLE_ID --port $PORT --force-rebuild --detach"
                 echo "WAIT: $IRB_WAIT --udid $UDID" ;;
+  install)      if [[ -n "$STORED_APP" ]]; then
+                  # Detached like a rebuild: a stored build that fails to install
+                  # falls back to compiling, which outlives a foreground call.
+                  echo "INVOKE: $IRB --udid $UDID --bundle-id $BUNDLE_ID --port $PORT --detach"
+                  echo "WAIT: $IRB_WAIT --udid $UDID"
+                else
+                  echo "INVOKE: $IRB --udid $UDID --bundle-id $BUNDLE_ID --port $PORT"
+                fi ;;
   *)            echo "INVOKE: $IRB --udid $UDID --bundle-id $BUNDLE_ID --port $PORT" ;;
 esac

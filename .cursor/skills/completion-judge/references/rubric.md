@@ -40,6 +40,21 @@ The bundle's "Segment scope" line decides what the bar is:
   no operator comments (next bullet). A clause a careful reader cannot place is the
   run's: doing it is the cheaper error, and the run's report should say it read the
   clause as its own.
+- LANDING IS THE HUMAN'S STEP UNTIL THE PR IS LANDABLE: a clause in the task
+  description or a comment that names landing as the outcome (merged, published, the
+  dependency bumped, "on staging", "in the release") is an ask for the run only when
+  the PR is landable per one-shot `land-on-approval`: the git section's PR record
+  reads `reviewDecision` APPROVED, or the bundle's fields line shows Force Land set.
+  With neither, the run's terminal action is the open, green PR (one-shot
+  `yolo-stop-at-pr`) and the land belongs to whoever reviews it: grade the clause
+  `not-for-run` in J1 with the reviewer as addressee, and never read the unlanded PR
+  as a deferral in J5. The rest of the same sentence still binds: the change itself,
+  its testing, and a CHANGELOG entry under the release the clause names. The land IS
+  the run's ask whatever the review state in three cases: a land/merge task (the
+  deliverable is landing an existing PR), an operator comment in this segment that
+  tells the run to land, and a land the run started (the git section or attempt-log
+  shows a merge), which owes its whole release chain per one-shot
+  `land-dep-publish-boundary`.
 - FOLLOWUP WITH NO OPERATOR COMMENTS (or none carrying an ask for the run): the
   operator re-armed the task by changing something else, and that change is the ask. Read the bundle's "field deltas since
   the previous segment" and the GitHub counters, and map each to what the orch owes
@@ -115,7 +130,8 @@ in `asks`.
 - `unaddressed`: no evidence either way, or evidence of a narrower delivery than asked
   (one token when "multiple" was asked; a static check when "actually test" was asked).
 - `not-for-run`: the clause hands work or a question to someone else (Scope, "who a
-  comment is for"); name the addressee in `evidence`. Never a fail. Use it also when
+  comment is for"), or names a land on a PR that is not landable (Scope, "landing is
+  the human's step"); name the addressee in `evidence`. Never a fail. Use it also when
   the run delivered such a clause anyway: that is neither a fail nor credit.
 List only the segment's asks (see Scope), one line per clause when a comment mixes
 asks for the run with clauses for others. On a followup, do NOT add the task

@@ -228,7 +228,9 @@ the task's own unpublished dep PRs when the deliverable requires them.
   waits on
 - Xcode DerivedData: worktree teardown (`cleanup-task-workspace.sh`) deletes the
   worktree's DerivedData, and a 6-hourly detached `derived-data-reap.sh
-  --orphans` deletes folders whose workspace is gone
+  --orphans --stale-hours 24` deletes folders whose workspace is gone, plus
+  folders a retained worktree has not built into for a day (each holds about
+  5.5 GB; an in-use slot and the primary checkouts are exempt)
 - orphan-Metro reap, idle-dirty-sim reclaim, and operator escalation for
   parked prompts or stuck sessions
 - Jev shadow: spools one named anchor's pane with its own regex state for
@@ -656,11 +658,19 @@ the app.
   `--login-role <role>` signs the flow in as a roster role, refuses to tap a
   PIN on another account's PIN scene.
 - **Build decisions** (`build-and-test/scripts/slot-preflight.sh`): one call
-  prints whether the slot needs no build, a JS-only launch or a full rebuild.
+  prints whether the slot needs no build, a JS-only launch, an install of a
+  stored build, or a full rebuild.
   It and `ios-rn-build.sh` take the native stamp from one function
   (`scripts/lib/native-deps-hash.sh`: `Podfile.lock` plus the embedded webview
   bundles, with pod install's hermes checksum rewrite put back before
   hashing), so the two never disagree about drift.
+- **Stored builds** (`build-and-test/scripts/lib/native-app-cache.sh`): every
+  fresh build is kept by its native state (the stamp plus the committed `ios/`
+  and `patches/` trees), and a worktree whose installed app has the wrong
+  native side gets a stored build of its own state installed in seconds
+  instead of a 12 to 15 minute cold compile. A tree with uncommitted native
+  source has no key, so it neither stores nor takes one, and
+  `--force-rebuild` always builds from source.
 - **Stale bundle and login checks.** `scripts/metro-fresh.sh` answers whether
   the Metro on a port sees edits to its checkout (watchman still observing,
   served `.json` modules equal to disk); `scripts/pin-agent-login.sh` pins a

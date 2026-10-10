@@ -297,7 +297,11 @@ ensure_env_json() {
   # YOLO auto-login re-asserts this account on every app relaunch. The roster is
   # local-only (~/.config/edge-secrets/test-accounts.json) so account names never
   # land in the synced tree. YOLO_* lives in config.json on develop, env.json on
-  # older branches; pin both when present.
+  # older branches; pin both when present. config.json also gets
+  # AGENT_TEST_MODE = true (no post-login modals, notification cards or LogBox
+  # warning toast in the app; a branch without the schema key ignores it). A run
+  # that tests one of those surfaces turns it off with build-and-test's
+  # scripts/pin-agent-login.sh --agent-test-mode off.
   for f in env.json config.json; do
     [[ -f "$WT/$f" ]] || continue
     node -e '
@@ -307,6 +311,7 @@ ensure_env_json() {
       if (acct == null) throw new Error("no default roster account");
       const env = JSON.parse(fs.readFileSync(p, "utf8"));
       env.YOLO_USERNAME = acct.username; env.YOLO_PIN = acct.pin;
+      if (p.endsWith("/config.json")) env.AGENT_TEST_MODE = true;
       fs.writeFileSync(p, JSON.stringify(env, null, 2) + "\n");
     ' "$WT/$f" "$HOME/.config/edge-secrets/test-accounts.json" 2>/dev/null \
       && echo ">> setup-task-workspace: $f YOLO login pinned to the default roster account" >&2 \

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # ios-rn-build.sh — Build + install + launch a React-Native iOS app on a sim.
 #
-# Detects whether the app is already installed and skips the full RN build path.
+# Detects whether the app is already installed and skips the full RN build path;
+# when the installed native side is wrong it installs a stored build of the
+# worktree's native state if one exists (lib/native-app-cache.sh).
 # A real build here is usually only a FEW MINUTES — the Hermes prebuilt tarball is
 # prefetched below, which avoids the slow (~40 min) build-from-source; warm Xcode +
 # APFS-cloned node_modules keep the rest fast. Pass --force-rebuild to always rebuild.
@@ -236,6 +238,42 @@ write_build_stamp() {
   printf '%s\n' "$want" > "$sp" 2>/dev/null && echo ">> ios-rn-build: wrote native-build stamp ($want)" >&2 || true
 }
 
+# ── Stored builds ───────────────────────────────────────────────────────────────
+# A native state that was already built (by the master refresh or by any run) is
+# installed from lib/native-app-cache.sh instead of compiled again; that file owns
+# the key, what makes a hit safe, and what misses. --force-rebuild never reads the
+# cache (the master refresh uses it to guarantee a build from source) but every
+# fresh build is stored.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/native-app-cache.sh"
+install_stored_build() {
+  local key app
+  key="$(native_app_cache_key . || true)"
+  [[ -n "$key" ]] || return 1
+  app="$(native_app_cache_get "$BUNDLE_ID" "$key")"
+  [[ -n "$app" ]] || return 1
+  echo ">> ios-rn-build: a build of this native state is stored ($key); installing it instead of rebuilding" >&2
+  if ! xcrun simctl install "$UDID" "$app"; then
+    echo ">> ios-rn-build: stored build did not install; building from source" >&2
+    return 1
+  fi
+  ensure_metro_ready_and_pin
+  xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null || return 1
+  # After launch: a first install has no data container to stamp until then.
+  write_build_stamp
+  echo ">> ios-rn-build: PASS (stored build installed, launched on Metro port $PORT)"
+}
+store_fresh_build() {
+  # Keyed on the tree AFTER the build: install may have moved the edge-* assets
+  # the app now embeds.
+  local key app
+  key="$(native_app_cache_key . || true)"
+  [[ -n "$key" ]] || return 0
+  app="$(xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" app 2>/dev/null || true)"
+  [[ -n "$app" ]] || return 0
+  native_app_cache_put "$BUNDLE_ID" "$key" "$app" "$(pwd) @ $(git rev-parse --short HEAD 2>/dev/null || echo unknown) $(date -u +%FT%TZ)" \
+    && echo ">> ios-rn-build: stored this build for reuse ($key)" >&2 || true
+}
+
 # Already installed? (sim is booted now, so this is an accurate check.)
 if ! $FORCE && xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>&1; then
   WANT_HASH="$(native_deps_hash)"
@@ -251,8 +289,15 @@ if ! $FORCE && xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>
     echo ">> ios-rn-build: PASS (cached install, launched on Metro port $PORT)"
     exit 0
   fi
-  echo ">> ios-rn-build: cached app present but native stamp '${HAVE_HASH:-<none>}' != worktree '$WANT_HASH' — pods drifted (reanimated/new-arch/native module) or never stamped; FORCING a full rebuild so develop's JS does not throw on a stale native app" >&2
-  # fall through to the full build path (which restamps on success)
+  echo ">> ios-rn-build: installed app's native stamp '${HAVE_HASH:-<none>}' != worktree '$WANT_HASH' — pods drifted (reanimated/new-arch/native module) or never stamped; replacing it (a stored build of this native state, else a full rebuild) so develop's JS does not throw on a stale native app" >&2
+  # fall through: a stored build when there is one, else the full build path
+  # (both restamp on success)
+fi
+
+# Not installed, or installed with the wrong native side: take a stored build of
+# this worktree's native state before compiling one.
+if ! $FORCE && install_stored_build; then
+  exit 0
 fi
 
 # Full build path
@@ -361,5 +406,6 @@ fi
 # Stamp the freshly-built app with the native-deps hash it was built from, so the
 # next cached launch (this sim, or a clone that inherits this image) can trust it.
 write_build_stamp
+store_fresh_build
 
 echo ">> ios-rn-build: PASS (fresh build, installed, launched)"

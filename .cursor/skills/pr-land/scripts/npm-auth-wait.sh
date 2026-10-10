@@ -52,6 +52,9 @@ marks() { grep -a -E "$MARK" "$1" 2>/dev/null; }
 sum_of() { marks "$1" | head -n "$2" | cksum | awk '{print $1}'; }
 relayed() {
   local n sum
+  # No state file yet (the first wait on this log): the redirect below would
+  # print its own "No such file" before 2>/dev/null could apply.
+  [ -f "$1.relayed" ] || { echo 0; return; }
   read -r n sum < "$1.relayed" 2>/dev/null || [ -n "$n" ] || { echo 0; return; }
   case "$n" in ''|*[!0-9]*) echo 0; return ;; esac
   [ "$(sum_of "$1" "$n")" = "$sum" ] && echo "$n" || echo 0

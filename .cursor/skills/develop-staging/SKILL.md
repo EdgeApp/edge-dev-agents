@@ -90,10 +90,10 @@ Show it to the operator and run it once they agree.
 <sub-step name="3b — non-CHANGELOG parity diff">
 The two branches would not be equivalent. Show each path and its diff, and name the likely cause:
 
-- Genuine drift on one branch. It has to be back-ported, then re-run.
-- The repo's own precommit chain, which runs the localize step and `update-eslint-warnings`, so
-  `eslint.config.mjs` and `src/locales/strings` can be rewritten by the merge commit itself. That is
-  an artifact rather than drift.
+- Genuine drift on one branch. It has to be back-ported, then re-run. A difference in
+  `eslint.config.mjs` is always this kind; never clear it with `--allow`.
+- The repo's own precommit chain, whose localize step can rewrite `src/locales/strings` in the merge
+  commit itself. That is an artifact rather than drift.
 
 Once the operator confirms, re-run adding `--allow <glob>` per path. The globs match whole paths, so
 a directory needs a trailing wildcard: `--allow 'src/locales/strings/*'`, not
@@ -130,6 +130,7 @@ cleared with `--allow` or `--resolve-theirs`. A cleared path is a decision worth
 | `--no-publish` | off | Skip the `dryrun/` inspection tags on a dry run |
 | `--tag-prefix <ns>` | `dryrun` | Namespace for those tags; refuses a `v*` prefix |
 | `--crowdin-merge-existing` | off | Merge the open Crowdin PR as-is; the operator vouches it is fresh |
+| `--no-gui-push` | off | Run every phase for real (Crowdin merges, dep publishes, bump, merge, verify) but hold the `develop` and `staging` pushes; publishes the inspection tags like a dry run |
 
 Exit `0` with `RESULT: ok`; `2` with `RESULT: conflicts`, `parity-mismatch` or `aborted`; `1` with
 `RESULT: error`.

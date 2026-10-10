@@ -45,7 +45,7 @@
       ]
     },
     "one-shot:yolo-true-blockers": {
-      "hash": "1bb2afeed328",
+      "hash": "4bb7e4e8c140",
       "dims": [
         "A7",
         "O7"
@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "437acf50c720",
+      "hash": "2d2de128a548",
       "dims": [
         "O4",
         "O5",
@@ -273,7 +273,7 @@
       ]
     },
     "file:setup-task-workspace.sh": {
-      "hash": "5b4db8573a52",
+      "hash": "8813bedc506c",
       "dims": [
         "O8"
       ]
@@ -375,7 +375,7 @@
       ]
     },
     "build-and-test:slot-sim-is-the-clone": {
-      "hash": "fd53a2b0b187",
+      "hash": "06e07591c4ab",
       "dims": [
         "O10"
       ]
@@ -654,7 +654,7 @@
       ]
     },
     "file:concession-taxonomy.md": {
-      "hash": "2571ea43fa04",
+      "hash": "4144b55f59ef",
       "dims": [
         "A32",
         "A7"
@@ -1719,8 +1719,8 @@
       "hash": "34bab6dc4b68"
     },
     "build-and-test:agent-account-first": {
-      "reason": "2026-10-09: citation repointed to agent-account-acquires-by-swap after the funding rule split; operator left account choice ungraded, and the pin check and PIN-scene guard are enforced by pin-agent-login.sh and xcuitest-run.sh --login-role",
-      "hash": "4dc36434ee0b"
+      "reason": "2026-10-09: operator left account choice ungraded; the pin check (now including the AGENT_TEST_MODE pin) and the PIN-scene guard are enforced by pin-agent-login.sh and xcuitest-run.sh --login-role; the added sentence only names when to pass --agent-test-mode off",
+      "hash": "50caa2dc58f9"
     },
     "asana-task-update:set-notes-when-no-run-is-live": {
       "reason": "2026-10-08: status gate mechanically enforced by asana-task-update.sh: refused at Pending and every phase status, so a run cannot rewrite its own task's prose; the operator-asked condition on other tasks is not graded",
@@ -1755,12 +1755,16 @@
       "hash": "2b94b0db83c6"
     },
     "pr-land:item-body": {
-      "reason": "2026-10-09: rule of the QA write-up subagent brief (references/qa-writeup.md), not read by the landing session; its outcome is gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
-      "hash": "110333c633e7"
+      "reason": "2026-10-09: subagent brief rule, gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
+      "hash": "cb47d1c5c88a"
     },
     "pr-land:nothing-to-verify": {
       "reason": "2026-10-09: rule of the QA write-up subagent brief (references/qa-writeup.md), not read by the landing session; its outcome is gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
       "hash": "3cc92f9cb3f9"
+    },
+    "pr-land:info-server-docs": {
+      "reason": "2026-10-09: subagent brief rule, gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
+      "hash": "e15873467f4a"
     }
   },
   "excluded_skills": {

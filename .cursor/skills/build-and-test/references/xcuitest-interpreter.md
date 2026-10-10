@@ -29,7 +29,7 @@ and source hash (`scripts/xcuitest-build.sh`, cached under
 | `tapOn` / `longPressOn` | `text`, `id`, `index`, `enabled`, `point`, `waitToSettleTimeoutMs`, `retryTapIfNoChange`, `failIfNoChange` (runner-only; see "Input that changes nothing"). `point` alone is a screen position: `"50%,80%"` (whole percentages of the screen) or `"120,640"` (points). `point` next to `text` or `id` is relative to the matched element. `longPressOn` holds for 3s, as Maestro does on iOS |
 | `assertVisible` / `assertNotVisible` | `enabled: true/false` narrows the match to enabled or disabled elements. Maestro timeouts: 17s (7s when `optional`), minus time since the last interaction. `assertNotVisible` therefore holds about 17s before it fails on text that is visible; for a fast absence check use `extendedWaitUntil: {notVisible: ..., timeout: 2000}` |
 | `extendedWaitUntil` | `visible` / `notVisible`, `timeout` |
-| `runFlow` | `file`, inline `commands`, `env`, `when` (`visible`, `notVisible`, `true`, `platform`). A false `when: visible:` costs about 0.5s on an idle scene and 5 to 7s while the app is busy |
+| `runFlow` | `file`, inline `commands`, `env`, `when` (`visible`, `notVisible`, `true`, `platform`). A `when: visible:` on an absent element, or `when: notVisible:` on a present one, waits 7s minus the time since the last interaction (launch, tap, drag, typing; waits, `evalScript` and `takeScreenshot` do not count), so about 7s right after a tap and nothing after a long wait. `when: notVisible:` on an absent element and `when: true:` return at once: gate on a value known before the run (`true:`) or probe absence first, never on the presence of something that is usually absent |
 | `inputText` / `eraseText` / `pressKey` | `pressKey`: Enter, Backspace, Home, and Back (does nothing, as on Maestro iOS). `eraseText` defaults to 50 characters. Three typing paths, tried in order: the focused element (`typeText`); with no focused element (a hidden input, such as the PIN entry) the on-screen keys, which covers only characters with their own key (digits, the current letter case, space); when a key is missing or the keyboard's keys are off screen, key events sent to the app. The step line names the path when it is not the first. `--typing events` sends every string as key events |
 | `inputRandomText` | `length` (default 8). Types random lowercase letters |
 | `copyTextFrom` / `pasteText` | `copyTextFrom` takes a selector and stores the element's text (title, else value, else placeholder, else label), also as `maestro.copiedText` for `evalScript` and `${}`. `pasteText` types it, and types nothing when nothing was copied |
@@ -74,6 +74,19 @@ passes it to the flow as env `EXPECT_USERNAME` and `PIN_DIGIT`.
 `common/login-if-needed.yaml` then fails within 5s, before any digit is
 tapped, when the PIN scene shows another account. Step lines and inspect
 output show the account name and the tapped digits as they are.
+
+Every run also gets env `LOGIN_MODE` and `AGENT_TEST_MODE`, read from the
+config of the gui checkout that the Metro on `$AGENT_METRO_PORT` serves
+(the script header has the derivation). `LOGIN_MODE=yolo` means the bundle
+signs in on launch: `common/login-if-needed.yaml` waits for the home scene
+and probes no PIN scene. YOLO signs in once per app process, so a flow that
+signs out and back in without a relaunch passes `LOGIN_MODE: pin` in that
+`runFlow`'s env. `AGENT_TEST_MODE=true` means the app raises no post-login
+modal, notification card or LogBox warning toast, and
+`common/dismiss-startup-modals.yaml` skips its modal gates. In either mode,
+a LogBox toast with any label but `! Open debugger to view warnings.` is an
+error: the session that meets it fixes the cause, and a dismissal is not a
+fix.
 
 ## Inspect and probe
 

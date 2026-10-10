@@ -22,8 +22,10 @@
 #
 # CYCLE, per armed+idle anchor:
 #   1. send a DISTILL prompt: the anchor updates its open-threads ledger at
-#      ~/.claude/projects/-Users-eddy/memory/anchor-<name>-open-threads.md and
-#      replies REANCHOR-DISTILL-DONE.
+#      ~/.claude/projects/-Users-eddy/memory/anchor-<name>-open-threads.md,
+#      moves finished entries to anchor-<name>-closed-threads.md beside it (the
+#      archive: searched on demand, never injected or read whole) and replies
+#      REANCHOR-DISTILL-DONE.
 #   2. wait up to DISTILL_WAIT_S; NO ledger confirmation -> ABORT this anchor
 #      (never kill a session whose state was not freshly distilled), retry on
 #      a later sweep.
@@ -157,9 +159,11 @@ for name in $ANCHORS; do
 
   # 1. Distill: the anchor snapshots its open threads BEFORE anything is killed.
   ledger="$MEMDIR/anchor-$name-open-threads.md"
+  # The archive sits beside the REAL open file (shared-ledger symlinks).
+  closed="$(realpath "$ledger" 2>/dev/null || echo "$ledger")"; closed="${closed%-open-threads.md}-closed-threads.md"
   distill_start=$(date +%s)
   tmux send-keys -t "$sess" C-u
-  tmux send-keys -t "$sess" -l "Reanchor sweep (automated): this session resets shortly. Update your open-threads ledger NOW: write every open thread, pending decision, and in-flight item (with enough context to resume cold) to $ledger, add/refresh its MEMORY.md index line, then reply with exactly REANCHOR-DISTILL-[DONE] but without the brackets."
+  tmux send-keys -t "$sess" -l "Reanchor sweep (automated): this session resets shortly. Update your open-threads ledger NOW: write every open thread, pending decision, and in-flight item (with enough context to resume cold) to $ledger, and move every shipped, settled or dropped entry out of it into $closed (newest first, each under a '# YYYY-MM-DD: title' heading; add with an edit, do not read that file whole). Add/refresh the MEMORY.md index line, then reply with exactly REANCHOR-DISTILL-[DONE] but without the brackets."
   sleep 1
   tmux send-keys -t "$sess" Enter
   ok=false
@@ -192,7 +196,7 @@ for name in $ANCHORS; do
     sleep 2
     tmux capture-pane -p -t "$sess" 2>/dev/null | grep -qE '(^|\s)/rc(\s|$)|bypass permissions on|Remote Control' && break
   done
-  tmux send-keys -t "$sess" -l "Fresh reanchor of $name (previous conversation reset for context hygiene; its transcript remains searchable via session-index). Read $ledger and your MEMORY.md before doing anything else, then summarize the open threads back to the operator."
+  tmux send-keys -t "$sess" -l "Fresh reanchor of $name (previous conversation reset for context hygiene; its transcript remains searchable via session-index). Read $ledger and your MEMORY.md before doing anything else, then summarize the open threads back to the operator. Finished work is in $closed: grep it only when a question needs history, never read it whole."
   sleep 1
   tmux send-keys -t "$sess" Enter
 

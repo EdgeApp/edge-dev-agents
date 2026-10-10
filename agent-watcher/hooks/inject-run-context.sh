@@ -14,7 +14,8 @@
 #     one-shot followup slice when the task already carries a run report, and
 #     re-read pointers for contract files.
 #   ANCHOR (tmux claude-asana-<name> with <name> in persistent_anchors):
-#     identity line + the anchor's open-threads ledger.
+#     identity line + the anchor's open-threads ledger, and a pointer to its
+#     closed-threads archive (searched on demand, never injected).
 #   Anything else: injects nothing. Outside orch runs a compact/clear boundary
 #     also expires this session's skill-read markers (sess-<session_id>).
 #
@@ -213,14 +214,33 @@ emit_chat() {
   echo "[chat-context] This is a DISCUSSION session (no orch contract). Do not do task deliverable work here: no edits in task worktrees, no commits, no PR/Asana mutations. Work is re-engaged by arming the task (agent_status=Pending); insights that should drive a run go into an Asana comment first. Discussing, inspecting, and drafting text for the operator are all fine."
 }
 
+# An anchor keeps TWO files. The open-threads ledger holds only what is still
+# open and is injected here at every boundary. The closed-threads archive beside
+# it holds everything finished; it grows without bound, so it is named here and
+# searched on demand, never injected and never read whole. The archive sits
+# beside the REAL open file, so anchors that share a ledger through a symlink
+# share it too.
+ANCHOR_LEDGER_CAP=6000
 emit_anchor() {
   local name="$1"
   echo "[anchor-context refresh] You are the '$name' anchor: tmux claude-asana-$name, RC $name."
   local ledger="$HOME/.claude/projects/-Users-eddy/memory/anchor-$name-open-threads.md"
   if [[ -f "$ledger" ]]; then
+    local real closed size
+    real=$(realpath "$ledger" 2>/dev/null || echo "$ledger")
+    closed="${real%-open-threads.md}-closed-threads.md"
+    size=$(wc -c < "$ledger" | tr -d ' ')
     echo "--- Open-threads ledger ($ledger) ---"
-    head -c 6000 "$ledger"
+    head -c "$ANCHOR_LEDGER_CAP" "$ledger"
     echo
+    if [[ "$size" -gt "$ANCHOR_LEDGER_CAP" ]]; then
+      echo "[LEDGER TRUNCATED: $size bytes, the first $ANCHOR_LEDGER_CAP shown. The open ledger holds ONLY open threads. Before other work, move every shipped, settled or dropped entry out of it into $closed until it fits.]"
+    fi
+    if [[ -f "$closed" ]]; then
+      echo "Closed threads: $closed ($(( $(wc -c < "$closed") / 1024 ))KB). Open it only when a question needs history, and then search it (grep, then Read the hit with offset/limit); never read it whole."
+    else
+      echo "Closed threads: $closed (not created yet). A thread that closes moves there, newest first under a '# YYYY-MM-DD: title' heading."
+    fi
   fi
   echo "Treat summarized/remembered session claims as stale; the ledger, MEMORY.md, and live fetches are the truth."
 }

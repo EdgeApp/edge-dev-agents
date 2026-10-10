@@ -55,6 +55,18 @@
 #     account's PIN scene). The output shows the account name and the
 #     tapped digits as they are: a roster name is not secret on this box, and
 #     a PIN works only on a device that already holds the account's login.
+#   Flow env set here from the gui checkout that the Metro on
+#   $AGENT_METRO_PORT serves (config.json, or env.json on a branch without
+#   src/configKeysSchema.ts); a caller's --env for the same key wins:
+#     LOGIN_MODE       `yolo` when the checkout pins YOLO_USERNAME and
+#                      YOLO_PIN (and, with --login-role, pins that role's
+#                      account): common/login-if-needed.yaml waits for the
+#                      home scene and taps no PIN. Otherwise `pin`.
+#     AGENT_TEST_MODE  `true` when the checkout's schema has the key and
+#                      config.json sets it: common/dismiss-startup-modals.yaml
+#                      skips the modal gates the app no longer raises.
+#                      Otherwise `false`.
+#   No Metro on the port, or no config file: `pin` and `false`.
 #   Relative takeScreenshot paths resolve against the current directory, as
 #   with `maestro test`.
 # Output: `[edge-flow]` step lines and the inspect lines, then
@@ -119,6 +131,27 @@ if [[ -n "$LOGIN_ROLE" ]]; then
   ENV_ARGS+=(--env "EXPECT_USERNAME=$LOGIN_USER" --env "PIN_DIGIT=${LOGIN_PIN:0:1}")
 fi
 
+LOGIN_MODE="pin"
+AGENT_TEST_MODE="false"
+METRO_PID=""
+[[ "${AGENT_METRO_PORT:-}" =~ ^[0-9]+$ ]] && METRO_PID="$(lsof -nP -iTCP:"$AGENT_METRO_PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)"
+if [[ -n "$METRO_PID" ]]; then
+  GUI_DIR="$(lsof -a -p "$METRO_PID" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)"
+  APP_CONFIG="$GUI_DIR/env.json"
+  [[ -f "$GUI_DIR/src/configKeysSchema.ts" ]] && APP_CONFIG="$GUI_DIR/config.json"
+  if [[ -n "$GUI_DIR" && -f "$APP_CONFIG" ]]; then
+    YOLO_USER="$(jq -r 'if ((.YOLO_PIN // "") | tostring) == "" then "" else (.YOLO_USERNAME // "") end' "$APP_CONFIG" 2>/dev/null)"
+    if [[ -n "$YOLO_USER" && ( -z "$LOGIN_ROLE" || "$YOLO_USER" == "$LOGIN_USER" ) ]]; then
+      LOGIN_MODE="yolo"
+    fi
+    if grep -q AGENT_TEST_MODE "$GUI_DIR/src/configKeysSchema.ts" 2>/dev/null \
+      && [[ "$(jq -r '.AGENT_TEST_MODE == true' "$GUI_DIR/config.json" 2>/dev/null)" == true ]]; then
+      AGENT_TEST_MODE="true"
+    fi
+  fi
+fi
+ENV_ARGS=(--env "LOGIN_MODE=$LOGIN_MODE" --env "AGENT_TEST_MODE=$AGENT_TEST_MODE" ${ENV_ARGS[@]+"${ENV_ARGS[@]}"})
+
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 START=$(date +%s)
 if [[ -n "$FLOW" ]]; then
@@ -167,7 +200,7 @@ else
   xcrun simctl spawn "$UDID" defaults write "$BUNDLE_ID" EdgeTestAnimations "$ANIMATIONS" >/dev/null 2>&1 || true
 fi
 
-echo "xcuitest-run: ${FLOW:-$FLOW_NAME} on $UDID (cap ${CAP}s, animations $ANIMATIONS${INSPECT:+, inspect $INSPECT}), run dir $RUN_DIR"
+echo "xcuitest-run: ${FLOW:-$FLOW_NAME} on $UDID (cap ${CAP}s, animations $ANIMATIONS, login $LOGIN_MODE, agent test mode $AGENT_TEST_MODE${INSPECT:+, inspect $INSPECT}), run dir $RUN_DIR"
 TEST_RUNNER_EDGE_FLOW_FILE="$RUN_DIR/flow.json" \
 TEST_RUNNER_EDGE_FLOW_CWD="$(pwd)" \
 TEST_RUNNER_EDGE_QUIESCENCE_CAP="$CAP" \

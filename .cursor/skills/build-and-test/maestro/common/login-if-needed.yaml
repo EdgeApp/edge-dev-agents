@@ -1,15 +1,27 @@
-# common/login-if-needed.yaml — PIN-login ONLY when the PIN screen is showing.
-# Safe under YOLO auto-login (app usually lands already logged in: the gate makes
-# this a no-op) and after a relaunch that returns to the PIN screen.
+# common/login-if-needed.yaml: reach the logged-in home scene after a launch.
+# LOGIN_MODE picks the path before any step runs:
+#   yolo  the build signs in by itself (YOLO_USERNAME + YOLO_PIN pinned in the
+#         checkout's config). The flow waits for HOME_MARKER and nothing else:
+#         no PIN gate is probed and no digit is tapped. A miss means the app
+#         did not auto-login: Metro serves a stale config
+#         (scripts/metro-fresh.sh --file config.json), or the app process
+#         already used its one auto-login (YOLO fires once per launch).
+#   pin   PIN-login ONLY when the PIN screen is showing. Every tap is gated,
+#         so a build that lands logged in passes through.
 # PARAMS:
 #   PIN_DIGIT        single digit tapped 4x (every roster PIN is one digit
 #                    repeated).
 #   EXPECT_USERNAME  account the PIN scene must show before any digit is
 #                    tapped. Unset skips the check.
 #   HOME_MARKER      text of the logged-in home scene. Default "Assets".
+#   LOGIN_MODE       `yolo` or `pin`. Default `pin`. `xcuitest-run.sh` sets it
+#                    from the checkout the slot's Metro serves. A flow that
+#                    signs out and back in without a relaunch passes `pin` in
+#                    its runFlow env.
 # On iOS pass `xcuitest-run.sh --login-role <role>`: it sets PIN_DIGIT and
 # EXPECT_USERNAME from the roster. A username or a PIN is never written into a
 # flow file: the library is published, and the roster is the one place they live.
+# The notes below describe the `pin` path.
 # ACCOUNT GUARD: the PIN scene shows the last-used account, which is not
 # always the one the caller means. With EXPECT_USERNAME set, a PIN scene on
 # another account fails the flow within 5s and no digit is tapped. The check
@@ -31,50 +43,63 @@ env:
   PIN_DIGIT: ${PIN_DIGIT || "0"}
   EXPECT_USERNAME: ${EXPECT_USERNAME || ""}
   HOME_MARKER: ${HOME_MARKER || "Assets"}
+  LOGIN_MODE: ${LOGIN_MODE || "pin"}
 ---
 - runFlow:
     when:
-      true: ${EXPECT_USERNAME != ''}
+      true: ${LOGIN_MODE == 'yolo'}
     commands:
+      - extendedWaitUntil:
+          visible: ${HOME_MARKER}
+          timeout: 60000
+          label: "YOLO auto-login reaches the home scene (a miss: metro-fresh.sh --file config.json)"
+- runFlow:
+    when:
+      true: ${LOGIN_MODE != 'yolo'}
+    commands:
+      - runFlow:
+          when:
+            true: ${EXPECT_USERNAME != ''}
+          commands:
+            - runFlow:
+                when:
+                  visible: "Exit PIN"
+                commands:
+                  - extendedWaitUntil:
+                      visible: ${EXPECT_USERNAME + "|" + HOME_MARKER}
+                      timeout: 5000
       - runFlow:
           when:
             visible: "Exit PIN"
           commands:
-            - extendedWaitUntil:
-                visible: ${EXPECT_USERNAME + "|" + HOME_MARKER}
-                timeout: 5000
-- runFlow:
-    when:
-      visible: "Exit PIN"
-    commands:
-      - tapOn:
-          text: ${PIN_DIGIT}
-          waitToSettleTimeoutMs: 900
-          optional: true
-- runFlow:
-    when:
-      visible: "Exit PIN"
-    commands:
-      - tapOn:
-          text: ${PIN_DIGIT}
-          waitToSettleTimeoutMs: 900
-          optional: true
-- runFlow:
-    when:
-      visible: "Exit PIN"
-    commands:
-      - tapOn:
-          text: ${PIN_DIGIT}
-          waitToSettleTimeoutMs: 900
-          optional: true
-- runFlow:
-    when:
-      visible: "Exit PIN"
-    commands:
-      - tapOn:
-          text: ${PIN_DIGIT}
-          waitToSettleTimeoutMs: 1500
-          optional: true
-- extendedWaitUntil:
-    notVisible: "Exit PIN"
-    timeout: 15000
+            - tapOn:
+                text: ${PIN_DIGIT}
+                waitToSettleTimeoutMs: 900
+                optional: true
+      - runFlow:
+          when:
+            visible: "Exit PIN"
+          commands:
+            - tapOn:
+                text: ${PIN_DIGIT}
+                waitToSettleTimeoutMs: 900
+                optional: true
+      - runFlow:
+          when:
+            visible: "Exit PIN"
+          commands:
+            - tapOn:
+                text: ${PIN_DIGIT}
+                waitToSettleTimeoutMs: 900
+                optional: true
+      - runFlow:
+          when:
+            visible: "Exit PIN"
+          commands:
+            - tapOn:
+                text: ${PIN_DIGIT}
+                waitToSettleTimeoutMs: 1500
+                optional: true
+      - extendedWaitUntil:
+          notVisible: "Exit PIN"
+          timeout: 15000

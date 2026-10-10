@@ -16,10 +16,10 @@ already encodes, params and gotchas included.
 
 | Flow | Params | Does |
 |---|---|---|
-| `common/login-if-needed.yaml` | PIN_DIGIT, EXPECT_USERNAME, HOME_MARKER (iOS: `xcuitest-run.sh --login-role <role>` sets the first two from the roster) | PIN login only when the PIN scene shows. With EXPECT_USERNAME set, a PIN scene on another account fails within 5s and no digit is tapped |
+| `common/login-if-needed.yaml` | PIN_DIGIT, EXPECT_USERNAME, HOME_MARKER, LOGIN_MODE (iOS: `xcuitest-run.sh` sets LOGIN_MODE from the checkout's config, and `--login-role <role>` sets the first two from the roster) | LOGIN_MODE `yolo`: wait for the home scene, no PIN probe. Otherwise PIN login only when the PIN scene shows. With EXPECT_USERNAME set, a PIN scene on another account fails within 5s and no digit is tapped |
 | `common/relaunch-and-login.yaml` | PIN_DIGIT, EXPECT_USERNAME, HOME_MARKER | Stop and launch the app (never `clearState`), LogBox toast, login, startup modals, home scene. The launch wait ends on the PIN scene, the home scene or the full login scene (a failure, within 1s) |
 | `common/dismiss-logbox-banner.yaml` | LOGBOX_TOAST | Close React Native's LogBox toast (debug builds; label is "! " plus the newest log line). No-op when absent. Run it again right before a tap or swipe on the bottom 50pt of a scene: the toast returns on every new warning or error |
-| `common/dismiss-startup-modals.yaml` | - | Clear survey/notification/update modals (runs `dismiss-logbox-banner` first) |
+| `common/dismiss-startup-modals.yaml` | AGENT_TEST_MODE (iOS: `xcuitest-run.sh` sets it from the checkout's config) | Clear survey/notification/update modals (runs `dismiss-logbox-banner` first). With AGENT_TEST_MODE `true` the app raises none of them, and the flow only closes a LogBox toast that is present |
 | `common/select-swap-pair.yaml` | SRC_ASSET, DST_ASSET, MANUAL_PATH, SRC_WALLET, DST_WALLET, SRC_ROW_ID, DST_ROW_ID, FIAT_AMOUNT, PROVIDER | Swap deep link sets the pair (MANUAL_PATH: Exchange tab → pick wallets via Search Wallets) → amount → quote (+ provider force, amount-field eraseText gotcha). The quote wait ends on the quote OR the "Exchange Error" card, 25s ceiling, and the flow fails within 1s of the error card |
 | `common/find-wallet.yaml` | SEARCH_TERM, MATCH_INDEX, ROW_ID | Assets tab → search → open a wallet's detail scene (Receive/Send/Trade). ROW_ID (`walletListRow.<wallet name>.<code>`) picks the exact row when the search text matches several wallets |
 | `common/open-settings.yaml` | - | Side menu → Settings list (compose your own subpage nav after) |
@@ -380,7 +380,7 @@ default 8081), who is listening there and from which directory, and a verdict:
 - **The YOLO login pin is a bundled module.** `config.json` (`env.json` on
   older branches) is read at bundle time. A checkout that skipped workspace
   init (the primary checkout a Task-shape run builds from) has no agent pin:
-  `scripts/pin-agent-login.sh <checkout>` writes it, `metro-fresh.sh --file
+  `scripts/pin-agent-login.sh <checkout>` writes it (with `AGENT_TEST_MODE`), `metro-fresh.sh --file
   config.json` proves Metro serves it, a cold launch signs in. A relaunch that
   stays on another account's PIN scene after a pin is this staleness, not a
   login bug.
@@ -499,9 +499,11 @@ device.
 - **Absence checks: a short `notVisible` wait, not `assertNotVisible`.** On the
   interpreter `assertNotVisible` on text that IS visible holds about 17s
   before it fails; `extendedWaitUntil: {notVisible: ..., timeout: 2000}` fails
-  in 2s. A `runFlow: when: visible:` whose condition is false costs about 0.5s
-  on an idle scene and 5 to 7s while the app is busy (a quote loading, a
-  region list saving), so order optional blocks after the scene settles.
+  in 2s. A `runFlow: when: visible:` on an absent element waits 7s minus the
+  time since the last interaction (`references/xcuitest-interpreter.md`,
+  `runFlow` row), so a presence gate right after a tap costs the full 7s:
+  gate on `when: true:` with a value known before the run, or probe absence
+  first with `when: notVisible:`.
 - **Exchange scene, error frames.** The "Exchange Error" card renders under
   the keyboard after Next: wait on the text, never on a frame, and take the
   proof frame after the keyboard is gone. The "Stealth Swap" label is part of
