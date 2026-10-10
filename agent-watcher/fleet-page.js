@@ -28,7 +28,8 @@ const DIR = path.join(os.homedir(), '.config/agent-watcher')
 const model = require(path.join(DIR, 'lib/fleet-model.js'))
 const args = process.argv.slice(2)
 const arg = (k, d) => { const i = args.indexOf(k); return i >= 0 && args[i + 1] ? args[i + 1] : d }
-const STATE_PATH = arg('--state', path.join(DIR, 'fleet-state.json'))
+const STATE_DIR = path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local/state'), 'agent-watcher')
+const STATE_PATH = arg('--state', path.join(STATE_DIR, 'fleet-state.json'))
 const OUT = arg('--out', '')
 const DUMP = arg('--dump', '')
 

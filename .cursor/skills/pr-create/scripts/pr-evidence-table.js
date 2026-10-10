@@ -182,12 +182,7 @@ function mergeManifest (manifest, entries) {
   for (const e of entries) {
     const k = batchFrameKey(e)
     const at = out.findIndex(x => batchFrameKey(x) === k)
-    // Carry a hosted url across a re-merge. A migrate re-run rebuilds entries
-    // from the PR comments and knows nothing about object storage, so a blind
-    // replace would silently revert a re-hosted PR to its long raw URLs and
-    // could push it back over the body cap. Same path only: a re-shot frame has
-    // a new stamped path, and the old url would show the frame it replaced.
-    if (at >= 0) out[at] = (e.url == null && out[at].url != null && e.path === out[at].path) ? { ...e, url: out[at].url } : e
+    if (at >= 0) out[at] = e
     else out.push(e)
   }
   return { version: 2, entries: out }
@@ -239,9 +234,11 @@ function render (manifest, { repo, pr, rawBase, commits }) {
       for (let c = 0; c < PER_ROW; c++) {
         const e = row[c]
         if (e == null) { out.push(`<td width="${CELL_W}"></td>`); continue }
-        // An entry may carry its own absolute url (object storage, where the
-        // key has its own random suffix and cannot be derived from a base).
-        // Otherwise the path is resolved against the assets-branch raw base.
+        // An entry carries its own absolute url (object storage, where the
+        // key has a random suffix and cannot be derived from a base).
+        // LEGACY agent-pr-assets: an entry attached before 2026-10-06 has no
+        // url, and its pixels are a blob on the old assets branch at rawBase.
+        // When that branch is deleted, drop rawBase and read e.url alone.
         const url = e.url || (rawBase + e.path.split('/').pop())
         // The capture number leads the caption so prose that says "screenshot 2"
         // resolves by reading, not by hovering the image URL. Position within

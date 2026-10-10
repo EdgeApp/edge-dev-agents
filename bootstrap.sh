@@ -14,9 +14,11 @@
 # never in this repo; carry them over in the machine-migration bundle) into the
 # standard entry points (~ and ~/git).
 #
-# Secrets are NOT in the repo. agent-watcher/credentials.json is seeded from
-# credentials.example.json (fill it in afterward). Machine-local state (pools,
-# logs, worktrees, watchdog state) is never copied.
+# Secrets and people data are NOT in the repo. agent-watcher/credentials.json
+# and agent-watcher/team-roster.json are seeded from their *.example.json
+# templates (fill them in afterward). Machine-local state (pools, logs,
+# worktrees, watchdog state, the Fleet ledger and artifact URL, the rc-heal
+# anchor list) is never copied.
 #
 # Usage:  ./bootstrap.sh        (run from the repo root after cloning)
 
@@ -50,6 +52,14 @@ if [[ -d "$REPO/agent-watcher" ]]; then
     cp "$HOME/.config/agent-watcher/credentials.example.json" "$CRED"
     chmod 600 "$CRED"
     warn "Seeded $CRED from example — EDIT IT and add your real asana_token."
+  fi
+  # The reviewer roster (names + Asana user gids) is people data: local-only,
+  # with an empty template in the repo. asana-task-update reads it.
+  ROSTER="$HOME/.config/agent-watcher/team-roster.json"
+  if [[ ! -f "$ROSTER" && -f "$HOME/.config/agent-watcher/team-roster.example.json" ]]; then
+    cp "$HOME/.config/agent-watcher/team-roster.example.json" "$ROSTER"
+    chmod 600 "$ROSTER"
+    warn "Seeded $ROSTER from example: fill in .members (see NEW-MACHINE-SETUP.md, Local-only files)."
   fi
 fi
 

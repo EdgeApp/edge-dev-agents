@@ -138,7 +138,7 @@
       ]
     },
     "pr-create:attach-test-evidence": {
-      "hash": "69989fa8760e",
+      "hash": "6917e3673d7a",
       "dims": [
         "A13"
       ]
@@ -721,7 +721,7 @@
       ]
     },
     "file:block-raw-gh-writes.sh": {
-      "hash": "c4333cbc75de",
+      "hash": "293b687654ba",
       "dims": [
         "A36"
       ]
@@ -1727,8 +1727,8 @@
       "hash": "12bd4b404e5a"
     },
     "build-and-test:redact-secrets-before-attach": {
-      "reason": "2026-10-08: 2026-10-08: operator ruling: a rule only, not graded",
-      "hash": "c05268c37efa"
+      "reason": "2026-10-10: operator ruling 2026-10-08 stands: a rule only, not graded; the frame half is enforced by pr-create/scripts/pr-attach-screenshots.sh through evidence-privacy.sh",
+      "hash": "98e30ef75239"
     },
     "pr-land:qa-writeups-by-opus-subagent": {
       "reason": "2026-10-08: who writes the QA items and from what reading; item quality is not an eval dimension, existence and plain language are gated by asana-task-update.sh",
@@ -1765,6 +1765,10 @@
     "pr-land:info-server-docs": {
       "reason": "2026-10-09: subagent brief rule, gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
       "hash": "e15873467f4a"
+    },
+    "pr-create:evidence-privacy-refusal": {
+      "reason": "2026-10-10: refusal mechanically enforced by pr-create/scripts/pr-attach-screenshots.sh (exit 3, nothing uploaded); the rule only names the remedy; a dimension for working around the refusal is proposed to the operator in the task A status file",
+      "hash": "21a78a53f5bd"
     }
   },
   "excluded_skills": {

@@ -3,6 +3,7 @@
 #   com.jontz.tmux      KeepAlive persistent tmux server (holds the anchor sessions)
 #   com.jontz.rc-heal   the healing tick, every 5 min
 # Healing only: no watcher, no watchdog, no Asana. See rc-heal.sh for the policy.
+# `install` also seeds the per-machine rc-heal.json from rc-heal.example.json.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 LA="$HOME/Library/LaunchAgents"
@@ -16,6 +17,12 @@ BIN_PATH="$(cd "$(dirname "$(command -v tmux)")" && pwd -P):$(cd "$(dirname "$(c
 
 case "${1:-}" in
   install)
+    # rc-heal.json is this machine's anchor list and is never synced; the repo
+    # ships only the template, whose empty list makes each tick a no-op.
+    if [[ ! -f "$HERE/rc-heal.json" && -f "$HERE/rc-heal.example.json" ]]; then
+      cp "$HERE/rc-heal.example.json" "$HERE/rc-heal.json"
+      echo "seeded rc-heal.json from rc-heal.example.json: add this machine's anchor under .anchors"
+    fi
     cat > "$LA/$TMUX_LABEL.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

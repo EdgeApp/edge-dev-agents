@@ -96,7 +96,6 @@ if printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])gh[[:space:]]+pr[[:space:
    printf '%s' "$CMD_M" | grep -qE '(^|[[:space:]])--(body|body-file|title)([[:space:]]|=|$)'; then
   block "raw \`gh pr edit --body/--body-file/--title\` is forbidden — the PR body carries the test-evidence table between its sentinels, and a raw rewrite can drop it and skips the no-slop prose lint. Use instead:
   add/refresh test evidence: ~/.cursor/skills/pr-create/scripts/pr-attach-screenshots.sh --repo <owner/repo> --pr <num> [--carry-forward <scene>] [--retire <scene>] <png...>
-  convert a PR's legacy screenshot comments: ~/.cursor/skills/pr-create/scripts/pr-evidence-migrate.sh --repo <owner/repo> --pr <num> --apply
   create the PR (owns the templated, linted body): ~/.cursor/skills/pr-create/scripts/pr-create.sh
   rewrite your own PR title/prose (sentinel blocks preserved, lint enforced): ~/.cursor/skills/pr-create/scripts/pr-prose-edit.sh --repo <owner/repo> --pr <num> [--title <t>] [--body-file <path>]
 Structural edits (--add-label, --base, --add-reviewer) are not blocked."

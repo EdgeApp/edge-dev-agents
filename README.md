@@ -326,7 +326,8 @@ just a viewport.
 - **Healing without the orch.** A box that hosts a pinned anchor but runs no Asana
   watcher (an operator laptop while the orch host is down) runs `rc-heal.sh`
   instead of `session-watchdog.js`: the watchdog's healing slice only, per
-  anchor in `rc-heal.json` (recreate a dead tmux session, revive a dead claude,
+  anchor in the machine's own `rc-heal.json` (seeded from `rc-heal.example.json`,
+  never synced) (recreate a dead tmux session, revive a dead claude,
   kill+respawn a dead RC bridge), one spawn per tick with verified-dead and
   cooldown guards; `tmux-keepalive.sh` is the KeepAlive LaunchAgent that keeps
   the tmux server alive across ticks, `install-rc-heal.sh` arms or disarms the
@@ -780,8 +781,12 @@ reproducible from a single clone + `./bootstrap.sh`:
   daemon, session watchdog, worktree/iOS-sim pool helpers, the enforcement
   hooks, status/attempt/tested scripts). Canonical home is
   `~/.config/agent-watcher`. Committed: scripts, `*.js`, `asana-config.json`,
-  docs, and `credentials.example.json`. **Never committed:** `credentials.json`
-  (secret) and machine-local state (`pool.json`, `slots.json`,
+  docs, and the fill-in templates (`credentials.example.json`,
+  `team-roster.example.json`, `rc-heal.example.json`). **Never committed:** `credentials.json`
+  (secret), `team-roster.json` (names and Asana user gids), `rc-heal.json` (one
+  machine's pinned anchors), `fleet-panel.json` and `fleet-state.json` (one
+  machine's Fleet artifact URL and request ledger), and machine-local state
+  (`pool.json`, `slots.json`,
   `watchdog-state.json`, `*.state`, `*.log`, forensics) and session briefs
   (`*-anchor-brief.*` and anything under `agent-watcher/briefs/`, such as a
   session's watch script; briefs live in `~/.local/state/agent-watcher/briefs`).
@@ -1050,6 +1055,9 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`git-default-branch.sh`](.cursor/skills/git-default-branch.sh) | A repo's default branch, the ref a NEW PR targets: origin/HEAD, else ask the remote once, else main, master, develop |
 | [`git-branch-base.sh`](.cursor/skills/git-branch-base.sh) | The ref the current branch is measured from (first commit, fixup targets, autosquash, doc fingerprints): its open PR's base, else the default branch, so a stacked branch never folds into its parent's commits |
 | [`hacked-frames.sh`](.cursor/skills/pr-create/scripts/hacked-frames.sh) | Which proof frames are hack-forced, by `pr-evidence-table.js`'s whole-token `HACKED` rule; used by the report gate, the screenshot attach and the judge's evidence bundle |
+| [`pr-attach-screenshots.sh`](.cursor/skills/pr-create/scripts/pr-attach-screenshots.sh) | Attach proof frames to a PR: privacy check, downscale, upload frames and the PR's manifest to the asset bucket, render the evidence table into the body |
+| [`evidence-privacy.sh`](.cursor/skills/pr-create/scripts/evidence-privacy.sh) | Classify frames by local OCR as clean, SECRET (seed, key, password, OTP) or USERNAME (roster account name), and write hatched copies; the attach refuses on SECRET and when the check cannot run. `evidence-privacy.js` holds the rules, `frame-vision.swift` is the macOS Vision reader it compiles on first use, and `wordlists/` holds the mnemonic lists (`bip39-english.txt`, `monero-english.txt`, `electrum-old-english.txt`) |
+| [`evidence-bucket.sh`](.cursor/skills/pr-create/scripts/evidence-bucket.sh) | Put, get, list and delete objects in the asset bucket, and read or write a PR's evidence manifest there (`evidence-bucket.js` is its S3 client) |
 | [`log-attempt.sh`](agent-watcher/log-attempt.sh) | Append truthful attempt-log entries |
 | [`set-tested.sh`](agent-watcher/set-tested.sh) | Set the task's tested field from run evidence |
 | [`convention-sync.sh`](.cursor/skills/convention-sync/scripts/convention-sync.sh) | Bidirectional sync with cross-machine safety blocks; `--commit` runs the message through `no-slop-lint.sh` first and exits 3 on a finding |

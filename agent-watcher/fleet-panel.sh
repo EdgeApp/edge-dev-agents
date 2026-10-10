@@ -5,10 +5,14 @@
 # artifact (the `fleet` anchor, skill /fleet-panel) does only what needs the
 # Artifact tool: read the live page, hand its state here, publish the result.
 #
-# Files (all in ~/.config/agent-watcher):
-#   fleet-state.json    request ledger: {"requests":[{id,kind,uuid,title,at,status,rc,tmux,note,doneAt}]}
-#   fleet-panel.json    {"url": "<artifact url>"} written by the skill at init
-#   fleet-panel.log     one line per request applied
+# Files, all one box's state and none of it synced (convention-sync excludes
+# both json names and *.log):
+#   ~/.local/state/agent-watcher/fleet-state.json
+#                       request ledger: {"requests":[{id,kind,uuid,title,at,status,rc,tmux,note,doneAt}]}
+#   ~/.config/agent-watcher/fleet-panel.json
+#                       {"url": "<artifact url>"} written by the skill at init
+#   ~/.config/agent-watcher/fleet-panel.log
+#                       one line per request applied
 #
 # Usage:
 #   fleet-panel.sh render [--out /tmp/fleet-page.html]     render from the current fleet + ledger
@@ -26,10 +30,14 @@
 #       render failure.
 set -uo pipefail
 DIR="$HOME/.config/agent-watcher"
-STATE="$DIR/fleet-state.json"
+ST="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"
+STATE="$ST/fleet-state.json"
 LOG="$DIR/fleet-panel.log"
 OUT="/tmp/fleet-page.html"
 cmd="${1:-}"; shift || true
+mkdir -p "$ST"
+# A ledger left in the config dir by an older copy of this script moves once.
+[ -f "$STATE" ] || [ ! -f "$DIR/fleet-state.json" ] || mv "$DIR/fleet-state.json" "$STATE"
 [ -f "$STATE" ] || echo '{"requests":[]}' > "$STATE"
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >> "$LOG"; }
 

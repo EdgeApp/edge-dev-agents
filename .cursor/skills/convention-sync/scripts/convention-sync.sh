@@ -167,8 +167,11 @@ LEGACY_REPO_README="$REPO_CURSOR/README.md"
 # NOT mirrored: memories stay off the public repo and travel only in the
 # machine-migration bundle (NEW-MACHINE-SETUP.md). Format: "SRC_ABS|REPO_SUBDIR|csv-excludes"
 # Excludes are rsync patterns (matched against the path relative to SRC).
+# Per-machine files that have a published template stay out by name and ship
+# as `<name>.example.json` (credentials, rc-heal anchors, team roster); the
+# Fleet artifact URL and request ledger are one box's state and ship nothing.
 EXTRA_TREES=(
-  "$HOME/.config/agent-watcher|agent-watcher|credentials.json,secrets,*.log,*.state,*.lock,pool.json,slots.json,watchdog-state.json,oom-repro/forensics,oom-repro/logs,*-anchor-brief.*,briefs,__pycache__,*.pyc,.DS_Store,.git"
+  "$HOME/.config/agent-watcher|agent-watcher|credentials.json,rc-heal.json,team-roster.json,fleet-panel.json,fleet-state.json,secrets,*.log,*.state,*.lock,pool.json,slots.json,watchdog-state.json,oom-repro/forensics,oom-repro/logs,*-anchor-brief.*,briefs,__pycache__,*.pyc,.DS_Store,.git"
   "$HOME/.claude/workflows|claude-workflows|.DS_Store,.git"
 )
 # Single committable files (home canonical) → repo relpath. Format: "SRC_FILE|REPO_RELPATH"

@@ -5,7 +5,8 @@
 # machine can host a pinned (remote-control) anchor session without running the Asana
 # control plane. No task pickup, no Asana reads/writes, no slots/sims/Metro, no
 # worktree GC, no idle reaping. It tends the anchors in rc-heal.json and touches
-# nothing else on the box.
+# nothing else on the box. rc-heal.json is per-machine and never synced; the
+# template is rc-heal.example.json (install-rc-heal.sh seeds from it).
 #
 # WHY IT EXISTS (2026-08-29): eddy (the orch host) is down; jontz needs one pinned
 # session that stays reachable from the phone. The full watchdog would be wrong here —

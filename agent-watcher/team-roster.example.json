@@ -1,0 +1,8 @@
+{
+  "_doc": "Template for team-roster.json: the people an agent may assign a task to or set as its developer, with their Asana user gids. Copy it to team-roster.json (bootstrap.sh does this when the file is missing) and fill in `members`. team-roster.json is never synced: copy it from a machine that already has one, or look each gid up in Asana (the Asana MCP get_users tool, or GET /users?workspace=<workspace_gid> with the token in credentials.json). An empty list means every assignee is asked for by gid.",
+  "_member_shape": {
+    "name": "<full name>",
+    "asana_user_gid": "<numeric gid>"
+  },
+  "members": []
+}

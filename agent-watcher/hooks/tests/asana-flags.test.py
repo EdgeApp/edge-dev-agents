@@ -145,11 +145,11 @@ def update(args, token='stub', **route_kw):
 
 
 # ---------------- A. asana-task-update.sh --assign ----------------
-p = update(['--assign', '522823585857811'])
+p = update(['--assign', '7770000000003'])
 pb = puts()
 check('A1 off-project assign exits 0', p.returncode == 0, p.stdout + p.stderr)
 check('A1 PUT carries the assignee and no custom_fields',
-      len(pb) == 1 and pb[0]['data'] == {'assignee': '522823585857811'}, pb)
+      len(pb) == 1 and pb[0]['data'] == {'assignee': '7770000000003'}, pb)
 check('A1 needs no task read and no prompt',
       not [c for c in calls() if c['method'] == 'GET'] and 'PROMPT' not in p.stdout, p.stdout)
 
@@ -166,7 +166,7 @@ check('A2 unknown option exits 1, lists the real options, no PUT',
       p.returncode == 1 and 'High' in p.stderr and not puts(), p.stdout + p.stderr)
 os.remove(cred)
 
-p = update(['--assign', '522823585857811'], put_code=400,
+p = update(['--assign', '7770000000003'], put_code=400,
            put_body={'errors': [{'message': 'Custom field with ID 123 is not on given object'}]})
 check('A3 refused PUT exits 1 (not a bare 56)', p.returncode == 1, f'rc={p.returncode} {p.stderr}')
 check('A3 stderr names HTTP status and Asana message',
@@ -176,7 +176,7 @@ p = update(['--set-priority', 'High'], task_code=404)
 check('A4 refused task read exits 1 with HTTP status',
       p.returncode == 1 and 'Task read: FAILED (HTTP 404' in p.stderr and not puts(), p.stdout + p.stderr)
 
-p = update(['--assign', '522823585857811'], put_exit=56)
+p = update(['--assign', '7770000000003'], put_exit=56)
 check('A5 transport failure exits 1 and names curl exit',
       p.returncode == 1 and 'curl exit 56' in p.stderr, f'rc={p.returncode} {p.stderr}')
 
@@ -187,7 +187,7 @@ check('A6 missing reviewer without skip exits 2 PROMPT_REVIEWER', p.returncode =
 
 for flag in (['--set-reviewer', '777'], ['--set-implementor', '777'], ['--set-status', 'Review Needed'],
              ['--set-planned', '1'], ['--auto-est-review-hrs']):
-    p = update(['--assign', '522823585857811'] + flag)
+    p = update(['--assign', '7770000000003'] + flag)
     check(f'A7 {flag[0]} is an unknown flag, no API call',
           p.returncode == 1 and 'Unknown flag' in p.stderr and not calls(), p.stdout + p.stderr)
 

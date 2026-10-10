@@ -134,12 +134,14 @@ If the caller used `--skip-assign-if-missing`, do not ask about `PROMPT_REVIEWER
 Summarize one line per action from script output (attach result, assignment, status change, field updates).
 </step>
 
-<team-roster description="Asana user GIDs. Use numbered lists when prompting users.">
-1. Jon Tzeng — `1200972350160586`
-2. William Swanson — `10128869002320`
-3. Paul Puey — `9976421903322`
-4. Sam Holmes — `1198904591136142`
-5. Matthew Piche — `522823585857811`
+<team-roster description="Asana user gids for `--assign` and `--set-developer`. Use numbered lists when prompting users.">
+The roster is each machine's own file, `~/.config/agent-watcher/team-roster.json`. Print it as a numbered list:
+
+```bash
+jq -r '.members | to_entries[] | "\(.key + 1). \(.value.name): \(.value.asana_user_gid)"' ~/.config/agent-watcher/team-roster.json
+```
+
+When the file is missing or the list is empty, ask for the person's Asana user gid. Never guess a gid, and never write a name or gid from the roster into a skill, script, or test.
 </team-roster>
 
 <exit-codes>

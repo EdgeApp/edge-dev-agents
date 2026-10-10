@@ -2,25 +2,28 @@
 # pr-attach-screenshots.sh — Publish test-evidence screenshots into a PR body.
 #
 # GitHub has NO official API for uploading images into a PR, so this uploads the
-# images to the orch's object bucket (~/git/site-orch/upload-asset.sh) and
-# renders them as ONE batch-grouped table inside the PR BODY, between invisible
-# HTML sentinels.
+# images to the orch's object bucket (evidence-bucket.sh) and renders them as
+# ONE batch-grouped table inside the PR BODY, between invisible HTML sentinels.
 #
-# HOSTING: pixels go to the bucket and never into a git history. A git blob is
+# HOSTING: the frames and the per-PR manifest (text: scenes, batches, urls) are
+# objects in one bucket, and nothing goes into a git history. A git blob is
 # permanent once pushed (deleting the file leaves it reachable by commit sha), so
-# a frame that turns out to show a secret could not be withdrawn from the assets
+# a frame that turns out to show a secret could never be withdrawn from a
 # branch; a bucket object can be deleted. Bucket URLs also render on PRIVATE
 # repos, where GitHub's image proxy cannot fetch raw.githubusercontent.com.
-# Only the per-PR manifest (text: scenes, batches, urls) is committed to the
-# assets branch of the infra repo, which keeps one place that says what a PR's
-# table holds. A manifest entry's `path` is the frame's identity (stamped
-# filename); for a bucket-hosted frame no blob exists at it, and `url` is where
-# the image is.
+# The manifest is the one place that says what a PR's table holds; its key is
+# manifests/<owner>/<repo>/pr-<num>.json (evidence-bucket.sh manifest-key). An
+# entry's `path` is the frame's identity (stamped filename) and `url` is where
+# the image is. No bucket (unconfigured) exits 1 before anything is written.
 #
-# No bucket (uploader missing or unconfigured) exits 1 before anything is
-# written. EVIDENCE_HOST=branch selects the old behavior, image blobs on the
-# assets branch served from raw.githubusercontent.com, for a machine that has no
-# bucket; it is never a fallback the script picks on its own.
+# PRIVACY: the bucket is public, so the fix for private content is never to
+# upload it. Every frame goes through evidence-privacy.sh before any network
+# call, against the two classes that build-and-test's
+# `redact-secrets-before-attach` defines. A SECRET frame (seed, private key,
+# password, 2FA code) refuses the whole run with exit 3: nothing is uploaded and
+# the message names the frame and the reason. A USERNAME frame (a roster
+# account name) uploads a hatched copy. A detector that cannot run also exits
+# 3: a frame with no verdict is never published.
 #
 # A BATCH is one invocation of this script at one head sha: the build those
 # frames were shot against. Re-running at the SAME head sha grows that batch in
@@ -66,17 +69,25 @@
 #
 # SCALING: every image is downscaled to max width 720px (ratio preserved) before
 # upload — the table renders at 200px and links the 720px original. Originals on
-# disk are never mutated (eval/validator checks stat the original /tmp paths).
+# disk are never mutated (eval/validator checks stat the original /tmp paths);
+# a hatched frame is likewise a copy.
 #
 # Exit codes: 0 = body updated, 1 = error, 2 = dispositions needed (nothing was
-# uploaded; re-run with the flags the refusal printed).
+# uploaded; re-run with the flags the refusal printed), 3 = privacy refusal
+# (nothing was uploaded; cover the content or re-shoot, then re-run).
 
 set -euo pipefail
 
-ASSETS_REPO="EdgeApp/edge-dev-agents"
-ASSETS_BRANCH="agent-pr-assets"
-UPLOADER="${EVIDENCE_UPLOADER:-$HOME/git/site-orch/upload-asset.sh}"
-export TABLE_JS="$HOME/.cursor/skills/pr-create/scripts/pr-evidence-table.js"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BUCKET="$DIR/evidence-bucket.sh"
+PRIVACY="$DIR/evidence-privacy.sh"
+export TABLE_JS="$DIR/pr-evidence-table.js"
+
+# LEGACY agent-pr-assets: where manifests and frames lived before the bucket.
+# Read-only here, and only by the two blocks tagged LEGACY below. When the
+# branch is deleted, remove these two lines and both blocks.
+LEGACY_REPO="EdgeApp/edge-dev-agents"
+LEGACY_BRANCH="agent-pr-assets"
 
 REPO=""; PR=""; HACK_NOTE=""
 IMAGES=(); CARRY=(); RETIRE=()
@@ -98,31 +109,86 @@ USAGE="Usage: pr-attach-screenshots.sh --repo <owner/repo> --pr <num> [--carry-f
 for f in "${IMAGES[@]:-}"; do [[ -z "$f" || -f "$f" ]] || { echo "Not found: $f" >&2; exit 1; }; done
 
 ANY_HACKED=false
-[[ -n "$("$(dirname "$0")/hacked-frames.sh" "${IMAGES[@]:-}")" ]] && ANY_HACKED=true
+[[ -n "$("$DIR/hacked-frames.sh" "${IMAGES[@]:-}")" ]] && ANY_HACKED=true
 if $ANY_HACKED && [[ -z "$HACK_NOTE" ]]; then
   echo "HACKED image(s) present: pass --hack-note '<one short line: WHAT was hacked>' (e.g. --hack-note 'hard-coded the empty-state branch true in WalletList') so the PR banner is specific. See build-and-test hack-verify-visual-changes." >&2
   exit 1
 fi
 
-# ── Where the pixels go (see HOSTING in the header) ───────────────────────────
-# Decided before any read or write, so a missing bucket costs nothing.
-HOST=bucket
-if [[ "${EVIDENCE_HOST:-bucket}" == "branch" ]]; then
-  HOST=branch
-elif [[ ${#IMAGES[@]} -gt 0 ]] && { [[ ! -x "$UPLOADER" ]] || ! "$UPLOADER" --check; }; then
-  echo "no asset bucket: $UPLOADER is missing or unconfigured, nothing uploaded. Configure it, or set EVIDENCE_HOST=branch to store image blobs on the public assets branch instead." >&2
-  exit 1
+log() { echo ">> pr-attach-screenshots: $*" >&2; }
+
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+
+# ── Privacy gate (see PRIVACY in the header) ──────────────────────────────────
+# Runs on the originals, before any network call. The classes and what counts
+# as each belong to `redact-secrets-before-attach`; this block only acts on the
+# detector's verdicts.
+if [[ ${#IMAGES[@]} -gt 0 ]]; then
+  PRIV_RC=0
+  "$PRIVACY" classify "${IMAGES[@]}" > "$WORK/privacy.ndjson" 2> "$WORK/privacy.err" || PRIV_RC=$?
+  # A verdict per frame, in argument order: REFUSE lines for a frame that may
+  # not go up, HATCH <index> for one that goes up as a hatched copy.
+  node -e '
+    const fs = require("fs")
+    const [recPath, rc, ...files] = process.argv.slice(1)
+    const recs = fs.readFileSync(recPath, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l))
+    const out = []
+    if (rc !== "0" && !recs.some(r => r.class === "error")) out.push("REFUSE the privacy check could not run (exit " + rc + ")")
+    files.forEach((f, i) => {
+      const r = recs[i]
+      if (r == null || r.file !== f) { if (rc === "0") out.push("REFUSE " + f + "\n         no verdict from the privacy check"); return }
+      if (r.class === "SECRET" || r.class === "error") {
+        out.push("REFUSE " + f)
+        for (const x of r.reasons) out.push("         " + (r.class === "error" ? "unreadable: " : "") + x.detail)
+      } else if (r.class === "USERNAME") {
+        out.push("HATCH " + i + " " + [...new Set(r.usernames.map(u => u.role))].join(", "))
+      } else if (r.class !== "clean") {
+        out.push("REFUSE " + f + "\n         unknown verdict " + r.class)
+      }
+    })
+    process.stdout.write(out.join("\n") + (out.length ? "\n" : ""))
+  ' "$WORK/privacy.ndjson" "$PRIV_RC" "${IMAGES[@]}" > "$WORK/privacy.txt" || { echo "privacy check produced no readable verdicts: nothing uploaded" >&2; cat "$WORK/privacy.err" >&2; exit 3; }
+
+  if grep -q '^REFUSE' "$WORK/privacy.txt"; then
+    {
+      echo ">> pr-attach-screenshots: REFUSING — nothing uploaded (redact-secrets-before-attach)."
+      echo "   The bucket is public, and these frames may not be published as they are:"
+      echo ""
+      grep -v '^HATCH' "$WORK/privacy.txt" | sed -e 's/^REFUSE /     /'
+      [[ -s "$WORK/privacy.err" ]] && sed -e 's/^/     /' "$WORK/privacy.err"
+      echo ""
+      echo "   Re-shoot the scene with the value hidden, or cover it in a copy and attach the copy"
+      echo "   (same filename in another directory, so the caption and cell number hold):"
+      echo "     $PRIVACY classify --explain <frame>            # each finding with its box"
+      echo "     $PRIVACY hatch <frame> <dir>/<same-name> <x,y,w,h>...   # prints the copy's verdict"
+    } >&2
+    exit 3
+  fi
+
+  mkdir "$WORK/hatched"
+  while read -r _ idx roles; do
+    src="${IMAGES[$idx]}"
+    mkdir "$WORK/hatched/$idx"
+    out="$WORK/hatched/$idx/$(basename "$src")"
+    if ! "$PRIVACY" redact "$src" "$out" > /dev/null 2> "$WORK/privacy.err"; then
+      echo ">> pr-attach-screenshots: REFUSING — nothing uploaded. Could not hatch the account name out of $src:" >&2
+      sed -e 's/^/     /' "$WORK/privacy.err" >&2
+      exit 3
+    fi
+    IMAGES[$idx]="$out"
+    log "hatched the account name ($roles) out of $(basename "$src"); the original is untouched"
+  done < <(grep '^HATCH' "$WORK/privacy.txt" || true)
 fi
+
+# ── The bucket holds the frames and the manifest ──────────────────────────────
+# Checked before any read or write, so a missing bucket costs nothing.
+"$BUCKET" check || { echo "no asset bucket configured (see the config path in evidence-bucket.js): nothing uploaded." >&2; exit 1; }
 
 REPO_NAME="${REPO#*/}"
 DEST_DIR="assets/${REPO_NAME}/pr-${PR}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 NOW_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-log() { echo ">> pr-attach-screenshots: $*" >&2; }
-
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
 
 json_array() { # json_array <item>... -> JSON array on stdout
   node -e 'process.stdout.write(JSON.stringify(process.argv.slice(1)))' "$@"
@@ -170,12 +236,30 @@ PR_COMMITS=$(cat "$WORK/commits.json")
 log "head $(echo "$HEAD_SHA" | cut -c1-7); human review actions: $(node -e 'console.log(JSON.parse(process.argv[1]).length)' "$ACTIONS")"
 
 # ── Existing manifest (the table's source of truth) ───────────────────────────
-MANIFEST_PATH="$DEST_DIR/manifest.json"
-gh api "repos/$ASSETS_REPO/contents/$MANIFEST_PATH?ref=$ASSETS_BRANCH" --jq '.content' 2>/dev/null | base64 -d > "$WORK/old.json" 2>/dev/null || true
-[[ -s "$WORK/old.json" ]] || echo '{"version":2,"entries":[]}' > "$WORK/old.json"
+# "No manifest" (exit 4) starts an empty table. Any other failure stops the run:
+# writing a fresh manifest over one that could not be read would drop its frames.
+MANIFEST_RC=0
+"$BUCKET" manifest-get "$REPO" "$PR" "$WORK/old.json" 2> "$WORK/manifest.err" || MANIFEST_RC=$?
+if [[ "$MANIFEST_RC" -eq 4 ]]; then
+  # LEGACY agent-pr-assets (start): a PR whose evidence predates the bucket
+  # manifest still has its manifest on the old assets branch. Read it once; the
+  # write below goes to the bucket, so the next run never comes back here.
+  if LEGACY=$(gh api "repos/$LEGACY_REPO/contents/$DEST_DIR/manifest.json?ref=$LEGACY_BRANCH" --jq '.content' 2> "$WORK/legacy.err"); then
+    printf '%s' "$LEGACY" | base64 -d > "$WORK/old.json" || { echo "could not decode the legacy manifest for $REPO#$PR: nothing uploaded" >&2; exit 1; }
+    log "manifest read from the legacy assets branch; it moves to the bucket with this run"
+  elif ! grep -q 'HTTP 404' "$WORK/legacy.err"; then
+    echo "could not read the legacy manifest for $REPO#$PR, nothing uploaded: $(cat "$WORK/legacy.err")" >&2
+    exit 1
+  fi
+  # LEGACY agent-pr-assets (end)
+  [[ -s "$WORK/old.json" ]] || echo '{"version":2,"entries":[]}' > "$WORK/old.json"
+elif [[ "$MANIFEST_RC" -ne 0 ]]; then
+  echo "could not read the manifest for $REPO#$PR, nothing uploaded: $(cat "$WORK/manifest.err")" >&2
+  exit 1
+fi
 
 # ── Batch decision + disposition gate, BEFORE any upload ──────────────────────
-# A refusal here costs no uploads and no commits on the assets branch.
+# A refusal here costs no uploads and no manifest write.
 SUPPLIED="[]"
 if [[ ${#IMAGES[@]} -gt 0 ]]; then
   SUPPLIED=$(node -e '
@@ -256,19 +340,8 @@ else
   log "new batch $BATCH_AT at $(echo "$HEAD_SHA" | cut -c1-7) (carried forward: $CARRIED_N)"
 fi
 
-# ── Ensure the assets branch exists (orphan, created on first use) ────────────
-if ! gh api "repos/$ASSETS_REPO/git/ref/heads/$ASSETS_BRANCH" >/dev/null 2>&1; then
-  log "assets branch missing — creating orphan $ASSETS_BRANCH"
-  README_BLOB=$(gh api "repos/$ASSETS_REPO/git/blobs" -f content="$(printf 'Agent PR test-evidence screenshots. Auto-managed by pr-attach-screenshots.sh; safe to prune old PR dirs.' | base64)" -f encoding=base64 --jq .sha)
-  TREE=$(gh api "repos/$ASSETS_REPO/git/trees" \
-    -f 'tree[][path]=README.md' -f 'tree[][mode]=100644' -f 'tree[][type]=blob' -f "tree[][sha]=$README_BLOB" --jq .sha)
-  COMMIT=$(gh api "repos/$ASSETS_REPO/git/commits" -f message="init agent-pr-assets" -f tree="$TREE" --jq .sha)
-  gh api "repos/$ASSETS_REPO/git/refs" -f ref="refs/heads/$ASSETS_BRANCH" -f sha="$COMMIT" >/dev/null
-  log "created $ASSETS_BRANCH @ $COMMIT"
-fi
-
 # ── Downscale to max width 720 (ratio preserved) into temp copies ─────────────
-# 720 = 2x the table's 360px render width (crisp on retina, ~4x smaller blob).
+# 720 = 2x the table's 360px render width (crisp on retina, ~4x smaller object).
 # Originals are never mutated; narrower images pass through unscaled.
 MAX_W=720
 UPLOADS=()
@@ -287,14 +360,10 @@ for f in "${IMAGES[@]:-}"; do
   UPLOADS+=("$f")
 done
 
-# ── Upload the frames, then build one commit holding the manifest ─────────────
-# Bucket uploads come first and any failure exits before the manifest commit, so
-# the manifest never names a frame that is not hosted. An object uploaded ahead
-# of a failed run is orphaned under an unguessable key; the re-run uploads anew.
-HEAD_ASSETS=$(gh api "repos/$ASSETS_REPO/git/ref/heads/$ASSETS_BRANCH" --jq .object.sha)
-BASE_TREE=$(gh api "repos/$ASSETS_REPO/git/commits/$HEAD_ASSETS" --jq .tree.sha)
-
-ENTRIES="[]"
+# ── Upload the frames ─────────────────────────────────────────────────────────
+# Uploads come first and any failure exits before the manifest write, so the
+# manifest never names a frame that is not hosted. An object uploaded ahead of a
+# failed run is orphaned under an unguessable key; the re-run uploads anew.
 PATHS="[]"
 URLS="{}"
 N=0
@@ -303,34 +372,17 @@ for f in "${UPLOADS[@]:-}"; do
   base="$(basename "$f")"; base="${base#scaled-}"
   safe="$(printf '%s' "$base" | tr -c 'A-Za-z0-9._-' '-')"
   path="$DEST_DIR/$STAMP-$safe"
-  if [[ "$HOST" == "bucket" ]]; then
-    N=$((N+1))
-    key=$(node -e '
-      const m = require(process.env.TABLE_JS)
-      const [repoName, pr, file, n] = process.argv.slice(1)
-      process.stdout.write(m.bucketKey({ repoName, pr, file, n: Number(n) }))
-    ' "$REPO_NAME" "$PR" "$base" "$N")
-    url=$("$UPLOADER" --key "$key" "$f" | tail -1) || { echo "bucket upload failed: $base (manifest and PR body untouched)" >&2; exit 1; }
-    [[ "$url" == https://* ]] || { echo "bucket upload returned no url for $base (manifest and PR body untouched)" >&2; exit 1; }
-    URLS=$(node -e 'const [j,p,u]=process.argv.slice(1);const o=JSON.parse(j);o[p]=u;console.log(JSON.stringify(o))' "$URLS" "$path" "$url")
-    PATHS=$(node -e 'const [j,p]=process.argv.slice(1);const a=JSON.parse(j);a.push(p);console.log(JSON.stringify(a))' "$PATHS" "$path")
-    log "uploaded $base → bucket $key"
-    continue
-  fi
-  tmp="$WORK/blob.json"
-  node -e '
-    const fs=require("fs");
-    const [src,out]=process.argv.slice(1);
-    fs.writeFileSync(out, JSON.stringify({content: fs.readFileSync(src).toString("base64"), encoding:"base64"}));
-  ' "$f" "$tmp"
-  sha=$(gh api "repos/$ASSETS_REPO/git/blobs" --input "$tmp" --jq .sha)
-  ENTRIES=$(node -e '
-    const [entries,path,sha]=process.argv.slice(1);
-    const a=JSON.parse(entries); a.push({path, mode:"100644", type:"blob", sha});
-    console.log(JSON.stringify(a));
-  ' "$ENTRIES" "$path" "$sha")
+  N=$((N+1))
+  key=$(node -e '
+    const m = require(process.env.TABLE_JS)
+    const [repoName, pr, file, n] = process.argv.slice(1)
+    process.stdout.write(m.bucketKey({ repoName, pr, file, n: Number(n) }))
+  ' "$REPO_NAME" "$PR" "$base" "$N")
+  url=$("$BUCKET" put "$f" "$key" | tail -1) || { echo "bucket upload failed: $base (manifest and PR body untouched)" >&2; exit 1; }
+  [[ "$url" == http*://* ]] || { echo "bucket upload returned no url for $base (manifest and PR body untouched)" >&2; exit 1; }
+  URLS=$(node -e 'const [j,p,u]=process.argv.slice(1);const o=JSON.parse(j);o[p]=u;console.log(JSON.stringify(o))' "$URLS" "$path" "$url")
   PATHS=$(node -e 'const [j,p]=process.argv.slice(1);const a=JSON.parse(j);a.push(p);console.log(JSON.stringify(a))' "$PATHS" "$path")
-  log "uploaded $base → $path"
+  log "uploaded $base → bucket $key"
 done
 
 # ── Merge this batch, then apply the keep predicate and write the manifest ────
@@ -347,7 +399,7 @@ node -e '
   const fresh = JSON.parse(pathsJson).map(p => {
     const meta = m.parseName(p.split("/").pop())
     const e = { path: p, ...meta, subject: null, hackNote: meta.hacked ? (hackNote || null) : null, batchAt, headSha, addedAt: nowIso }
-    return urls[p] ? { ...e, url: urls[p] } : e
+    return { ...e, url: urls[p] }
   })
   let merged = m.mergeManifest(old, [...gate.carried, ...fresh])
 
@@ -365,26 +417,13 @@ node -e '
   if (retired) console.error(">> pr-attach-screenshots: retired " + retired + " frame(s) from " + dropped.length + " superseded batch(es)")
 ' "$WORK/old.json" "$WORK/gate.json" "$PATHS" "$HACK_NOTE" "$HEAD_SHA" "$ACTIONS" "$RETIRE_JSON" "$NOW_UTC" "$WORK/new.json" "$URLS"
 
-node -e 'const fs=require("fs");const [c,o]=process.argv.slice(1);fs.writeFileSync(o,JSON.stringify({content:fs.readFileSync(c).toString("base64"),encoding:"base64"}))' "$WORK/new.json" "$WORK/mblob.json"
-MSHA=$(gh api "repos/$ASSETS_REPO/git/blobs" --input "$WORK/mblob.json" --jq .sha)
-ENTRIES=$(node -e '
-  const [entries,path,sha]=process.argv.slice(1);
-  const a=JSON.parse(entries); a.push({path, mode:"100644", type:"blob", sha});
-  console.log(JSON.stringify(a));
-' "$ENTRIES" "$MANIFEST_PATH" "$MSHA")
-
-node -e '
-  const [baseTree,entries,out]=process.argv.slice(1);
-  require("fs").writeFileSync(out, JSON.stringify({base_tree: baseTree, tree: JSON.parse(entries)}));
-' "$BASE_TREE" "$ENTRIES" "$WORK/tree.json"
-NEW_TREE=$(gh api "repos/$ASSETS_REPO/git/trees" --input "$WORK/tree.json" --jq .sha)
-NEW_COMMIT=$(gh api "repos/$ASSETS_REPO/git/commits" \
-  -f message="evidence: $REPO_NAME#$PR (${#UPLOADS[@]} new on $HOST, $CARRIED_N carried)" \
-  -f tree="$NEW_TREE" -f "parents[]=$HEAD_ASSETS" --jq .sha)
-gh api -X PATCH "repos/$ASSETS_REPO/git/refs/heads/$ASSETS_BRANCH" -f sha="$NEW_COMMIT" >/dev/null
-log "committed $NEW_COMMIT to $ASSETS_BRANCH"
+"$BUCKET" manifest-put "$REPO" "$PR" "$WORK/new.json" > /dev/null || { echo "manifest write failed for $REPO#$PR (PR body untouched; re-run to retry)" >&2; exit 1; }
+log "manifest written to the bucket ($("$BUCKET" manifest-key "$REPO" "$PR"))"
 
 # ── Re-render the whole table into the PR body between its sentinels ──────────
+# LEGACY agent-pr-assets: a frame attached before the bucket has no url of its
+# own and renders from the old assets branch. Drop this with the branch.
+LEGACY_RAW_BASE="https://raw.githubusercontent.com/$LEGACY_REPO/$LEGACY_BRANCH/$DEST_DIR/"
 CUR_BODY=$(gh api "repos/$REPO/pulls/$PR" --jq '.body // ""')
 NEW_BODY=$(node -e '
   const m = require(process.env.TABLE_JS)
@@ -392,8 +431,7 @@ NEW_BODY=$(node -e '
   const [manPath, body, repo, pr, rawBase, commits] = process.argv.slice(1)
   const table = m.render(JSON.parse(fs.readFileSync(manPath, "utf8")), { repo, pr, rawBase, commits: JSON.parse(commits) })
   process.stdout.write(m.splice(body, table))
-' "$WORK/new.json" "$CUR_BODY" "$REPO" "$PR" \
-  "https://raw.githubusercontent.com/$ASSETS_REPO/$ASSETS_BRANCH/$DEST_DIR/" "$PR_COMMITS") || exit 1
+' "$WORK/new.json" "$CUR_BODY" "$REPO" "$PR" "$LEGACY_RAW_BASE" "$PR_COMMITS") || exit 1
 
 # GitHub caps a PR body at 65536 chars; past that the edit is rejected and the
 # table would be lost, so refuse while the old body is still intact.

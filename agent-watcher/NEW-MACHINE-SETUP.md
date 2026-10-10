@@ -83,6 +83,8 @@ Everything below this line is for Claude, not you.
 >    (147 keys, incl. `BREEZ_API_KEY`), `~/.config/edge-secrets/` (incl. the local-only
 >    test-account roster `test-accounts.json`; copy the folder from
 >    the old machine if the bundle lacks it, workspace init pins the YOLO login from it),
+>    `~/.config/agent-watcher/team-roster.json` (the local-only reviewer roster with Asana
+>    user gids; see "Local-only files" below),
 >    `~/.cursor/skills` + `~/.cursor/rules`, the 6
 >    `~/Library/LaunchAgents/com.jontz.*.plist`, and that `~/.claude/skills/one-shot/SKILL.md`
 >    resolves (its symlink should now point into THIS user's `~/.cursor`, not `/Users/jontz`).
@@ -91,7 +93,9 @@ Everything below this line is for Claude, not you.
 >    except for the username). Install maestro (`curl -Ls https://get.maestro.mobile.dev | bash`).
 >    Install oh-my-zsh WITHOUT clobbering the placed `.zshrc` (which sources it):
 >    `RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"`
->    Set `git config --global user.name "Jonathan Tzeng"` and `user.email jnthntzng@gmail.com`.
+>    Set `git config --global user.name` and `user.email` to the operator's commit identity:
+>    read both from the source machine (`git config --global user.name`, `git config --global
+>    user.email`) or ask me. Neither value is kept in the repo.
 >    Verify `jq gh tmux watchman`, `node -v` (== v24.15.0), `maestro -v`.
 > 3. **iOS sims.** Install the iOS 18 runtime (`xcodebuild -downloadPlatform iOS`; if it
 >    needs Apple ID, tell me). Create the master sim matching
@@ -166,6 +170,23 @@ Commits are then distinguishable by which machine's signing key signed them — 
 Until signed commits are required, attribution is implicit (source watcher is off, so
 anything new came from this machine). Note: auth/push stays on HTTPS + the gh token; the
 signing key is only for signatures.
+
+## Local-only files (never in the repo)
+
+The repo is public, so secrets, people data and one machine's own state stay out
+of it. The bundle from step 2 carries the first two rows; a machine set up from a
+clone plus `./bootstrap.sh` instead gets the templates and fills them in.
+
+| File in `~/.config/agent-watcher` | Template in the repo | Where the values come from |
+|---|---|---|
+| `credentials.json` (mode 600) | `credentials.example.json`, seeded by `bootstrap.sh` | The Asana PAT and webhook secret, from the source machine or the operator |
+| `team-roster.json` | `team-roster.example.json`, seeded by `bootstrap.sh` | Copy from the source machine, or look each person's gid up in Asana (`GET /users?workspace=<workspace_gid>`). asana-task-update reads it to offer assignees |
+| `rc-heal.json` | `rc-heal.example.json`, seeded by `install-rc-heal.sh install` | Written per machine: the pinned anchors that machine hosts. Only a box that runs `rc-heal.sh` needs it |
+| `fleet-panel.json` | none | Written by the fleet-panel skill when that machine first publishes its Fleet page |
+
+`fleet-state.json` (the Fleet request ledger) lives in
+`~/.local/state/agent-watcher` with the other machine state and starts empty.
+The git commit name and email are set by hand (PART C step 2).
 
 ## Claude Code hooks (manual step — settings.json is not synced)
 

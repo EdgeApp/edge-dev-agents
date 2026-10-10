@@ -1,0 +1,10 @@
+{
+  "_doc": "Template for rc-heal.json, the per-machine list of pinned anchors rc-heal.sh tends. Copy it to rc-heal.json (install-rc-heal.sh install does this when the file is missing) and fill in `anchors`. rc-heal.json is never synced: each machine keeps its own. name -> tmux session claude-asana-<name> and RC name <name>. session_id is minted on first spawn and is the ONLY transcript identity used afterward (no argv/mtime guessing). An empty `anchors` list makes every tick a no-op.",
+  "_anchor_shape": {
+    "name": "<machine>-main",
+    "cwd": "/Users/<you>/git",
+    "model": "opus[1m]",
+    "effort": "high"
+  },
+  "anchors": []
+}
