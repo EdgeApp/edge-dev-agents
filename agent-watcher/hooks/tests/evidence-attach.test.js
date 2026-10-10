@@ -28,7 +28,6 @@ const PR = '7'
 const MANIFEST_KEY = `manifests/${REPO}/pr-${PR}.json`
 const HEAD_A = 'a'.repeat(40)
 const HEAD_B = 'b'.repeat(40)
-const LEGACY_BRANCH = 'agent-pr-assets'
 
 // ── Fake bucket: an S3-shaped object store that records every request ────────
 const objects = new Map()
@@ -60,14 +59,8 @@ const path = require('path')
 const dir = ${JSON.stringify(GH_DIR)}
 const a = process.argv.slice(2)
 fs.appendFileSync(path.join(dir, 'log'), JSON.stringify(a) + '\\n')
-const has = f => fs.existsSync(path.join(dir, f))
 const read = f => fs.readFileSync(path.join(dir, f), 'utf8')
 if (a[0] === 'api' && a[1] === 'graphql') { process.stdout.write(read('pr.json')); process.exit(0) }
-if (a[0] === 'api' && /^repos\\/[^/]+\\/[^/]+\\/contents\\//.test(a[1])) {
-  if (has('legacy-broken')) { process.stderr.write('gh: Server Error (HTTP 502)\\n'); process.exit(1) }
-  if (!has('legacy.json')) { process.stderr.write('gh: Not Found (HTTP 404)\\n'); process.exit(1) }
-  process.stdout.write(Buffer.from(read('legacy.json')).toString('base64') + '\\n'); process.exit(0)
-}
 if (a[0] === 'api' && /^repos\\/[^/]+\\/[^/]+\\/pulls\\/\\d+$/.test(a[1])) { process.stdout.write(read('body.md')); process.exit(0) }
 if (a[0] === 'pr' && a[1] === 'edit') { fs.copyFileSync(a[a.indexOf('--body-file') + 1], path.join(dir, 'body.out')); process.exit(0) }
 process.stderr.write('fake gh: unexpected call ' + JSON.stringify(a) + '\\n')
@@ -172,7 +165,7 @@ async function main () {
 
   await t('clean attach: gh is only read, apart from the one body edit', async () => {
     const calls = ghLog()
-    assert.deepStrictEqual(calls.map(a => a.slice(0, 2).join(' ')), ['api graphql', `api repos/EdgeApp/edge-dev-agents/contents/assets/edge-widget/pr-${PR}/manifest.json?ref=${LEGACY_BRANCH}`, `api repos/${REPO}/pulls/${PR}`, 'pr edit'])
+    assert.deepStrictEqual(calls.map(a => a.slice(0, 2).join(' ')), ['api graphql', `api repos/${REPO}/pulls/${PR}`, 'pr edit'])
     for (const a of calls) {
       if (a[0] !== 'api' || a[1] === 'graphql') continue
       assert.ok(!a.some(x => /^(-X|--method|-f|-F|--field|--raw-field|--input)$/.test(x)), `a write-shaped gh api call: ${a.join(' ')}`)
@@ -180,13 +173,12 @@ async function main () {
     }
   })
 
-  await t('second attach at the same head reads the bucket manifest, not the branch', async () => {
+  await t('second attach at the same head grows the batch from the bucket manifest', async () => {
     fs.rmSync(path.join(GH_DIR, 'log'))
     requests = []
     const r = await run([frame('02-settings')])
     assert.strictEqual(r.status, 0, r.stderr)
     assert.strictEqual(manifest().entries.length, 2)
-    assert.ok(!ghLog().some(a => a.join(' ').includes(LEGACY_BRANCH)), 'the legacy branch was read although the bucket had the manifest')
   })
 
   await t('SECRET frame refuses the whole run: exit 3, frame and reason named, nothing sent anywhere', async () => {
@@ -238,28 +230,6 @@ async function main () {
     assert.strictEqual(ghLog().length, 0)
   })
 
-  await t('legacy manifest on the branch is read once and moves to the bucket', async () => {
-    reset()
-    const old = { path: `assets/edge-widget/pr-${PR}/20260901-101010-agent-proof-1-01-old-scene.png`, caption: 'old scene', index: '01', hacked: false, batchAt: '2026-09-01T10:10:10Z', headSha: HEAD_A, addedAt: '2026-09-01T10:10:10Z' }
-    fs.writeFileSync(path.join(GH_DIR, 'legacy.json'), JSON.stringify({ version: 2, entries: [old] }))
-    const r = await run([frame('01-wallet-list')])
-    assert.strictEqual(r.status, 0, r.stderr)
-    const man = manifest()
-    assert.strictEqual(man.entries.length, 2)
-    assert.ok(man.entries.some(e => e.path === old.path && e.url == null))
-    assert.ok(bodyOut().includes(`https://raw.githubusercontent.com/EdgeApp/edge-dev-agents/${LEGACY_BRANCH}/assets/edge-widget/pr-${PR}/20260901-101010-agent-proof-1-01-old-scene.png`))
-    assert.strictEqual(ghLog().filter(a => a.join(' ').includes(LEGACY_BRANCH)).length, 1)
-  })
-
-  await t('a legacy read that fails (not a 404) stops before any write', async () => {
-    reset()
-    fs.writeFileSync(path.join(GH_DIR, 'legacy-broken'), '')
-    const r = await run([frame('01-wallet-list')])
-    assert.strictEqual(r.status, 1, r.stderr)
-    assert.strictEqual(puts().length, 0)
-    assert.ok(!fs.existsSync(path.join(GH_DIR, 'body.out')))
-  })
-
   await t('a bucket manifest read that fails stops before any write', async () => {
     reset()
     objects.set(MANIFEST_KEY, Buffer.from(JSON.stringify({ version: 2, entries: [] })))
@@ -267,7 +237,6 @@ async function main () {
     const r = await run([frame('01-wallet-list')])
     assert.strictEqual(r.status, 1, r.stderr)
     assert.strictEqual(puts().length, 0)
-    assert.ok(!ghLog().some(a => a.join(' ').includes(LEGACY_BRANCH)), 'a failed bucket read fell through to the branch')
     assert.ok(!fs.existsSync(path.join(GH_DIR, 'body.out')))
   })
 
@@ -306,8 +275,6 @@ async function main () {
     for (const gone of ['EVIDENCE_HOST', 'EVIDENCE_UPLOADER', 'upload-asset', 'git/refs', 'git/blobs', 'git/trees', 'git/commits', '-X PATCH', '-X POST', '-X PUT']) {
       assert.ok(!src.includes(gone), `still mentions ${gone}`)
     }
-    const stray = src.split('\n').filter(l => l.includes(LEGACY_BRANCH) && !/LEGACY/.test(l))
-    assert.deepStrictEqual(stray, [], 'the old branch is named outside a LEGACY-tagged line')
   })
 
   server.close()

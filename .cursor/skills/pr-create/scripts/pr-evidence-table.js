@@ -207,7 +207,7 @@ function bucketKey ({ repoName, pr, file, n, prefix }) {
 // commits: [{sha, subject}] from the PR, newest last. A batch sha still present
 // in that list links to its commit; one that a force-push orphaned renders as
 // plain text, because the link would 404 once GitHub collects it.
-function render (manifest, { repo, pr, rawBase, commits }) {
+function render (manifest, { repo, pr, commits }) {
   const subjects = new Map((commits || []).map(c => [c.sha, c.subject]))
   const out = ['<table>']
   for (const b of batchesOf(manifest)) {
@@ -236,10 +236,7 @@ function render (manifest, { repo, pr, rawBase, commits }) {
         if (e == null) { out.push(`<td width="${CELL_W}"></td>`); continue }
         // An entry carries its own absolute url (object storage, where the
         // key has a random suffix and cannot be derived from a base).
-        // LEGACY agent-pr-assets: an entry attached before 2026-10-06 has no
-        // url, and its pixels are a blob on the old assets branch at rawBase.
-        // When that branch is deleted, drop rawBase and read e.url alone.
-        const url = e.url || (rawBase + e.path.split('/').pop())
+        const url = e.url
         // The capture number leads the caption so prose that says "screenshot 2"
         // resolves by reading, not by hovering the image URL. Position within
         // the batch is the fallback for a frame whose filename carried no index.

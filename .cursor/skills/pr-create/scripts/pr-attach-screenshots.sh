@@ -83,12 +83,6 @@ BUCKET="$DIR/evidence-bucket.sh"
 PRIVACY="$DIR/evidence-privacy.sh"
 export TABLE_JS="$DIR/pr-evidence-table.js"
 
-# LEGACY agent-pr-assets: where manifests and frames lived before the bucket.
-# Read-only here, and only by the two blocks tagged LEGACY below. When the
-# branch is deleted, remove these two lines and both blocks.
-LEGACY_REPO="EdgeApp/edge-dev-agents"
-LEGACY_BRANCH="agent-pr-assets"
-
 REPO=""; PR=""; HACK_NOTE=""
 IMAGES=(); CARRY=(); RETIRE=()
 while [[ $# -gt 0 ]]; do
@@ -241,18 +235,7 @@ log "head $(echo "$HEAD_SHA" | cut -c1-7); human review actions: $(node -e 'cons
 MANIFEST_RC=0
 "$BUCKET" manifest-get "$REPO" "$PR" "$WORK/old.json" 2> "$WORK/manifest.err" || MANIFEST_RC=$?
 if [[ "$MANIFEST_RC" -eq 4 ]]; then
-  # LEGACY agent-pr-assets (start): a PR whose evidence predates the bucket
-  # manifest still has its manifest on the old assets branch. Read it once; the
-  # write below goes to the bucket, so the next run never comes back here.
-  if LEGACY=$(gh api "repos/$LEGACY_REPO/contents/$DEST_DIR/manifest.json?ref=$LEGACY_BRANCH" --jq '.content' 2> "$WORK/legacy.err"); then
-    printf '%s' "$LEGACY" | base64 -d > "$WORK/old.json" || { echo "could not decode the legacy manifest for $REPO#$PR: nothing uploaded" >&2; exit 1; }
-    log "manifest read from the legacy assets branch; it moves to the bucket with this run"
-  elif ! grep -q 'HTTP 404' "$WORK/legacy.err"; then
-    echo "could not read the legacy manifest for $REPO#$PR, nothing uploaded: $(cat "$WORK/legacy.err")" >&2
-    exit 1
-  fi
-  # LEGACY agent-pr-assets (end)
-  [[ -s "$WORK/old.json" ]] || echo '{"version":2,"entries":[]}' > "$WORK/old.json"
+  echo '{"version":2,"entries":[]}' > "$WORK/old.json"
 elif [[ "$MANIFEST_RC" -ne 0 ]]; then
   echo "could not read the manifest for $REPO#$PR, nothing uploaded: $(cat "$WORK/manifest.err")" >&2
   exit 1
@@ -421,17 +404,14 @@ node -e '
 log "manifest written to the bucket ($("$BUCKET" manifest-key "$REPO" "$PR"))"
 
 # ── Re-render the whole table into the PR body between its sentinels ──────────
-# LEGACY agent-pr-assets: a frame attached before the bucket has no url of its
-# own and renders from the old assets branch. Drop this with the branch.
-LEGACY_RAW_BASE="https://raw.githubusercontent.com/$LEGACY_REPO/$LEGACY_BRANCH/$DEST_DIR/"
 CUR_BODY=$(gh api "repos/$REPO/pulls/$PR" --jq '.body // ""')
 NEW_BODY=$(node -e '
   const m = require(process.env.TABLE_JS)
   const fs = require("fs")
-  const [manPath, body, repo, pr, rawBase, commits] = process.argv.slice(1)
-  const table = m.render(JSON.parse(fs.readFileSync(manPath, "utf8")), { repo, pr, rawBase, commits: JSON.parse(commits) })
+  const [manPath, body, repo, pr, commits] = process.argv.slice(1)
+  const table = m.render(JSON.parse(fs.readFileSync(manPath, "utf8")), { repo, pr, commits: JSON.parse(commits) })
   process.stdout.write(m.splice(body, table))
-' "$WORK/new.json" "$CUR_BODY" "$REPO" "$PR" "$LEGACY_RAW_BASE" "$PR_COMMITS") || exit 1
+' "$WORK/new.json" "$CUR_BODY" "$REPO" "$PR" "$PR_COMMITS") || exit 1
 
 # GitHub caps a PR body at 65536 chars; past that the edit is rejected and the
 # table would be lost, so refuse while the old body is still intact.
