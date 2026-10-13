@@ -192,6 +192,12 @@ sync_content() {
 # Create symlink, replacing if target changed
 sync_symlink() {
   local src="$1" dest="$2"
+  # ~/.claude/skills is itself a symlink to ~/.cursor/skills, so dest can BE
+  # src. Replacing it would delete the file and leave a link to itself.
+  if [[ -e "$dest" && "$dest" -ef "$src" ]]; then
+    ((skipped++)) || true
+    return
+  fi
   if [[ -L "$dest" ]]; then
     local current
     current=$(readlink "$dest")

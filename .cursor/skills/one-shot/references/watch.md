@@ -20,7 +20,7 @@ Keep agent_status=Reviewing (set in step 5; the PR is up and under external revi
 
 Exit conditions:
 - **All green** (per `finalize-gate`: CI checks pass + every `reviewer-bots` check-run completed-clean on HEAD + no unresolved threads from any of them): proceed to step 7.
-- **30 min wall-clock elapsed**: take the blocked completion (`yolo-true-blockers`) with the one-line comment summarizing what was still red.
+- **`watch-pr.sh` exits 75/124** (the watch budget for this HEAD is spent): take the blocked completion (`yolo-true-blockers`) with the one-line comment summarizing what was still red.
 - **True-blocker hit during a fix attempt**: take the blocked completion per `yolo-true-blockers`.
 
 Honor `yolo-stop-at-pr` strictly: never merge, never tag, never deploy DURING the watch. The only mutations here are force-pushes to the PR's own branch. After green, step 7's routing may sanction a land (`land-on-approval`, via /pr-land) or a `test-*` cheese push (`cheese-build-on-green`) — those are the only post-green exceptions.

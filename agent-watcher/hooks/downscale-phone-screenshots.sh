@@ -97,11 +97,11 @@ case "$W$H" in ''|*[!0-9]*) exit 0 ;; esac
 # zero saving.
 #
 # Token cost tracks pixel AREA, so the target is expressed as a fraction of the
-# displayed AREA and converted to a long edge by sqrt. Halving the area (the
-# default) means ~71% of each dimension and ~half the tokens, and it lands on the
-# same size for every device rather than varying with how far the original
-# happened to sit above the cap. A quarter of the area is legible to a model but
-# too small to review by eye, which is the reason this is not more aggressive.
+# displayed AREA and converted to a long edge by sqrt. A quarter of the area
+# (the default) means half of each dimension and about a quarter of the tokens,
+# and it lands on the same size for every device rather than varying with how
+# far the original happened to sit above the cap. A quarter is legible to a
+# model but small for review by eye; the original file is untouched for that.
 #
 # AGENT_SHOT_AREA_PCT overrides the fraction; AGENT_SHOT_MAX_EDGE pins the long
 # edge outright and skips the computation.

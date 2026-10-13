@@ -23,7 +23,7 @@
 // Exit codes:
 //   0 = All (non-skipped) PRs merged successfully
 //   1 = Verification failed
-//   4 = CHANGELOG-only conflict (agent can resolve semantically)
+//   4 = Rebase conflict left in progress, CHANGELOG-only or code (status in JSON)
 
 const { spawnSync } = require("child_process");
 const path = require("path");

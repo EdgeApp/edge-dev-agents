@@ -287,10 +287,12 @@ downloaded = []
 
 print(f'ATTACHMENTS: {len(data)} files')
 for a in data:
-    name = a.get('name', 'unnamed')
+    # The name is whatever the uploader typed: keep the last path component
+    # so it cannot leave download_dir.
+    name = os.path.basename(a.get('name') or 'unnamed')
     url = a.get('download_url')
     ext = os.path.splitext(name)[1].lower()
-    if ext in DOWNLOAD_EXTS and url:
+    if ext in DOWNLOAD_EXTS and url and name not in ('.', '..'):
         os.makedirs(download_dir, exist_ok=True)
         dest = os.path.join(download_dir, name)
         try:

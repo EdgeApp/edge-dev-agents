@@ -403,7 +403,7 @@ HACKED_SHOTS="$("$HOME/.cursor/skills/pr-create/scripts/hacked-frames.sh" /tmp/a
 if [ -n "$HACKED_SHOTS" ] && ! grep -qE '🪓|🩹|HACK-FORCED' "$REPORT"; then
   FAIL+="- Hack-forced screenshots are not declared in the report. This run captured:
 $(echo "$HACKED_SHOTS" | head -5 | sed 's/^/    /')
-    Add a 🪓 line in the Testing section per one-shot references/report.md: the file, the exact hack, that it was reverted (clean git status), and what the frame does NOT prove (the trigger).
+    Add a 🪓 line in the Testing section per one-shot references/finalize.md: the file, the exact hack, that it was reverted (clean git status), and what the frame does NOT prove (the trigger).
 "
 fi
 

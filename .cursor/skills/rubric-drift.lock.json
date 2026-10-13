@@ -20,7 +20,7 @@
       ]
     },
     "file:update-status.sh": {
-      "hash": "ada60fd7fa79",
+      "hash": "d9f6acad88d3",
       "dims": [
         "A4",
         "O8"
@@ -138,7 +138,7 @@
       ]
     },
     "pr-create:attach-test-evidence": {
-      "hash": "6917e3673d7a",
+      "hash": "650afd72940f",
       "dims": [
         "A13"
       ]
@@ -216,7 +216,7 @@
       ]
     },
     "one-shot:followup-scope-is-the-deliverable": {
-      "hash": "56b9d321e405",
+      "hash": "70b09ab6c3d0",
       "dims": [
         "A23"
       ]
@@ -246,7 +246,7 @@
       ]
     },
     "file:asana-watcher.js": {
-      "hash": "6c8cd62c2e7c",
+      "hash": "cba79cf50924",
       "dims": [
         "O1"
       ]
@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "2d2de128a548",
+      "hash": "9a744a92f165",
       "dims": [
         "O4",
         "O5",
@@ -273,7 +273,7 @@
       ]
     },
     "file:setup-task-workspace.sh": {
-      "hash": "8813bedc506c",
+      "hash": "1dc160a97806",
       "dims": [
         "O8"
       ]
@@ -369,7 +369,7 @@
       ]
     },
     "build-and-test:log-every-attempt": {
-      "hash": "5cb9f45e6c34",
+      "hash": "b7d1840d40f5",
       "dims": [
         "A26"
       ]
@@ -417,7 +417,7 @@
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "98640bd8e17e",
+      "hash": "c96c9ead99a1",
       "dims": [
         "A9"
       ]
@@ -557,7 +557,7 @@
       ]
     },
     "file:require-followup-scope-on-complete.sh": {
-      "hash": "7b1e20850b73",
+      "hash": "add3bf7c6af8",
       "dims": [
         "A14",
         "A9"
@@ -648,7 +648,7 @@
       ]
     },
     "file:operator-hold-gate.sh": {
-      "hash": "6b4ea742726b",
+      "hash": "e9d4f9f22e59",
       "dims": [
         "A7"
       ]
@@ -991,8 +991,8 @@
       "hash": "5fd4676ebc17"
     },
     "build-and-test:proof-screenshots-for-pr": {
-      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged; screenshot evidence graded by A13",
-      "hash": "1c458a64d065"
+      "reason": "2026-10-10: capture bullet aligned to drive explore-on-interpreter-prove-on-flow (proof from a CLI flow run, never an MCP screenshot), which already graded it; no separate dimension",
+      "hash": "98e5e99b10af"
     },
     "build-and-test:executable-pair-must-complete": {
       "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged",
@@ -1559,8 +1559,8 @@
       "hash": "c32f66511e88"
     },
     "build-and-test:hack-verify-visual-changes": {
-      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged; graded by A13",
-      "hash": "a552c99de9cc"
+      "reason": "2026-10-10: wording only: the HACKED caption and header-cell description now match what pr-evidence-table renders; imperative and eval expectation unchanged; graded by A13",
+      "hash": "ca6b6a7358c1"
     },
     "one-shot:description-current-state": {
       "reason": "2026-10-08: punctuation only; the graded expectation is unchanged",
@@ -1647,8 +1647,8 @@
       "hash": "c958a5abe4fa"
     },
     "build-and-test:create-missing-destination-wallet": {
-      "reason": "2026-09-23: graded through the concession-taxonomy deny item (A7 deferral validity); no separate dimension",
-      "hash": "c7360bd58918"
+      "reason": "2026-10-10: wording only: the concession validator is named as the completion judge; graded through the concession-taxonomy deny item (A7 deferral validity); no separate dimension",
+      "hash": "25d126e3a7d4"
     },
     "one-shot:run-rules": {
       "reason": "2026-10-08: pointer rule to references/run-rules.md; the edit only names claude-calls-on-subscription in its id list, and each listed rule is graded under its own dimension",

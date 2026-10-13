@@ -100,7 +100,7 @@ async function main () {
     const req = pendingByUuid.get(d.uuid)
     const btn = req ? `<button class="act" disabled>${req.status === 'running' ? 'resuming' : 'queued'}</button>`
       : `<button class="act" data-uuid="${esc(d.uuid)}" data-title="${esc(strip(d.title))}">Resume</button>`
-    const flags = [d.isForkOfLive ? 'has fork' : '', d.forkChild ? '' : ''].filter(Boolean).join(' · ')
+    const flags = d.isForkOfLive ? 'has fork' : ''
     return `<li class="row tr" data-q="${esc(strip(d.title).toLowerCase())} ${esc(d.uuid.slice(0, 8))}"><span class="main"><span class="t">${esc(strip(d.title) || d.uuid)}</span><span class="m">${esc(ago(d.mtime))} ago · <code>${esc(d.uuid.slice(0, 8))}</code>${flags ? ' · ' + esc(flags) : ''}</span></span>${btn}</li>`
   }).join('')
 

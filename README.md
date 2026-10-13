@@ -108,17 +108,22 @@ flowchart TD
 `agent-watcher/asana-watcher.js`, launchd every 120s, polls the project for
 `agent_status = Pending`.
 
-- **Tick gate.** The tick is skipped when a resource guardrail trips (1-minute
-  load over `max_load_avg`, free RAM under `min_free_ram_gb`) or the
-  concurrency cap is full (`max_concurrent`, default 4).
+- **Tick gate.** Two caps count live sessions apart: `max_concurrent` for runs
+  holding a pool sim (code default 2) and `max_concurrent_nosim` for runs
+  without one (code default 3). The tick is skipped when both caps are full,
+  when free RAM is under `min_free_ram_gb`, or under a usage hold. A 1-minute
+  load over `max_load_avg` holds sim spawns only; no-sim runs still spawn.
 - **Provisioning.** Each pickable task gets a slot: a git worktree, a cloned
-  simulator from the pool, and a Metro port. Before recloning the pool the
-  watcher runs `refresh-master-build.sh`: if `develop` advanced AND its native
+  simulator from the pool, and a Metro port. The master build is refreshed off
+  the spawn path: launchd `com.jontz.sim-pool-refresh` runs
+  `ensure-sim-pool.sh` every 30 minutes, which calls
+  `refresh-master-build.sh` (the watcher and `resume-task.sh` pass
+  `SKIP_MASTER_REFRESH=1`). If `develop` advanced AND its native
   side (`ios/Podfile.lock`) changed, the master sim is rebuilt from `develop`
   and the pool recloned, so runs test against a current build. A JS-only
   advance skips the rebuild (clones bundle JS live from Metro). The check is a
   cheap `git fetch` plus SHA compare; a build failure is non-fatal
-  (provisioning continues on the last-good master). The failed develop SHA is
+  (the pool keeps cloning the last-good master). The failed develop SHA is
   memoized as `failed_sha` in `master-build.json` and not retried until develop
   moves; while develop HEAD equals it, a fresh edge-react-gui worktree branches
   from the last-good `develop_sha` instead (`setup-task-workspace.sh`), and
@@ -156,7 +161,9 @@ flowchart TD
   (currently `.watcher.agent_model` = Opus 5 1M, `.watcher.agent_effort` =
   high).
 - **Per-task self-review.** The task's `agent_review` field (`low`, `medium`,
-  `high`, `xhigh`; unset follows `.watcher.default_review`, currently `none`)
+  `high`, `xhigh`, or `off`, an explicit no for this task that outranks the
+  fleet default; unset follows `.watcher.default_review`, currently `none`;
+  `max` clamps to `xhigh` and any other value resolves to `low`)
   decides whether the run reviews its own branch before opening the PR, and at
   what depth. `asana-review-field.sh` resolves it to the arguments of the
   `code-review-sonnet` workflow, one level per field value. The phase runs
@@ -247,7 +254,8 @@ just a viewport.
 
 - **Naming is state.** `claude-asana-<gid>` is a live run; the watchdog's
   completion sweep renames it to `done-asana-<gid>` at retirement (resources
-  freed, claude kept alive); `chat-<slug>` sessions are discussion forks of
+  freed, claude kept alive); `claude-asana-chat-<slug>` sessions (Remote
+  Control name `chat-<slug>`) are discussion forks of
   past transcripts (`resume-agent.sh --chat`: talk to a finished run from
   anywhere, no slot, original conversation untouched); long-lived operator
   anchors keep their own names. Hooks and the watchdog read the name to decide
@@ -283,9 +291,10 @@ just a viewport.
   never adds a second process (the count goes 1 to 0 to 1).
 - **Run shape is decided once, at spawn.** The `agent_deliverable` field on the
   task (created with `asana-field-ensure.sh`, gids in `asana-config.json`)
-  picks the skill the watcher sends: `PR` (default) spawns `/one-shot` with a
-  pool sim; `Task` spawns `/task-run` with no sim; `Task + sim` spawns
-  `/task-run` with a sim. `spawn-test-session.sh` exports `AGENT_DELIVERABLE`,
+  picks the skill the watcher sends: `PR` (default) spawns `/one-shot`, `Task`
+  spawns `/task-run`. The sim is a separate question answered by `agent_lane`:
+  unset or including `iOS Sim` takes a pool sim, any other selection (None,
+  Android) takes none. `spawn-test-session.sh` exports `AGENT_DELIVERABLE`,
   which is the only thing the hooks branch on (`inject-run-context.sh` injects
   task-review for PR only; `require-skill-read-for-scripts.sh` maps intake and
   Complete to the running skill). Every other gate keys on `AGENT_TASK_GID`
@@ -348,13 +357,15 @@ just a viewport.
   swept (an anchor that holds standing instructions has nothing to distill).
   `touch /tmp/reanchor-hold` or `/tmp/reanchor-hold-<name>` vetoes a sweep.
 - **The host must not idle-sleep.** All of this dies with the machine, so the
-  box runs a keep-awake LaunchAgent (machine-local, not synced; an idle-sleep
+  box runs a keep-awake LaunchAgent (`launchd/com.jontz.keep-awake.plist`,
+  installed by `install-launchd.sh`; an idle-sleep
   default once killed every bridge in the fleet after hours of quiet).
 
 #### 6. Run reports and the watermark
 
 Every run ends by attaching ONE structured run report to the Asana task
-(`agent-run-report-NN-<slug>.md`). The report is more than documentation: its
+(`<N>-agent-run-report.md`; `agent-watcher/lib/attach-names.sh` owns the
+name). The report is more than documentation: its
 attachment timestamp is the followup-scope WATERMARK. Comments newer than the
 newest report are undischarged scope for the next run, so every comment a run
 owes posts BEFORE the attach, and a comment that must land later forces a
@@ -400,12 +411,12 @@ flowchart TD
   [preflight-before-build-decisions]"] --> WALL{"hit a wall?"}
   WALL -- no --> PR
   WALL -- yes --> ATTEMPT["log the attempt
-  (failed:/blocked:/loss:)"] --> VALID{"concession-validator
-  verdict [yolo-true-blockers]"}
-  VALID -- "legitimate: true" --> BLOCKED["blocked completion:
+  (failed:/blocked:/loss:)"] --> VALID{"completion judge rules on
+  the block [yolo-true-blockers]"}
+  VALID -- "allowed" --> BLOCKED["blocked completion:
   Complete --blocked yes (one-line
   comment, report attached as normal)"]
-  VALID -- "legitimate: false" --> RETRY["do what_to_try, continue"] --> TEST
+  VALID -- "denied" --> RETRY["do each what_to_do, continue"] --> TEST
 
   PR["Reviewing: /pr-create (verify green, clean tree,
   template, evidence; Asana attach; multi-repo
@@ -413,10 +424,12 @@ flowchart TD
   one under the awaiting-dep-publish label)"] --> WATCH
   WATCH["watch-pr bounded poll; bots must be
   SUCCESS (NEUTRAL = findings -> /bugbot);
-  fixes via amend + force-with-lease"] --> GATE
+  fixes via amend + force-with-lease before
+  the first human review on an owned PR,
+  fixup commits after"] --> GATE
   GATE{"finalize-gate green:
   CI + every bot clean +
-  0 unresolved bot threads
+  0 unresolved review threads
   on EVERY primary PR"}
   GATE -- "not green" --> WATCH
   GATE -- green --> LAND{"landable? human APPROVED
@@ -479,8 +492,8 @@ the marker is what the read-gate checks before letting any companion script
 execute:
 
 1. **Injected at the boundary** — every fresh segment gets the planning
-   contracts (asana-plan + task-review) pushed in whole by
-   `inject-run-context.sh`.
+   contracts (asana-plan + task-review; asana-plan alone on a Task
+   deliverable) pushed in whole by `inject-run-context.sh`.
 2. **Read whole by the agent**: strict marking, every check made against the
    current file on disk. Reads of the SKILL.md whose returned lines together
    cover every line (one uncapped Read, or pages when the token cap cuts a
@@ -544,7 +557,7 @@ done.
 | Status gates | `require-plan-before-developing.sh` | No Developing until ingestion evidence (`asana-get-context.sh` ran, attachments downloaded) AND the plan doc exist |
 | | `require-completion-judgment.sh` | Every completion event (Complete, PR creation, `blocked = Yes`) is ruled on by a headless judge OUTSIDE the run, from an evidence bundle; the verdict is bound to the evidence hash, so an unchanged retry is instant and new evidence is re-judged. A block needs `--reason`. The run never writes a verdict or a waiver. `require-concession-validation.sh` remains as a 6-line shim that forwards here |
 | | `require-followup-scope-on-complete.sh` | Complete needs a fresh live scope check: no newer operator comments unaddressed, zero blocking threads, reviewer bots concluded, watermark last; refreshes the check itself when only the run's own comments postdate it |
-| | `require-continuation-or-block.sh` (Stop) | A turn may not end except at Complete or a validated block |
+| | `require-continuation-or-block.sh` (Stop) | Blocks a premature turn end. The end is allowed at Complete or Archived, at a block the judge allowed, under an operator hold or a usage pause, and after 3 blocked stops (it then writes `/tmp/agent-stuck-<gid>.md` for the watchdog) |
 | | `require-tdd-current.sh` | TDD-flagged tasks keep the design doc current before finalize |
 | PR / git gates | `git-history-gate.sh` | Commits go through `lint-commit.sh`; no raw `git commit`, no `--no-verify` |
 | | `pre-pr-gate.sh` | PR creation needs test evidence (proof frames or a justified blocker note) and runs a duplicate-utility scan |
@@ -561,23 +574,26 @@ done.
 | | `block-coordinate-taps.sh` | No blind coordinate taps; drive by accessibility ids or text |
 | | `block-sim-wipe.sh` | No sim erase/wipe (pooled sims carry funded test accounts) |
 | | `require-bundle-triage.sh` | Stale-bundle symptoms get triaged before deeper debugging |
-| Prose gates | `lint-md-on-write.sh` | Mechanical no-slop lint on markdown written outside the internal allowlist (full on Write, fragment on Edit/heredoc). Skill and rule prose (`SKILL.md`, `references/*.md`, `rules/*.mdc`) is also counted for incident narration (dates, 16-digit ids, "NOTE since", "no longer", "used to"), and a write that raises the count is blocked; `agent-eval/references/era.md` is the exempt home for dated rulings |
+| Prose gates | `lint-md-on-write.sh` | Mechanical no-slop lint on markdown written outside the internal allowlist (full on Write, fragment on Edit), on every vector (Write, Edit, redirect, tee, sed -i, perl -pi); CHANGELOG.md targets also pass the changelog entry-shape lint (length cap, mechanism tails, second sentences). Skill and rule prose (`SKILL.md`, `references/*.md`, `rules/*.mdc`) is also counted for incident narration (dates, 16-digit ids, "NOTE since", "no longer", "used to"), and a write that raises the count is blocked; `agent-eval/references/era.md` is the exempt home for dated rulings |
 | | `slack-prose-gate.sh` | Outbound Slack text passes the shared lint with the judge tier; brevity nudge over ~900 chars; operator-quoted text posts verbatim, unlinted |
 | Hygiene / injectors | `no-interactive-prompt.sh` | No AskUserQuestion in hands-off runs; pick the defensible default |
 | | `no-self-respawn.sh` | No ScheduleWakeup/CronCreate/`claude --resume` self-respawn |
-| | `guard-piped-watcher-scripts.sh` | Watcher status scripts run bare (pipes silently masked their exit codes); gated-claim commands hard-block instead of rewriting |
+| | `guard-piped-watcher-scripts.sh` | Watcher status scripts run bare (pipes silently masked their exit codes): trailing `head`/`tail`/`sed -n` stages are dropped and the call is rewritten. Any other filter stage, a helper piped inside a command substitution, and a command carrying `--attach-name` hard-block |
 | | `mark-agent-authored-asana.sh` | In-flight-run Asana prose carries the 🥋/👊 authorship markers; operator-context text stays unmarked |
 | | `record-own-asana-story.sh` (PostToolUse) | Records the story gid of each in-flight run's own MCP comment so the Complete gate can tell it from operator scope (`asana-task-update.sh --comment-file` records the script path) |
 | | `require-skill-for-file.sh` | A file with an owning skill is written only after that skill entered context, on every vector (Write, Edit, redirect, tee, sed -i, interpreter heredoc); deny-with-body via the shared gate library, one glob table for all of them. AGENTS.md: agents-md, every session. CHANGELOG.md: changelog, orch runs. The workflow itself (`SKILL.md`, `.mdc` rules, skill and agent-watcher scripts, site-orch's hooks, and `~/.claude/settings.json`, where a wrong registration means a hook never fires): author, every session |
-| | `lint-md-on-write.sh` | Markdown written outside the internal allowlist passes the mechanical no-slop tier on every vector (Write, Edit, redirect, tee, sed -i, perl -pi); CHANGELOG.md targets also pass the changelog entry-shape lint (length cap, mechanism tails, second sentences) |
 | | `require-skill-read-for-scripts.sh` + `mark-skill-read.sh` | A skill's companion script runs only after its SKILL.md FULLY entered context; the deny message delivers the complete body itself (deny-with-body) and writes the marker, so the retry passes educated, and states that the whole Bash command was cancelled. Marking is strict and content-checked against the current file: Read pages covering every line (a token-capped Read counts only the lines it returned), a `cat` whose unaltered stdout holds the body, Skill tool, or gate/session-start injection; partial reads (sed slices, cat piped to head or redirected) earn nothing. Before denying, the gate credits a body the transcript proves is in context since the last compaction (slash-command delivery, uncut `invoked_skills` re-injection, covering Read pages). `--help`/`-h`-only invocations are exempt. Bodies over 50KB fall back to a read-in-pages pointer without a marker. The same gate also delivers a PHASE SLICE (`one-shot:<phase>` or `pr-land:<phase>`, `references/<phase>.md`) at the first companion-script call of that phase, since each split left only the core in context by default; the pr-land slices apply in every session, since /pr-land also runs by hand |
 | | `mark-playbook-read.sh` | Records the playbook read the drive gate requires |
 | | `record-file-writes.sh` (PreToolUse Bash + PostToolUse) | Records which session wrote which file, as the write happens, into `~/.local/state/agent-watcher/write-ledger.jsonl`: Write/Edit by `file_path`, Bash by what changed under the synced trees since a pre-call stamp (so `sed -i`, redirects and interpreter heredocs are seen). A file the command names is a strong row; one that only changed during the call is a weak row, since a long command overlaps every other session's writes. A subagent's write lands on its parent session. `/convention-sync` reads it to learn whose diffs it has not seen. Machine-local state, every session, never blocks |
 | | `nudge-asana-mcp.sh` | Steers bulk Asana reads to the cheaper script path |
 | | `block-raw-asana-api.sh` | Raw Asana API calls go through the sanctioned scripts (ingestion with attachment download, field reads, writes, scope checks) |
-| | `inject-run-context.sh`, `inject-no-slop-reminder.sh`, `inject-no-slop-line.sh` | Session-start run context, plus the asana-plan + task-review bodies on every fresh segment (startup/resume, and compact while unplanned); a fresh segment (startup/resume) expires the prior segment's ingestion + skill-read markers, and compact/clear expire skill-read markers too, since compaction destroys the in-context text the marker attests to (the read-gate then re-delivers bodies lazily); headless `claude -p` children (no-slop judge etc.) inherit the gid but are ignored, since a child's startup is not a run segment; no-slop refresh at session start and every prompt |
+| | `inject-run-context.sh`, `inject-no-slop-reminder.sh`, `inject-no-slop-line.sh` | Session-start run context, plus the asana-plan + task-review bodies (asana-plan alone on a Task deliverable) on every fresh segment (startup/resume, and compact while unplanned); a fresh segment (startup/resume) expires the prior segment's ingestion + skill-read markers, and compact/clear expire skill-read markers too, since compaction destroys the in-context text the marker attests to (the read-gate then re-delivers bodies lazily); headless `claude -p` children (no-slop judge etc.) inherit the gid but are ignored, since a child's startup is not a run segment; no-slop refresh at session start and every prompt |
 | Shared helpers | `strip-cmd-mentions.sh` | Blanks quoted/heredoc spans so hooks trigger on commands, not on text that merely mentions them |
 | | `cmd-executes.sh` | Command-position matching, so naming a script in a grep never fires the gate that guards executing it |
+
+This table groups the main gates and is not the registry:
+[`agent-watcher/hooks/README.md`](agent-watcher/hooks/README.md) has one row per
+registered hook, with its event, matcher and the failure it prevents.
 
 `retired/require-block-validation.sh` is an unregistered legacy kept for history; the
 completion judge's `block` event replaced it.
@@ -625,8 +641,8 @@ The file-write hook exists because posted prose travels as
 command-string hook literally cannot see it; the bytes are visible when the
 file is written and when the poster script assembles the final body, and both
 points are covered. Known residuals: raw `gh api` posting that bypasses the
-scripts is unlinted, and Asana comments get the authorship marker but no prose
-lint today.
+scripts is unlinted, and Asana MCP comments get the authorship marker, the
+reviewer-outage deny and `orch-prose-lint.sh`, but no no-slop tier.
 
 ## Testing infrastructure
 
@@ -652,7 +668,9 @@ the app.
   port (`--flow`), prints the current screen's elements with testID, label,
   frame and hittable state (`--inspect`), and runs inline steps against the
   live app (`--steps`). iOS exploration uses it; a screen outside the app
-  under test goes to the maestro CLI, and the maestro MCP is Android-only.
+  under test goes to the maestro CLI. The maestro MCP is launched only for
+  Android-lane sessions; in a session with a slot sim it is bound to that iOS
+  sim, so an Android device there is driven with `maestro --device <serial>`.
   Each tap is compared against the screen after it, and a tap that changed
   nothing says so in its step line (`--tap-check`); typing falls back from the
   focused element to the on-screen keys to key events (`--typing`);
@@ -789,8 +807,9 @@ reproducible from a single clone + `./bootstrap.sh`:
   (`pool.json`, `slots.json`,
   `watchdog-state.json`, `*.state`, `*.log`, forensics) and session briefs
   (`*-anchor-brief.*` and anything under `agent-watcher/briefs/`, such as a
-  session's watch script; briefs live in `~/.local/state/agent-watcher/briefs`).
-- **`agent-watcher/launchd/`**: templates for every `com.jontz.*` launchd job
+  session's watch script; briefs live in `~/.local/state/agent-watcher/briefs`),
+  and `agent-watcher/artifacts/` (pages a task run wrote for its own task).
+- **`agent-watcher/launchd/`**: templates for the `com.jontz.*` launchd jobs
   (watcher, watchdog, reanchor sweep, checkout refresh, sim pool refresh
   `launchd/com.jontz.sim-pool-refresh.plist` which owns the master rebuild and pool
   refill so no spawn waits on them, guards, the settings guard
@@ -798,7 +817,8 @@ reproducible from a single clone + `./bootstrap.sh`:
   `install-launchd.sh`, which renders `__HOME__` and `__NODE_BIN__`, writes
   `~/Library/LaunchAgents`, and loads each job, skipping any whose program is
   not on the machine. The templates are the source of truth; the installed
-  plists are generated. Scripts that run under launchd source
+  plists are generated. Two jobs have no template: `install-rc-heal.sh`
+  writes the tmux keep-alive and rc-heal plists itself. Scripts that run under launchd source
   `lib/launchd-env.sh` for their PATH, so a job definition never has to carry
   tool paths.
 - **`claude-settings/hooks.json`**: a PROJECTION of the `.hooks` key of
@@ -826,8 +846,9 @@ reproducible from a single clone + `./bootstrap.sh`:
   Claude auto-memory is machine-local and also NOT synced. The only officially global Claude file is `~/.claude/CLAUDE.md`,
   generated here from always-apply rules.
 - **`.cursor/.syncignore`**: permanent sync exclusions, read from the REPO
-  copy so every machine honors the same list. Currently: WIP commands and
-  task-specific maestro flows (dev artifacts, not conventions). Third-party
+  copy so every machine honors the same list. Currently: WIP commands,
+  task-specific maestro flows (dev artifacts, not conventions) and the
+  machine-local sync announcers (`convention-sync/scripts/sync-*.sh`). Third-party
   skills need no entry: the sync ships only skills this repo already tracks or
   whose frontmatter names an author it distributes, and reports every other
   entry under `excludedSkills` with its reason.
@@ -922,7 +943,7 @@ scripts, not be re-described independently across skills.
 | Skill | Description |
 |------|-------------|
 | [`/one-shot`](.cursor/skills/one-shot/SKILL.md) | End-to-end task flow: plan, implement, test, PR, finalize; the skill orchestrated runs execute |
-| [`/task-run`](.cursor/skills/task-run/SKILL.md) | The no-PR run shape (Asana `agent_deliverable` = Task or Task + sim): ingest, plan, do the work, post one findings comment, attach a run report, Complete. Shares `one-shot/references/run-rules.md` (the run-wide rules) and the report template with `/one-shot`; loads none of the PR phases. A land task (the deliverable is landing a release or listed PRs) runs `/pr-land` in the primary checkouts as its work step |
+| [`/task-run`](.cursor/skills/task-run/SKILL.md) | The no-PR run shape (Asana `agent_deliverable` = Task): ingest, plan, do the work, post one findings comment, attach a run report, Complete. Shares `one-shot/references/run-rules.md` (the run-wide rules) and the report template with `/one-shot`; loads none of the PR phases. A land task (the deliverable is landing a release or listed PRs) runs `/pr-land` in the primary checkouts as its work step |
 | [`/asana-plan`](.cursor/skills/asana-plan/SKILL.md) | Build an implementation plan from Asana or ad-hoc requirements |
 | [`/task-review`](.cursor/skills/task-review/SKILL.md) | Fetch Asana task context, summarize, and resolve the target repo by code evidence |
 | [`/im`](.cursor/skills/im/SKILL.md) | Implement with clean, structured commits (lint-warnings, lint-commit, history discipline) |
@@ -943,8 +964,9 @@ scripts, not be re-described independently across skills.
 
 | Skill | Description |
 |------|-------------|
-| [`/concession-validator`](.cursor/skills/concession-validator/SKILL.md) | Judge whether delivering less than the prescribed bar is legitimate; deny-on-sight taxonomy |
-| [`/blocker-validator`](.cursor/skills/blocker-validator/SKILL.md) | Judge whether a proposed block is a true blocker or a premature yield |
+| [`/concession-validator`](.cursor/skills/concession-validator/SKILL.md) | Retired: a section of the completion judge, with its taxonomy in `completion-judge/references/concession-taxonomy.md` |
+| [`/blocker-validator`](.cursor/skills/blocker-validator/SKILL.md) | Retired: its gate was never registered and nothing invokes it; a block is a completion-judge event |
+| [`/completion-judge`](.cursor/skills/completion-judge/SKILL.md) | The judge behind every completion event (Complete, PR creation, `blocked = Yes`): a headless context rules on the run's evidence bundle and the gate enforces the verdict |
 | [`/no-slop`](.cursor/skills/no-slop/SKILL.md) | The prose rules; its scripts are the shared lint + judge every boundary calls |
 
 ### Evals
@@ -964,7 +986,10 @@ scripts, not be re-described independently across skills.
 | [`/asana-task-update`](.cursor/skills/asana-task-update/SKILL.md) | Generic Asana mutations: attach PR or file, comment (post, edit or delete our own), assign, Board State, Engineering Priority / Release / Developer, description tail |
 | [`/asana-task-create`](.cursor/skills/asana-task-create/SKILL.md) | Create Edge dev tasks on the standard boards with the right fields |
 | [`/kanban-categorize`](.cursor/skills/kanban-categorize/SKILL.md) | Sweep a kanban board and populate Category fields |
-| [`/convention-sync`](.cursor/skills/convention-sync/SKILL.md) | Sync `~/.cursor/` + portable trees with this repo; mirror this README; update the PR description |
+| [`/slack`](.cursor/skills/slack/SKILL.md) | Compose, draft, send or schedule Slack messages through the Slack connector: formatting per path, draft-and-confirm, link relay |
+| [`/sentry`](.cursor/skills/sentry/SKILL.md) | Query the self-hosted Sentry for production error data: issue counts, affected users, OS/device/release distributions |
+| [`/fleet-panel`](.cursor/skills/fleet-panel/SKILL.md) | Own the Fleet artifact (the mobile session list with a Resume button); runs only in the dedicated `fleet` anchor session |
+| [`/convention-sync`](.cursor/skills/convention-sync/SKILL.md) | Sync `~/.cursor/` + portable trees with this repo; mirror this README; push to `main` (there is no sync PR) |
 | [`/author`](.cursor/skills/author/SKILL.md) | Create, revise, and debug skills, scripts, and rules |
 | [`/agents-md`](.cursor/skills/agents-md/SKILL.md) | Write or revise a repo's AGENTS.md agent-context file |
 | [`/q`](.cursor/skills/q/SKILL.md) | Answer questions before taking action |
@@ -1100,8 +1125,9 @@ scripts live at `skills/` top level. The ones most worth knowing:
    become gates, the era table keeps old runs graded by the rules in force
    when they ran, and the actions ledger keeps remediation ranked by tier
    and recurrence across cohorts.
-9. **Interactive sessions over headless.** Every agent runs as an interactive
-   `claude` in tmux, never `claude -p`. The pane is an interface: the operator
+9. **Interactive sessions over headless.** Every task session runs as an
+   interactive `claude` in tmux, never `claude -p`; the judges and the prose
+   linter are bounded headless one-shots (`claude -p`). The pane is an interface: the operator
    can attach or remote-control any run mid-flight and steer it by typing;
    the watchdog reads it (bridge footer, parked prompts, menus) and drives it
    with send-keys; a run survives watcher restarts and stays alive after

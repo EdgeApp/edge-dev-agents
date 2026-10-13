@@ -31,7 +31,7 @@ bundle is at `~/Downloads/orchestration-migration.tgz` (configs, secrets, skills
 tar xzf ~/Downloads/orchestration-migration.tgz -C ~ && ~/APPLY.sh && rm ~/APPLY.sh
 ```
 That places `~/.config/agent-watcher` (incl. credentials + this runbook), `~/.cursor/{skills,rules}`,
-`~/.claude/{CLAUDE.md,settings.json,memory-shared}`, `env.json`, and the 6 plists, and
+`~/.claude/{CLAUDE.md,settings.json,memory-shared}`, `env.json`, and the launchd plists, and
 regenerates the `~/.claude/skills` symlinks for your user. (Delete the .tgz after — it has secrets.)
 
 **3. Shell env + secrets — nothing to paste.** Your full `.zprofile` + `.zshrc` + `.zshenv`
@@ -85,8 +85,8 @@ Everything below this line is for Claude, not you.
 >    the old machine if the bundle lacks it, workspace init pins the YOLO login from it),
 >    `~/.config/agent-watcher/team-roster.json` (the local-only reviewer roster with Asana
 >    user gids; see "Local-only files" below),
->    `~/.cursor/skills` + `~/.cursor/rules`, the 6
->    `~/Library/LaunchAgents/com.jontz.*.plist`, and that `~/.claude/skills/one-shot/SKILL.md`
+>    `~/.cursor/skills` + `~/.cursor/rules`, the
+>    `~/Library/LaunchAgents/com.jontz.*.plist` files, and that `~/.claude/skills/one-shot/SKILL.md`
 >    resolves (its symlink should now point into THIS user's `~/.cursor`, not `/Users/jontz`).
 > 2. **Toolchain** (no sudo — Homebrew exists): `brew install jq gh tmux watchman cocoapods`.
 >    Install nvm and `nvm install v24.15.0` (pin it — keeps the launchd node path identical
@@ -133,8 +133,8 @@ Everything below this line is for Claude, not you.
 >    `/opt/homebrew`; if this is an Intel mac, fix to `/usr/local`). `plutil -lint` each. For a
 >    dedicated box bootstrap `asana-watcher`, `session-watchdog`, `runaway-guard`;
 >    `mem-trace`/`memory-monitor`/`config-watch` are optional — skip unless I ask.
-> 6. **Fresh machine state.** `rm -f ~/.config/agent-watcher/{pool.json,pool.lock,watchdog-state.json}`
->    and `rm -f "${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/slots.json"`. Then
+> 6. **Fresh machine state.** `rm -f ~/.config/agent-watcher/pool.lock`
+>    and `rm -f "${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher"/{pool.json,slots.json,watchdog-state.json}`. Then
 >    `~/.config/agent-watcher/ensure-sim-pool.sh --size 2` to build a fresh pool.
 > 7. **Load + validate.** `launchctl bootstrap gui/$(id -u) <plist>` for the chosen agents.
 >    Confirm `launchctl list | grep com.jontz`, run one `asana-watcher.js` tick and confirm it
@@ -188,40 +188,12 @@ clone plus `./bootstrap.sh` instead gets the templates and fills them in.
 `~/.local/state/agent-watcher` with the other machine state and starts empty.
 The git commit name and email are set by hand (PART C step 2).
 
-## Claude Code hooks (manual step — settings.json is not synced)
+## Claude Code hooks
 
-Agent sessions are gated by two PreToolUse hooks in `~/.claude/settings.json`
-(scripts live in this repo's `agent-watcher/hooks/`, installed to
-`~/.config/agent-watcher/hooks/` by bootstrap). Both no-op unless
-`AGENT_TASK_GID` is set, so interactive sessions are unaffected. Add to the
-`hooks.PreToolUse` block (matcher `Bash`):
-
-    { "type": "command", "command": "~/.config/agent-watcher/hooks/git-history-gate.sh", "timeout": 10 },
-    { "type": "command", "command": "~/.config/agent-watcher/hooks/pre-pr-gate.sh", "timeout": 10 }
-
-block-raw-git-commit: commits must go through lint-commit.sh (--amend allowed, --no-verify never).
-pre-pr-gate: pr-create.sh is blocked until a proof screenshot
-(/tmp/agent-proof-<gid>-*.png) or a justified blocker note (/tmp/agent-test-blocker-<gid>.md) exists.
-    { "type": "command", "command": "~/.config/agent-watcher/hooks/block-simctl-booted.sh", "timeout": 10 },
-
-block-simctl-booted: in slot sessions (AGENT_SIM_UDID set), `simctl ... booted` is
-blocked — concurrent runs boot multiple sims and `booted` resolves arbitrarily.
-    { "type": "command", "command": "~/.config/agent-watcher/hooks/require-plan-before-developing.sh", "timeout": 10 },
-    { "type": "command", "command": "~/.config/agent-watcher/hooks/block-raw-thread-resolve.sh", "timeout": 10 },
-
-require-plan-before-developing: the Planning-to-Developing status transition is blocked
-until /tmp/plan-<gid>-*.md exists (asana-plan then attaches it to the task).
-block-raw-thread-resolve: raw resolveReviewThread graphql is blocked; threads resolve
-through pr-address/bugbot companion scripts, which reply in-thread first.
-    { "type": "command", "command": "~/.config/agent-watcher/hooks/require-maestro-device.sh", "timeout": 10 },
-
-require-maestro-device: maestro test/record without --device is blocked in slot
-sessions (multiple booted sims make the default driver attachment ambiguous).
-    { "type": "command", "command": "~/.config/agent-watcher/hooks/lint-md-on-write.sh", "timeout": 30 },
-
-lint-md-on-write: registered under BOTH matcher `Bash` and matcher `Write|Edit`.
-Runs the shared no-slop lint when markdown is written outside the internal-path
-allowlist (mechanical tier; full on Write, fragment on Edit/heredoc). NOT
-gid-gated — interactive sessions post PRs and Slack messages too. This is the
-file-creation choke point: posted prose travels as --body-file/$(cat file), so
-posting-time hooks cannot see it.
+Nothing here is manual. `bootstrap.sh` step 4b merges the repo's
+`claude-settings/hooks.json` into the `.hooks` key of `~/.claude/settings.json`
+and `~/.claude/settings.canonical.json`, and the bundle path carries
+`~/.claude/settings.json` whole. `hooks/README.md` in this directory is the
+reference: one row per registered hook with its event, matcher and the
+failure it prevents. Registrations that point outside the synced trees
+(site-orch hooks, `socket-guard.mjs`) are listed there too.

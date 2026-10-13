@@ -304,9 +304,9 @@ function spawnForTask(task, cfg) {
   if (rt.status === 0) {
     log(`  resumed prior session for ${task.gid} (revisit: memory + fresh slot)`)
     // The resumed conversation was previously FINISHED, so it comes back idle at the input
-    // prompt (resume-task answered the resume-summary menu but does not drive it). Send the
-    // SAME /one-shot prompt the fresh path sends: the resumed agent has its summarized prior
-    // context, re-reads the task, and picks up the followup scope per
+    // prompt (resume-task answered the resume menu with a full resume but does not drive it).
+    // Send the SAME /one-shot prompt the fresh path sends: the resumed agent has its full
+    // prior context, re-reads the task, and picks up the followup scope per
     // `followup-scope-is-the-deliverable`. Without this nudge the session sits idle.
     waitRcReadyAndSendPrompt(`${SESSION_PREFIX}${task.gid}`, skillPrompt(deliverable, taskUrl))
     return true

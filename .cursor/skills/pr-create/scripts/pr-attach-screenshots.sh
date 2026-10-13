@@ -92,8 +92,9 @@ while [[ $# -gt 0 ]]; do
     --carry-forward) CARRY+=("$2");  shift 2 ;;
     --retire)        RETIRE+=("$2"); shift 2 ;;
     --hack-note)     HACK_NOTE="$2"; shift 2 ;;
-    --title)         shift 2 ;;  # retired: the table has no per-batch title
-    --commit)        echo ">> pr-attach-screenshots: --commit is retired (frames group by capture batch, not commit); ignoring" >&2; shift 2 ;;
+    # A frame path never starts with a dash: evidence-privacy.sh and node would
+    # read one as their own option and drop it from the frames they check.
+    -*) echo "Unknown flag: $1 (name a frame that starts with a dash as ./$1)" >&2; exit 1 ;;
     *) IMAGES+=("$1"); shift ;;
   esac
 done
@@ -101,11 +102,15 @@ USAGE="Usage: pr-attach-screenshots.sh --repo <owner/repo> --pr <num> [--carry-f
 [[ -n "$REPO" && -n "$PR" ]] || { echo "$USAGE" >&2; exit 1; }
 [[ ${#IMAGES[@]} -gt 0 || ${#CARRY[@]} -gt 0 || ${#RETIRE[@]} -gt 0 ]] || { echo "Nothing to do: give images, or a --carry-forward/--retire disposition" >&2; echo "$USAGE" >&2; exit 1; }
 for f in "${IMAGES[@]:-}"; do [[ -z "$f" || -f "$f" ]] || { echo "Not found: $f" >&2; exit 1; }; done
+# A frame is identified by its file name (scaled copy, bucket path, manifest
+# entry), so two of the same name in one attach would leave one of them out.
+DUP=$(for f in "${IMAGES[@]:-}"; do [[ -z "$f" ]] || basename "$f" | tr -c 'A-Za-z0-9._\n-' '-'; done | sort | uniq -d | head -1)
+[[ -z "$DUP" ]] || { echo "Two frames share the file name $DUP: rename one, a frame is identified by its file name" >&2; exit 1; }
 
 ANY_HACKED=false
 [[ -n "$("$DIR/hacked-frames.sh" "${IMAGES[@]:-}")" ]] && ANY_HACKED=true
 if $ANY_HACKED && [[ -z "$HACK_NOTE" ]]; then
-  echo "HACKED image(s) present: pass --hack-note '<one short line: WHAT was hacked>' (e.g. --hack-note 'hard-coded the empty-state branch true in WalletList') so the PR banner is specific. See build-and-test hack-verify-visual-changes." >&2
+  echo "HACKED image(s) present: pass --hack-note '<one short line: WHAT was hacked>' (e.g. --hack-note 'hard-coded the empty-state branch true in WalletList') so the batch's header cell names the hack. See build-and-test hack-verify-visual-changes." >&2
   exit 1
 fi
 
@@ -113,6 +118,10 @@ log() { echo ">> pr-attach-screenshots: $*" >&2; }
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
+
+# The paths as given. The privacy gate swaps a hatched frame for a copy under
+# $WORK, which is gone at exit, so a printed re-run command names these.
+ORIG_IMAGES=("${IMAGES[@]:-}")
 
 # ── Privacy gate (see PRIVACY in the header) ──────────────────────────────────
 # Runs on the originals, before any network call. The classes and what counts
@@ -128,10 +137,12 @@ if [[ ${#IMAGES[@]} -gt 0 ]]; then
     const [recPath, rc, ...files] = process.argv.slice(1)
     const recs = fs.readFileSync(recPath, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l))
     const out = []
-    if (rc !== "0" && !recs.some(r => r.class === "error")) out.push("REFUSE the privacy check could not run (exit " + rc + ")")
+    if (recs.length > files.length) out.push("REFUSE the privacy check returned " + recs.length + " verdicts for " + files.length + " frames")
     files.forEach((f, i) => {
       const r = recs[i]
-      if (r == null || r.file !== f) { if (rc === "0") out.push("REFUSE " + f + "\n         no verdict from the privacy check"); return }
+      // A missing record, or one that names another file, is no verdict for
+      // this frame whatever the exit code was.
+      if (r == null || r.file !== f) { out.push("REFUSE " + f + "\n         no verdict from the privacy check"); return }
       if (r.class === "SECRET" || r.class === "error") {
         out.push("REFUSE " + f)
         for (const x of r.reasons) out.push("         " + (r.class === "error" ? "unreadable: " : "") + x.detail)
@@ -141,6 +152,9 @@ if [[ ${#IMAGES[@]} -gt 0 ]]; then
         out.push("REFUSE " + f + "\n         unknown verdict " + r.class)
       }
     })
+    // Exit 3 means "refuse to publish" (evidence-privacy.sh), so any non-zero
+    // exit refuses the batch even when every record it did print reads clean.
+    if (rc !== "0" && !out.some(l => l.startsWith("REFUSE"))) out.push("REFUSE the privacy check did not finish (exit " + rc + ")")
     process.stdout.write(out.join("\n") + (out.length ? "\n" : ""))
   ' "$WORK/privacy.ndjson" "$PRIV_RC" "${IMAGES[@]}" > "$WORK/privacy.txt" || { echo "privacy check produced no readable verdicts: nothing uploaded" >&2; cat "$WORK/privacy.err" >&2; exit 3; }
 
@@ -309,7 +323,8 @@ if [[ -n "$MISSING" ]]; then
     echo ""
     CMD="   e.g. ~/.cursor/skills/pr-create/scripts/pr-attach-screenshots.sh --repo $REPO --pr $PR"
     while IFS= read -r s; do [[ -n "$s" ]] && CMD="$CMD --carry-forward $s"; done <<< "$MISSING"
-    echo "$CMD ${IMAGES[*]:-}"
+    for f in "${ORIG_IMAGES[@]:-}"; do [[ -n "$f" ]] && CMD="$CMD $(printf '%q' "$f")"; done
+    echo "$CMD"
   } >&2
   exit 2
 fi
@@ -324,7 +339,8 @@ else
 fi
 
 # ── Downscale to max width 720 (ratio preserved) into temp copies ─────────────
-# 720 = 2x the table's 360px render width (crisp on retina, ~4x smaller object).
+# 720px is the copy a cell links to; the table shows it at 200px (IMG_W in
+# pr-evidence-table.js).
 # Originals are never mutated; narrower images pass through unscaled.
 MAX_W=720
 UPLOADS=()
@@ -400,10 +416,9 @@ node -e '
   if (retired) console.error(">> pr-attach-screenshots: retired " + retired + " frame(s) from " + dropped.length + " superseded batch(es)")
 ' "$WORK/old.json" "$WORK/gate.json" "$PATHS" "$HACK_NOTE" "$HEAD_SHA" "$ACTIONS" "$RETIRE_JSON" "$NOW_UTC" "$WORK/new.json" "$URLS"
 
-"$BUCKET" manifest-put "$REPO" "$PR" "$WORK/new.json" > /dev/null || { echo "manifest write failed for $REPO#$PR (PR body untouched; re-run to retry)" >&2; exit 1; }
-log "manifest written to the bucket ($("$BUCKET" manifest-key "$REPO" "$PR"))"
-
 # ── Re-render the whole table into the PR body between its sentinels ──────────
+# Rendered and size-checked before the manifest is written, so a body that
+# cannot take the table leaves the stored manifest matching the body on show.
 CUR_BODY=$(gh api "repos/$REPO/pulls/$PR" --jq '.body // ""')
 NEW_BODY=$(node -e '
   const m = require(process.env.TABLE_JS)
@@ -414,12 +429,16 @@ NEW_BODY=$(node -e '
 ' "$WORK/new.json" "$CUR_BODY" "$REPO" "$PR" "$PR_COMMITS") || exit 1
 
 # GitHub caps a PR body at 65536 chars; past that the edit is rejected and the
-# table would be lost, so refuse while the old body is still intact.
+# table would be lost, so refuse while the old body and manifest are intact.
 BODY_LEN=${#NEW_BODY}
 if [[ "$BODY_LEN" -gt 60000 ]]; then
   echo "refusing: rendered body is $BODY_LEN chars, over the 60000 safety margin (GitHub caps at 65536). Prune frames for this PR." >&2
   exit 1
 fi
+
+"$BUCKET" manifest-put "$REPO" "$PR" "$WORK/new.json" > /dev/null || { echo "manifest write failed for $REPO#$PR (PR body untouched; re-run to retry)" >&2; exit 1; }
+log "manifest written to the bucket ($("$BUCKET" manifest-key "$REPO" "$PR"))"
+
 printf '%s' "$NEW_BODY" > "$WORK/body.md"
 gh pr edit "$PR" --repo "$REPO" --body-file "$WORK/body.md" >/dev/null
 TOTAL=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).entries.length)' "$WORK/new.json")

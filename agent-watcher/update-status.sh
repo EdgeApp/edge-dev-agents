@@ -32,8 +32,8 @@ usage() {
   cat <<EOF >&2
 Usage: $(basename "$0") <task_gid> <status_name> [--blocked yes|no] [--reason "<text>"]
   status_name: Pending | Planning | Developing | Reviewing | Testing | Complete
-  --reason: REQUIRED with --blocked yes — the claimed blocker, judged by the
-            concession-validation gate against the true-blocker taxonomy.
+  --reason: REQUIRED with --blocked yes — the claimed blocker, ruled on by the
+            completion judge against the true-blocker taxonomy.
 EOF
   exit 2
 }

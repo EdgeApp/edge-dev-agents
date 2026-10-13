@@ -54,8 +54,10 @@ set -e
 tail -6 /tmp/coinhub-jest-verify.log
 
 # Assert no edge-font (Quicksand) leakage remains in committed-tree snapshots.
-QUICKSAND=$(grep -rl "Quicksand" src/__tests__/**/__snapshots__/*.snap 2>/dev/null | wc -l | tr -d ' ')
-NUNITO=$(grep -rl "NunitoSans" src/__tests__/**/__snapshots__/*.snap 2>/dev/null | wc -l | tr -d ' ')
+# grep exits 1 when nothing matches, which is the passing case here, so the
+# status is dropped; --include recurses to every depth without globstar.
+QUICKSAND=$({ grep -rl --include='*.snap' "Quicksand" src/__tests__ 2>/dev/null || true; } | wc -l | tr -d ' ')
+NUNITO=$({ grep -rl --include='*.snap' "NunitoSans" src/__tests__ 2>/dev/null || true; } | wc -l | tr -d ' ')
 echo ">> snapshot fonts: Quicksand files=${QUICKSAND} (must be 0), NunitoSans files=${NUNITO}"
 
 if [[ "$RC" -ne 0 ]]; then

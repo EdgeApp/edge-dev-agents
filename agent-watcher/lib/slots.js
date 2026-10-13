@@ -200,7 +200,7 @@ function main() {
       if (!f['task-gid']) { console.error('get: --task-gid required'); return 2 }
       const e = get(f['task-gid'])
       process.stdout.write((e ? JSON.stringify(e, null, 2) : '') + '\n')
-      return e ? 0 : 0
+      return 0
     }
     case 'allocate': {
       if (!f['task-gid']) { console.error('allocate: --task-gid required'); return 2 }

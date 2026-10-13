@@ -5,7 +5,7 @@
 # screenshot attach and the completion judge's evidence bundle all ask here.
 #
 # Usage: hacked-frames.sh <path>...     (missing paths are ignored)
-# stdout: one hacked path per line. Exit 0 always (2 on a usage error).
+# stdout: one hacked path per line. Exit 0 always, no arguments included.
 set -uo pipefail
 [[ $# -gt 0 ]] || exit 0
 exec node -e '

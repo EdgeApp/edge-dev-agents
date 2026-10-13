@@ -16,7 +16,7 @@ metadata:
 <rule id="never-newest-guess">Ambiguity is resolved by ASKING with a table (uuid, kind, task, mtime, live name), never by silently taking the newest mtime. The newest transcript is frequently a fork or an unrelated echo.</rule>
 <rule id="verify-before-handoff">After the session boots, CONFIRM it is the right one before reporting success: grep the resumed transcript (or for --in-place, the same uuid) for the user's anchor (the quoted phrase, or the task name/gid) and check the pane booted without "No conversation found". A failed check is a STOP-and-report, not a shrug — kill the wrong spawn before trying the next candidate.</rule>
 <rule id="orch-boundary">This skill NEVER re-engages orch task WORK. New scope on a finished task goes through `agent_status=Pending` → the watcher (one-shot `followup-reopens-status`). If the user's real intent is a followup run, say so and offer to arm Pending instead. Chat sessions must not do deliverable work; insights that should drive a run belong in an Asana comment before the bounce.</rule>
-<rule id="session-hygiene-facts">Sessions this skill creates are `claude-asana-chat-<slug>` / RC `chat-<slug>`: watchdog RC-revived, exempt from the completion sweep, reaped after 48h idle (transcript survives; resurrection is this same skill). Tell the user the RC name to look for, every time.</rule>
+<rule id="session-hygiene-facts">Sessions this skill creates are `claude-asana-chat-<slug>` / RC `chat-<slug>`: watchdog RC-revived, exempt from the completion sweep, reaped after `idle_reap_hours` idle (72h by default; transcript survives; resurrection is this same skill). Tell the user the RC name to look for, every time.</rule>
 </rules>
 
 <step id="1" name="Parse the reference">
@@ -54,7 +54,7 @@ cd ~/git && ~/.config/agent-watcher/resume-agent.sh --uuid <uuid> --chat [--in-p
 </step>
 
 <step id="5" name="Verify and report">
-Per `verify-before-handoff`: confirm boot + anchor. Then report, bulleted: the RC name to find in the session list, what the session is (kind, task, last activity date), which mode was used (continued vs forked), and the 48h-reap note when a new chat session was created.
+Per `verify-before-handoff`: confirm boot + anchor. Then report, bulleted: the RC name to find in the session list, what the session is (kind, task, last activity date), which mode was used (continued vs forked), and the idle-reap note when a new chat session was created.
 </step>
 
 <edge-cases>

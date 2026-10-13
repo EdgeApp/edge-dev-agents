@@ -77,6 +77,8 @@ const FRAMES = {
   otp: ['Email Verification', 'Enter the 6-digit code we sent you', '', '483 920'],
   'password-shown': ['Sign In', 'Password', 'Tr0ub4dor&3', '', 'Next'],
   'password-masked': ['Sign In', 'Password', '••••••••••', '', 'Next'],
+  'password-hint-word': ['Sign In', 'Password', 'Spinach42!', '', 'Next'],
+  'password-hint': ['Sign In', 'Password', 'Forgot password?', '', 'Next'],
   username: ['Sign In', 'Username', USER_A, '', 'Recent', USER_F, 'someone-else'],
   'roster-password': ['Notes', `pw ${PASSWORD}`],
   'roster-otp': ['Two-factor backup', TOTP]
@@ -113,6 +115,8 @@ const EXPECT = {
   otp: ['SECRET', 'otp-code'],
   'password-shown': ['SECRET', 'password'],
   'password-masked': ['clean'],
+  'password-hint-word': ['SECRET', 'password'],
+  'password-hint': ['clean'],
   username: ['USERNAME'],
   'roster-password': ['SECRET', 'password'],
   'roster-otp': ['SECRET', 'otp-secret']
@@ -189,6 +193,32 @@ t('an unreadable frame is an error record and exit 3', () => {
   assert.strictEqual(r.status, 3)
   assert.deepStrictEqual(records(r.stdout).map(x => x.class), ['clean', 'error'])
 })
+// An animated PNG from two same-sized stills: every reader shows the first,
+// the second plays after it.
+function apng (first, second, out) {
+  const table = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0 })
+  const crc = buf => { let c = 0xffffffff; for (const b of buf) c = table[(c ^ b) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0 }
+  const u32 = n => { const b = Buffer.alloc(4); b.writeUInt32BE(n); return b }
+  const chunk = (type, data) => { const body = Buffer.concat([Buffer.from(type), data]); return Buffer.concat([u32(data.length), body, u32(crc(body))]) }
+  const chunks = file => { const b = fs.readFileSync(file); const out = []; for (let at = 8; at < b.length; at += 12 + b.readUInt32BE(at)) out.push({ type: b.toString('latin1', at + 4, at + 8), data: b.subarray(at + 8, at + 8 + b.readUInt32BE(at)) }); return out }
+  const pixels = cs => Buffer.concat(cs.filter(c => c.type === 'IDAT').map(c => c.data))
+  const a = chunks(first)
+  const ihdr = a.find(c => c.type === 'IHDR').data
+  const fctl = seq => chunk('fcTL', Buffer.concat([u32(seq), ihdr.subarray(0, 8), u32(0), u32(0), Buffer.from([0, 1, 0, 1, 0, 0])]))
+  fs.writeFileSync(out, Buffer.concat([
+    fs.readFileSync(first).subarray(0, 8), chunk('IHDR', ihdr), chunk('acTL', Buffer.concat([u32(2), u32(0)])),
+    fctl(0), chunk('IDAT', pixels(a)), fctl(1), chunk('fdAT', Buffer.concat([u32(2), pixels(chunks(second))])), chunk('IEND', Buffer.alloc(0))
+  ]))
+}
+t('an animation whose later frame shows a seed is an error record and exit 3', () => {
+  const anim = path.join(TMP, 'animated.png')
+  apng(frame('clean'), frame('bip39'), anim)
+  const r = run(['classify', '--roster', ROSTER, anim])
+  assert.strictEqual(r.status, 3, r.stdout)
+  const rec = records(r.stdout)[0]
+  assert.strictEqual(rec.class, 'error')
+  assert.match(rec.reasons[0].detail, /multi-frame/)
+})
 t('a missing frame is exit 3', () => {
   assert.strictEqual(run(['classify', '--roster', ROSTER, path.join(TMP, 'absent.png')]).status, 3)
 })
@@ -201,6 +231,16 @@ t('a malformed roster is exit 3', () => {
   const bad = path.join(TMP, 'bad-roster.json')
   fs.writeFileSync(bad, '{"roster": ')
   assert.strictEqual(run(['classify', '--roster', bad, frame('clean')]).status, 3)
+})
+t('a malformed creds file is exit 3 and its text is not echoed', () => {
+  const creds = path.join(TMP, 'bad-creds.json')
+  fs.writeFileSync(creds, '{"username": "x", "password": "hunter2"quote"}')
+  const bad = path.join(TMP, 'bad-creds-roster.json')
+  fs.writeFileSync(bad, JSON.stringify({ roster: { agent: { credsFile: creds } } }))
+  const r = run(['classify', '--roster', bad, frame('clean')])
+  assert.strictEqual(r.status, 3)
+  assert.match(r.stderr, /bad-creds\.json is not valid JSON/)
+  assert.doesNotMatch(r.stderr, /hunter2/)
 })
 t('a roster whose creds file is unreadable is exit 3', () => {
   const bad = path.join(TMP, 'dangling-roster.json')
@@ -229,6 +269,11 @@ t('a QR code holding a WIF key is SECRET', () => {
 t('a QR code holding a 2FA enrolment link is SECRET', () => {
   const rec = classifyOcr(ocr([line('Scan with your authenticator', 100)], [{ payload: `otpauth://totp/x?secret=${TOTP}`, box: [200, 300, 400, 400] }]))
   assert.ok(rec.reasons.some(r => r.rule === 'otp-secret'))
+})
+t('a QR code holding a seed phrase is SECRET', () => {
+  const rec = classifyOcr(ocr([line('Scan to restore', 100)], [{ payload: BIP39_12.join(' '), box: [200, 300, 400, 400] }]))
+  assert.strictEqual(rec.class, 'SECRET')
+  assert.ok(rec.reasons.some(r => r.rule === 'mnemonic-words' && /QR code/.test(r.detail)), JSON.stringify(rec.reasons))
 })
 t('a QR code holding an address is clean', () => {
   const rec = classifyOcr(ocr([line('Receive', 100)], [{ payload: 'bitcoin:bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', box: [200, 300, 400, 400] }]))

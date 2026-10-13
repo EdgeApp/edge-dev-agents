@@ -4,7 +4,9 @@
 # Called by runaway-guard.sh on EARLY detection (before the kill), or run manually:
 #   capture-runaway-forensics.sh [<pgid>]
 #
-# Writes a timestamped report to ~/.config/agent-watcher/oom-repro/forensics/.
+# Writes a timestamped report to
+# ${XDG_STATE_HOME:-~/.local/state}/agent-watcher/forensics/ (the directory
+# runaway-guard.sh reads as FORENSIC_DIR).
 # Goal: while the chain's parents are still alive, capture enough to answer
 # "what is spawning each new claude?" — confirming or refuting the recursive-/loop
 # hypothesis. The first action is an INSTANT full `ps` snapshot to a side file so the

@@ -63,7 +63,7 @@ if [[ -d "$REPO/agent-watcher" ]]; then
   fi
 fi
 
-# 3b. Workflow-tool scripts (model-invocable workflows, e.g. code-review-sonnet)
+# 3. Workflow-tool scripts (model-invocable workflows, e.g. code-review-sonnet)
 if [[ -d "$REPO/claude-workflows" ]]; then
   say "Installing ~/.claude/workflows from repo/claude-workflows"
   copy_tree "$REPO/claude-workflows" "$HOME/.claude/workflows"
@@ -144,15 +144,16 @@ if [[ -d "$HOME/.cursor/skills" ]]; then
     warn "~/.claude/skills exists and is not a symlink — left as-is."
   fi
 fi
-# 5. launchd jobs (watcher, watchdog, sweeps, guards). Templates live in
+GEN="$HOME/.cursor/skills/convention-sync/scripts/generate-claude-md.sh"
+[[ -x "$GEN" ]] && { say "Regenerating ~/.claude/CLAUDE.md"; "$GEN" >/dev/null || warn "generate-claude-md.sh failed (non-fatal)"; }
+
+# 5a. launchd jobs (watcher, watchdog, sweeps, guards). Templates live in
 # agent-watcher/launchd; the installer renders __HOME__/__NODE_BIN__, loads
 # each job, and skips any whose program is not on this machine.
 if [[ -x "$HOME/.config/agent-watcher/launchd/install-launchd.sh" ]]; then
   say "Installing launchd jobs from agent-watcher/launchd"
   "$HOME/.config/agent-watcher/launchd/install-launchd.sh" || warn "some launchd jobs did not load; see output above"
 fi
-GEN="$HOME/.cursor/skills/convention-sync/scripts/generate-claude-md.sh"
-[[ -x "$GEN" ]] && { say "Regenerating ~/.claude/CLAUDE.md"; "$GEN" >/dev/null || warn "generate-claude-md.sh failed (non-fatal)"; }
 
 # 5b. Portable `timeout` on PATH: macOS has no timeout/gtimeout, but the skills
 # prescribe `timeout <s> <cmd>` to bound waits. Symlink the committed shim.

@@ -101,10 +101,18 @@ func emit(_ obj: [String: Any]) {
   FileHandle.standardOutput.write("\n".data(using: .utf8)!)
 }
 
+func frameCount(_ path: String) -> Int {
+  guard let src = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil) else { return 0 }
+  return CGImageSourceGetCount(src)
+}
+
 func ocr(_ files: [String]) {
   for file in files {
     autoreleasepool {
       guard let image = loadImage(file) else { emit(["file": file, "error": "unreadable image"]); return }
+      // Only the first frame is read, so an animation or a multi-page file
+      // would be judged on a frame the viewer may never be looking at.
+      if frameCount(file) != 1 { emit(["file": file, "error": "multi-frame image: only a single still can be checked"]); return }
       do {
         let off = try recognize(image, correction: false)
         let on = try recognize(image, correction: true)

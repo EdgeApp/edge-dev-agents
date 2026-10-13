@@ -287,7 +287,7 @@ for (const [key, a] of anchors) {
 for (const key of Object.keys(lock.anchors)) {
   if (!anchors.has(key)) {
     const gone = key.startsWith('file:') ? !resolveFile(key.slice(5)) : !ruleIndex.has(key)
-    out(`${gone ? 'MISSING' : 'UNANCHORED'} ${key} (dims ${lock.anchors[key].dims}) — ${gone ? 'the anchored rule/file no longer exists; the dimension may be stale' : 'rubric no longer cites it; --reconcile after confirming intentional'}`)
+    out(`${gone ? 'MISSING' : 'UNANCHORED'} ${key} (dims ${lock.anchors[key].dims}) — ${gone ? 'the anchored rule/file no longer exists; the dimension may be stale' : `rubric no longer cites it; --forget ${key} after confirming intentional`}`)
   }
 }
 // coverage: corpus rules with no anchor and no current-version ack.

@@ -19,9 +19,11 @@
 //   - Then prompt the user to run `npm publish` in a real terminal
 //
 // Exit codes:
-//   0 = Version bumped, committed, tagged (check needsPush in JSON)
+//   0 = Every repo was bumped, committed and tagged, or skipped for having
+//       no unreleased changes. Read published[] (with needsPush) and
+//       skipped[] in the JSON to tell them apart per repo.
 //   1 = Verification failed
-//   2 = No unreleased changes
+//   75 = Land lock busy for one of the repos
 
 const { execSync } = require("child_process");
 const { existsSync, readFileSync, writeFileSync } = require("fs");

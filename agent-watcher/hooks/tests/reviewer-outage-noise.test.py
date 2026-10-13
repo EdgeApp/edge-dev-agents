@@ -18,6 +18,8 @@ NOISE = [
     'Cursor Bugbot still has not reviewed PR 6066 at dc0b8682, unchanged since the last push.',
     'Reviewer bot unavailable: cursor posted no check-run on the ready HEAD.',
     'Bugbot is out of quota, so this PR carries no automated review.',
+    'Bugbot ran out of quota before the second push.',
+    'Cursor Bugbot is on hold again: no check-run on HEAD.',
 ]
 CLEAN = [
     'CI is red under the awaiting-dep-publish label until edge-core-js publishes',

@@ -83,7 +83,7 @@ If `CREATED: false`, report the existing task to the user and continue with the 
 </step>
 
 <step id="3" name="Implement and PR">
-Delegate to the `pr-create.md` workflow using the **new** (or existing) task URL:
+Delegate to the `/pr-create` workflow using the **new** (or existing) task URL:
 
 1. `cd` to the target repo directory (see repo-map).
 2. **Read `~/.cursor/skills/pr-create/SKILL.md` now** (use the Read tool — do NOT skip this). Then follow its steps 1-6 (push, verify, build PR description, create PR, optional Asana updates, report).
@@ -98,6 +98,6 @@ Display both the new Asana task and the PR as clickable links. Note the dependen
 <edge-cases>
 <case name="Dependent task already exists">The script detects this. Report: "Found existing dependent task: [link]. Continuing with PR workflow." Then proceed to step 3.</case>
 <case name="Parent task has no project">The script falls back to the first available project. Warn the user if the placement looks wrong.</case>
-<case name="Target repo already has a matching branch">Step 3 delegates to `pr-create.md` which handles branch state assessment.</case>
+<case name="Target repo already has a matching branch">Step 3 delegates to `/pr-create`, which handles branch state assessment.</case>
 <case name="Upward dependency (higher-level target)">Ask: "Creating a [gui] task from a [core] parent is unusual — the dependency direction would be reversed. Confirm? (yes/no)"</case>
 </edge-cases>

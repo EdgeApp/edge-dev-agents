@@ -193,7 +193,7 @@ Valid threads — reply body cites the SHA Step 4d resolved:
 ~/.cursor/skills/pr-address/scripts/pr-address.sh reply \
   --owner <OWNER> --repo <REPO> --pr <NUMBER> \
   --comment-id <numeric_id> \
-  --body "Valid — fixed in <fixup_sha>. <one-sentence description of the fix and file:line>."
+  --body "Valid. Fixed in <fixup_sha>: <one-sentence description of the fix and file:line>."
 ```
 
 Invalid threads — reply body cites the matched heuristic:

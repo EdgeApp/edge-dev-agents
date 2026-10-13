@@ -118,8 +118,8 @@ if (hits.length) process.stdout.write(hits.join("\n"));
     [ -n "$hit" ] && targets="$hit"
   fi
   [ -n "$targets" ] || targets=$(printf '%s' "$cmd" \
-    | grep -oE "(^|[[:space:]])(>>?|tee([[:space:]]+-a)?)[[:space:]]*\"?'?[^\"'[:space:];|&]*${tail}" \
-    | sed -E "s/^[[:space:]]*(>>?|tee([[:space:]]+-a)?)[[:space:]]*[\"']?//" | _pick || true)
+    | grep -oE "(^|[[:space:]])(>>?|tee([[:space:]]+-a)?)[[:space:]]*\"?'?[^\"'[:space:];|&]*${tail}([[:space:];|&<>)\"']|\$)" \
+    | sed -E "s/^[[:space:]]*(>>?|tee([[:space:]]+-a)?)[[:space:]]*[\"']?//; s/[[:space:];|&<>)\"']\$//" | _pick || true)
   if [ -z "$targets" ] && printf '%s' "$cmd" | grep -qE "(^|[[:space:]|;&(])(sed[[:space:]]+(-[a-zA-Z]*)?-i|perl[[:space:]]+(-[a-zA-Z]*)?-[a-zA-Z]*i)"; then
     # Only the simple command that runs the editor names its file: split on
     # unquoted ; & | ( ) and newlines, keep the segments whose command word is

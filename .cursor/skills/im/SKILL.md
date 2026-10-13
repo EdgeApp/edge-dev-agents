@@ -44,7 +44,7 @@ After Step 0 determines the target repo (or if no Asana task, use the current re
 1. **Stash any uncommitted changes** (including untracked files) before switching branches: `git stash -u`
 2. Determine the correct branch state:
    - **Wrong repo**: `cd` to the correct workspace repo directory.
-   - **On an unrelated feature branch**: Switch to the base branch (see "Branch from" column in `task-review.md`), then create a new feature branch.
+   - **On an unrelated feature branch**: Switch to the base branch (see "Branch from" column in `~/.cursor/skills/task-review/SKILL.md`), then create a new feature branch.
    - **On the base branch**: Create a new feature branch.
    - **On the correct feature branch**: Continue.
 3. **Branch naming**: `${GIT_BRANCH_PREFIX:-jon}/<short-description>` or `${GIT_BRANCH_PREFIX:-jon}/fix/<short-description>` for bug fixes. Use kebab-case. Example: `<prefix>/some-feature` or `<prefix>/fix/some-bug`. (`GIT_BRANCH_PREFIX` comes from the interactive shell profile and is often UNSET in orchestrated/spawned shells — always fall back to `jon`, never create a branch starting with a bare `/`.)

@@ -80,7 +80,7 @@ To inspect a specific inline thread, including an already-resolved one, use:
 The `fetch-pr-body` call writes the current PR body to `/tmp/pr-body.md`. This file is available for editing throughout the session. If you need to update the PR body (e.g. to revise the description after addressing feedback), edit `/tmp/pr-body.md` via the Write tool and push it back:
 
 ```bash
-gh pr edit <NUMBER> --body-file /tmp/pr-body.md
+~/.cursor/skills/pr-create/scripts/pr-prose-edit.sh --repo <owner>/<repo> --pr <NUMBER> --body-file /tmp/pr-body.md
 ```
 </step>
 

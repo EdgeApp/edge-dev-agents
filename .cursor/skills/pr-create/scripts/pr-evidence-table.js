@@ -42,8 +42,6 @@
 // reads as a gesture, never as a pre-fix frame.
 
 const PER_ROW = 3, IMG_W = 200, CELL_W = 210, HDR_W = 170
-const START = '<!-- agent-test-evidence:start -->'
-const END = '<!-- agent-test-evidence:end -->'
 const HEADING = '### Test evidence'
 
 // Entries written before batches existed carry no batchAt. They are one
@@ -56,6 +54,8 @@ const LEGACY = '(earlier)'
 const marks = name => [`<!-- agent-${name}:start -->`, `<!-- agent-${name}:end -->`]
 
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+// For a value inside a double-quoted attribute: a quote would end it.
+const escAttr = s => esc(s).replace(/"/g, '&quot;')
 
 // Filename → { caption, index, hacked, phase }. Strips the transport prefix
 // (<stamp>-agent-proof-<gid>-<NN>-) and the uppercase marker tokens.
@@ -64,6 +64,8 @@ const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 // by their capture number ("screenshot 2"), and without it in the cell that
 // number is visible only by hovering the image URL. A stripped run of digits is
 // an index only when it is short — a task gid is 16 digits and is never one.
+// Stripping stops at the index: a number after it opens the caption
+// ("02-2-factor-prompt" is frame 2, "2 factor prompt").
 function parseName (file) {
   let s = String(file).replace(/\.[a-z0-9]+$/i, '')
   s = s.replace(/^\d{8}-\d{6}-/, '')
@@ -72,8 +74,8 @@ function parseName (file) {
   for (let i = 0; i < 2; i++) {
     const m = s.match(/^(\d+)[-_]/)
     if (!m) break
-    if (m[1].length <= 3) index = String(Number(m[1]))
     s = s.slice(m[0].length)
+    if (m[1].length <= 3) { index = String(Number(m[1])); break }
   }
   const hacked = /(^|-)HACKED(-|$)/.test(s)
   const before = /(^|-)BEFORE(-|$)/.test(s)
@@ -236,7 +238,9 @@ function render (manifest, { repo, pr, commits }) {
         if (e == null) { out.push(`<td width="${CELL_W}"></td>`); continue }
         // An entry carries its own absolute url (object storage, where the
         // key has a random suffix and cannot be derived from a base).
-        const url = e.url
+        // The manifest is a public, writable-by-key object, so the url is
+        // escaped like any other value read from it.
+        const url = escAttr(e.url)
         // The capture number leads the caption so prose that says "screenshot 2"
         // resolves by reading, not by hovering the image URL. Position within
         // the batch is the fallback for a frame whose filename carried no index.
@@ -256,8 +260,9 @@ function render (manifest, { repo, pr, commits }) {
 // The ANCHOR is the sentinel comment pair and nothing else. The heading is
 // regenerated INSIDE the block, so it is display text: renaming it, or a human
 // writing the words "Test evidence" elsewhere in the body, cannot move or
-// duplicate the block. Half a pair means a hand-edit truncated the block;
-// appending a second one there would silently leave two tables, so it throws.
+// duplicate the block. Half a pair, or an end sentinel above the start, means a
+// hand-edit broke the block; appending a second one there would silently leave
+// two tables, so it throws.
 function splice (body, table, opts) {
   const { name = 'test-evidence', heading = HEADING } = opts || {}
   const [START, END] = marks(name)
@@ -267,8 +272,9 @@ function splice (body, table, opts) {
   const b = String(body || '')
   const i = b.indexOf(START), j = b.indexOf(END)
   if (i >= 0 && j > i) return b.slice(0, i) + block + b.slice(j + END.length)
-  if ((i >= 0) !== (j >= 0)) {
-    throw new Error(`PR body has a broken evidence block: found ${i >= 0 ? START : END} without its pair. Repair or remove it, then re-run.`)
+  if (i >= 0 || j >= 0) {
+    const what = i < 0 ? `found ${END} without its pair` : j < 0 ? `found ${START} without its pair` : `${END} sits above ${START}`
+    throw new Error(`PR body has a broken evidence block: ${what}. Repair or remove it, then re-run.`)
   }
   return b.replace(/\s*$/, '') + '\n\n' + block + '\n'
 }
@@ -329,5 +335,5 @@ function moveSectionFirst (body, heading) {
 module.exports = {
   parseName, frameKey, sceneId, resolveScenes, batchesOf, pruneBatches, wouldRetire,
   mergeManifest, bucketKey, render, splice, replaceSection, removeSection, moveSectionFirst,
-  marks, START, END, LEGACY
+  marks, LEGACY
 }

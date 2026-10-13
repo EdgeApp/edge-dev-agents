@@ -85,10 +85,17 @@ function nearWord(list, t) {
 const fold = s => s.toLowerCase().replace(/0/g, 'o').replace(/[1i|!]/g, 'l')
 const squash = s => fold(s).replace(/[^a-z0-9]/g, '')
 
+// A parse error from JSON.parse quotes the text around the bad token, and
+// these files hold passwords: name the file, never the excerpt.
+function readJson(file) {
+  const text = fs.readFileSync(file, 'utf8')
+  try { return JSON.parse(text) } catch (e) { throw new Error(`${file} is not valid JSON`) }
+}
+
 function loadRoster(file) {
   const out = { usernames: [], secrets: [] }
   if (!fs.existsSync(file)) return out
-  const roster = JSON.parse(fs.readFileSync(file, 'utf8')).roster
+  const roster = readJson(file).roster
   if (roster == null || typeof roster !== 'object') throw new Error(`roster file has no "roster" object: ${file}`)
   const addUser = (role, v) => {
     if (typeof v === 'string' && squash(v).length >= 4 && !out.usernames.some(u => u.value === v)) out.usernames.push({ role, value: v })
@@ -105,7 +112,7 @@ function loadRoster(file) {
       const full = path.isAbsolute(p) ? p : path.join(path.dirname(file), p)
       // A named creds file that cannot be read is a detector failure: its
       // password would otherwise go unchecked.
-      sources.push(JSON.parse(fs.readFileSync(full, 'utf8')))
+      sources.push(readJson(full))
     }
     for (const src of sources) {
       addUser(role, src.username)
@@ -387,7 +394,9 @@ function otpReasons(lines, allText) {
 // A password field with its value showing: the field label, then text that is
 // neither masked nor one of the app's own hints.
 const PASSWORD_LABEL = /^((current|new|confirm|re-?enter|your)\s+)?password$/i
-const PASSWORD_HINT = /password|characters|uppercase|lowercase|number|must|forgot|username|login|log in|sign in|next|done|cancel|continue|submit|save|show|hide|create|recover|help|touch|face|pin|enter|required|incorrect|match|change|confirm|verify|^ok$|^or$/i
+// Whole words only: a revealed value such as Spinach42! holds "pin" and is
+// still a password.
+const PASSWORD_HINT = /\b(?:password|character|uppercase|lowercase|number|must|forgot|username|login|log in|sign in|next|done|cancel|continue|submit|save|show|hide|create|recover|help|touch|face|pin|enter|required|incorrect|match|change|confirm|verify)(?:s|d|ed|ing)?\b|^ok$|^or$/i
 
 function passwordReasons(lines) {
   const reasons = []
@@ -489,6 +498,11 @@ function classifyOcr(ocr, roster = { usernames: [], secrets: [] }) {
     reasons.push(...matched.reasons)
     usernames.push(...matched.usernames)
   }
+  // A QR code can hold the phrase itself: read each payload as a line of words.
+  for (const b of barcodes) {
+    const words = String(b.payload).split(/\s+/).filter(Boolean).map(text => ({ text, box: b.box }))
+    for (const r of mnemonicReasons([{ words }], false)) reasons.push({ ...r, detail: `${r.detail} in a QR code` })
+  }
   reasons = dedupe(reasons, r => r.rule + r.detail)
   usernames = dedupe(usernames, u => u.role)
   const cls = reasons.length > 0 ? 'SECRET' : usernames.length > 0 ? 'USERNAME' : 'clean'
@@ -507,12 +521,17 @@ function vision(args) {
   return res.stdout
 }
 
+// One frame-vision process reads at most this many frames.
+const OCR_BATCH = 40
+
 function ocrFiles(files) {
   const out = []
-  for (let i = 0; i < files.length; i += 40) {
-    const chunk = files.slice(i, i + 40)
+  for (let i = 0; i < files.length; i += OCR_BATCH) {
+    const chunk = files.slice(i, i + OCR_BATCH)
     const rows = vision(['ocr', ...chunk]).split('\n').filter(Boolean).map(l => JSON.parse(l))
     if (rows.length !== chunk.length) throw new DetectorError(`frame-vision returned ${rows.length} results for ${chunk.length} files`)
+    // A verdict is only ever printed under the frame it was read from.
+    rows.forEach((row, n) => { if (row.file !== chunk[n]) throw new DetectorError(`frame-vision answered for ${row.file} where ${chunk[n]} was asked`) })
     out.push(...rows)
   }
   return out
@@ -556,13 +575,11 @@ function main(argv) {
       if (listFile != null) files.push(...fs.readFileSync(listFile, 'utf8').split('\n').filter(Boolean))
       if (files.length === 0) return usage()
       let failed = false
-      for (let i = 0; i < files.length; i += 40) {
-        for (const ocr of ocrFiles(files.slice(i, i + 40))) {
-          const rec = classifyOcr(ocr, roster)
-          if (rec.class === 'error') failed = true
-          if (!explain) for (const r of rec.reasons) delete r.box
-          print(rec)
-        }
+      for (const ocr of ocrFiles(files)) {
+        const rec = classifyOcr(ocr, roster)
+        if (rec.class === 'error') failed = true
+        if (!explain) for (const r of rec.reasons) delete r.box
+        print(rec)
       }
       return failed ? 3 : 0
     }

@@ -2,9 +2,11 @@
 # check-followup-scope.sh — LIVE-fetch a task's followup scope against the run-report
 # watermark, per one-shot's `followup-scope-is-the-deliverable`.
 #
-# Why a script: every watcher resume auto-compacts the session from a summary built
-# BEFORE the followup comment existed (spawn-test-session answers the resume menu with
-# "Resume from summary", which runs /compact — trigger "manual" in the transcript).
+# Why a script: a watcher resume brings back a session whose context was built
+# BEFORE the followup comment existed. The watcher path now answers the resume
+# menu FULL (spawn-test-session.sh; it answered "Resume from summary", which
+# runs /compact, when this script was written), and a full transcript predates
+# the comment just the same.
 # So a resumed agent's memory is by construction pre-followup, and runs kept
 # re-Completing without seeing new operator comments (the 1209296431612665 UTXO miss,
 # 2026-07-02). The enumeration must therefore be a REAL fetch, never recalled context.

@@ -14,7 +14,9 @@
 # The roster defaults to ~/.config/edge-secrets/test-accounts.json
 # (EVIDENCE_ROSTER overrides it). The Vision reader is compiled from
 # frame-vision.swift on first use into ${XDG_CACHE_HOME:-~/.cache}/agent-evidence,
-# keyed by the source hash, so an edited source rebuilds itself.
+# keyed by the source hash, so an edited source rebuilds itself. FRAME_VISION
+# names a prebuilt reader to use instead; it is a test seam, and a reader that
+# answers "no text" for every frame turns the check off.
 #
 # Exit codes:
 #   0  every frame has a verdict (read the class from each JSON record)

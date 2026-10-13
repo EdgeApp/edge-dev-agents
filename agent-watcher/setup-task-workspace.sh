@@ -4,7 +4,8 @@
 # Each parallel agent runs in its own worktree so concurrent sessions never share
 # a working tree. The worktree lives at:
 #     ~/git/.agent-worktrees/<task-gid>/<repo>/
-# on a fresh branch `agent/<task-gid>` based on origin/develop (configurable).
+# on a fresh branch `${GIT_BRANCH_PREFIX:-jon}/<task-gid>` (or --branch) based on
+# origin/develop (configurable).
 # Works for ANY repo under ~/git (gui or a dependency), so one task can have several
 # co-located worktrees that updot can sibling-link.
 # env.json (and, on develop, its split config.json / keys.json / edgeKey.json) is

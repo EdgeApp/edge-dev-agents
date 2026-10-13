@@ -33,6 +33,9 @@ set -euo pipefail
 FILE="${1:-}"
 [[ -f "$FILE" ]] || { echo "usage: tdd-lint.sh <file.md>" >&2; exit 1; }
 
+# || RC=$?: under set -e a bare failing node call would end the script here,
+# before the three lints below get to report.
+RC=0
 node -e '
 const fs = require("fs")
 const src = fs.readFileSync(process.argv[1], "utf8")
@@ -309,8 +312,7 @@ if (findings.length === 0 && warns.length === 0) {
   if (findings.length > 0) process.exit(1)
   console.log("STRUCTURE_OK_WITH_WARNINGS headings=" + headings.length + " mermaid=" + mermaid.length + " glossary=" + glossTerms.length)
 }
-' "$FILE"
-RC=$?
+' "$FILE" || RC=$?
 
 # Glossary link placement is computed, not judged: this reports any term whose
 # first use in a top-level section is unlinked. Fix by running the same script

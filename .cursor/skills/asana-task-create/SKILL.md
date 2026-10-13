@@ -55,7 +55,7 @@ Preview first, then create with the same flags minus `--dry-run`:
   --dry-run
 ```
 
-Review the dry-run payload (fields resolved, sections found, `CREATED_OPTION` lines flag options that will be created). Then re-run without `--dry-run`. Report `TASK_URL`, the `FIELD:`/`CREATED_OPTION:`/`ATTACHED:` lines, and anything left unset with the reason.
+Review the dry-run payload (fields resolved, sections found, `WOULD_CREATE_OPTION` lines flag options the real run will create). Then re-run without `--dry-run`. Report `TASK_URL`, the `FIELD:`/`CREATED_OPTION:`/`ATTACHED:` lines, and anything left unset with the reason.
 </step>
 
 <edge-cases>

@@ -90,7 +90,7 @@ if [ -f "$MARKER" ] && [ -z "$SLICES" ]; then
   TOP=$(git -C "${CWD:-/nonexistent}" rev-parse --show-toplevel 2>/dev/null || true)
   CP="$TOP/src/util/corePlugins.ts"
   if [ -n "$TOP" ] && [ -f "$CP" ] && git -C "$TOP" diff --quiet HEAD -- src/util/corePlugins.ts 2>/dev/null; then
-    jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: "corePlugins.ts is untouched. If this task is asset/chain/provider-scoped, trim the plugin set to the task WORKING SET before driving: the target plugin(s) plus funding sources (BTC/ETH/USDC) plus every provider under test — playbook \"working set\" entry. Funding carve-out: if a funding route later needs a filtered-out asset/provider, widen or remove the trim, fund, re-trim if useful; a funding blocker caused by your own trim is self-inflicted (concession-validator denies it). If the full plugin set is intentional for this task, drive on."}}'
+    jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: "corePlugins.ts is untouched. If this task is asset/chain/provider-scoped, trim the plugin set to the task WORKING SET before driving: the target plugin(s) plus funding sources (BTC/ETH/USDC) plus every provider under test — playbook \"working set\" entry. Funding carve-out: if a funding route later needs a filtered-out asset/provider, widen or remove the trim, fund, re-trim if useful; a funding blocker caused by your own trim is self-inflicted (the completion judge denies it). If the full plugin set is intentional for this task, drive on."}}'
   fi
   exit 0
 fi

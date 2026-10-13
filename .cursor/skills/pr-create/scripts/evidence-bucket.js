@@ -56,7 +56,9 @@ function configPath() {
 function loadConfig() {
   const file = configPath()
   let cfg
-  try { cfg = JSON.parse(fs.readFileSync(file, 'utf8')) } catch (e) { throw new Error(`no asset bucket configured (${file}): ${e.message}`) }
+  // A JSON.parse message quotes the text around the bad token, and this file
+  // holds the bucket's secret key: say it is malformed, never the excerpt.
+  try { cfg = JSON.parse(fs.readFileSync(file, 'utf8')) } catch (e) { throw new Error(`no asset bucket configured (${file}): ${e instanceof SyntaxError ? 'not valid JSON' : e.message}`) }
   for (const k of ['accessKeyId', 'secretAccessKey', 'bucket', 'publicBaseUrl']) {
     if (typeof cfg[k] !== 'string' || cfg[k] === '') throw new Error(`asset bucket config ${file} has no ${k}`)
   }

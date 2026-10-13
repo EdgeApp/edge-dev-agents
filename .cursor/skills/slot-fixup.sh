@@ -11,8 +11,10 @@
 # Usage:
 #   slot-fixup.sh [--base <ref>]
 #
-# --base <ref>   Base commit/ref to rebase from. Defaults to merge-base of
-#                origin's default branch with HEAD.
+# --base <ref>   Base commit/ref to rebase from. Defaults to the merge-base of
+#                HEAD with the ref git-branch-base.sh names: the base of this
+#                branch's open PR, else the default branch (origin/master
+#                when that script fails).
 #
 # Exit codes:
 #   0 — slotted cleanly (HEAD now points to the slotted fixup)

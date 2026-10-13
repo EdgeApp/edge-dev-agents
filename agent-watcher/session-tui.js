@@ -273,7 +273,7 @@ function createSessionsView (host) {
   return { name: 'sessions', render, onKey, refresh, setModel, busy }
 }
 
-module.exports = { createSessionsView, buildModel: buildSessions, buildSessions, fmtAgo, sh }
+module.exports = { createSessionsView, buildSessions, fmtAgo, sh }
 
 if (require.main === module) {
   if (process.argv.includes('--dump')) {

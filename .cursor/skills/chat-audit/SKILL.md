@@ -67,7 +67,7 @@ For each step in the command, check if the tool sequence includes the correspond
 - Missing verification step
 - Missing CHANGELOG entry
 - Missing Asana linking
-- Skipped cross-file reads (e.g., never read `im.md` when step 3 requires it)
+- Skipped cross-file reads (e.g., never read `im/SKILL.md` when step 3 requires it)
 </sub-step>
 </step>
 

@@ -109,7 +109,7 @@ const PR_URL_RE = /^https:\/\/github\.com\/EdgeApp\/([^/]+)\/pull\/(\d+)/;
 const PR_SHORT_RE = /^([a-z][a-z0-9-]+)#(\d+)$/;
 // Matches both old (app.asana.com/0/<project>/<taskGid>) and new
 // (app.asana.com/1/<workspace>/project/<projectId>/task/<taskGid>) URL formats.
-// Strips query params via the [^?]* fallback.
+// Unanchored at the end, so a trailing query string is ignored.
 const ASANA_URL_RE = /^https:\/\/app\.asana\.com\/(?:\d+\/\d+\/(?:project\/\d+\/)?(?:task\/)?(\d+))/;
 
 const repoArgs = [];

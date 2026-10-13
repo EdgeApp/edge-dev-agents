@@ -2,8 +2,10 @@
 # resume-agent.sh — Find and resume a watcher-spawned claude session.
 #
 # Watcher-spawned sessions have a unique signature:
-#   (a) project dir is enc(~/git) — e.g. -Users-<user>-git (cwd was ~/git when spawned)
-#   (b) the first user message starts with `/one-shot --yolo`
+#   (a) project dir is enc(~/git), e.g. -Users-<user>-git (cwd was ~/git when spawned)
+#   (b) the transcript head matches RUN_SIGNATURE_RE in lib/run-signature.sh
+#       (a `/one-shot --yolo` or `/task-run --yolo` user message, in either
+#       recorded form); that file owns the pattern
 # Filtering on both excludes other claude sessions (this desktop app's history,
 # ad-hoc terminal sessions, etc.) that may incidentally mention the same term.
 #
@@ -250,7 +252,8 @@ if $CHAT; then
   #   - --remote-control chat-<slug>: reachable from the phone session list.
   # --name <anchor> resurrects a session as a NAMED ANCHOR (claude-asana-<name>,
   # RC <name>) instead of a chat. This matters because the watchdog's idle
-  # reaper kills `claude-asana-chat-*` after 48h and exempts anchors BY NAME:
+  # reaper kills `claude-asana-chat-*` after idle_reap_hours (default 72; it
+  # was 48h at the time of the incident below) and exempts anchors BY NAME:
   # resurrecting a persistent anchor (main/eval/pokemon/...) with the default
   # chat naming silently DEMOTES it into the reap pool, which is how the "main"
   # chat died 2026-07-26 exactly 48h after its resurrection. Resurrecting an
@@ -342,7 +345,8 @@ if $CHAT; then
   $CHROME && CHROME_FLAG="--chrome"
   AC_FLAG="$("$DIR/lib/autocompact-flag.sh")"
   tmux send-keys -t "$TMUX_NAME" "claude --resume $LATEST_UUID $FORK_FLAG $CHROME_FLAG $AC_FLAG --dangerously-skip-permissions --remote-control $RC_NAME" Enter
-  # Auto-answer the resume-summary menu (option 1, pre-selected) when it appears.
+  # Auto-answer the resume menu when it appears: a FULL resume by default, the
+  # summary only under --summary.
   for _ in $(seq 1 30); do
     sleep 2
     pane=$(tmux capture-pane -p -t "$TMUX_NAME" 2>/dev/null || true)

@@ -58,7 +58,8 @@ if [[ -z "$GIST_ID" ]]; then
   args=()
   [[ "$VISIBILITY" == "public" ]] && args+=(--public)
   [[ -n "$DESC" ]] && args+=(--desc "$DESC")
-  url=$(gh gist create "${args[@]}" "$FILE" | tail -1)
+  # ${args[@]+...}: bash 3.2 treats an empty array as unbound under set -u.
+  url=$(gh gist create ${args[@]+"${args[@]}"} "$FILE" | tail -1)
   GIST_ID="${url##*/}"
 else
   payload=$(jq -Rs --arg name "$BASENAME" '{files: {($name): {content: .}}}' "$FILE")

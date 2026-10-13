@@ -440,4 +440,4 @@ function retitle (fleet, names) {
   return fleet
 }
 
-module.exports = { retitle, buildSessions, buildModel: buildSessions, collect, collectAsana, dump, spawnVerdict, loadNames, warmNames, loadTmux, nameOf, fmtAgo, fmtDate, sh, jread, AW, ST }
+module.exports = { retitle, buildSessions, collect, collectAsana, dump, spawnVerdict, loadNames, warmNames, loadTmux, nameOf, fmtAgo, fmtDate, sh, jread, AW, ST }

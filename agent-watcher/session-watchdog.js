@@ -155,7 +155,6 @@ function holdAgeMs(taskGid) {
 // visible, session-record bridge id when the build hides the pill). See
 // lib/rc-state.js for why the footer alone stopped working on >= 2.1.268.
 const { rcBridgeUp } = require('./lib/rc-state.js')
-const RC_HALFOPEN_BACKSTOP_MS = 3 * 60 * 60 * 1000      // DISABLED 2026-06-05 (backstop removed to eval zero-ping-on-healthy); kept for easy revert
 const SESSION_PREFIX = 'claude-asana-'
 // Completed sessions are RENAMED to this prefix instead of being killed, so the
 // watcher (which counts a slot only for `claude-asana-<digits>`) stops counting
@@ -235,10 +234,6 @@ function sh(cmd) {
   } catch {
     return ''
   }
-}
-
-function shStrict(cmd) {
-  return execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }).trim()
 }
 
 function listTargetSessions() {
@@ -359,9 +354,9 @@ function resumeAfterApiError(session, taskGid, s) {
   return true
 }
 
-// Operator hold stamp (see operator-hold.sh): held while the stamp exists. No
-// TTL: a steered run waits for the operator; the park escalation below is the
-// reminder. Read directly (no shell-out) so the tick stays cheap.
+// Operator hold stamp (see operator-hold.sh): held while the stamp exists.
+// The hold-expiry branch in the tick releases a stamp older than
+// operator_hold_ttl_min once the pane is idle. Read directly (no shell-out) so the tick stays cheap.
 function operatorHeld(taskGid) {
   return fs.existsSync(`/tmp/agent-operator-hold-${taskGid}`)
 }
@@ -1443,8 +1438,8 @@ function main() {
       // NEVER ping — a half-open bridge (indicator up but actually unreachable) is
       // left for the operator to reconnect on their next attach (the real ground-
       // truth test anyway). [Backstop re-register removed 2026-06-05 to evaluate
-      // zero-ping-on-healthy; to revert, re-add an
-      // `rcUp && idle > RC_HALFOPEN_BACKSTOP_MS` branch here.]
+      // zero-ping-on-healthy; a revert re-adds an `rcUp && idle > <3h>` branch
+      // here.]
       const idle = now - prior.lastChange
       log(`[${session}] RC indicator ABSENT + idle ${Math.round(idle / 60000)}m → reviving.`)
       if (attemptRcRespawn(session, prior)) respawnedAt = now
@@ -1452,7 +1447,7 @@ function main() {
     }
     // On an unconfirmed fetch, preserve the prior heavyFreed rather than letting a
     // null-blocked blip reset it to false and re-free next tick.
-    state.sessions[session] = { lastContent: content, lastChange, heldLogged: isHeld, declinedAt, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated, respawnedAt, heldLogged: isHeld, archivedLogged: archived, pauseSince: pauseSt.pauseSince, pausePingedAt: pauseSt.pausePingedAt, pauseEscSent: pauseSt.pauseEscSent }
+    state.sessions[session] = { lastContent: content, lastChange, declinedAt, heavyFreed: stateOk ? isBlocked : (prior?.heavyFreed ?? false), parkedSince, parkLogged, parkEscalated, respawnedAt, heldLogged: isHeld, archivedLogged: archived, pauseSince: pauseSt.pauseSince, pausePingedAt: pauseSt.pausePingedAt, pauseEscSent: pauseSt.pauseEscSent }
   }
 
   // Cap retired (completed-but-kept-alive) sessions so they don't accumulate in memory.

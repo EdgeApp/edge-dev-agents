@@ -56,7 +56,7 @@ if [[ -n "$BODY_FILE" ]]; then
       const S = `<!-- agent-${name}:start -->`, E = `<!-- agent-${name}:end -->`
       const i = body.indexOf(S), j = body.indexOf(E)
       if (i >= 0 && j > i) body = body.slice(0, i) + m[0] + body.slice(j + E.length)
-      else if ((i >= 0) !== (j >= 0)) { console.error(`new body has a broken agent-${name} block (half a sentinel pair)`); process.exit(1) }
+      else if (i >= 0 || j >= 0) { console.error(`new body has a broken agent-${name} block (half a sentinel pair, or the end above the start)`); process.exit(1) }
       else body = body.replace(/\s*$/, "") + "\n\n" + m[0] + "\n"
     }
     fs.writeFileSync(out, body)

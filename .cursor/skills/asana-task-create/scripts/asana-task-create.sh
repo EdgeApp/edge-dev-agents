@@ -150,12 +150,17 @@ resolve_enum() {
     // ([$o[] | select((.name | ascii_downcase) | startswith($w | ascii_downcase))] | if length == 1 then .[0].gid else empty end)
     // empty')
   if [[ -z "$gid" ]]; then
-    if allow_create "$label"; then
+    if allow_create "$label" && $DRY_RUN; then
+      # A dry run writes nothing: name the option it would create and stop.
+      echo "WOULD_CREATE_OPTION: $label=$wanted" >&2
+      gid="<new option: $wanted>"
+    elif allow_create "$label"; then
       gid=$(curl -sf --max-time 20 -X POST "$API/custom_fields/$field_gid/enum_options" "${AUTH[@]}" \
         -H "Content-Type: application/json" \
         -d "$(jq -n --arg n "$wanted" '{data: {name: $n}}')" | jq -r '.data.gid // empty')
       [[ -n "$gid" ]] || { echo "ERROR: failed to create option \"$wanted\" on $label" >&2; exit 1; }
-      echo "CREATED_OPTION: $label=$wanted"
+      # stderr: stdout is the option gid the caller captures.
+      echo "CREATED_OPTION: $label=$wanted" >&2
     else
       echo "ERROR: $label has no option matching \"$wanted\". Available:" >&2
       echo "$opts" | jq -r '.data.enum_options[] | select(.enabled) | "  - " + .name' >&2

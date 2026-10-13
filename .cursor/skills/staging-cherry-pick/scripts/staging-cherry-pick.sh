@@ -15,8 +15,9 @@
 //
 // Exit codes:
 //   0 = All cherry-picks succeeded
-//   1 = Error (auth, git failure, etc.)
-//   3 = Cherry-pick conflict (agent must resolve)
+//   1 = Error (code conflict, git failure)
+//   2 = gh auth needed (prints PROMPT_GH_AUTH)
+//   3 = CHANGELOG-only conflict (agent resolves)
 
 const { spawnSync } = require("child_process");
 const path = require("path");

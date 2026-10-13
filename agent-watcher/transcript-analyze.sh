@@ -4,7 +4,7 @@
 //
 // Two subcommands, one parser:
 //
-//   cost <target> [--since <ISO>]
+//   cost <target>
 //       Where a session's tokens went: call count, context curve, compaction
 //       count, image-Read positions, and the weighted cost of holding those
 //       images vs checking them in a subagent. Output is ~20 lines, so it is
@@ -58,6 +58,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === "--before") opt.before = Number(argv[++i]);
   else if (a === "--after") opt.after = Number(argv[++i]);
   else if (a === "--out") opt.out = argv[++i];
+  // --since is accepted and ignored: no subcommand ever filtered on it.
   else if (a === "--since") opt.since = argv[++i];
   else target = a;
 }

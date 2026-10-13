@@ -3,8 +3,9 @@
 # orchestrated agent sessions unless a FRESH followup-scope check exists, per
 # one-shot's `followup-scope-is-the-deliverable`.
 #
-# Why: every watcher resume auto-compacts the session from a pre-followup summary
-# (resume menu -> "Resume from summary" -> /compact), so a resumed agent's memory
+# Why: every watcher resume brings back a session built before the followup
+# comment (a full resume today, a /compact summary when this hook was written),
+# so a resumed agent's memory
 # cannot know about newer operator comments. Runs asserted "no comment newer than
 # my run-report" from that stale summary and re-Completed past real followup scope
 # (the 1209296431612665 UTXO miss, 2026-07-02, twice). A prose rule cannot fix a
@@ -55,7 +56,7 @@ OWN="/tmp/agent-own-stories-$GID"
 SOLO="Run the check as its OWN Bash command, never chained with the Complete call (this gate evaluates before anything chained ahead of Complete executes)."
 
 if [ ! -s "$MARKER" ]; then
-  echo "BLOCKED: no followup-scope check for task $GID. Your context may predate operator comments (a watcher resume compacts the session from a PRE-followup summary), so recalled history can never establish 'no new scope'. Run: $CHECK; then: if it lists operator asks newer than the run-report watermark, they are THIS run's deliverable (followup-scope-is-the-deliverable); deliver or explicitly surface them before Complete. If it lists none, retry Complete. $SOLO" >&2
+  echo "BLOCKED: no followup-scope check for task $GID. Your context may predate operator comments (a watcher resume restores a session built BEFORE the followup comment), so recalled history can never establish 'no new scope'. Run: $CHECK; then: if it lists operator asks newer than the run-report watermark, they are THIS run's deliverable (followup-scope-is-the-deliverable); deliver or explicitly surface them before Complete. If it lists none, retry Complete. $SOLO" >&2
   exit 2
 fi
 

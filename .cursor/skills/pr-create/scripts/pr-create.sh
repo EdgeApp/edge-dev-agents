@@ -324,26 +324,6 @@ if (
   process.exit(1);
 }
 
-// Guardrail: fail fast on duplicated PR template sections.
-// This catches stale/concatenated body files before creating malformed PRs.
-const sectionCounts = {
-  changelog: countOccurrences(body, "### CHANGELOG"),
-  dependencies: countOccurrences(body, "### Dependencies"),
-  description: countOccurrences(body, "### Description"),
-};
-if (
-  sectionCounts.changelog > 1 ||
-  sectionCounts.dependencies > 1 ||
-  sectionCounts.description > 1
-) {
-  console.error(
-    "ERROR: PR body appears to contain duplicated template sections. " +
-      "Regenerate the body file and retry."
-  );
-  console.error(JSON.stringify(sectionCounts));
-  process.exit(1);
-}
-
 // Inject Asana link if provided and not already present
 if (asanaTask) {
   const asanaUrl = `https://app.asana.com/0/0/${asanaTask}/f`;

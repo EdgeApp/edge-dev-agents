@@ -4,7 +4,7 @@
 # The attempt-log is the authoritative, agent-LOCATION-INDEPENDENT record of every
 # value-moving action (swap/send/sweep) and every test-drive/repro a run actually
 # performed. Whoever does the attempt writes it here; whoever validates a CONCESSION
-# (the concession-validation gate now — covering BOTH a formal `--blocked yes` and a
+# (the completion judge now — covering BOTH a formal `--blocked yes` and a
 # silent DOWNGRADE-finalize that completes/opens a PR without reaching the prescribed
 # in-app success — the eval post-hoc) reads it here. This decoupling is what survives
 # the tester split: when testing becomes its own subagent, the test drive lands in the

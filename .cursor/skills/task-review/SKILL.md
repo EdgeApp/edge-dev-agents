@@ -6,7 +6,7 @@ metadata:
   author: j0ntz
 ---
 
-<goal>Fetch context from an Asana task, analyze it, present a summary, and determine the target repo. This is the **single source of truth** for Asana task understanding — both `im.md` and `pr-create.md` delegate here.</goal>
+<goal>Fetch context from an Asana task, analyze it, present a summary, and determine the target repo. This is the **single source of truth** for Asana task understanding — both `/im` and `/pr-create` delegate here.</goal>
 
 <rules description="Non-negotiable constraints.">
 <rule id="summary-first">Present the task summary to the user BEFORE exploring any code. Code exploration happens after the user has seen the analysis.</rule>
@@ -15,8 +15,8 @@ metadata:
 </rules>
 
 <when-this-runs>
-- Automatically as the first step of `im.md` when an Asana task link is provided
-- Automatically as Step 1 of `pr-create.md` when an Asana task link is provided
+- Automatically as the first step of `/im` when an Asana task link is provided
+- Automatically as Step 1 of `/pr-create` when an Asana task link is provided
 - Can also be invoked standalone: `/task-review https://app.asana.com/1/.../task/<task_gid>`
 </when-this-runs>
 
@@ -136,12 +136,12 @@ If there are no questions, say so explicitly — don't fabricate them.
 </sub-step>
 </step>
 
-<step id="4" name="Wait for confirmation (im.md and standalone only)">
-When invoked from `im.md` or standalone, end with a clear prompt:
+<step id="4" name="Wait for confirmation (/im and standalone only)">
+When invoked from `/im` or standalone, end with a clear prompt:
 
 > Does this match your understanding? Any adjustments before I start?
 
 **Do NOT begin implementation until the user confirms.**
 
-When invoked from `pr-create.md`, skip this step — the task context is used for repo/branch resolution and PR enrichment, not for implementation planning.
+When invoked from `/pr-create`, skip this step — the task context is used for repo/branch resolution and PR enrichment, not for implementation planning.
 </step>

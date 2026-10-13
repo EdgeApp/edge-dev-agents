@@ -295,8 +295,8 @@ case "$CMD" in
       const ob = []
       const unresolved = threads.filter(t => !t.isResolved).length
       if (unresolved) ob.push(unresolved + ' unresolved thread(s) in .threads: each needs reply-then-resolve (owner) or reply-only (non-owner).')
-      if (reviewBodies.length) ob.push(reviewBodies.length + ' top-level REVIEW BODY(ies) in .reviewBodies (states: ' + reviewBodies.map(r => r.state).join(', ') + '): review feedback exactly like a thread. Each needs a reply, then mark-addressed (pr-address.sh mark-addressed --review-id <id>). Filtering to .threads drops these.')
-      if (topLevel.length) ob.push(topLevel.length + ' top-level PR comment(s) in .topLevel: same reply-then-mark-addressed contract (--comment-id <id>).')
+      if (reviewBodies.length) ob.push(reviewBodies.length + ' top-level REVIEW BODY(ies) in .reviewBodies (states: ' + reviewBodies.map(r => r.state).join(', ') + '): review feedback exactly like a thread. Each needs a reply, then mark-addressed (pr-address.sh mark-addressed --type review --target-id <id> --body <text>). Filtering to .threads drops these.')
+      if (topLevel.length) ob.push(topLevel.length + ' top-level PR comment(s) in .topLevel: same reply-then-mark-addressed contract (--type comment --target-id <id>).')
       if (ob.length) {
         process.stderr.write('\n>> OBLIGATIONS (pr-address contract; not discharged until each is replied AND marked):\n')
         for (const o of ob) process.stderr.write('>>   - ' + o + '\n')

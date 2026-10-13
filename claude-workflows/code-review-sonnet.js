@@ -409,7 +409,7 @@ const block = ranked.map((c, i) =>
 
 const report = P.singlePass ? null : await agent(
   "## Synthesis: final code-review report\n\n" +
-  ranked.length + " findings " + (P.singlePass ? "from a single-pass low-effort review" : "survived independent verification (" + LEVEL + "-effort review)") + ". They are numbered [0]-[" + (ranked.length - 1) + "] below.\n\n" + block + "\n" +
+  ranked.length + " findings " + "survived independent verification (" + LEVEL + "-effort review)" + ". They are numbered [0]-[" + (ranked.length - 1) + "] below.\n\n" + block + "\n" +
   "## Instructions\n" +
   "Return decisions about findings BY INDEX — never re-emit finding text.\n" +
   "1. For each distinct defect, emit one decision with its index. When several findings describe the same defect (same root cause), keep one entry and list the others in its merge array.\n" +

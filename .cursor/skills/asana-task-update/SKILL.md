@@ -147,5 +147,5 @@ When the file is missing or the list is empty, ask for the person's Asana user g
 <exit-codes>
 - `0`: success
 - `1`: error
-- `2`: needs user input (`PROMPT_REVIEWER`)
+- `2`: needs user input (`PROMPT_REVIEWER`), or `QA_SUBTASKS_REQUIRED` (a move to QA Verification with no open QA subtask and no `--no-manual-qa`)
 </exit-codes>

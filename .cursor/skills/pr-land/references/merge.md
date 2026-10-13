@@ -73,7 +73,7 @@ The local merge script processes PRs **sequentially** with automatic rebase-befo
 3. **Conflict handling during rebase:**
    - No conflict → continue
    - CHANGELOG-only (any section) → **exit 4** (agent resolves, re-runs)
-   - Code conflict → **skip PR**, abort rebase, continue
+   - Code conflict → **exit 4**, rebase left in progress (resolve per `code-conflicts`, else abort and skip the PR)
 4. **Push `--force-with-lease`**
 5. **Run local verification** (MANDATORY)
 6. **Merge via GitHub API**

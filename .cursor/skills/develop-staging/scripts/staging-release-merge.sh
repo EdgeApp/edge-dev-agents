@@ -405,27 +405,6 @@ CLNODE
   local pub_json pub_rc new_version skipped_err
   pub_rc=0
   pub_json="$(printf '[{"repo":"%s","branch":"master"%s}]' "$pkg" "${bump:+,\"bump\":\"$bump\"}" | "$PUBLISH_SH" | sed -n '/^{/,$p')" || pub_rc=$?
-  if [ "$pub_rc" -eq 2 ]; then
-    # Exit 2 is "nothing to release" ONLY for an empty-but-present Unreleased
-    # section with the current version already served by the registry. Any
-    # other exit-2 shape (missing CHANGELOG, missing Unreleased heading) is
-    # repo damage and stops the run. Failures are stops, never skips.
-    local err2 mver
-    err2="$(printf '%s' "$pub_json" | read_json_field "skipped.0.error" 2>/dev/null || echo "")"
-    mver="$(git -C "$repo_dir" show "$REMOTE/master:package.json" | read_json_field version)"
-    if [ "$err2" = "No entries in Unreleased section" ] && [ -n "$latest" ] && [ "$mver" = "$latest" ]; then
-      if [ "$pin" != "$latest" ]; then
-        ( cd "$WT" && "$UPGRADE_DEP" "$pkg" "$latest" ) \
-          || { step "$phase" failed "nothing to publish, but upgrade-dep.sh failed for the gui pin"; die "dep: gui upgrade of $pkg failed"; }
-        step "$phase" ok "nothing to publish; gui pin upgraded $pin -> $latest"
-        return 0
-      fi
-      step "$phase" ok "nothing to publish (Unreleased empty, $latest current on registry and master)"
-      return 0
-    fi
-    step "$phase" failed "pr-land-publish.sh exit 2: ${err2:-unreadable reason} (master $mver, registry ${latest:-unknown})"
-    die "dep: $pkg publish preflight refused; failures are stops"
-  fi
   [ "$pub_rc" -eq 0 ] || { step "$phase" failed "pr-land-publish.sh exit $pub_rc"; die "dep: $pkg version bump failed"; }
   # A skipped repo also comes back with exit 0: the JSON's published array is
   # empty and skipped[] carries the reason.

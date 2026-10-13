@@ -114,9 +114,9 @@ const FRAMES = {
 }
 const frame = name => path.join(TMP, `${name}.png`)
 
-function run (args, extra) {
+function run (args, extra, attach = ATTACH) {
   return new Promise(resolve => {
-    const child = cp.spawn(ATTACH, ['--repo', REPO, '--pr', PR, ...args], { env: env(extra) })
+    const child = cp.spawn(attach, ['--repo', REPO, '--pr', PR, ...args], { env: env(extra) })
     let stderr = ''
     child.stderr.on('data', d => { stderr += d })
     child.stdout.resume()
@@ -230,6 +230,61 @@ async function main () {
     assert.strictEqual(ghLog().length, 0)
   })
 
+  await t('a frame argument that reads as a flag is refused: exit 1, nothing sent anywhere', async () => {
+    reset()
+    const r = await run(['--explain', frame('01-wallet-list')])
+    assert.strictEqual(r.status, 1, r.stderr)
+    assert.strictEqual(requests.length, 0)
+    assert.strictEqual(ghLog().length, 0)
+  })
+
+  await t('two frames of one file name are refused: exit 1, nothing sent anywhere', async () => {
+    reset()
+    const twin = path.join(TMP, 'twin', '01-wallet-list.png')
+    fs.mkdirSync(path.dirname(twin), { recursive: true })
+    fs.copyFileSync(frame('02-settings'), twin)
+    const r = await run([frame('01-wallet-list'), twin])
+    assert.strictEqual(r.status, 1, r.stderr)
+    assert.match(r.stderr, /share the file name 01-wallet-list\.png/)
+    assert.strictEqual(requests.length, 0)
+    assert.strictEqual(ghLog().length, 0)
+  })
+
+  // The verdict loop on its own: a copy of the scripts whose detector prints
+  // what the case hands it, so the loop meets records the real detector does
+  // not produce.
+  const STUB = path.join(TMP, 'stub-scripts')
+  fs.cpSync(SCRIPTS, STUB, { recursive: true })
+  fs.writeFileSync(path.join(STUB, 'evidence-privacy.sh'), '#!/usr/bin/env bash\nprintf \'%s\' "$STUB_VERDICTS"\nexit "${STUB_RC:-0}"\n', { mode: 0o755 })
+  const rec = (file, cls) => JSON.stringify({ file, class: cls, reasons: cls === 'error' ? [{ rule: 'unreadable', detail: 'unreadable image' }] : [], usernames: [] }) + '\n'
+  const A = frame('01-wallet-list')
+  const B = frame('02-settings')
+  for (const [name, verdicts, rc] of [
+    ['an error verdict that names another file', rec(path.join(TMP, 'elsewhere.png'), 'error') + rec(B, 'clean'), 3],
+    ['a non-zero exit with every verdict clean', rec(A, 'clean') + rec(B, 'clean'), 3],
+    ['a frame with no verdict', rec(A, 'clean'), 0],
+    ['a frame with no verdict and a non-zero exit', rec(A, 'error'), 3],
+    ['verdicts in the wrong order', rec(B, 'clean') + rec(A, 'clean'), 0],
+    ['more verdicts than frames', rec(A, 'clean') + rec(B, 'clean') + rec(A, 'clean'), 0],
+    ['an unknown verdict class', rec(A, 'clean') + rec(B, 'fine'), 0],
+    ['no verdicts at all', '', 0]
+  ]) {
+    await t(`verdict loop: ${name} refuses with exit 3, nothing sent anywhere`, async () => {
+      reset()
+      const r = await run([A, B], { STUB_VERDICTS: verdicts, STUB_RC: String(rc) }, path.join(STUB, 'pr-attach-screenshots.sh'))
+      assert.strictEqual(r.status, 3, r.stderr)
+      assert.match(r.stderr, /REFUSING/)
+      assert.strictEqual(requests.length, 0)
+      assert.strictEqual(ghLog().length, 0)
+    })
+  }
+  await t('verdict loop: aligned clean verdicts and exit 0 still publish', async () => {
+    reset()
+    const r = await run([A, B], { STUB_VERDICTS: rec(A, 'clean') + rec(B, 'clean'), STUB_RC: '0' }, path.join(STUB, 'pr-attach-screenshots.sh'))
+    assert.strictEqual(r.status, 0, r.stderr)
+    assert.strictEqual(framePuts().length, 2)
+  })
+
   await t('a bucket manifest read that fails stops before any write', async () => {
     reset()
     objects.set(MANIFEST_KEY, Buffer.from(JSON.stringify({ version: 2, entries: [] })))
@@ -237,6 +292,16 @@ async function main () {
     const r = await run([frame('01-wallet-list')])
     assert.strictEqual(r.status, 1, r.stderr)
     assert.strictEqual(puts().length, 0)
+    assert.ok(!fs.existsSync(path.join(GH_DIR, 'body.out')))
+  })
+
+  await t('a body with half a sentinel pair stops before the manifest write', async () => {
+    reset()
+    fs.writeFileSync(path.join(GH_DIR, 'body.md'), 'A PR description.\n\n<!-- agent-test-evidence:start -->\nold table\n')
+    const r = await run([frame('01-wallet-list')])
+    assert.strictEqual(r.status, 1, r.stderr)
+    assert.match(r.stderr, /broken evidence block/)
+    assert.ok(!puts().includes(MANIFEST_KEY))
     assert.ok(!fs.existsSync(path.join(GH_DIR, 'body.out')))
   })
 
@@ -252,9 +317,11 @@ async function main () {
     assert.strictEqual((await run([frame('01-wallet-list')])).status, 0)
     fs.writeFileSync(path.join(GH_DIR, 'pr.json'), prState(HEAD_B))
     requests = []
-    const r = await run([frame('02-settings')])
+    const r = await run([frame('02-settings'), frame('04-login')])
     assert.strictEqual(r.status, 2, r.stderr)
     assert.match(r.stderr, /--carry-forward wallet-list/)
+    // The re-run command names the frame as given, not its hatched temp copy.
+    assert.ok(r.stderr.includes(` ${frame('02-settings')} ${frame('04-login')}\n`), r.stderr)
     assert.strictEqual(puts().length, 0)
   })
 

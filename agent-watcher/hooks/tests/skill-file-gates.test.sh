@@ -82,6 +82,14 @@ ta "Bash ungated .sh then a gated .sh" 2 '{"tool_name":"Bash","session_id":"SESS
 ta "Bash gated .sh then an ungated .sh" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > ~/.config/agent-watcher/hooks/g.sh <<EOF\nx\nEOF\ncat > /tmp/b.sh <<EOF\ny\nEOF"}}'
 ta "Bash two ungated .sh writes" 0 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"cat > /tmp/a.sh <<EOF\nx\nEOF\ncat > /tmp/b.sh <<EOF\ny\nEOF"}}'
 ta "Bash grep of a hook writing to /tmp" 0 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"grep -n foo ~/.config/agent-watcher/hooks/x.sh > /tmp/out.txt"}}'
+# A redirect target is read to the end of its name: a longer extension that
+# starts with a gated one (.json, .jsonl, .mdx, .shadow) is a different file.
+ta "Bash redirect into a .json beside the hooks (not .js)" 0 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"jq . /tmp/in.json > ~/.config/agent-watcher/team-roster.json"}}'
+ta "Bash redirect into a .jsonl beside the hooks (not .js)" 0 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"echo x >> ~/.config/agent-watcher/state.jsonl; echo done"}}'
+ta "Bash tee into a .shadow under a skill (not .sh)" 0 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"echo x | tee ~/.cursor/skills/foo/scripts/x.shadow"}}'
+ta "Bash redirect into a references .mdx (not .md)" 0 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"echo x > ~/.cursor/skills/foo/references/a.mdx"}}'
+ta "Bash redirect into a hook, then a second command" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"echo x > ~/.config/agent-watcher/hooks/x.sh; echo done"}}'
+ta "Bash redirect into a hook .js inside a subshell" 2 '{"tool_name":"Bash","session_id":"SESS","cwd":"/tmp","tool_input":{"command":"(echo x > ~/.config/agent-watcher/hooks/lib/x.js)"}}'
 # The in-place vector reads only the sed/perl simple command: a script RUN later
 # in the same command is not its target.
 ta "Bash sed -i on scratch yaml, then run a skill script" 0 '{"tool_name": "Bash", "session_id": "SESS", "cwd": "/tmp", "tool_input": {"command": "sed -i \"\" \"s/a/b/\" /tmp/flow.yaml && ~/.cursor/skills/build-and-test/scripts/xcuitest-run.sh --flow /tmp/flow.yaml"}}'

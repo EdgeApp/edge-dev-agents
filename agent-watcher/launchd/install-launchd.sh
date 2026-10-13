@@ -9,8 +9,8 @@
 #                 are skipped with a warning when nvm has no node installed
 #
 # A job whose program path does not exist after rendering (a script this repo
-# does not carry, e.g. ~/.bin/config-watch.sh) is rendered but NOT loaded, and
-# named in the summary, so a fresh machine never loads a job that fails on start.
+# does not carry, e.g. ~/.bin/config-watch.sh) is NOT installed or loaded, and
+# is named in the summary, so a fresh machine never loads a job that fails on start.
 #
 # Usage:
 #   install-launchd.sh [--dry-run] [--only <label>[,<label>...]]
@@ -59,8 +59,9 @@ for tpl in "$HERE"/com.jontz.*.plist; do
   # /bin/bash -c "<script>" style: the real program is the last argument
   case "$prog" in /bin/bash|/bin/sh|/usr/bin/env) prog=$(plutil -extract ProgramArguments json -o - "$out" | jq -r '.[-1]' | awk '{print $1}') ;; esac
   if [[ ! -e "$prog" ]]; then
-    skipped+=("$label (program missing: $prog)"); rendered+=("$label")
-    $DRY || cp "$out" "$DEST/$label.plist"
+    # Not copied into $DEST: a plist there loads at the next login whether
+    # or not this run bootstrapped it.
+    skipped+=("$label (program missing: $prog)")
     continue
   fi
   if $DRY; then

@@ -195,8 +195,8 @@ if [[ -n "$SESSION_ID" ]]; then
 fi
 
 # FRESH-SPAWN FOLLOWUP (transcript past the degradation threshold): boot a new
-# conversation and send the /one-shot prompt ourselves, exactly like the
-# watcher does for first runs. one-shot's followup rules re-anchor from the
+# conversation. The caller sends the /one-shot prompt (see the note after the
+# spawn below). one-shot's followup rules re-anchor from the
 # task's artifacts (report watermark, open PR branch, TDD), and the
 # SessionStart run-context hook injects live task state at boot.
 echo ">> resume-task: spawning ${SESSION_PREFIX}${TASK_GID} FRESH (artifact-anchored followup)" >&2

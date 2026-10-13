@@ -30,7 +30,7 @@ WHAT=""
 # completion judge agree on what a block is.
 source "$H/hooks/lib/completion-event.sh"
 case "$(completion_event "$CMD")" in complete|status) WHAT="an agent_status transition (update-status.sh)" ;; esac
-for s in pr-create.sh pr-land-automerge.sh pr-land-merge.sh pr-land-publish.sh npm-publish-web.sh upgrade-dep.sh staging-cherry-pick.sh pr-finalize-fixups.sh cheese.sh; do
+for s in pr-create.sh pr-land-automerge.sh pr-land-merge.sh pr-land-publish.sh npm-publish-web.sh upgrade-dep.sh staging-cherry-pick.sh pr-finalize-fixups.sh cheese-build.sh; do
   [ -n "$WHAT" ] && break
   executes "$s" && WHAT="a PR/landing action ($s)"
 done
@@ -46,6 +46,6 @@ fi
 [ -n "$WHAT" ] || exit 0
 
 cat >&2 <<EOF
-BLOCKED by operator hold ($STATE): this command is $WHAT, and a human is steering this session right now. Answer the operator in prose and END YOUR TURN; do not advance the run. The operator releases the hold with a message that starts with go, resume, continue or proceed; there is no expiry. If the operator asked you to block, use update-status.sh <gid> <status> --blocked yes --reason "operator-directed: <their words>", which this gate allows. Do not remove /tmp/agent-operator-hold-$GID yourself.
+BLOCKED by operator hold ($STATE): this command is $WHAT, and a human is steering this session right now. Answer the operator in prose and END YOUR TURN; do not advance the run. The operator releases the hold with a message that starts with go, resume, continue or proceed. A hold the operator leaves alone lapses on its own: the watchdog releases it after operator_hold_ttl_min (15 by default) of an idle pane and sends <operator-hold-expired>. If the operator asked you to block, use update-status.sh <gid> <status> --blocked yes --reason "operator-directed: <their words>", which this gate allows. Do not remove /tmp/agent-operator-hold-$GID yourself.
 EOF
 exit 2

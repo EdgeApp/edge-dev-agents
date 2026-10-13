@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# watch-pr.sh — single bounded `gh pr checks --watch` call against a shared
-# per-task 30-minute deadline. Owns the budget arithmetic that one-shot's
+# watch-pr.sh: bounded poll of `gh pr checks` against a 30-minute budget of
+# WATCHED seconds per HEAD. Owns the budget arithmetic that one-shot's
 # pr-watch-bounded-poll rule used to spell out in prose.
 #
-# First call for a task computes deadline = now + budget and persists it; every
-# subsequent call bounds its watch by the remaining budget. One blocking call per
-# invocation. No loops, no respawned processes (never-self-respawn).
+# The budget file stores the seconds remaining and the HEAD they apply to (see
+# BUDGET SEMANTICS below): a new HEAD resets it, time spent outside the watch
+# does not count. Each invocation polls for at most MAX_CALL seconds and exits
+# 7 when checks are still pending with budget left, so the caller re-invokes.
+# One foreground call per invocation, no respawned processes
+# (never-self-respawn).
 #
 # SLOW-CI CARVE-OUT (2026-07-24): the Travis check is non-blocking WHILE PENDING.
 # Travis runs 9-13 min but queues 40-90 min under contention (shared account
@@ -151,7 +154,6 @@ else
     exit 2
   fi
 fi
-command -v timeout >/dev/null || { echo "ERROR: timeout not on PATH (shim: ~/.cursor/skills/timeout.sh)" >&2; exit 2; }
 
 # BUDGET SEMANTICS (reworked 2026-08-06 per the cohort's watch-pr findings):
 # the budget bounds waiting PER HEAD/ROUND, not per task-lifetime, and it burns

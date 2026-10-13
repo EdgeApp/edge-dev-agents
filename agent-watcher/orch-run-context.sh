@@ -25,8 +25,10 @@
 # the watchdog's rename (one tick, <=120s), operator interjections still count
 # as orch context.
 #
-# Consumers: hooks/mark-agent-authored-asana.sh (MCP write path) and
-# agent-authored-text.sh (script write path). Behavior gates that constrain
+# Consumers: hooks/mark-agent-authored-asana.sh (MCP write path),
+# agent-authored-text.sh (script write path), hooks/record-own-asana-story.sh
+# and hooks/operator-hold-prompt.sh (which uses it to skip prompt stamping
+# outside a run); grep for this file's name for the current list. Behavior gates that constrain
 # agent TOOL conduct (block-*, require-*) intentionally do NOT use this — a
 # retired session doing work is still an agent doing work; this predicate is
 # about text AUTHORSHIP only.
