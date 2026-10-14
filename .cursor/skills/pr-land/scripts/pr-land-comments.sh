@@ -36,14 +36,15 @@ function ghGraphql(query, variables = {}) {
 }
 
 const QUERY = `
-query($owner: String!, $repo: String!, $number: Int!) {
+query($owner: String!, $repo: String!, $number: Int!, $threadsAfter: String) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
       author { __typename login }
       commits(last: 1) {
         nodes { commit { committedDate } }
       }
-      reviewThreads(first: 100) {
+      reviewThreads(first: 100, after: $threadsAfter) {
+        pageInfo { hasNextPage endCursor }
         nodes {
           id
           isResolved
@@ -78,6 +79,8 @@ query($owner: String!, $repo: String!, $number: Int!) {
     }
   }
 }`
+
+const MAX_THREAD_PAGES = 20
 
 requireGh()
 
@@ -121,9 +124,24 @@ async function main() {
   const currentUser = getCurrentUser()
 
   for (const { repo, prNumber, branch } of prs) {
-    let data
+    // Review threads come 100 to a page, oldest first, so every page is read:
+    // the newest threads are on the last one. Reviews and top-level comments
+    // are asked for newest-first (last: 50) and need no paging for a recency
+    // check.
+    let pr
     try {
-      data = ghGraphql(QUERY, { owner: "EdgeApp", repo, number: prNumber })
+      const vars = { owner: "EdgeApp", repo, number: prNumber }
+      pr = ghGraphql(QUERY, vars).repository.pullRequest
+      let page = pr.reviewThreads.pageInfo
+      for (let i = 1; page && page.hasNextPage; i++) {
+        if (i >= MAX_THREAD_PAGES) {
+          throw new Error(`more than ${MAX_THREAD_PAGES} pages of review threads`)
+        }
+        const next = ghGraphql(QUERY, { ...vars, threadsAfter: page.endCursor })
+          .repository.pullRequest.reviewThreads
+        pr.reviewThreads.nodes.push(...next.nodes)
+        page = next.pageInfo
+      }
     } catch (e) {
       console.error(
         `WARNING: Failed to query ${repo}#${prNumber}: ${e.message}`
@@ -131,7 +149,6 @@ async function main() {
       continue
     }
 
-    const pr = data.repository.pullRequest
     const lastCommitDate = pr.commits.nodes[0]
       ? new Date(pr.commits.nodes[0].commit.committedDate)
       : new Date(0)

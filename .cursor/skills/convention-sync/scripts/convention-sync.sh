@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # convention-sync.sh — Sync ~/.cursor/ files with the edge-dev-agents repo.
 # Usage: ./convention-sync.sh [repo-dir] [--stage] [--commit -m "message"] [--repo-to-user]
-# Compares ~/.cursor/{README.md,skills,rules,scripts} against the distribution
+# Compares ~/.cursor/{README.md,skills,rules} against the distribution
 # copy in <repo-dir> and outputs a structured JSON summary of new, modified,
 # and deleted files.
 # With --stage: copies changed files and stages them in git (or copies to user dir with --repo-to-user).
@@ -152,7 +152,7 @@ fi
 
 USER_DIR="$HOME/.cursor"
 REPO_CURSOR="$REPO_DIR/.cursor"
-DIRS="skills rules scripts"
+DIRS="skills rules"
 # .syncignore is canonical in the repo (#4) so a fresh machine inherits the same
 # excludes; fall back to ~/.cursor only if the repo doesn't carry one.
 if [[ -f "$REPO_CURSOR/.syncignore" ]]; then SYNCIGNORE="$REPO_CURSOR/.syncignore"; else SYNCIGNORE="$USER_DIR/.syncignore"; fi

@@ -175,11 +175,11 @@ function createSessionsView (host) {
     const target = r.kind === 'transcript' ? r.liveName : r.name
     if (!target) return
     if (process.env.TMUX) {
-      sh(`tmux switch-client -t '${target}'`)
+      sh(`tmux switch-client -t '=${target}'`)
       host.quit()
     } else {
       host.suspend()
-      spawnSync('tmux', ['attach', '-t', target], { stdio: 'inherit' })
+      spawnSync('tmux', ['attach', '-t', `=${target}`], { stdio: 'inherit' })
       host.resume()
       refresh('detached — refreshed')
     }
@@ -207,8 +207,8 @@ function createSessionsView (host) {
     if (r.kind === 'run') { status = 'dead RUN panes need slot re-alloc — use: resume-task.sh ' + (r.gid || ''); render(); return }
     if (!r.uuid) { status = 'no transcript uuid known (not in fork registry) — fork instead with c'; render(); return }
     const rcName = r.slug
-    sh(`tmux send-keys -t '${r.name}' C-u`)
-    sh(`tmux send-keys -t '${r.name}' "claude --resume ${r.uuid} --dangerously-skip-permissions --remote-control ${rcName}" Enter`)
+    sh(`tmux send-keys -t '=${r.name}:' C-u`)
+    sh(`tmux send-keys -t '=${r.name}:' "claude --resume ${r.uuid} --dangerously-skip-permissions --remote-control ${rcName}" Enter`)
     refresh(`revived claude in ${r.name} (rc ${rcName}) — give it a few seconds, then r to re-check`)
   }
 
@@ -216,7 +216,7 @@ function createSessionsView (host) {
     if (r.kind === 'transcript') return
     status = `kill tmux session ${r.name}? [y/n]`
     confirmFn = (yes) => {
-      if (yes) { sh(`tmux kill-session -t '${r.name}'`); refresh(`killed ${r.name}`) } else { status = ''; render() }
+      if (yes) { sh(`tmux kill-session -t '=${r.name}'`); refresh(`killed ${r.name}`) } else { status = ''; render() }
     }
     render()
   }

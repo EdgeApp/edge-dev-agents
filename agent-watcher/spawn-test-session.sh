@@ -76,9 +76,9 @@ fi
 
 SESSION="claude-asana-${ID}"
 
-if tmux has-session -t "$SESSION" 2>/dev/null; then
-  echo "Session '$SESSION' already exists. Attach with: tmux attach -t $SESSION"
-  echo "Or kill with: tmux kill-session -t $SESSION"
+if tmux has-session -t "=$SESSION" 2>/dev/null; then
+  echo "Session '$SESSION' already exists. Attach with: tmux attach -t '=$SESSION'"
+  echo "Or kill with: tmux kill-session -t '=$SESSION'"
   exit 1
 fi
 
@@ -275,11 +275,11 @@ tmux new-session -d -s "$SESSION" "bash $TMPSCRIPT"
 if [[ -n "$RESUME_ID" ]]; then
   for _ in $(seq 1 30); do
     sleep 2
-    _pane="$(tmux capture-pane -t "$SESSION" -p 2>/dev/null || true)"
+    _pane="$(tmux capture-pane -t "=$SESSION:" -p 2>/dev/null || true)"
     if printf '%s' "$_pane" | grep -q "Resume from summary\|Resume full session"; then
-      tmux send-keys -t "$SESSION" Down
+      tmux send-keys -t "=$SESSION:" Down
       sleep 1
-      tmux send-keys -t "$SESSION" Enter
+      tmux send-keys -t "=$SESSION:" Enter
       echo ">> spawn-test-session: auto-answered the resume menu (Down+Enter = resume FULL; summary tier is retired)" >&2
       break
     fi
@@ -290,6 +290,6 @@ echo "Spawned tmux session: $SESSION${YOLO:+ (yolo)}"
 if [[ -n "$SLOT_INDEX" ]]; then
   echo "  slot $SLOT_INDEX  |  cwd $CWD  |  sim ${SIM_UDID:-none}  |  metro ${METRO_PORT:-8081}  |  maestro-mcp $([[ -n "$MCP_FLAG" ]] && echo yes || echo no)"
 fi
-echo "  Attach locally: tmux attach -t $SESSION"
-echo "  Kill session:   tmux kill-session -t $SESSION"
+echo "  Attach locally: tmux attach -t '=$SESSION'"
+echo "  Kill session:   tmux kill-session -t '=$SESSION'"
 echo "  (inner cmd:     $TMPSCRIPT)"

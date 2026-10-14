@@ -87,6 +87,7 @@ fi
 
 API="https://app.asana.com/api/1.0"
 AUTH="Authorization: Bearer $ASANA_TOKEN"
+export ASANA_TOKEN
 DOWNLOAD_DIR="/tmp/asana-task-$TASK_GID"
 mkdir -p "$DOWNLOAD_DIR"
 # Inline text ceiling. Task text is ingested in FULL (a capped description or
@@ -197,8 +198,10 @@ fi
 # task-review operator-final-say; whether other people's text conflicts with
 # the operator's is the planner's call, gated by the plan's Conflicts line in
 # require-plan-before-developing.sh, not by timestamps here.
-curl -s "$API/tasks/$TASK_GID/stories?opt_fields=resource_subtype,text,created_by.name,created_by.gid,created_at&limit=100" \
-  -H "$AUTH" | python3 -c "
+# Every page of the thread: a task with more than 100 stories pages, and the
+# newest comments are on the last page.
+"$(dirname "$0")/asana-paged-get.sh" "tasks/$TASK_GID/stories?opt_fields=resource_subtype,text,created_by.name,created_by.gid,created_at&limit=100" \
+  | python3 -c "
 import sys, json, os
 data = json.load(sys.stdin)['data']
 op = os.environ.get('OPERATOR_GID') or ''

@@ -16,6 +16,7 @@
 //       One JSON record per frame on stdout, in input order:
 //         { file, class: clean|SECRET|USERNAME|error, reasons: [{ rule,
 //           detail, box }], usernames: [{ role, box }], width, height }
+//       A frame with no readable text and no barcode is an error record.
 //       `--list` reads image paths from a file, one per line. Records never
 //       carry the matched text: a reason names the rule, a username names the
 //       roster role. Boxes are [x, y, w, h] pixels from the top-left corner.
@@ -31,8 +32,8 @@
 //       Draws text on a blank canvas. Tests build their frames with it.
 //
 // Exit codes: 0 every frame has a verdict; 1 bad usage; 3 the detector could
-// not read a frame (callers refuse: no verdict is never a clean verdict);
-// 4 `redact` refused a SECRET frame.
+// not read a frame or the roster file is missing or malformed (callers refuse:
+// no verdict is never a clean verdict); 4 `redact` refused a SECRET frame.
 
 'use strict'
 
@@ -94,7 +95,8 @@ function readJson(file) {
 
 function loadRoster(file) {
   const out = { usernames: [], secrets: [] }
-  if (!fs.existsSync(file)) return out
+  // No roster means no way to tell a roster name or password from other text.
+  if (!fs.existsSync(file)) throw new Error(`no roster file at ${file}`)
   const roster = readJson(file).roster
   if (roster == null || typeof roster !== 'object') throw new Error(`roster file has no "roster" object: ${file}`)
   const addUser = (role, v) => {
@@ -485,6 +487,11 @@ function classifyOcr(ocr, roster = { usernames: [], secrets: [] }) {
   let reasons = []
   let usernames = []
   const barcodes = ocr.barcodes ?? []
+  // A screen always carries text. A frame where no pass read a line and no
+  // barcode decoded was not read, and an unread frame has no verdict.
+  if (barcodes.length === 0 && ocr.passes.every(p => !Array.isArray(p.lines) || p.lines.length === 0)) {
+    return { file: ocr.file, class: 'error', reasons: [{ rule: 'no-text', detail: 'no readable text in the frame', box: null }], usernames: [] }
+  }
   for (const pass of ocr.passes) {
     const lines = readingOrder(pass.lines)
     const allText = lines.map(l => l.text).join('\n')
@@ -563,7 +570,8 @@ function main(argv) {
   if (rosterFile == null) return usage()
   let roster
   try {
-    roster = loadRoster(rosterFile)
+    // `render` only draws; every verb that prints a verdict needs the roster.
+    roster = cmd === 'render' ? null : loadRoster(rosterFile)
   } catch (e) {
     process.stderr.write(`evidence-privacy: cannot read the roster (${e.message}); refusing to classify without it\n`)
     return 3

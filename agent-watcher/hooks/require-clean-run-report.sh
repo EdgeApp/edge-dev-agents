@@ -96,11 +96,15 @@ CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentio
 # Gate BOTH attach paths: asana-task-update.sh --attach-file, and direct curl
 # to the Asana attachments API (runs fall back to curl when the script or MCP
 # misbehaves — two 2026-08 reports reached Asana unlinted through that side
-# door, em dashes intact).
+# door, em dashes intact). The curl URL usually sits inside quotes, which the
+# stripped view blanks, so that path is: a curl in command position in the
+# stripped view AND the attachments URL anywhere in the raw command.
 case "$CMD_M" in
   *asana-task-update.sh*--attach-file*) ;;
-  *api.asana.com*attachments*) ;;
-  *) exit 0 ;;
+  *)
+    printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])curl([[:space:]]|$)' || exit 0
+    printf '%s' "$CMD" | grep -qE '(app\.asana\.com/api|api\.asana\.com)[^[:space:]]*attachments' || exit 0
+    ;;
 esac
 case "$CMD" in
   *agent-run-report*) ;;

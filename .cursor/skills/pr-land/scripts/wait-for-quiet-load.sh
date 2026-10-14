@@ -56,7 +56,7 @@ load1() {
 own_roots() {
   local roots="" gid="${AGENT_TASK_GID:-}" pid=$$ parent pcomm hops=0
   if [ -n "$gid" ]; then
-    roots=$(tmux list-panes -s -t "claude-asana-$gid" -F '#{pane_pid}' 2>/dev/null | tr '\n' ' ')
+    roots=$(tmux list-panes -s -t "=claude-asana-$gid:" -F '#{pane_pid}' 2>/dev/null | tr '\n' ' ')
   fi
   if [ -z "${roots// /}" ]; then
     while [ "$hops" -lt 40 ]; do

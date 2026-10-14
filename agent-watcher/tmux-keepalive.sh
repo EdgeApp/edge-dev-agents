@@ -15,6 +15,6 @@
 set -u
 SESSION="__anchor_keepalive__"
 while true; do
-  tmux has-session -t "$SESSION" 2>/dev/null || tmux new-session -d -s "$SESSION" 'while true; do sleep 86400; done'
+  tmux has-session -t "=$SESSION" 2>/dev/null || tmux new-session -d -s "$SESSION" 'while true; do sleep 86400; done'
   sleep 30
 done

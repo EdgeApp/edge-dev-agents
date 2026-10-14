@@ -155,7 +155,7 @@ LABEL="Asana: ${NAME:-task $TASK_GID}"
 
 # 3. Tear down any existing session for this gid (old pane + stale resources).
 for s in "${SESSION_PREFIX}${TASK_GID}" "${RETIRED_PREFIX}${TASK_GID}"; do
-  tmux kill-session -t "$s" 2>/dev/null && echo ">> resume-task: killed existing session $s" >&2 || true
+  tmux kill-session -t "=$s" 2>/dev/null && echo ">> resume-task: killed existing session $s" >&2 || true
 done
 
 # 4. Release any stale slot/sim, then allocate FRESH. (slots.allocate is idempotent —

@@ -303,7 +303,7 @@ if $CHAT; then
   # pane with no claude) → append a short uuid suffix and spawn a distinct chat.
   pane_resume_uuid() { # $1=tmux session name → its claude's --resume uuid ("" if none)
     local pid c a
-    for pid in $(tmux list-panes -s -t "$1" -F '#{pane_pid}' 2>/dev/null || true); do
+    for pid in $(tmux list-panes -s -t "=$1:" -F '#{pane_pid}' 2>/dev/null || true); do
       for c in $(ps -axo pid=,ppid= | awk -v p="$pid" '$2==p {print $1}'); do
         a=$(ps -ww -o command= -p "$c" 2>/dev/null || true)
         case "$a" in claude\ *|*/claude\ *|claude)
@@ -317,15 +317,15 @@ if $CHAT; then
   # A registered spawn's pane has no --resume in argv, so the uuid comparison
   # below cannot recognize it; a same-name session IS that spawn (never suffix
   # it into a second claude on one transcript).
-  if [[ -z "$ANCHOR_NAME" && -z "$SPAWN_RC" ]] && tmux has-session -t "$TMUX_NAME" 2>/dev/null; then
+  if [[ -z "$ANCHOR_NAME" && -z "$SPAWN_RC" ]] && tmux has-session -t "=$TMUX_NAME" 2>/dev/null; then
     if [[ "$(pane_resume_uuid "$TMUX_NAME")" != "$LATEST_UUID" ]]; then
       SLUG="${SLUG}-$(printf '%s' "$LATEST_UUID" | cut -c1-4)"
       RC_NAME="chat-${SLUG}"
       TMUX_NAME="claude-asana-chat-${SLUG}"
     fi
   fi
-  if tmux has-session -t "$TMUX_NAME" 2>/dev/null; then
-    echo ">> resume-agent: chat session $TMUX_NAME already exists — attach: tmux attach -t $TMUX_NAME (or find '$RC_NAME' in your remote session list)" >&2
+  if tmux has-session -t "=$TMUX_NAME" 2>/dev/null; then
+    echo ">> resume-agent: chat session $TMUX_NAME already exists — attach: tmux attach -t '=$TMUX_NAME' (or find '$RC_NAME' in your remote session list)" >&2
     exit 0
   fi
   CHAT_CWD="$PWD"   # the cwd resolution above already ran
@@ -340,19 +340,19 @@ if $CHAT; then
   PROJ_DIR="$HOME/.claude/projects/$PROJ_ENC"
   BEFORE_LIST=$(ls "$PROJ_DIR"/*.jsonl 2>/dev/null || true)
   tmux new-session -d -s "$TMUX_NAME" -c "$CHAT_CWD"
-  tmux send-keys -t "$TMUX_NAME" C-u   # clear any stray typed text before the command
+  tmux send-keys -t "=$TMUX_NAME:" C-u   # clear any stray typed text before the command
   CHROME_FLAG=""
   $CHROME && CHROME_FLAG="--chrome"
   AC_FLAG="$("$DIR/lib/autocompact-flag.sh")"
-  tmux send-keys -t "$TMUX_NAME" "claude --resume $LATEST_UUID $FORK_FLAG $CHROME_FLAG $AC_FLAG --dangerously-skip-permissions --remote-control $RC_NAME" Enter
+  tmux send-keys -t "=$TMUX_NAME:" "claude --resume $LATEST_UUID $FORK_FLAG $CHROME_FLAG $AC_FLAG --dangerously-skip-permissions --remote-control $RC_NAME" Enter
   # Auto-answer the resume menu when it appears: a FULL resume by default, the
   # summary only under --summary.
   for _ in $(seq 1 30); do
     sleep 2
-    pane=$(tmux capture-pane -p -t "$TMUX_NAME" 2>/dev/null || true)
+    pane=$(tmux capture-pane -p -t "=$TMUX_NAME:" 2>/dev/null || true)
     if printf '%s' "$pane" | grep -q "No conversation found"; then
       echo ">> resume-agent: claude could not load $LATEST_UUID from $CHAT_CWD" >&2
-      tmux kill-session -t "$TMUX_NAME" 2>/dev/null || true
+      tmux kill-session -t "=$TMUX_NAME" 2>/dev/null || true
       exit 1
     fi
     # Claude Code >= 2.1.25x refuses to --resume a transcript that its daemon
@@ -362,7 +362,7 @@ if $CHAT; then
     if printf '%s' "$pane" | grep -q "is running as a background session"; then
       SHORT=$(printf '%s' "$LATEST_UUID" | cut -c1-8)
       echo ">> resume-agent: $LATEST_UUID is held by the claude daemon as a background session; run 'claude stop $SHORT' first (or 'claude attach $SHORT' to use it there), then retry" >&2
-      tmux kill-session -t "$TMUX_NAME" 2>/dev/null || true
+      tmux kill-session -t "=$TMUX_NAME" 2>/dev/null || true
       exit 1
     fi
     if printf '%s' "$pane" | grep -q "Resume from summary"; then
@@ -370,11 +370,11 @@ if $CHAT; then
       # Chat defaults to FULL (a summary resume compresses away the drafts/details a
       # chat exists to continue); --summary keeps the cheaper compact resume.
       if $SUMMARY; then
-        tmux send-keys -t "$TMUX_NAME" Enter
+        tmux send-keys -t "=$TMUX_NAME:" Enter
       else
-        tmux send-keys -t "$TMUX_NAME" Down
+        tmux send-keys -t "=$TMUX_NAME:" Down
         sleep 1
-        tmux send-keys -t "$TMUX_NAME" Enter
+        tmux send-keys -t "=$TMUX_NAME:" Enter
       fi
       break
     fi

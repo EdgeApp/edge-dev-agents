@@ -61,8 +61,8 @@ else
   TASK_JSON="$(curl -sf --max-time 30 -H "Authorization: Bearer $ASANA_TOKEN" \
     "$API/tasks/$TASK_GID?opt_fields=custom_fields.name,custom_fields.resource_subtype,custom_fields.text_value")" \
     || { echo "Error: could not read task $TASK_GID" >&2; exit 1; }
-  STORIES_JSON="$(curl -sf --max-time 30 -H "Authorization: Bearer $ASANA_TOKEN" \
-    "$API/tasks/$TASK_GID/stories?opt_fields=resource_subtype,text,created_at&limit=100")" \
+  STORIES_JSON="$("$SCRIPT_DIR/../../asana-paged-get.sh" \
+    "tasks/$TASK_GID/stories?opt_fields=resource_subtype,text,created_at&limit=100")" \
     || { echo "Error: could not read stories for task $TASK_GID" >&2; exit 1; }
 fi
 

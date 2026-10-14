@@ -8,7 +8,8 @@
 #   completion-judge.sh --gid <gid> --event complete|pr-create|block [--reason "<text>"]
 #                       [--offline] [--force] [--quiet]
 # Exit: 0 allow | 1 deny (failed items on stdout) | 3 judge unavailable (no verdict
-#       written; reason on stderr) | 2 usage
+#       written; reason on stderr: a timeout, a judge error, an unparseable verdict,
+#       or an allow that leaves a rubric dimension unanswered) | 2 usage
 # Files:
 #   /tmp/agent-completion-evidence-<gid>.md   the bundle
 #   /tmp/agent-completion-verdict-<gid>.json  the verdict, bound to evidence_hash
@@ -20,9 +21,12 @@
 #       an operator waiver file is consumed: a completion event with neither a
 #       verdict nor an override line for it went around the gate.
 # Env: COMPLETION_JUDGE_MODEL (opus), COMPLETION_JUDGE_EFFORT (high),
-#      COMPLETION_JUDGE_DEADLINE seconds (480; keep under the gate hook timeout, a
-#      timed-out hook fails OPEN), COMPLETION_JUDGE_OFFLINE=1, COMPLETION_JUDGE_LOG_DIR.
+#      COMPLETION_JUDGE_DEADLINE seconds (480) for the WHOLE run: the clock starts
+#      before the evidence step, and the judge call gets what the evidence step
+#      left. Keep it under the gate hook timeout, a timed-out hook fails OPEN.
+#      COMPLETION_JUDGE_OFFLINE=1, COMPLETION_JUDGE_LOG_DIR.
 set -uo pipefail
+T0=$(date +%s)
 
 GID="" EVENT="" REASON="" BASE_ARG="" FORCE=0 QUIET=0 OFFLINE="${COMPLETION_JUDGE_OFFLINE:-0}"
 while [ $# -gt 0 ]; do
@@ -64,12 +68,31 @@ shadow_blocker_row() {
 }
 trap 'shadow_blocker_row $?' EXIT
 
-# 1. Evidence
+fail_unavailable() { # fail_unavailable <why>
+  printf '{"ts":"%s","gid":"%s","event":"%s","evidence_hash":"%s","nonce":"%s","verdict":"unavailable","error":%s,"duration_s":%s}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GID" "$EVENT" "${HASH:-}" "${NONCE:-}" "$(printf '%s' "$1" | jq -Rs .)" "$(( $(date +%s) - T0 ))" >> "$LOG_DIR/$GID.jsonl"
+  echo "completion-judge: judge unavailable: $1" >&2; exit 3; }
+
+# run_bounded <secs> <cmd...>: run cmd in its own process group and kill the group
+# at the limit (rc 124). macOS ships no timeout(1).
+run_bounded() {
+  perl -e 'my $t=shift; my $pid=fork; defined $pid or exit 127;
+if(!$pid){ setpgrp(0,0); exec @ARGV; exit 127 }
+$SIG{ALRM}=sub{ kill "TERM",-$pid; sleep 1; kill "KILL",-$pid; exit 124 };
+alarm $t; waitpid $pid,0; exit($? & 127 ? 128+($? & 127) : $? >> 8)' "$@"
+}
+
+# 1. Evidence, inside the deadline
 EV_ARGS=(--gid "$GID" --event "$EVENT")
 [ -n "$REASON" ] && EV_ARGS+=(--reason "$REASON")
 [ -n "$BASE_ARG" ] && EV_ARGS+=(--base "$BASE_ARG")
 [ "$OFFLINE" = 1 ] && EV_ARGS+=(--offline)
-EV=$("$H/completion-evidence.sh" "${EV_ARGS[@]}") || { echo "completion-judge: evidence collection failed" >&2; exit 3; }
+EV_OUT=$(mktemp "${TMPDIR:-/tmp}/judge-evidence.XXXXXX")
+run_bounded "$DEADLINE" "$H/completion-evidence.sh" "${EV_ARGS[@]}" > "$EV_OUT"
+EV_RC=$?; EV=$(cat "$EV_OUT"); rm -f "$EV_OUT"
+EV_S=$(( $(date +%s) - T0 ))
+[ "$EV_RC" = 124 ] && fail_unavailable "evidence gathering timed out at the ${DEADLINE}s deadline, before the judge was called"
+[ "$EV_RC" = 0 ] || { echo "completion-judge: evidence collection failed" >&2; exit 3; }
 BUNDLE=${EV#path=}; BUNDLE=${BUNDLE%% hash=*}; HASH=${EV##*hash=}
 
 # ORDERED OVERRIDE IN A COMMENT. Operator comments in the segment's scope are read with the same grammar
@@ -136,7 +159,8 @@ PROMPT="$WORK/prompt.md"
   printf '\n\n---\nJudge the `%s` event for task %s now. Return only the JSON object in a ```json fence.\n' "$EVENT" "$GID"
 } > "$PROMPT"
 
-START=$(date +%s)
+REMAIN=$(( DEADLINE - ($(date +%s) - T0) ))
+[ "$REMAIN" -ge 1 ] || fail_unavailable "evidence gathering took ${EV_S}s of the ${DEADLINE}s deadline, no time left for the judge"
 RAW_OUT="$WORK/raw.json"; ERR="$WORK/stderr.txt"
 # The run's AGENT_TASK_GID must not leak into the judge (its hooks key on it).
 ( cd "$WORK" && env -u AGENT_TASK_GID -u AGENT_SIM_UDID -u AGENT_METRO_PORT \
@@ -148,22 +172,18 @@ const r=spawnSync("claude",["-p","--model",model,"--effort",effort,"--tools","",
   {input:fs.readFileSync(prompt),timeout:Number(deadline)*1000,maxBuffer:64*1024*1024,encoding:"utf8"});
 fs.writeFileSync(out,r.stdout||""); fs.writeFileSync(err,(r.stderr||"")+(r.error?"\n"+String(r.error):""));
 process.exit(r.error&&r.error.code==="ETIMEDOUT"?124:(r.status??1));
-' "$PROMPT" "$RAW_OUT" "$ERR" "$MODEL" "$EFFORT" "$DEADLINE" )
+' "$PROMPT" "$RAW_OUT" "$ERR" "$MODEL" "$EFFORT" "$REMAIN" )
 RC=$?
-DUR=$(( $(date +%s) - START ))
 
-fail_unavailable() { # fail_unavailable <why>
-  printf '{"ts":"%s","gid":"%s","event":"%s","evidence_hash":"%s","nonce":"%s","verdict":"unavailable","error":%s,"duration_s":%s}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GID" "$EVENT" "$HASH" "$NONCE" "$(printf '%s' "$1" | jq -Rs .)" "$DUR" >> "$LOG_DIR/$GID.jsonl"
-  echo "completion-judge: judge unavailable: $1" >&2; exit 3; }
-
-[ "$RC" = 124 ] && fail_unavailable "judge timed out after ${DEADLINE}s"
+[ "$RC" = 124 ] && fail_unavailable "judge timed out: evidence gathering took ${EV_S}s and the judge call was cut at ${REMAIN}s (whole-run deadline ${DEADLINE}s)"
 [ "$RC" = 0 ] || fail_unavailable "claude -p exited $RC: $(head -c 300 "$ERR" | tr '\n' ' ')"
 
-# 4. Parse and validate
+# 4. Parse and validate. An allow must answer every rubric dimension (pass or na).
+DIM_IDS=$(grep -oE '^### J[0-9]+' "$SK/rubric.md" | awk '{print $2}' | tr '\n' ' ')
+[ -n "${DIM_IDS// /}" ] || fail_unavailable "no J dimension headings found in $SK/rubric.md"
 PARSED=$(node -e '
 const fs=require("fs");
-const [rawPath,gid,event,hash,nonce,model]=process.argv.slice(1);
+const [rawPath,gid,event,hash,nonce,model,,dimIds]=process.argv.slice(1);
 let wrapper; try{ wrapper=JSON.parse(fs.readFileSync(rawPath,"utf8")) }catch(e){ console.error("wrapper not JSON"); process.exit(1) }
 if(wrapper.is_error){ console.error("claude reported error: "+String(wrapper.result||"").slice(0,200)); process.exit(1) }
 const text=String(wrapper.result||"");
@@ -172,10 +192,15 @@ let v; try{ v=JSON.parse(body) }catch(e){ const s=body.lastIndexOf("{"); try{ v=
 if(!["allow","deny"].includes(v.verdict)||!Array.isArray(v.items)){ console.error("verdict schema invalid"); process.exit(1) }
 const fails=v.items.filter(i=>i.status==="fail").length;
 if(fails>0&&v.verdict==="allow") v.verdict="deny";
+if(v.verdict==="allow"){
+  const answered=new Set(v.items.filter(i=>i&&["pass","na"].includes(i.status)).map(i=>String(i.id)));
+  const missing=String(dimIds||"").split(/\s+/).filter(Boolean).filter(id=>!answered.has(id));
+  if(missing.length){ console.error("allow verdict leaves rubric dimensions unanswered: "+missing.join(", ")); process.exit(1) }
+}
 const out={gid,event,evidence_hash:hash,nonce,ts:new Date().toISOString(),model,cost_usd:wrapper.total_cost_usd??null,duration_ms:wrapper.duration_ms??null,cached:false,...v};
 fs.writeFileSync(process.argv[7],JSON.stringify(out,null,2));
 console.log(JSON.stringify({verdict:out.verdict,fails,cost:out.cost_usd,duration_ms:out.duration_ms,fail_ids:v.items.filter(i=>i.status==="fail").map(i=>i.id),summary:String(v.summary||"").slice(0,200)}));
-' "$RAW_OUT" "$GID" "$EVENT" "$HASH" "$NONCE" "$MODEL" "$VERDICT.tmp" 2>"$WORK/parse.err") || fail_unavailable "$(cat "$WORK/parse.err")"
+' "$RAW_OUT" "$GID" "$EVENT" "$HASH" "$NONCE" "$MODEL" "$VERDICT.tmp" "$DIM_IDS" 2>"$WORK/parse.err") || fail_unavailable "$(cat "$WORK/parse.err")"
 mv -f "$VERDICT.tmp" "$VERDICT"
 
 # 5. Provenance

@@ -13,10 +13,9 @@ The `.cursor/` path is historical, not a commitment: the system is built to
 sync across agent harnesses, not just Cursor. Claude Code is the primary
 consumer today (`~/.claude/skills` symlinks to the canonical tree,
 `~/.claude/CLAUDE.md` is generated from the always-apply rules, and the
-enforcement hooks are Claude Code hooks); OpenCode gets generated mirrors via
-`tool-sync.sh`. Other harnesses are untested, but the content is plain
-markdown and shell, so most of it should carry in theory; the hook layer is
-the Claude-specific part.
+enforcement hooks are Claude Code hooks). Other harnesses are untested, but
+the content is plain markdown and shell, so most of it should carry in
+theory; the hook layer is the Claude-specific part.
 
 The canonical local doc lives at `~/.cursor/README.md`. During
 `/convention-sync`, that file is mirrored to `edge-dev-agents/README.md`, and
@@ -555,7 +554,7 @@ done.
 | Group | Hook | Enforces |
 |---|---|---|
 | Status gates | `require-plan-before-developing.sh` | No Developing until ingestion evidence (`asana-get-context.sh` ran, attachments downloaded) AND the plan doc exist |
-| | `require-completion-judgment.sh` | Every completion event (Complete, PR creation, `blocked = Yes`) is ruled on by a headless judge OUTSIDE the run, from an evidence bundle; the verdict is bound to the evidence hash, so an unchanged retry is instant and new evidence is re-judged. A block needs `--reason`. The run never writes a verdict or a waiver. `require-concession-validation.sh` remains as a 6-line shim that forwards here |
+| | `require-completion-judgment.sh` | Every completion event (Complete, PR creation, `blocked = Yes`) is ruled on by a headless judge OUTSIDE the run, from an evidence bundle; the verdict is bound to the evidence hash, so an unchanged retry is instant and new evidence is re-judged. A block needs `--reason`. The run never writes a verdict or a waiver |
 | | `require-followup-scope-on-complete.sh` | Complete needs a fresh live scope check: no newer operator comments unaddressed, zero blocking threads, reviewer bots concluded, watermark last; refreshes the check itself when only the run's own comments postdate it |
 | | `require-continuation-or-block.sh` (Stop) | Blocks a premature turn end. The end is allowed at Complete or Archived, at a block the judge allowed, under an operator hold or a usage pause, and after 3 blocked stops (it then writes `/tmp/agent-stuck-<gid>.md` for the watchdog) |
 | | `require-tdd-current.sh` | TDD-flagged tasks keep the design doc current before finalize |
@@ -965,7 +964,6 @@ scripts, not be re-described independently across skills.
 | Skill | Description |
 |------|-------------|
 | [`/concession-validator`](.cursor/skills/concession-validator/SKILL.md) | Retired: a section of the completion judge, with its taxonomy in `completion-judge/references/concession-taxonomy.md` |
-| [`/blocker-validator`](.cursor/skills/blocker-validator/SKILL.md) | Retired: its gate was never registered and nothing invokes it; a block is a completion-judge event |
 | [`/completion-judge`](.cursor/skills/completion-judge/SKILL.md) | The judge behind every completion event (Complete, PR creation, `blocked = Yes`): a headless context rules on the run's evidence bundle and the gate enforces the verdict |
 | [`/no-slop`](.cursor/skills/no-slop/SKILL.md) | The prose rules; its scripts are the shared lint + judge every boundary calls |
 
@@ -1060,6 +1058,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | Script | What it does |
 |------|-------------|
 | [`asana-get-context.sh`](.cursor/skills/asana-get-context.sh) | Fetch task details, comments, subtasks, attachments (iOS `.ips`/`.crash` reports included), and the Engineering Board fields (other boards' fields on the task are not printed); `QA:` subtasks (manual verification items) are hidden from ingestion, only their count shows |
+| [`asana-paged-get.sh`](.cursor/skills/asana-paged-get.sh) | Read every page of an Asana collection (stories, subtasks, attachments, project tasks) and print it as one `{"data":[...]}` response; the query must set a limit, and a collection past `ASANA_MAX_PAGES` pages (default 50) is an error, not a silent cut |
 | [`asana-task-update.sh`](.cursor/skills/asana-task-update/scripts/asana-task-update.sh) | Reusable Asana mutations (the report-attach path is hook-gated); `--subtask-notes` writes a plain subtask body, and `--set-board-state "QA Verification"` refuses (exit 2) until the task carries `QA:` subtasks or `--no-manual-qa "<reason>"`; a `QA:` subtask with developer detail (PR numbers, GitHub links, commit hashes, repo names, source paths) is refused with `QA_NOT_PLAIN`, since testers never open GitHub; `--set-repos` sets the Repo field to an exact repo list; field gids come from the `asana-config.json` registry |
 | [`asana-field-value.sh`](.cursor/skills/asana-field-value.sh), [`asana-build-field.sh`](.cursor/skills/asana-build-field.sh), [`asana-force-land.sh`](.cursor/skills/asana-force-land.sh) | Live single-field reads the finalize gate consumes |
 | [`asana-on-complete-actions.sh`](.cursor/skills/one-shot/scripts/asana-on-complete-actions.sh) | Lists the operator's `agent_on_complete` lines (the run's last actions before `Complete`, one-shot and task-run alike) and records each outcome as a marker comment, so a re-engaged run repeats only what is still pending. It is the field's only reader: session-start context and `check-followup-scope.sh` leave the field out, so it never reaches a run as scope |
@@ -1084,6 +1083,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`evidence-privacy.sh`](.cursor/skills/pr-create/scripts/evidence-privacy.sh) | Classify frames by local OCR as clean, SECRET (seed, key, password, OTP) or USERNAME (roster account name), and write hatched copies; the attach refuses on SECRET and when the check cannot run. `evidence-privacy.js` holds the rules, `frame-vision.swift` is the macOS Vision reader it compiles on first use, and `wordlists/` holds the mnemonic lists (`bip39-english.txt`, `monero-english.txt`, `electrum-old-english.txt`) |
 | [`evidence-bucket.sh`](.cursor/skills/pr-create/scripts/evidence-bucket.sh) | Put, get, list and delete objects in the asset bucket, and read or write a PR's evidence manifest there (`evidence-bucket.js` is its S3 client) |
 | [`pr-evidence-relink.sh`](.cursor/skills/pr-create/scripts/pr-evidence-relink.sh) | Re-point evidence image URLs in one owned PR body or PR comment from a map of old URL to new URL, in place; a null entry replaces the image markup with "Frame withdrawn."; author-scoped, fetches the live text before writing, waits out rate limits |
+| [`pr-evidence-withdraw.sh`](.cursor/skills/pr-create/scripts/pr-evidence-withdraw.sh) | Take a hosted proof frame down: delete its bucket object, drop its manifest entry and re-render the PR body table without it, for a frame in any batch; `--dry-run` prints the plan, and a failed run is finished by running the same command again |
 | [`log-attempt.sh`](agent-watcher/log-attempt.sh) | Append truthful attempt-log entries |
 | [`set-tested.sh`](agent-watcher/set-tested.sh) | Set the task's tested field from run evidence |
 | [`convention-sync.sh`](.cursor/skills/convention-sync/scripts/convention-sync.sh) | Bidirectional sync with cross-machine safety blocks; `--commit` runs the message through `no-slop-lint.sh` first and exits 3 on a finding |

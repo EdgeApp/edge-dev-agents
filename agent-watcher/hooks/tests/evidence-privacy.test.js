@@ -193,6 +193,18 @@ t('an unreadable frame is an error record and exit 3', () => {
   assert.strictEqual(r.status, 3)
   assert.deepStrictEqual(records(r.stdout).map(x => x.class), ['clean', 'error'])
 })
+t('a frame with no readable text is an error record and exit 3', () => {
+  const blank = path.join(TMP, 'blank.png')
+  assert.strictEqual(run(['render', blank, String(W), String(H)]).status, 0)
+  const r = run(['classify', '--roster', ROSTER, frame('clean'), blank])
+  assert.strictEqual(r.status, 3)
+  const recs = records(r.stdout)
+  assert.deepStrictEqual(recs.map(x => x.class), ['clean', 'error'])
+  assert.deepStrictEqual(recs[1].reasons.map(x => x.rule), ['no-text'])
+  const out = path.join(TMP, 'blank-redacted.png')
+  assert.strictEqual(run(['redact', '--roster', ROSTER, blank, out]).status, 3)
+  assert.ok(!fs.existsSync(out))
+})
 // An animated PNG from two same-sized stills: every reader shows the first,
 // the second plays after it.
 function apng (first, second, out) {
@@ -247,10 +259,21 @@ t('a roster whose creds file is unreadable is exit 3', () => {
   fs.writeFileSync(bad, JSON.stringify({ roster: { agent: { username: USER_A, credsFile: path.join(TMP, 'gone.json') } } }))
   assert.strictEqual(run(['classify', '--roster', bad, frame('clean')]).status, 3)
 })
-t('an absent roster file checks secrets only', () => {
-  const r = run(['classify', '--roster', path.join(TMP, 'no-roster.json'), frame('username'), frame('bip39')])
+t('an absent roster file is exit 3 with no verdict', () => {
+  const gone = path.join(TMP, 'no-roster.json')
+  for (const args of [['classify', frame('clean'), frame('bip39')], ['redact', frame('clean'), path.join(TMP, 'no-roster-out.png')], ['hatch', frame('clean'), path.join(TMP, 'no-roster-out.png'), '0,0,10,10']]) {
+    const r = run([args[0], '--roster', gone, ...args.slice(1)])
+    assert.strictEqual(r.status, 3, `${args[0]}: ${r.stderr}`)
+    assert.strictEqual(r.stdout, '', args[0])
+    assert.match(r.stderr, /no roster file/, args[0])
+  }
+  assert.ok(!fs.existsSync(path.join(TMP, 'no-roster-out.png')))
+})
+t('render draws without a roster', () => {
+  const out = path.join(TMP, 'render-no-roster.png')
+  const r = run(['render', '--roster', path.join(TMP, 'no-roster.json'), out, '400', '200', '20,20,30,Hello there'])
   assert.strictEqual(r.status, 0, r.stderr)
-  assert.deepStrictEqual(records(r.stdout).map(x => x.class), ['clean', 'SECRET'])
+  assert.ok(fs.statSync(out).size > 0)
 })
 
 // ---- classifier on synthetic OCR: shapes Vision cannot be made to draw here
@@ -291,6 +314,14 @@ t('a username misread by one character still matches', () => {
   const roster = { usernames: [{ role: 'agent', value: USER_A }], secrets: [] }
   const rec = classifyOcr(ocr([line('Username', 100), line(USER_A.replace('4', 'A'), 160)]), roster)
   assert.strictEqual(rec.class, 'USERNAME')
+})
+t('no lines in any pass is an error; a barcode alone is a verdict', () => {
+  const empty = { file: 'x.png', width: 100, height: 100, passes: [{ lines: [] }, { lines: [] }] }
+  const rec = classifyOcr(empty)
+  assert.strictEqual(rec.class, 'error')
+  assert.strictEqual(rec.reasons[0].rule, 'no-text')
+  assert.strictEqual(classifyOcr({ ...empty, barcodes: [{ payload: 'https://example.test/x', box: [0, 0, 50, 50] }] }).class, 'clean')
+  assert.strictEqual(classifyOcr({ ...empty, passes: [{ lines: [] }, { lines: [line('Wallets', 10)] }] }).class, 'clean')
 })
 t('Raw Keys with content is SECRET', () => {
   const rec = classifyOcr(ocr([line('Raw Keys', 100), line('{ "displayKey": "made-up-value" }', 200)]))

@@ -6,7 +6,7 @@ metadata:
   author: j0ntz
 ---
 
-<goal>Sync the canonical home setup (`~/.cursor/` skills/rules/scripts + the agent orchestration system) into the `edge-dev-agents` repo, commit, and push directly to `main` (the perpetual sync PR is retired; PR #1 merged 2026-08-26). Also maintains cross-tool compatibility: symlinks `~/.claude/skills` → `~/.cursor/skills` and generates `~/.claude/CLAUDE.md` from always-apply rules. The repo is the distribution copy a second machine bootstraps from.</goal>
+<goal>Sync the canonical home setup (`~/.cursor/` skills and rules + the agent orchestration system) into the `edge-dev-agents` repo, commit, and push directly to `main` (the perpetual sync PR is retired; PR #1 merged 2026-08-26). Also maintains cross-tool compatibility: symlinks `~/.claude/skills` → `~/.cursor/skills` and generates `~/.claude/CLAUDE.md` from always-apply rules. The repo is the distribution copy a second machine bootstraps from.</goal>
 
 <rules>
 <rule id="default-branch-only">Every run works on the repo default branch (`main`) unless `--branch <name>` names another for THAT run. The script checks the branch out itself before any diff, restore or commit (creating a `--branch` that does not exist from `origin/main`), refuses to switch away from uncommitted work, and measures `originAhead` against `origin/<branch>`. `--branch` never persists: the next run without it is back on main, so no machine can get parked on a side branch again. Pass it only when the operator says the work stays on a branch for a while; announce and notify as usual, naming the branch.</rule>
@@ -25,7 +25,7 @@ metadata:
 <rule id="dry-run-first">Always run without `--stage` first to show the summary. Only stage/commit after user confirms.</rule>
 <rule id="no-script-bypass">If the script fails, report the error and STOP.</rule>
 <rule id="readme-is-source">`~/.cursor/README.md` is the canonical local documentation source. The sync script mirrors it to the repo root README, which is the repo's front page.</rule>
-<rule id="claude-compat">Every run ensures `~/.claude/skills` symlinks to `~/.cursor/skills` and regenerates `~/.claude/CLAUDE.md` from `alwaysApply: true` rules. This enables OpenCode and Claude Code to discover skills and rules without separate config.</rule>
+<rule id="claude-compat">Every run ensures `~/.claude/skills` symlinks to `~/.cursor/skills` and regenerates `~/.claude/CLAUDE.md` from `alwaysApply: true` rules. This lets Claude Code discover skills and rules without separate config.</rule>
 <rule id="target-repo-resolution">For user-to-repo sync, target the `edge-dev-agents` checkout. Do NOT assume the current repo is correct just because it contains a `.cursor/` folder. Let the companion script resolve and validate the repo path.</rule>
 </rules>
 

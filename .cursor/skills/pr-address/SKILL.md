@@ -215,7 +215,7 @@ The script appends `<!-- addressed:review:ID -->` or `<!-- addressed:comment:ID 
 <step id="4" name="Finalize fixups (autosquash or push, mode-dependent)">
 Delegate the autosquash-vs-push decision and execution to the shared finalize helper. It calls `pr-address.sh review-mode` to derive the mode from the latest human activity, then either autosquashes + force-pushes (autosquash mode) or folds the fixups the reviewer already read (a backstop for step 1.5), condenses same-target fixups into one per kind (human, auto) and force-pushes (preserve mode); in both modes it re-stamps a committed TDD the pass edited. Policy lives in that one script and is shared with other skills (bugbot) so behavior never drifts.
 
-**Ownership guard:** if you are not the PR author (`currentUser !== prAuthor`), the helper forces `preserve` mode and never autosquashes — we never rewrite the history of a PR we don't own. Fixups stay on top for the owner to squash at merge.
+**Ownership guard:** if you are not the PR author (`currentUser !== prAuthor`), the helper only pushes the fixups as committed (no autosquash, fold or condense) — we never rewrite the history of a PR we don't own. Fixups stay on top for the owner to squash at merge.
 
 ```bash
 ~/.cursor/skills/pr-finalize-fixups.sh --owner <OWNER> --repo <REPO> --pr <NUMBER>

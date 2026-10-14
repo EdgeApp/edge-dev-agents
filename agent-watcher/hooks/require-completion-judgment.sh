@@ -7,8 +7,7 @@
 # The judge runs OUTSIDE the run (completion-judge.sh spawns a headless Opus with
 # the evidence bundle; the agent never writes the verdict). Its verdict is bound to
 # the evidence hash, so an unchanged retry is instant and any new evidence is
-# re-judged. Supersedes require-concession-validation.sh (a shim at that path
-# forwards here): the concession taxonomy is one section of the judge's rubric,
+# re-judged. The concession taxonomy is one section of the judge's rubric,
 # and the block/downgrade kinds are the `block` event and the J5 dimension.
 #
 # Pass-throughs (no judgment):
@@ -16,14 +15,14 @@
 #     one asking for it (operator-directed)
 #   - /tmp/agent-judge-waiver-<gid> written by an OPERATOR (never the run), by hand
 #     or by hooks/operator-hold-prompt.sh on an ordered override ("complete the
-#     task", "stop the task", "bypass the judge"): covers ONE completion event and
+#     task", "bypass the judge"): covers ONE completion event and
 #     is consumed (removed) by it, so the next event is judged again; the text is
 #     echoed and written to the provenance log as `"verdict":"override"`. The same
 #     order sitting in an OPERATOR COMMENT in the segment's scope overrides per
 #     event inside completion-judge.sh, each with its own log line.
 # Judge unavailable (no binary, timeout under the launcher's own deadline, garbage
 # output) DENIES with a retry recipe: a timed-out hook would fail OPEN, so the
-# launcher deadline (480s) stays under this hook's timeout (600s).
+# launcher deadline (480s, evidence step included) stays under this hook's timeout (600s).
 #
 # The verdict reaches the attached run report after the status write lands
 # (hooks/refresh-report-judge-section.sh, PostToolUse), not from here: an allow

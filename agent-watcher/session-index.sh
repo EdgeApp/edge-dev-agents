@@ -58,7 +58,7 @@ TMUX_TSV=""
 if tmux list-sessions -F '#{session_name}\t#{session_created}' >/dev/null 2>&1; then
   while IFS=$'\t' read -r name created; do
     [ -n "$name" ] || continue
-    pid=$(tmux list-panes -t "$name" -F '#{pane_pid}' 2>/dev/null | head -1 || true)
+    pid=$(tmux list-panes -t "=$name:" -F '#{pane_pid}' 2>/dev/null | head -1 || true)
     args=""
     if [ -n "$pid" ]; then
       for c in $(pgrep -P "$pid" 2>/dev/null); do

@@ -18,6 +18,12 @@ Covers:
         with PROMPT_REVIEWER.
      A7 the removed other-board flags (Status, Reviewer, Implementor, Planned,
         review estimate) are unknown flags: exit 1, no API call.
+  C. asana-task-update.sh --set-board-state "QA Verification" (runs before B)
+     C1 no open QA subtask and no --no-manual-qa exits 2 and writes nothing; C2 also
+        when the call carries --comment-file.
+     C3 --no-manual-qa posts its reason as a comment; C4 with --comment-file the
+        reason is the last paragraph of that comment; C5 an open QA subtask posts
+        no reason; C6 --no-manual-qa with --edit-comment exits 1.
   B. pr-create.sh --asana-attach
      B1 `--asana-task <gid> --asana-attach` (one-shot references/pr.md, step 5) attaches and
         reports asana_attached true; B2 the reverse flag order does too.
@@ -38,6 +44,7 @@ PROJ = '8880000000001'
 PRIORITY = '1213843686985522'
 RELEASE = '1213939602865824'
 DEVELOPER = '1214028561571290'
+BOARD = json.load(open(os.path.expanduser('~/.config/agent-watcher/asana-config.json')))['custom_fields']['board_state']['gid']
 fails = []
 
 
@@ -108,10 +115,11 @@ for name, body in [('curl', CURL)]:
     open(p, 'w').write(body); os.chmod(p, 0o755)
 
 
-def routes(put_code=200, put_body=None, task_code=200, project_fields=(), put_exit=0):
+def routes(put_code=200, put_body=None, task_code=200, project_fields=(), put_exit=0, subtasks=()):
     task = {'data': {'gid': GID, 'name': 't', 'memberships': [{'project': {'gid': PROJ}}],
                      'custom_fields': [
                          {'gid': PRIORITY, 'enum_options': [{'gid': 'p-high', 'name': 'High'}]},
+                         {'gid': BOARD, 'enum_options': [{'gid': 'b-qa', 'name': 'QA Verification'}]},
                          {'gid': RELEASE, 'enum_options': [{'gid': 'r-53', 'name': '53.0'}]},
                          {'gid': DEVELOPER, 'people_value': []}]}}
     rs = [
@@ -121,6 +129,9 @@ def routes(put_code=200, put_body=None, task_code=200, project_fields=(), put_ex
          'body': {'data': [{'custom_field': {'gid': g}} for g in project_fields]}},
         {'method': 'PUT', 'path': f'/tasks/{GID}', 'code': put_code, 'exit': put_exit,
          'body': put_body if put_body is not None else {'data': {'gid': GID}}},
+        {'method': 'GET', 'path': f'/tasks/{GID}/subtasks', 'code': 200,
+         'body': {'data': [{'name': n, 'completed': False} for n in subtasks]}},
+        {'method': 'POST', 'path': f'/tasks/{GID}/stories', 'code': 200, 'body': {'data': {'gid': '6660001'}}},
     ]
     p = os.path.join(TMP, 'routes.json')
     json.dump(rs, open(p, 'w'))
@@ -190,6 +201,42 @@ for flag in (['--set-reviewer', '777'], ['--set-implementor', '777'], ['--set-st
     p = update(['--assign', '7770000000003'] + flag)
     check(f'A7 {flag[0]} is an unknown flag, no API call',
           p.returncode == 1 and 'Unknown flag' in p.stderr and not calls(), p.stdout + p.stderr)
+
+# ---------------- C. asana-task-update.sh QA handoff ----------------
+def posts():
+    return [json.loads(c['data'])['data']['text'] for c in calls() if c['method'] == 'POST' and c['url'].endswith('/stories')]
+
+
+QA = ['--set-board-state', 'QA Verification']
+NOTE = os.path.join(TMP, 'note.md')
+open(NOTE, 'w').write('Landed in the release build.\n')
+
+p = update(QA)
+check('C1 no open QA subtask and no reason exits 2, writes nothing',
+      p.returncode == 2 and 'QA_SUBTASKS_REQUIRED' in p.stderr and not posts() and not puts(), p.stdout + p.stderr)
+
+p = update(QA + ['--comment-file', NOTE])
+check('C2 the refusal comes before the comment is posted',
+      p.returncode == 2 and not posts() and not puts(), p.stdout + p.stderr)
+
+p = update(QA + ['--no-manual-qa', 'server-only change'])
+check('C3 the reason is posted as a comment and the state is written',
+      p.returncode == 0 and posts() == ['No manual QA items: server-only change'] and len(puts()) == 1
+      and puts()[0]['data'].get('custom_fields') == {BOARD: 'b-qa'}, f'{p.stdout}{p.stderr} {posts()} {puts()}')
+
+p = update(QA + ['--no-manual-qa', 'server-only change', '--comment-file', NOTE])
+check('C4 with --comment-file the reason is the last paragraph of that one comment',
+      p.returncode == 0 and posts() == ['Landed in the release build.\n\n\nNo manual QA items: server-only change'],
+      f'{p.stdout}{p.stderr} {posts()}')
+check('C4 the caller file is left as it was', open(NOTE).read() == 'Landed in the release build.\n')
+
+p = update(QA + ['--no-manual-qa', 'server-only change'], subtasks=['QA: send a payment'])
+check('C5 an open QA subtask means no reason comment',
+      p.returncode == 0 and not posts() and len(puts()) == 1, f'{p.stdout}{p.stderr} {posts()}')
+
+p = update(QA + ['--no-manual-qa', 'x', '--edit-comment', '6660001', '--comment-file', NOTE])
+check('C6 --no-manual-qa with --edit-comment exits 1, no API call',
+      p.returncode == 1 and 'does not pair' in p.stderr and not calls(), p.stdout + p.stderr)
 
 # ---------------- B. pr-create.sh --asana-attach ----------------
 PRC = install('.cursor/skills/pr-create/scripts/pr-create.sh', from_path=src('.cursor/skills/pr-create/scripts/pr-create.sh'))

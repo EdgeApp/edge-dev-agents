@@ -48,7 +48,9 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n "$GID" && -n "$SEGMENT" ]] || exit 0
 
-# digest <root> [egrep-exclude] → 12-hex content digest of all files under root
+# digest <root> [egrep-exclude] → 12-hex content digest of all files under root.
+# The root is stripped from each hashed line, so the same files under two roots
+# (the installed tree and its repo copy) give the same digest.
 digest() {
   local root="$1" exclude="${2:-__none__}"
   [[ -d "$root" ]] || { echo "------------"; return; }
@@ -57,12 +59,14 @@ digest() {
     | grep -vE '(^|/)(credentials\.json|.*\.log|\.DS_Store)$' \
     | LC_ALL=C sort \
     | xargs shasum -a 256 2>/dev/null \
+    | sed "s|  $root/|  |" \
     | shasum -a 256 | cut -c1-12
 }
 
 D_SKILLS=$(digest "$HOME/.cursor/skills" "/skills/($EVAL_FAMILY)/")
 D_RULES=$(digest "$HOME/.cursor/rules")
-D_WATCHER=$(digest "$HOME/.config/agent-watcher" '/hooks/|/oom-repro/|pool\.json|slots\.json|watchdog-state\.json')
+WATCHER_SKIP='/hooks/|/oom-repro/|pool\.json|slots\.json|watchdog-state\.json|credentials\.example\.json'
+D_WATCHER=$(digest "$HOME/.config/agent-watcher" "$WATCHER_SKIP")
 D_HOOKS=$(digest "$HOME/.config/agent-watcher/hooks")
 D_SETTINGS=$(jq -S '.hooks // {}' "$HOME/.claude/settings.json" 2>/dev/null | shasum -a 256 | cut -c1-12)
 ORCH=$(printf '%s %s %s %s %s' "$D_SKILLS" "$D_RULES" "$D_WATCHER" "$D_HOOKS" "$D_SETTINGS" | shasum -a 256 | cut -c1-12)
@@ -75,9 +79,9 @@ if [[ -d "$REPO/.git" ]]; then
   REPO_HEAD=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || true)
   # Compare deployed components against the repo's distribution copies (content digests
   # with matching exclusions). settings_hooks has no repo counterpart — not compared.
-  R_SKILLS=$(digest "$REPO/skills" "/skills/($EVAL_FAMILY)/")
-  R_RULES=$(digest "$REPO/rules")
-  R_WATCHER=$(digest "$REPO/agent-watcher" '/hooks/|/oom-repro/|credentials\.example\.json')
+  R_SKILLS=$(digest "$REPO/.cursor/skills" "/skills/($EVAL_FAMILY)/")
+  R_RULES=$(digest "$REPO/.cursor/rules")
+  R_WATCHER=$(digest "$REPO/agent-watcher" "$WATCHER_SKIP")
   R_HOOKS=$(digest "$REPO/agent-watcher/hooks")
   DC=()
   [[ "$D_SKILLS"  != "$R_SKILLS"  ]] && DC+=("skills")

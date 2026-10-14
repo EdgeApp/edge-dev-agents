@@ -5,10 +5,11 @@ hooks/require-completion-judgment.sh.
 Run: python3 ~/.config/agent-watcher/hooks/tests/completion-judge.test.py
 
 One forked case per behavior. A fake `claude` on PATH answers per FAKE_VERDICT
-(allow | deny | garbage) and counts invocations so cache reuse is observable. Offline
+(allow | deny | garbage | partial, an allow that answers J1 only), sleeps FAKE_SLEEP
+seconds first, and counts invocations so cache reuse is observable. Offline
 (COMPLETION_JUDGE_OFFLINE=1) against fixture files for a synthetic gid.
 """
-import json, os, shutil, stat, subprocess, sys, tempfile
+import json, os, re, shutil, stat, subprocess, sys, tempfile, time
 
 AW = os.path.expanduser('~/.config/agent-watcher')
 GID = '8888888888'
@@ -29,13 +30,19 @@ tmp = tempfile.mkdtemp(prefix='judge-')
 fake_bin = os.path.join(tmp, 'bin'); os.makedirs(fake_bin)
 count_file = os.path.join(tmp, 'calls')
 fake = os.path.join(fake_bin, 'claude')
+RUBRIC = os.path.expanduser('~/.cursor/skills/completion-judge/references/rubric.md')
+with open(RUBRIC) as rubric_fh:
+    DIMS = re.findall(r'^### (J\d+)', rubric_fh.read(), re.M)
+ALL_PASS = ','.join('{"id":"%s","dimension":"d","status":"%s","evidence":"ok","what_to_do":""}' % (d, 'pass' if i % 2 == 0 else 'na') for i, d in enumerate(DIMS))
 open(fake, 'w').write(f'''#!/usr/bin/env bash
 echo x >> {count_file}
 cat >/dev/null
+sleep "${{FAKE_SLEEP:-0}}"
 case "${{FAKE_VERDICT:-allow}}" in
   garbage) echo '{{"result":"no json here","total_cost_usd":0.1,"duration_ms":5}}'; exit 0 ;;
   deny) V='{{"verdict":"deny","summary":"custom token never driven","asks":[{{"ask":"try a custom token","source":"comment","status":"unaddressed","evidence":"one drive only"}}],"items":[{{"id":"J1","dimension":"asks-satisfied","status":"fail","evidence":"one token driven","what_to_do":"drive the custom token and log-attempt it"}}]}}' ;;
-  *) V='{{"verdict":"allow","summary":"delivered","asks":[],"items":[{{"id":"J1","dimension":"asks-satisfied","status":"pass","evidence":"ok","what_to_do":""}}]}}' ;;
+  partial) V='{{"verdict":"allow","summary":"delivered","asks":[],"items":[{{"id":"J1","dimension":"asks-satisfied","status":"pass","evidence":"ok","what_to_do":""}}]}}' ;;
+  *) V='{{"verdict":"allow","summary":"delivered","asks":[],"items":[{ALL_PASS}]}}' ;;
 esac
 node -e 'const v=process.argv[1];console.log(JSON.stringify({{result:"```json\\n"+v+"\\n```",total_cost_usd:0.42,duration_ms:1234,num_turns:1,is_error:false}}))' "$V"
 ''')
@@ -124,6 +131,27 @@ try:
     rc, out, err = judge('--event', 'complete', '--force', verdict='garbage')
     check('launcher: unparseable judge -> exit 3, verdict untouched, logged', rc == 3 and 'unavailable' in err and open(VERDICT).read() == prev
           and json.loads(open(LOGF).read().strip().splitlines()[-1])['verdict'] == 'unavailable', f'rc={rc} {err[:120]}')
+    rc, out, err = judge('--event', 'complete', '--force', verdict='partial')
+    check('launcher: an allow that leaves rubric dimensions unanswered -> exit 3 naming them, verdict untouched',
+          rc == 3 and 'unanswered' in err and DIMS[1] in err and DIMS[-1] in err and DIMS[0] + ',' not in err and open(VERDICT).read() == prev, f'rc={rc} {err[:160]}')
+    # The deadline covers the evidence step: a HOME whose evidence collector sleeps first.
+    slow_home = os.path.join(tmp, 'slow-home'); slow_aw = os.path.join(slow_home, '.config', 'agent-watcher'); os.makedirs(slow_aw)
+    os.symlink(os.path.expanduser('~/.cursor'), os.path.join(slow_home, '.cursor'))
+    for e in os.listdir(AW):
+        if e != 'completion-evidence.sh': os.symlink(os.path.join(AW, e), os.path.join(slow_aw, e))
+    w = os.path.join(slow_aw, 'completion-evidence.sh')
+    open(w, 'w').write(f'#!/usr/bin/env bash\nsleep "${{FAKE_EVIDENCE_SLEEP:-0}}"\nexec {AW}/completion-evidence.sh "$@"\n'); os.chmod(w, 0o755)
+
+    def slow_judge(evidence_sleep, deadline, claude_sleep):
+        t = time.time()
+        p = subprocess.run([f'{slow_aw}/completion-judge.sh', '--gid', GID, '--event', 'complete', '--force'], capture_output=True, text=True,
+                           env=dict(ENV, HOME=slow_home, FAKE_VERDICT='allow', FAKE_EVIDENCE_SLEEP=str(evidence_sleep), COMPLETION_JUDGE_DEADLINE=str(deadline), FAKE_SLEEP=str(claude_sleep)))
+        return p.returncode, p.stderr, time.time() - t
+    rc, err, secs = slow_judge(2, 3, 2)
+    check('launcher: the judge call gets only the time the evidence step left -> exit 3 naming both', rc == 3 and 'evidence gathering took' in err and open(VERDICT).read() == prev, f'rc={rc} {secs:.1f}s {err[:160]}')
+    n = calls(); rc, err, secs = slow_judge(5, 1, 0)
+    check('launcher: an evidence step past the deadline is cut -> exit 3, no judge call', rc == 3 and 'evidence gathering timed out' in err and calls() == n and secs < 4, f'rc={rc} {secs:.1f}s {err[:160]}')
+    check('launcher: both deadline exits are logged as unavailable', [json.loads(l)['verdict'] for l in open(LOGF).read().strip().splitlines()[-2:]] == ['unavailable', 'unavailable'])
     marker([ASK, {'created_at': '2026-09-10T23:37:00Z', 'by': 'op', 'authored': 'operator', 'text': 'You have approval to bypass the completion judge after this point'}])
     n = calls(); rc, out, err = judge('--event', 'complete', '--force', verdict='deny')
     last = json.loads(open(LOGF).read().strip().splitlines()[-1])

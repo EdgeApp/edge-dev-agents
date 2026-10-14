@@ -120,7 +120,7 @@ claude_pid_under() {
   return 1
 }
 
-pane_pid() { tmux list-panes -t "$1" -F '#{pane_pid}' 2>/dev/null | head -1; }
+pane_pid() { tmux list-panes -t "=$1:" -F '#{pane_pid}' 2>/dev/null | head -1; }
 
 # The claude invocation for an anchor. First spawn MINTS the id (--session-id); every
 # later spawn resumes it. Flags stay identical across heals so the anchor's identity
@@ -140,10 +140,10 @@ claude_cmd() { # cwd name model effort sid mode(new|resume)
 # already verified NO claude is running under the pane.
 launch_into_pane() { # sess cmd name
   local sess="$1" cmd="$2" name="$3" i
-  tmux send-keys -t "$sess" C-u
-  tmux send-keys -t "$sess" "$cmd" Enter
+  tmux send-keys -t "=$sess:" C-u
+  tmux send-keys -t "=$sess:" "$cmd" Enter
   for ((i = 0; i < ARM_WAIT_S; i++)); do
-    if rc_up "$(tmux capture-pane -t "$sess" -p 2>/dev/null)"; then
+    if rc_up "$(tmux capture-pane -t "=$sess:" -p 2>/dev/null)"; then
       log "[$name] bridge armed (/rc footer token present)."
       return 0
     fi
@@ -176,7 +176,7 @@ while IFS= read -r a; do
   [[ -n "$sid" ]] || { sid=$(uuidgen | tr 'A-Z' 'a-z'); sset "$name" session_id "$sid"; log "[$name] minted session id $sid"; }
 
   # ── 1. tmux session gone ────────────────────────────────────────────────────
-  if ! tmux has-session -t "$sess" 2>/dev/null; then
+  if ! tmux has-session -t "=$sess" 2>/dev/null; then
     if [[ "$MODE" == status ]]; then echo "$name: NO SESSION (would create; sid $sid)"; continue; fi
     # A transcript on disk means the anchor lived before (reboot/killed server) -> resume it.
     mode=new
@@ -193,7 +193,7 @@ while IFS= read -r a; do
   ppid=$(pane_pid "$sess")
   [[ -n "$ppid" ]] || { log "[$name] could not read pane pid; skipping"; continue; }
   cpid=$(claude_pid_under "$ppid" || true)
-  content=$(tmux capture-pane -t "$sess" -p 2>/dev/null)
+  content=$(tmux capture-pane -t "=$sess:" -p 2>/dev/null)
 
   # ── 2. pane alive, claude dead ──────────────────────────────────────────────
   if [[ -z "$cpid" ]]; then

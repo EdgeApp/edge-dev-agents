@@ -19,7 +19,7 @@ metadata:
 <rule id="slot-after-each-fixup">Immediately after every successful `lint-commit.sh` call, run `~/.cursor/skills/slot-fixup.sh` to slot the new fixup next to its target's group. Keeps the "every fixup sits next to its target" invariant continuously. If `slot-fixup.sh` exits non-zero (rebase conflict), report and STOP — do not continue the cycle. The cron will retry on the next fire once resolved.</rule>
 <rule id="fixup-target-headline">Before each fixup, run `git log --oneline -- <changed-file>` to find the commit that introduced the behavior being fixed and target its sha. The fixup must target a real commit on the branch so the later autosquash resolves correctly.</rule>
 <rule id="no-summary-comment">Do NOT post a top-level PR summary comment. Reply inline on each thread only. The scheduler consumes per-cycle status from stdout; extra body comments add noise on recurring runs.</rule>
-<rule id="self-schedule-on-claude-code">When `CronList`, `CronCreate`, and `CronDelete` tools are available (Claude Code), the skill MUST manage its own recurring schedule per Step 5: arm a 5-minute cron on any non-clean outcome if one isn't already armed; delete any matching cron on clean/skipped. On tools without those APIs (Cursor/Codex), skip Step 5 — the user configures their tool's Automation manually per `<scheduling>`.</rule>
+<rule id="self-schedule-on-claude-code">When `CronList`, `CronCreate`, and `CronDelete` tools are available (Claude Code), the skill MUST manage its own recurring schedule per Step 5: arm a 5-minute cron on any non-clean outcome if one isn't already armed, but not when called from a run that is already watching the PR (one-shot's step-6 watch does the waiting there); delete any matching cron on clean, and on skipped (which ends the monitoring without being a review). On tools without those APIs (Cursor/Codex), skip Step 5 — the user configures their tool's Automation manually per `<scheduling>`.</rule>
 <rule id="one-cron-per-pr">Never arm a second cron for a `(owner, repo, pr)` tuple that already has one. Always `CronList` first and match by the prompt substring; only `CronCreate` if no existing cron matches.</rule>
 <rule id="script-timeouts">Set `block_until_ms: 60000` when invoking `bugbot.sh` or `pr-address.sh` — GitHub API calls can take up to 30s and bugbot's `--paginate` query may take longer on busy PRs. Body-carrying `pr-address.sh` verbs (`reply`, `mark-addressed`, `comment`) need `600000` instead, per pr-address `script-timeouts`.</rule>
 <rule id="finalize-on-task-gid">When invoked standalone with a task GID (e.g. to finish a task after a blocker was cleared), bugbot owns completion per one-shot's `finalize-gate`: after reaching bugbot-clean, run the full green gate — CI green (`gh pr checks`) + every configured `.watcher.reviewer_bots` clean on HEAD + no unresolved threads from any of them — and if green AND the task has an `agent_status` field, set `agent_status=Complete` (`~/.config/agent-watcher/update-status.sh <gid> Complete`). This is the continuous-monitor completion path — never rely on a one-off `/pr-address` to complete (automated reviews can land after it). If not yet green, keep addressing/waiting or report what's red — do NOT set Complete prematurely.</rule>
@@ -89,8 +89,8 @@ Pick the FIRST matching row. Set an internal `OUTCOME` variable to one of `waiti
    Do NOT act. (Bugbot may start scanning shortly.)
 
 3. **`status == "completed"` AND `conclusion == "skipped"`** → `OUTCOME = skipped`.
-   Status line: `bugbot skipped <HEAD_SHORT>`.
-   Treat as clean for this SHA — bugbot explicitly declined to scan (often because the diff only changed docs/config).
+   Status line: `bugbot skipped <HEAD_SHORT> (not reviewed)`.
+   A skip is NOT a review and NOT clean: bugbot did not scan this SHA (a docs or config only diff, or its quota ran out), so nothing here says the code is free of findings. This skill stops monitoring the SHA (Step 5) and reports it as not reviewed; it does not count toward `finalize-on-task-gid`'s bugbot-clean.
 
 4. **`status == "completed"` (any other conclusion) AND 0 unresolved `cursor[bot]` threads** → `OUTCOME = clean`.
    Verify unresolved count with `pr-address.sh fetch` (see Step 4a).
@@ -226,7 +226,9 @@ This step runs AFTER every other step, on every outcome. Its job: arm a 5-minute
 
 **If `CronList`, `CronCreate`, and `CronDelete` tools are NOT available** (Cursor, Codex, agent harnesses without Claude Code scheduling): skip this step entirely. Emit the status line from Step 3/4g and exit. The user's Cursor/Codex Automation (configured per `<scheduling>`) keeps firing until they disable it when they see the clean status.
 
-**If those tools ARE available** (Claude Code):
+**If the caller is a run that is already watching the PR** (one-shot's step-6 watch invoking `/bugbot` to fix findings): arm nothing. `CronDelete` any cron whose `prompt` contains this PR's `/bugbot <owner>/<repo>#<pr>` string, emit the status line and exit; the caller's watch does the waiting.
+
+**Otherwise, if those tools ARE available** (Claude Code):
 
 1. Build the cron prompt string: `/bugbot <owner>/<repo>#<pr>` (matching exactly what the user invoked). This string is the unique key for finding/removing this PR's cron.
 
@@ -240,7 +242,7 @@ This step runs AFTER every other step, on every outcome. Its job: arm a 5-minute
 
    - `OUTCOME == clean` OR `OUTCOME == skipped`:
      For each id in `EXISTING_IDS`: `CronDelete(id)`.
-     Append ` · monitor stopped` to the status line if any were deleted, or ` · no monitor was armed` if not.
+     Append ` · monitor stopped` to the status line if any were deleted, or ` · no monitor was armed` if not. On `skipped` the status line still reads `not reviewed`: the monitor stops because there is nothing to wait for, not because the PR is clean.
 
    - `OUTCOME == waiting` OR `OUTCOME == no-check-run` OR `OUTCOME == findings`:
      If `EXISTING_IDS` is empty:

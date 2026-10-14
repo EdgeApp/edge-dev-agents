@@ -60,7 +60,12 @@ const dir = ${JSON.stringify(GH_DIR)}
 const a = process.argv.slice(2)
 fs.appendFileSync(path.join(dir, 'log'), JSON.stringify(a) + '\\n')
 const read = f => fs.readFileSync(path.join(dir, f), 'utf8')
-if (a[0] === 'api' && a[1] === 'graphql') { process.stdout.write(read('pr.json')); process.exit(0) }
+if (a[0] === 'api' && a[1] === 'graphql') {
+  // A follow-up page names its cursor; the answer is the file of that name.
+  const cur = a.find(x => x.startsWith('cursor='))
+  process.stdout.write(read(cur ? 'page-' + cur.slice(7) + '.json' : 'pr.json'))
+  process.exit(0)
+}
 if (a[0] === 'api' && /^repos\\/[^/]+\\/[^/]+\\/pulls\\/\\d+$/.test(a[1])) { process.stdout.write(read('body.md')); process.exit(0) }
 if (a[0] === 'pr' && a[1] === 'edit') { fs.copyFileSync(a[a.indexOf('--body-file') + 1], path.join(dir, 'body.out')); process.exit(0) }
 process.stderr.write('fake gh: unexpected call ' + JSON.stringify(a) + '\\n')
@@ -335,6 +340,28 @@ async function main () {
     assert.strictEqual(man.entries.length, 1)
     assert.strictEqual(man.entries[0].url, hosted)
     assert.strictEqual(man.entries[0].headSha, HEAD_B)
+  })
+
+  await t('human actions past the first page of reviews and threads are read', async () => {
+    reset()
+    const who = { login: 'a-reviewer', __typename: 'User' }
+    const pr = JSON.parse(prState(HEAD_A, '2026-01-01T00:00:00Z')).data.repository.pullRequest
+    pr.reviews.pageInfo = { hasNextPage: true, endCursor: 'r1' }
+    pr.reviewThreads.pageInfo = { hasNextPage: true, endCursor: 't1' }
+    const page = body => JSON.stringify({ data: { repository: { pullRequest: body } } })
+    fs.writeFileSync(path.join(GH_DIR, 'pr.json'), page(pr))
+    fs.writeFileSync(path.join(GH_DIR, 'page-r1.json'), page({ reviews: {
+      pageInfo: { hasNextPage: true, endCursor: 'r2' }, nodes: [{ createdAt: '2026-01-02T00:00:00Z', author: who }] } }))
+    fs.writeFileSync(path.join(GH_DIR, 'page-r2.json'), page({ reviews: {
+      pageInfo: { hasNextPage: false, endCursor: null }, nodes: [{ createdAt: '2026-01-03T00:00:00Z', author: who }] } }))
+    fs.writeFileSync(path.join(GH_DIR, 'page-t1.json'), page({ reviewThreads: {
+      pageInfo: { hasNextPage: false, endCursor: null },
+      nodes: [{ comments: { nodes: [{ createdAt: '2026-01-04T00:00:00Z', author: who }] } }] } }))
+    const r = await run([frame('01-wallet-list')])
+    assert.strictEqual(r.status, 0, r.stderr)
+    assert.match(r.stderr, /human review actions: 4\b/)
+    const cursors = ghLog().filter(a => a[1] === 'graphql').map(a => (a.find(x => x.startsWith('cursor=')) || 'cursor=').slice(7))
+    assert.deepStrictEqual(cursors, ['', 'r1', 'r2', 't1'])
   })
 
   await t('the script holds no branch mode and no git-data write', async () => {

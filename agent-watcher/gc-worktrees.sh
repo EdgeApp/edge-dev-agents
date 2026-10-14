@@ -68,7 +68,7 @@ fetch_status() {
 }
 
 has_session() {
-  tmux has-session -t "claude-asana-$1" 2>/dev/null || tmux has-session -t "done-asana-$1" 2>/dev/null
+  tmux has-session -t "=claude-asana-$1" 2>/dev/null || tmux has-session -t "=done-asana-$1" 2>/dev/null
 }
 
 # lib/remove-task-worktrees.sh holds this marker (its pid) while it runs.

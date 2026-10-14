@@ -655,6 +655,24 @@ reset()
 p = rgate(f'{UPD} --task {GID} --attach-file $MISSING_VAR --attach-name agent-run-report.md')
 check('I8 an unset variable keeps the not-readable block', p.returncode == 2 and 'not readable' in p.stderr, p.stderr)
 
+# ---------------- J. raw curl attach reaches the report gate ----------------
+GONE = f'/tmp/agent-run-report-{GID}-gone.md'
+reset()
+p = rgate(f'curl -s -X POST "https://app.asana.com/api/1.0/tasks/{GID}/attachments" -H "Authorization: Bearer $T" -F "file=@{GONE}"')
+check('J1 curl attach with a quoted URL is gated', p.returncode == 2 and 'not readable' in p.stderr, p.stderr)
+
+reset()
+p = rgate(f'curl -s -X POST https://app.asana.com/api/1.0/attachments -F parent={GID} -F file=@{GONE}')
+check('J2 curl attach with a bare URL is gated', p.returncode == 2 and 'not readable' in p.stderr, p.stderr)
+
+reset()
+p = rgate(f'echo "curl https://app.asana.com/api/1.0/attachments -F file=@{GONE}"')
+check('J3 a command that only quotes a curl attach passes', p.returncode == 0, p.stderr)
+
+reset()
+p = rgate(f'curl -s "https://app.asana.com/api/1.0/tasks/{GID}/stories" -o /tmp/agent-run-report-{GID}-stories.json')
+check('J4 a curl that is not an attach passes', p.returncode == 0, p.stderr)
+
 
 reset()
 shutil.rmtree(TMP, ignore_errors=True)

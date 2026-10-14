@@ -61,5 +61,5 @@ Per `verify-before-handoff`: confirm boot + anchor. Then report, bulleted: the R
 <case name="Reference matches this session or a desktop session">Desktop/interactive transcripts are indexed and can be forked (`--uuid --chat`), but flag it: the user may just mean the app conversation they already have open.</case>
 <case name="Anchor phrase only in pre-registry forks">Historical forks (before the lineage registry) classify as `interactive` and their copies look authored. If two transcripts share large authored counts and sizes, suspect an unregistered fork: prefer the one with the `/one-shot` run signature or the older birth time, and say the lineage is uncertain.</case>
 <case name="The matched run's task is live again (watcher respawned it)">Do not fork a transcript whose conversation is actively being driven by the orch (`live` shows claude-asana-<gid>). Point the user at the live run session, or wait.</case>
-<case name="User wants the chat killed">`tmux kill-session -t claude-asana-chat-<slug>`; the transcript survives. Mention resurrection is one invocation away.</case>
+<case name="User wants the chat killed">`tmux kill-session -t '=claude-asana-chat-<slug>'`; the transcript survives. Mention resurrection is one invocation away.</case>
 </edge-cases>

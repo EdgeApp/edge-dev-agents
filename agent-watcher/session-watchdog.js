@@ -242,7 +242,7 @@ function listTargetSessions() {
 }
 
 function capturePane(session) {
-  return sh(`tmux capture-pane -t "${session}" -p`)
+  return sh(`tmux capture-pane -t "=${session}:" -p`)
 }
 
 // Archiving a session in the desktop app closes its RC bridge with code 4090 and
@@ -296,22 +296,22 @@ function usagePauseTick(session, s, prior) {
   if (pause && st.pauseSince !== pause.since) {
     if (s.awaitingChoice || s.isHeld) return st
     const msg = `<usage-pause> Claude usage ${pause.window} is at ${pause.pct}% (pause threshold ${pause.threshold}%, resets ${pause.resets_at}). Commit WIP without pushing, leave agent_status unchanged, end your turn; <watchdog-revive-ping> resumes you after usage drops.`
-    if (!busy) sh(`tmux send-keys -t "${session}" C-u`)
-    sh(`tmux send-keys -t "${session}" -l "${msg.replace(/(["$\\`])/g, '\\$1')}"`)
-    sh(`tmux send-keys -t "${session}" Enter`)
+    if (!busy) sh(`tmux send-keys -t "=${session}:" C-u`)
+    sh(`tmux send-keys -t "=${session}:" -l "${msg.replace(/(["$\\`])/g, '\\$1')}"`)
+    sh(`tmux send-keys -t "=${session}:" Enter`)
     log(`[${session}] usage pause (${pause.window} ${pause.pct}% >= ${pause.threshold}%) → <usage-pause> sent${busy ? ' (queued behind the running turn)' : ''}.`)
     return { pauseSince: pause.since, pausePingedAt: s.now, pauseEscSent: false, acted: true }
   }
   if (pause && busy && !st.pauseEscSent && s.now - st.pausePingedAt > USAGE_PAUSE_ESC_MS) {
-    sh(`tmux send-keys -t "${session}" Escape`)
+    sh(`tmux send-keys -t "=${session}:" Escape`)
     log(`[${session}] still mid-turn ${Math.round((s.now - st.pausePingedAt) / 60000)}m after <usage-pause> → Escape sent (hard stop).`)
     return { ...st, pauseEscSent: true, acted: true }
   }
   if (!pause && st.pauseSince) {
     if (s.awaitingChoice || s.isHeld) return st   // retry once the pane is free
     if (busy) return { pauseSince: null, pausePingedAt: null, pauseEscSent: false, acted: false }   // already working again
-    sh(`tmux send-keys -t "${session}" C-u`)
-    sh(`tmux send-keys -t "${session}" "<watchdog-revive-ping>" Enter`)
+    sh(`tmux send-keys -t "=${session}:" C-u`)
+    sh(`tmux send-keys -t "=${session}:" "<watchdog-revive-ping>" Enter`)
     log(`[${session}] usage pause cleared → <watchdog-revive-ping> sent to resume.`)
     return { pauseSince: null, pausePingedAt: null, pauseEscSent: false, acted: true }
   }
@@ -328,8 +328,8 @@ function resumeAfterApiError(session, taskGid, s) {
   // the escalation cap. Still locked at ping time -> the hook records a fresh reset.
   if (m.type === 'quota' && m.resets_at) {
     if (s.now < m.resets_at + QUOTA_RESUME_GRACE_MS) return false
-    sh(`tmux send-keys -t "${session}" C-u`)
-    sh(`tmux send-keys -t "${session}" "<watchdog-revive-ping>" Enter`)
+    sh(`tmux send-keys -t "=${session}:" C-u`)
+    sh(`tmux send-keys -t "=${session}:" "<watchdog-revive-ping>" Enter`)
     m.pinged_at = s.now
     try { fs.writeFileSync(apiErrorMarkerPath(taskGid), JSON.stringify(m)) } catch {}
     log(`[${session}] turn ended on the usage limit; window reset at ${new Date(m.resets_at).toISOString()} → <watchdog-revive-ping> sent to resume.`)
@@ -338,7 +338,7 @@ function resumeAfterApiError(session, taskGid, s) {
   const count = Math.max(1, m.count || 1)
   if (count > API_ERROR_RESUME_MAX) {
     if (!m.escalated) {
-      log(`[${session}] turn ended on an API error ${count} times in a row (last: ${m.error}) → NOT resuming again; operator attention needed (attach: tmux attach -t ${session}).`)
+      log(`[${session}] turn ended on an API error ${count} times in a row (last: ${m.error}) → NOT resuming again; operator attention needed (attach: tmux attach -t '=${session}').`)
       m.escalated = true
       try { fs.writeFileSync(apiErrorMarkerPath(taskGid), JSON.stringify(m)) } catch {}
     }
@@ -346,8 +346,8 @@ function resumeAfterApiError(session, taskGid, s) {
   }
   const delay = API_ERROR_RESUME_BASE_MS * 2 ** (count - 1)
   if (s.now - (m.last_at || 0) < delay) return false
-  sh(`tmux send-keys -t "${session}" C-u`)
-  sh(`tmux send-keys -t "${session}" "<watchdog-revive-ping>" Enter`)
+  sh(`tmux send-keys -t "=${session}:" C-u`)
+  sh(`tmux send-keys -t "=${session}:" "<watchdog-revive-ping>" Enter`)
   m.pinged_at = s.now
   try { fs.writeFileSync(apiErrorMarkerPath(taskGid), JSON.stringify(m)) } catch {}
   log(`[${session}] turn ended on an API error (${m.error}, #${count}) ${Math.round((s.now - m.last_at) / 60000)}m ago, pane idle → <watchdog-revive-ping> sent to resume.`)
@@ -381,7 +381,7 @@ function paneAwaitingChoice(content) {
 }
 
 function getPanePid(session) {
-  const out = sh(`tmux list-panes -t "${session}" -F "#{pane_pid}"`)
+  const out = sh(`tmux list-panes -t "=${session}:" -F "#{pane_pid}"`)
   const n = parseInt(out.split('\n')[0], 10)
   return Number.isFinite(n) ? n : null
 }
@@ -518,7 +518,7 @@ function attemptRcRespawn(session, prior) {
   if (effort) keep.push(`--effort ${effort}`)
   const autocompact = (proc.args.match(/--autocompact\s+(\S+)/) || [])[1]
   if (autocompact) keep.push(`--autocompact ${autocompact}`)
-  const cwd = sh(`tmux display-message -p -t "${session}" '#{pane_current_path}'`) || HOME
+  const cwd = sh(`tmux display-message -p -t "=${session}:" '#{pane_current_path}'`) || HOME
   // A pinned composer draft dies with the process — preserve its text in the log.
   const draft = (capturePane(session).match(/^❯\s+(\S.*)$/m) || [])[1]
   if (draft) log(`[${session}] composer draft lost with respawn (re-send by hand if still wanted): ${draft.trim()}`)
@@ -531,9 +531,9 @@ function attemptRcRespawn(session, prior) {
   }
   const cmd = `cd '${cwd}' && claude ${keep.join(' ')} --remote-control '${rcName}' --resume ${liveId}`
   const escaped = cmd.replace(/(["$\\`])/g, '\\$1')
-  sh(`tmux send-keys -t "${session}" C-u`)
-  sh(`tmux send-keys -t "${session}" -l "${escaped}"`)
-  sh(`tmux send-keys -t "${session}" Enter`)
+  sh(`tmux send-keys -t "=${session}:" C-u`)
+  sh(`tmux send-keys -t "=${session}:" -l "${escaped}"`)
+  sh(`tmux send-keys -t "=${session}:" Enter`)
   let armed = false
   for (let i = 0; i < 45; i++) {
     if (rcBridgeUp(capturePane(session), claudeProcUnder(panePid)?.pid)) { armed = true; break }
@@ -544,8 +544,8 @@ function attemptRcRespawn(session, prior) {
     // Wake ping, same as the old revive: confirms the resumed session answers.
     // C-u first: remote-control clients can sync drafts into the composer;
     // typing without clearing concatenates the draft.
-    sh(`tmux send-keys -t "${session}" C-u`)
-    sh(`tmux send-keys -t "${session}" "<watchdog-revive-ping>" Enter`)
+    sh(`tmux send-keys -t "=${session}:" C-u`)
+    sh(`tmux send-keys -t "=${session}:" "<watchdog-revive-ping>" Enter`)
   } else {
     log(`[${session}] RC respawn: relaunched but no RC signal after 45s — leaving it; cooldown armed, re-check next ticks.`)
   }
@@ -639,7 +639,7 @@ function escalateStuckSessions() {
     const full = `/tmp/${f}`
     let detail = ''
     try { detail = fs.readFileSync(full, 'utf8').split('\n').slice(1).join(' ').replace(/\s+/g, ' ').trim().slice(0, 220) } catch { /* best-effort */ }
-    log(`[claude-asana-${gid}] STUCK — agent gave up after repeated premature stops (Stop-hook livelock bound). Operator attention needed (attach: tmux attach -t claude-asana-${gid}). ${detail}`)
+    log(`[claude-asana-${gid}] STUCK — agent gave up after repeated premature stops (Stop-hook livelock bound). Operator attention needed (attach: tmux attach -t '=claude-asana-${gid}'). ${detail}`)
     try { fs.renameSync(full, `${full}.escalated`) } catch { /* best-effort */ }
   }
 }
@@ -880,8 +880,8 @@ function removeTaskWorktrees(taskGid, repos) {
   // sparing logic uses lists captured earlier in the tick; an un-retire renames
   // done-asana → claude-asana mid-tick, leaving the gid in neither stale list —
   // the prune then destroys the just-resurrected session's worktree and slot.
-  const liveNow = sh(`tmux has-session -t "${SESSION_PREFIX}${taskGid}" 2>/dev/null && echo yes`) === 'yes'
-    || sh(`tmux has-session -t "${RETIRED_PREFIX}${taskGid}" 2>/dev/null && echo yes`) === 'yes'
+  const liveNow = sh(`tmux has-session -t "=${SESSION_PREFIX}${taskGid}" 2>/dev/null && echo yes`) === 'yes'
+    || sh(`tmux has-session -t "=${RETIRED_PREFIX}${taskGid}" 2>/dev/null && echo yes`) === 'yes'
   if (liveNow) {
     log(`  [${taskGid}] prune SKIPPED: a session exists for this gid (re-checked live)`)
     return
@@ -957,8 +957,8 @@ function killMaestroMcp(session) {
 function retireSession(session, taskGid, agentStatus = 'Complete') {
   const dest = `${RETIRED_PREFIX}${taskGid}`
   // rename-session can't clobber; drop a prior retirement of the same task first.
-  if (sh(`tmux has-session -t "${dest}" 2>/dev/null && echo yes`) === 'yes') {
-    sh(`tmux kill-session -t "${dest}"`)
+  if (sh(`tmux has-session -t "=${dest}" 2>/dev/null && echo yes`) === 'yes') {
+    sh(`tmux kill-session -t "=${dest}"`)
   }
   // Read the FULL slot BEFORE releasing it: the Metro port must be freed after the
   // slot release (next task on this slot_index reuses it), and the release receipt
@@ -966,7 +966,7 @@ function retireSession(session, taskGid, agentStatus = 'Complete') {
   let slot = null
   try { slot = slots.get(taskGid) } catch { /* slots.json unreadable */ }
   const metroPort = slot?.metro_port ?? null
-  sh(`tmux rename-session -t "${session}" "${dest}"`)
+  sh(`tmux rename-session -t "=${session}" "${dest}"`)
   releaseSimAndSlot(taskGid)
   freeMetroPort(metroPort)
   writeReleaseReceipt(taskGid, slot, metroPort)
@@ -1037,7 +1037,7 @@ function pruneRetiredSessions(state) {
     return pid !== null && !claudeRunningUnder(pid)
   })
   for (const s of dead) {
-    sh(`tmux kill-session -t "${s.name}"`)
+    sh(`tmux kill-session -t "=${s.name}"`)
     delete state.sessions[s.name]
     log(`[${s.name}] retired pane's claude gone → killed`)
   }
@@ -1060,7 +1060,7 @@ function pruneRetiredSessions(state) {
   }
   for (const s of stale) {
     const idleH = Math.round((now - (state.sessions[s.name]?.lastChange ?? now)) / 3600000)
-    sh(`tmux kill-session -t "${s.name}"`)
+    sh(`tmux kill-session -t "=${s.name}"`)
     delete state.sessions[s.name]
     log(`[${s.name}] retired idle ${idleH}h > ${Math.round(IDLE_REAP_MS() / 3600000)}h TTL → killed (transcript survives)`)
   }
@@ -1072,7 +1072,7 @@ function pruneRetiredSessions(state) {
   const toPrune = retired.slice(keep) // oldest beyond the cap
   log(`Retired sessions: ${retired.length} > cap ${keep} → killing ${toPrune.length} oldest`)
   for (const s of toPrune) {
-    sh(`tmux kill-session -t "${s.name}"`)
+    sh(`tmux kill-session -t "=${s.name}"`)
     delete state.sessions[s.name]
     log(`[${s.name}] retired beyond cap → killed`)
   }
@@ -1193,8 +1193,8 @@ function teardownMergedWork(liveSessions, state) {
     if (merged.some((m) => m === null)) continue
     log(`[${gid}] all PRs merged (${merged.flat().join(', ')}) → tearing down worktree(s) ${repos.join(', ')}`)
     const retired = `${RETIRED_PREFIX}${gid}`
-    if (sh(`tmux has-session -t "${retired}" 2>/dev/null && echo yes`) === 'yes') {
-      sh(`tmux kill-session -t "${retired}"`)
+    if (sh(`tmux has-session -t "=${retired}" 2>/dev/null && echo yes`) === 'yes') {
+      sh(`tmux kill-session -t "=${retired}"`)
       delete state.sessions[retired]
       log(`[${retired}] killed: work merged (transcript survives)`)
     }
@@ -1239,7 +1239,7 @@ function main() {
       let slot = null
       try { slot = slots.get(taskGid) } catch { /* slots.json unreadable */ }
       const metroPort = slot?.metro_port ?? null
-      sh(`tmux kill-session -t "${session}"`)
+      sh(`tmux kill-session -t "=${session}"`)
       releaseSimAndSlot(taskGid)
       freeMetroPort(metroPort)
       const wtRepo = fs.existsSync(path.join(WORKTREES_ROOT, taskGid))
@@ -1262,7 +1262,7 @@ function main() {
       // (no forensic value; the transcript survives on disk) — kill it immediately.
       if (taskGid.startsWith('chat-')) {
         log(`[${session}] chat session's claude is gone → killing the empty pane (transcript survives; resurrect: resume-agent <term> --chat)`)
-        sh(`tmux kill-session -t "${session}"`)
+        sh(`tmux kill-session -t "=${session}"`)
         delete state.sessions[session]
         continue
       }
@@ -1273,7 +1273,7 @@ function main() {
         const deadSince = state.sessions[session]?.deadSince ?? now
         if (now - deadSince >= DEAD_ANCHOR_REAP_MS) {
           log(`[${session}] anchor pane's claude gone ${Math.round((now - deadSince) / 60000)}m → reaped (transcript survives; resurrect via /resume-session)`)
-          sh(`tmux kill-session -t "${session}"`)
+          sh(`tmux kill-session -t "=${session}"`)
           delete state.sessions[session]
         } else {
           if (!state.sessions[session]?.deadSince) log(`[${session}] anchor pane's claude gone → reaping in ${Math.round(DEAD_ANCHOR_REAP_MS / 60000)}m unless it comes back`)
@@ -1301,7 +1301,7 @@ function main() {
       const spawned = chatSpawns.load().byTmux.get(session)
       const resurrect = spawned ? chatSpawns.resumeCommand(spawned) : `resume-agent --uuid <id> --chat --in-place${taskGid.startsWith('chat-') ? '' : ' --name <name>'}`
       log(`[${session}] archived from the desktop app (RC code 4090) → killed (transcript survives; resurrect: ${resurrect})`)
-      sh(`tmux kill-session -t "${session}"`)
+      sh(`tmux kill-session -t "=${session}"`)
       delete state.sessions[session]
       continue
     }
@@ -1350,7 +1350,7 @@ function main() {
       const spawned = chatSpawns.load().byTmux.get(session)
       const resurrect = spawned ? chatSpawns.resumeCommand(spawned) : `resume-agent --uuid <id> --chat${isChat ? '' : ' --name <name>'}`
       log(`[${session}] ${kind} idle ${Math.round((now - prior.lastChange) / 3600000)}h > ${Math.round(IDLE_REAP_MS() / 3600000)}h → reaped (transcript survives; resurrect: ${resurrect}; keep one permanently via watcher.persistent_anchors)`)
-      sh(`tmux kill-session -t "${session}"`)
+      sh(`tmux kill-session -t "=${session}"`)
       if (isRun) {
         let slot = null
         try { slot = slots.get(taskGid) } catch { /* slots.json unreadable */ }
@@ -1369,14 +1369,14 @@ function main() {
     let declinedAt = prior?.declinedAt ?? null
     const isRunSession = !isChat && /^\d+$/.test(taskGid)   // never answer dialogs in chat/anchor sessions
     if (isRunSession && awaitingChoice && paneSafetyDialog(content)) {
-      sh(`tmux send-keys -t "${session}" "2" Enter`)
+      sh(`tmux send-keys -t "=${session}:" "2" Enter`)
       log(`[${session}] CLI safety dialog (dangerous-operation confirm) → answered No; resume prompt follows once the pane settles.`)
       declinedAt = now
       awaitingChoice = false
       lastChange = now
     } else if (isRunSession && declinedAt && !changed && !awaitingChoice && !/esc to interrupt/.test(content) && !operatorHeld(taskGid)) {
-      sh(`tmux send-keys -t "${session}" C-u`)
-      sh(`tmux send-keys -t "${session}" "<watchdog-dialog-declined>" Enter`)
+      sh(`tmux send-keys -t "=${session}:" C-u`)
+      sh(`tmux send-keys -t "=${session}:" "<watchdog-dialog-declined>" Enter`)
       log(`[${session}] declined dialog ${Math.round((now - declinedAt) / 60000)}m ago, pane idle → <watchdog-dialog-declined> sent.`)
       declinedAt = null
       lastChange = now
@@ -1393,8 +1393,8 @@ function main() {
     if (isHeld && !changed && !awaitingChoice && !/esc to interrupt/.test(content) && holdAgeMs(taskGid) > HOLD_TTL_MS()) {
       const ageM = Math.round(holdAgeMs(taskGid) / 60000)
       sh(`"${HOME}/.config/agent-watcher/operator-hold.sh" release ${taskGid}`)
-      sh(`tmux send-keys -t "${session}" C-u`)
-      sh(`tmux send-keys -t "${session}" "<operator-hold-expired>" Enter`)
+      sh(`tmux send-keys -t "=${session}:" C-u`)
+      sh(`tmux send-keys -t "=${session}:" "<operator-hold-expired>" Enter`)
       log(`[${session}] operator hold expired (${ageM}m > ${Math.round(HOLD_TTL_MS() / 60000)}m, pane idle) → released + resume prompt sent.`)
       isHeld = false
       lastChange = now
@@ -1423,7 +1423,7 @@ function main() {
       if (!prior?.parkLogged) {
         log(`[${session}] parked at an interactive prompt — NOT reviving (needs a human choice).`)
       } else if (!parkEscalated && now - parkedSince > PARK_ESCALATE_MS) {
-        log(`[${session}] STILL parked at a human-choice prompt after ${Math.round((now - parkedSince) / 60000)}m — operator attention needed (attach: tmux attach -t ${session}). Not reviving, not shedding.`)
+        log(`[${session}] STILL parked at a human-choice prompt after ${Math.round((now - parkedSince) / 60000)}m — operator attention needed (attach: tmux attach -t '=${session}'). Not reviving, not shedding.`)
         parkEscalated = true
       }
     }

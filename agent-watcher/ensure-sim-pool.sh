@@ -99,7 +99,7 @@ sim_live_owner() {
   while IFS= read -r sess; do
     gid="${sess#claude-asana-}"
     [[ "$gid" =~ ^[0-9]+$ ]] || continue
-    ppid="$(tmux list-panes -t "$sess" -F '#{pane_pid}' 2>/dev/null | head -1)"
+    ppid="$(tmux list-panes -t "=$sess:" -F '#{pane_pid}' 2>/dev/null | head -1)"
     [[ -n "$ppid" ]] || continue
     cpid="$(pgrep -P "$ppid" 2>/dev/null | head -1)"
     [[ -n "$cpid" ]] || continue

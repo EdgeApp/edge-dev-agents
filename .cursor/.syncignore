@@ -1,9 +1,5 @@
 # Files to exclude from convention-sync (one glob per line)
-# Patterns match against relative paths like: commands/foo.sh, rules/bar.mdc
-
-# WIP commands
-commands/hudl.md
-commands/github-pr-hudl.sh
+# Patterns match against relative paths like: skills/foo/bar.sh, rules/bar.mdc
 
 # --- Maestro flows -----------------------------------------------------------
 # The build-and-test harness ships ONE canonical, reusable flow a fresh machine

@@ -2,7 +2,7 @@
 # bootstrap.sh — Reproduce this agent setup on a fresh Mac from the cloned repo.
 #
 # Installs (repo -> home), idempotent, never clobbers secrets/state:
-#   .cursor/            -> ~/.cursor/                 (skills, rules, scripts, README)
+#   .cursor/            -> ~/.cursor/                 (skills, rules, README)
 #   agent-watcher/      -> ~/.config/agent-watcher/   (orchestration code + config)
 #   claude-workflows/   -> ~/.claude/workflows/       (Workflow-tool scripts)
 #   bin/link-shared-memory.sh -> ~/.claude/link-shared-memory.sh
@@ -36,7 +36,7 @@ copy_tree() { # src dest  (update files, preserve anything extra in dest)
   else cp -R "$src/." "$dest/"; fi
 }
 
-# 1. Cursor skills/rules/scripts (still used; mirrors into ~/.cursor)
+# 1. Skills and rules (mirrors into ~/.cursor)
 if [[ -d "$REPO/.cursor" ]]; then
   say "Installing ~/.cursor from repo/.cursor"
   copy_tree "$REPO/.cursor" "$HOME/.cursor"

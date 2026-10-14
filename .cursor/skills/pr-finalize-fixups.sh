@@ -17,9 +17,12 @@
 #   honors; /eval-run audits it against the operator comment it cites.
 #
 #   Ownership guard (HARD override, checked first): if the authenticated gh user
-#   is NOT the PR author (currentUser != prAuthor), mode is ALWAYS preserve and
-#   squash-stale is a noop. We never autosquash or otherwise rewrite a PR we
-#   don't own — fixups are left on top for the owner to squash at merge. This
+#   is NOT the PR author (currentUser != prAuthor), mode is ALWAYS preserve,
+#   squash-stale is a noop, and finalize only pushes: no fold, no TDD stamp
+#   fold, no condense. A PR we don't own is never autosquashed or otherwise
+#   rewritten: fixups are left as committed for the owner to squash at merge.
+#   The push is plain when the remote tip is an ancestor of HEAD, and
+#   force-with-lease only when the caller's slotting reordered the tip. This
 #   takes precedence over the activity-based derivation below.
 #
 #   Modes — derived from the latest human activity on the PR (formal review,
@@ -53,7 +56,7 @@
 #                   stamp asserts the doc was re-read against this tree, so an
 #                   unedited stale doc is left for the Complete gate to bounce).
 #                   In autosquash mode → autosquash + force-push.
-#                   In preserve mode → the same stale fold squash-stale does
+#                   In preserve mode on an owned PR → the same stale fold squash-stale does
 #                   (so a skipped or failed step 1.5 heals here), then condense
 #                   (git-branch-ops.sh condense-fixups: one fixup! per target
 #                   and kind, bodies concatenated, targets untouched) +
@@ -234,6 +237,20 @@ run_condense_and_push() {
   emit_json "{action: '$(prefix_action push)', mode: '$MODE', newHead: '$(git rev-parse --short=10 HEAD)', folded: $FOLDED, condensed: $CONDENSED, stamped: $TDD_STAMPED}"
 }
 
+# A PR someone else owns: push the fixups as committed. Plain push when the
+# remote tip is an ancestor of HEAD; the lease form only when it is not.
+run_push_unowned() {
+  local branch remote_tip
+  branch="$(git branch --show-current)"
+  remote_tip="$(git rev-parse --verify -q "refs/remotes/origin/$branch" 2>/dev/null || true)"
+  if [[ -z "$remote_tip" ]] || git merge-base --is-ancestor "$remote_tip" HEAD 2>/dev/null; then
+    "$GIT_BRANCH_OPS_SH" push >&2
+  else
+    "$GIT_BRANCH_OPS_SH" push --force-with-lease >&2
+  fi
+  emit_json "{action: '$(prefix_action push)', mode: '$MODE', newHead: '$(git rev-parse --short=10 HEAD)', folded: 0, condensed: 0, stamped: false, reason: 'not PR owner: fixups pushed as committed'}"
+}
+
 emit_noop() {
   local reason="$1"
   emit_json "{action: '$(prefix_action noop)', mode: '$MODE', reason: '$reason'}"
@@ -301,13 +318,19 @@ fi
 
 # preserve mode
 if [[ "$CHECK_ONLY" == "true" ]]; then
-  emit_json "{action: '$(prefix_action push)', mode: '$MODE', reason: 'reviewer still active; preserving fixups, condensed to one per target'}"
+  if [[ "$IS_OWNER" == "true" ]]; then
+    emit_json "{action: '$(prefix_action push)', mode: '$MODE', reason: 'reviewer still active; preserving fixups, condensed to one per target'}"
+  else
+    emit_json "{action: '$(prefix_action push)', mode: '$MODE', reason: 'not PR owner: fixups pushed as committed'}"
+  fi
   exit 0
 fi
 
 # Only on an owned PR: a non-owner never rewrites history, not even a fold.
-if [[ "$IS_OWNER" == "true" ]]; then
-  fold_stale_fixups || exit 1
+if [[ "$IS_OWNER" != "true" ]]; then
+  run_push_unowned
+  exit 0
 fi
+fold_stale_fixups || exit 1
 stamp_tdd_if_edited || exit 1
 run_condense_and_push

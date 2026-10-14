@@ -132,6 +132,10 @@ if [[ -n "$EDIT_COMMENT_GID" && -n "$DELETE_COMMENT_GID" ]]; then
   echo "Error: --edit-comment and --delete-comment are mutually exclusive" >&2
   exit 1
 fi
+if [[ -n "$EDIT_COMMENT_GID" && -n "$NO_MANUAL_QA" ]]; then
+  echo "Error: --no-manual-qa posts its reason as a comment, so it does not pair with --edit-comment" >&2
+  exit 1
+fi
 if [[ -n "$EDIT_COMMENT_GID" && -z "$COMMENT_FILE" ]]; then
   echo "Error: --edit-comment <story_gid> requires --comment-file <path> (the replacement body)" >&2
   exit 1
@@ -519,6 +523,33 @@ if [[ -n "$DELETE_COMMENT_GID" ]]; then
   echo ">> Comment: deleted story $DELETE_COMMENT_GID from task $TASK_GID"
 fi
 
+# QA handoff gate: the move to QA Verification is where the manual verification
+# list must already exist as "QA: ..." subtasks (pr-land qa-subtasks-before-handoff).
+# It runs ahead of the comment step so a refusal writes nothing, and so the
+# --no-manual-qa reason reaches that step: as the comment when the call has no
+# --comment-file, else as a last paragraph of that comment.
+if [[ "$SET_BOARD_STATE" == "QA Verification" ]]; then
+  QA_OPEN="$(curl -sS "$ASANA_API/tasks/$TASK_GID/subtasks?opt_fields=name,completed" \
+    -H "Authorization: Bearer $ASANA_TOKEN" \
+    | jq --arg p "$QA_SUBTASK_PREFIX" '[.data[]? | select((.completed | not) and (.name | startswith($p)))] | length')"
+  if [[ "${QA_OPEN:-0}" -eq 0 && -z "$NO_MANUAL_QA" ]]; then
+    echo "QA_SUBTASKS_REQUIRED: task $TASK_GID has no open '${QA_SUBTASK_PREFIX}...' subtask. Create one per manual verification item (--create-subtask --subtask-name \"${QA_SUBTASK_PREFIX}<what a human checks>\" --subtask-notes <file>) before --set-board-state \"QA Verification\", or pass --no-manual-qa \"<why nothing needs a human>\"." >&2
+    exit 2
+  fi
+  if [[ "${QA_OPEN:-0}" -eq 0 && -n "$NO_MANUAL_QA" ]]; then
+    NO_QA_BODY="$(mktemp)"
+    if [[ -n "$COMMENT_FILE" ]]; then
+      [[ -f "$COMMENT_FILE" ]] || { echo "Error: --comment-file not found: $COMMENT_FILE" >&2; exit 1; }
+      { cat "$COMMENT_FILE"; printf '\n\n'; } > "$NO_QA_BODY"
+    fi
+    printf 'No manual QA items: %s\n' "$NO_MANUAL_QA" >> "$NO_QA_BODY"
+    COMMENT_FILE="$NO_QA_BODY"
+    echo ">> no manual QA items (reason recorded as a comment)"
+  else
+    echo ">> manual QA items: $QA_OPEN open '${QA_SUBTASK_PREFIX}' subtask(s)"
+  fi
+fi
+
 # --comment-file <path>: post the file's text as a task comment. Runs BEFORE
 # --attach-file so a single call that does both keeps the watermark order the
 # one-shot report-as-attachment rule requires (comment first, report last).
@@ -730,25 +761,6 @@ if $DO_ASSIGN && [[ -z "$ASSIGN_GID" ]]; then
 fi
 
 CUSTOM_FIELDS_PATCH='{}'
-
-# QA handoff gate: the move to QA Verification is where the manual verification
-# list must already exist as "QA: ..." subtasks (pr-land qa-subtasks-before-handoff).
-if [[ "$SET_BOARD_STATE" == "QA Verification" ]]; then
-  QA_OPEN="$(curl -sS "$ASANA_API/tasks/$TASK_GID/subtasks?opt_fields=name,completed" \
-    -H "Authorization: Bearer $ASANA_TOKEN" \
-    | jq --arg p "$QA_SUBTASK_PREFIX" '[.data[]? | select((.completed | not) and (.name | startswith($p)))] | length')"
-  if [[ "${QA_OPEN:-0}" -eq 0 && -z "$NO_MANUAL_QA" ]]; then
-    echo "QA_SUBTASKS_REQUIRED: task $TASK_GID has no open '${QA_SUBTASK_PREFIX}...' subtask. Create one per manual verification item (--create-subtask --subtask-name \"${QA_SUBTASK_PREFIX}<what a human checks>\" --subtask-notes <file>) before --set-board-state \"QA Verification\", or pass --no-manual-qa \"<why nothing needs a human>\"." >&2
-    exit 2
-  fi
-  if [[ "${QA_OPEN:-0}" -eq 0 && -n "$NO_MANUAL_QA" ]]; then
-    NO_QA_BODY="$(mktemp)"; printf 'No manual QA items: %s\n' "$NO_MANUAL_QA" > "$NO_QA_BODY"
-    [[ -n "$COMMENT_FILE" ]] || COMMENT_FILE="$NO_QA_BODY"
-    echo ">> no manual QA items (reason recorded as a comment)"
-  else
-    echo ">> manual QA items: $QA_OPEN open '${QA_SUBTASK_PREFIX}' subtask(s)"
-  fi
-fi
 
 if [[ -n "$SET_BOARD_STATE" ]]; then
   BOARD_STATE_GID="$(enum_option_gid "$BOARD_STATE_FIELD" "Board State 🤖" "$SET_BOARD_STATE")" || exit 1

@@ -191,7 +191,7 @@ function setStatusPlanning(taskGid) {
 // ─── tmux / spawn ───────────────────────────────────────────────────────────────
 
 function tmuxSessionExists(name) {
-  return sh(`tmux has-session -t "${name}" 2>/dev/null && echo yes`) === 'yes'
+  return sh(`tmux has-session -t "=${name}" 2>/dev/null && echo yes`) === 'yes'
 }
 
 function shCapture(cmd) {
@@ -204,13 +204,13 @@ function waitRcReadyAndSendPrompt(sessionName, prompt) {
   let ready = false
   let acceptedBypass = false
   while (Date.now() < deadline) {
-    const pane = sh(`tmux capture-pane -t "${sessionName}" -p`)
+    const pane = sh(`tmux capture-pane -t "=${sessionName}:" -p`)
     if (RC_READY_MARKERS.some((m) => pane.includes(m))) { ready = true; break }
     if (!acceptedBypass && pane.includes(BYPASS_PROMPT_MARKER)) {
       log(`  bypass-permissions dialog detected; auto-accepting (Down + Enter)`)
-      execSync(`tmux send-keys -t "${sessionName}" Down`, { stdio: 'inherit' })
+      execSync(`tmux send-keys -t "=${sessionName}:" Down`, { stdio: 'inherit' })
       execSync('sleep 0.3')
-      execSync(`tmux send-keys -t "${sessionName}" Enter`, { stdio: 'inherit' })
+      execSync(`tmux send-keys -t "=${sessionName}:" Enter`, { stdio: 'inherit' })
       acceptedBypass = true
     }
     execSync(`sleep ${RC_READY_POLL_MS / 1000}`)
@@ -227,13 +227,13 @@ function waitRcReadyAndSendPrompt(sessionName, prompt) {
     // clients sync suggested-command drafts into the composer (observed
     // 2026-07-17: "! gh auth refresh ..." re-typed by the agents app); typing
     // without clearing concatenates the draft into the submitted prompt.
-    execSync(`tmux send-keys -t "${sessionName}" C-u`, { stdio: 'inherit' })
+    execSync(`tmux send-keys -t "=${sessionName}:" C-u`, { stdio: 'inherit' })
     execSync('sleep 0.3')
-    execSync(`tmux send-keys -t "${sessionName}" ${JSON.stringify(prompt)}`, { stdio: 'inherit' })
+    execSync(`tmux send-keys -t "=${sessionName}:" ${JSON.stringify(prompt)}`, { stdio: 'inherit' })
     execSync('sleep 1')
-    execSync(`tmux send-keys -t "${sessionName}" Enter`, { stdio: 'inherit' })
+    execSync(`tmux send-keys -t "=${sessionName}:" Enter`, { stdio: 'inherit' })
     execSync('sleep 8')
-    const pane = sh(`tmux capture-pane -t "${sessionName}" -p`)
+    const pane = sh(`tmux capture-pane -t "=${sessionName}:" -p`)
     const paneLines = pane.split('\n')
     // Submitted when the prompt has LEFT the input box. Two signals, EITHER suffices:
     //  (a) the `❯` input line no longer holds it (cleared on submit); OR

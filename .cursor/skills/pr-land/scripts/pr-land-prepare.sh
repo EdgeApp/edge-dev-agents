@@ -9,7 +9,8 @@
 //   staging-task-under-unreleased CHANGELOG placement check.
 //
 // For each branch:
-//   1. Checkout + fetch
+//   1. Checkout + fetch; stop with status "diverged" when the local branch
+//      lacks commits the remote branch has (see checkDivergence)
 //   2. Autosquash fixup commits
 //   3. Rebase onto upstream (repo's default branch via origin/HEAD; origin/develop for GUI)
 //   4. Detect conflicts: code OR CHANGELOG = rebase left IN PROGRESS for the
@@ -29,7 +30,7 @@
 // Output: JSON with results for each branch
 
 const { execSync, spawnSync } = require("child_process");
-const { existsSync, readFileSync } = require("fs");
+const { existsSync, readFileSync, writeFileSync, mkdirSync } = require("fs");
 const path = require("path");
 const {
   getRepoDir,
@@ -182,6 +183,44 @@ function describeBranchState(repoDir, branch) {
   return parts.join("\n");
 }
 
+// The land force-pushes the local branch, so a local branch that lacks commits
+// origin/<branch> has would replace them. Prepare itself rewrites the local
+// branch (autosquash, rebase) and is re-run after a conflict is resolved in
+// place, so the remote tip a run started from is recorded in
+// <git-common-dir>/pr-land-prepared/<branch>: a later run that finds the same
+// remote tip knows the local rewrite is its own. Returns null when the branch
+// may proceed, else the message for status "diverged".
+function checkDivergence(repoDir, branch) {
+  const remote = runGit(["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${branch}`], repoDir, {
+    allowFailure: true,
+  });
+  if (!remote.success || remote.stdout === "") return null;
+  const commonDir = runGit(["rev-parse", "--git-common-dir"], repoDir, { allowFailure: true });
+  const marker = path.join(
+    path.resolve(repoDir, commonDir.stdout || ".git"),
+    "pr-land-prepared",
+    encodeURIComponent(branch)
+  );
+  const contained = runGit(["merge-base", "--is-ancestor", remote.stdout, "HEAD"], repoDir, {
+    allowFailure: true,
+  });
+  if (contained.success) {
+    mkdirSync(path.dirname(marker), { recursive: true });
+    writeFileSync(marker, remote.stdout + "\n");
+    return null;
+  }
+  let recorded = "";
+  try { recorded = readFileSync(marker, "utf8").trim(); } catch {}
+  if (recorded === remote.stdout) return null;
+  const local = runGit(["rev-parse", "HEAD"], repoDir, { allowFailure: true });
+  return (
+    `Local ${branch} (${local.stdout.slice(0, 10)}) lacks commits that origin/${branch} (${remote.stdout.slice(0, 10)}) has, ` +
+    `and landing would force-push over them. If the local branch is a leftover of an earlier attempt: ` +
+    `git checkout -B ${branch} origin/${branch}, then re-run prepare. If it holds work the PR lacks: ` +
+    `rebase it onto origin/${branch} and push it first.`
+  );
+}
+
 async function prepareBranch(repo, branch, buildField) {
   const canonicalDir = getRepoDir(repo);
   let repoDir = canonicalDir;
@@ -287,6 +326,14 @@ async function prepareBranch(repo, branch, buildField) {
   } catch (e) {
     result.status = "checkout_failed";
     result.message = e.message;
+    return result;
+  }
+
+  const diverged = checkDivergence(repoDir, branch);
+  if (diverged != null) {
+    result.status = "diverged";
+    result.message = diverged;
+    console.error(`✗ ${diverged}`);
     return result;
   }
 

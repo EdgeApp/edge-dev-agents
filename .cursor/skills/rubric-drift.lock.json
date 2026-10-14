@@ -64,7 +64,7 @@
       ]
     },
     "file:agent-run-report.md": {
-      "hash": "9ec8ed99f975",
+      "hash": "ed2ce36f63c2",
       "dims": [
         "A18",
         "A20",
@@ -216,7 +216,7 @@
       ]
     },
     "one-shot:followup-scope-is-the-deliverable": {
-      "hash": "70b09ab6c3d0",
+      "hash": "9a6e9af2c45e",
       "dims": [
         "A23"
       ]
@@ -246,7 +246,7 @@
       ]
     },
     "file:asana-watcher.js": {
-      "hash": "cba79cf50924",
+      "hash": "0844669b1ac7",
       "dims": [
         "O1"
       ]
@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "9a744a92f165",
+      "hash": "8a49666ac4fc",
       "dims": [
         "O4",
         "O5",
@@ -405,7 +405,7 @@
       ]
     },
     "one-shot:land-on-approval": {
-      "hash": "e59855bdaa7c",
+      "hash": "b990afa05efa",
       "dims": [
         "A8"
       ]
@@ -417,7 +417,7 @@
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "c96c9ead99a1",
+      "hash": "52cbbd11b956",
       "dims": [
         "A9"
       ]
@@ -642,13 +642,13 @@
       ]
     },
     "one-shot:operator-hold": {
-      "hash": "54a3a4e9d500",
+      "hash": "9d27d4612332",
       "dims": [
         "A7"
       ]
     },
     "file:operator-hold-gate.sh": {
-      "hash": "e9d4f9f22e59",
+      "hash": "e540a32624a8",
       "dims": [
         "A7"
       ]
@@ -667,13 +667,13 @@
       ]
     },
     "file:require-completion-judgment.sh": {
-      "hash": "596045fd3dd4",
+      "hash": "0d65c972e498",
       "dims": [
         "O9"
       ]
     },
     "file:completion-judge.sh": {
-      "hash": "26940cf40e0d",
+      "hash": "ae62c0994787",
       "dims": [
         "O9"
       ]
@@ -817,7 +817,7 @@
       ]
     },
     "one-shot:descope-only-after-attempt": {
-      "hash": "d04f55cde1fb",
+      "hash": "4030c376f662",
       "dims": [
         "A23"
       ]
@@ -878,22 +878,6 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "c6ce294d8717"
     },
-    "blocker-validator:default-deny": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "9399f4aeb47d"
-    },
-    "blocker-validator:read-only": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "75bbd219b2f8"
-    },
-    "blocker-validator:evidence-not-narration": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "8f454e5fc0e0"
-    },
-    "blocker-validator:actionable-deny": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "d9884bb8b686"
-    },
     "bugbot:use-companion-scripts": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "8c0ce0309950"
@@ -935,8 +919,8 @@
       "hash": "62b299bd06ad"
     },
     "bugbot:self-schedule-on-claude-code": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "9f9a34c22676"
+      "reason": "2026-10-14: 2026-10-13: the rule gained one exception (no timer when the caller is a run already watching the PR); the timer is still not graded by an eval dimension, and an orch run cannot arm one because no-self-respawn.sh denies CronCreate",
+      "hash": "a60f73c85c13"
     },
     "bugbot:one-cron-per-pr": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1123,8 +1107,8 @@
       "hash": "ecfd157b1711"
     },
     "one-shot:bugbot-in-watch": {
-      "reason": "2026-10-08: restated NEUTRAL rationale replaced by a cross-reference to reviewer-bot-coverage (anchored under A3); the bot gate itself is graded via A3",
-      "hash": "2d06469d91d4"
+      "reason": "2026-10-14: 2026-10-13: the sentence on bugbot's recurring timer moved to the bugbot skill, which owns it; the bot gate itself is graded via A3",
+      "hash": "4d0d774fd176"
     },
     "pr-address:use-companion-script": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1695,8 +1679,8 @@
       "hash": "011891c2fa81"
     },
     "one-shot:claude-calls-on-subscription": {
-      "reason": "2026-09-27: operator standing preference 2026-09-27; a missed case surfaces as a blocked completion or an API bill, both visible without an eval dimension",
-      "hash": "0d826fe90f7f"
+      "reason": "2026-10-14: 2026-10-13: wording only, the call now goes in a script file because no-self-respawn.sh denies a typed claude -p; operator standing preference 2026-09-27, a missed case surfaces as a blocked completion or an API bill, both visible without an eval dimension",
+      "hash": "eebd0075422f"
     },
     "task-run:landing-task": {
       "reason": "2026-10-01: permission-only routing rule; A15 grades the /pr-land run it permits",
@@ -1769,6 +1753,10 @@
     "pr-create:evidence-privacy-refusal": {
       "reason": "2026-10-10: refusal mechanically enforced by pr-create/scripts/pr-attach-screenshots.sh (exit 3, nothing uploaded); the rule only names the remedy; a dimension for working around the refusal is proposed to the operator in the task A status file",
       "hash": "21a78a53f5bd"
+    },
+    "pr-create:evidence-withdraw": {
+      "reason": "2026-10-14: 2026-10-13: a takedown is a rare corrective action with no per-run expectation an eval can grade; the deny hook block-direct-evidence-bucket-write.sh closes the direct route",
+      "hash": "d300b874144a"
     }
   },
   "excluded_skills": {

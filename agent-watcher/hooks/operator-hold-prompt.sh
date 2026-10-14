@@ -3,14 +3,15 @@
 # prompt a HUMAN types is read for what it orders: a question or an interrupt
 # sets an operator hold (operator-hold.sh) and prints one context line telling
 # the agent to answer and wait; a release clears it and says so; a stop order
-# keeps it and tells the agent to take the operator-directed block now; any
+# keeps it and tells the agent to end the run as a blocked completion now; any
 # other human text is a STEER, printed as such, and sets nothing (the run stays
 # autonomous). Machine prompts and headless children touch nothing.
 #
 # Grammar (hooks/lib/operator-directives.sh owns the sentence rules), checked in
 # this order:
 #   stop     a STOP directive opens or closes the message ("stop the task",
-#            "set it to blocked"); the hold stays, the agent is told to block
+#            "set it to blocked"); the hold stays, the agent is told to end the run as
+#            Complete plus blocked
 #   release  the first word (after ok/yes/sure/please) is go|resume|continue|
 #            proceed, or the last bare clause (after the final , ; . ! ? and/then)
 #            is go|go ahead|resume|continue|proceed|complete|finish up|wrap it up,
@@ -24,12 +25,13 @@
 #            continue", "not yet")
 #   steer    anything else a human typed ("the fee row is wrong, fix it"):
 #            carried out, no hold
-# A completion or stop directive, or an explicit "bypass the judge", also writes
+# A completion directive, or an explicit "bypass the judge", also writes
 # /tmp/agent-judge-waiver-<gid>: the completion judge is skipped for ONE completion
 # event, which consumes the file and logs the skip as an operator override
 # (require-completion-judgment.sh; spawn clears a leftover). Every later event is
 # judged again, so the release text says the judge is waived for this completion
-# rather than claiming the normal gates all still apply.
+# rather than claiming the normal gates all still apply. A stop directive writes
+# no waiver: the blocked write it orders passes the judge gate on the active hold.
 #
 # Not steering: harness envelopes and notices (background-task completions,
 # file-changed notes, command echoes) are stripped before the text is read, and
@@ -84,16 +86,15 @@ case " $KINDS " in *" bypass "*) BYPASS=true ;; esac
 write_waiver() { printf 'operator-directed %s (%s): %s\n' "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(printf '%s' "$PROMPT" | head -c 300 | tr '\n' ' ')" > "/tmp/agent-judge-waiver-$GID" 2>/dev/null || true; }
 if $BYPASS; then
   write_waiver bypass
-  # A stop or completion directive in the same message prints its own waiver line below.
-  if ! $STOP && ! $RELEASE; then
+  # A completion directive in the same message prints its own waiver line below.
+  if $STOP || ! $COMPLETE_DIRECTIVE; then
     echo "[completion judge waived] The operator waived the completion judge for your NEXT completion event only: that event consumes the waiver and is logged as an operator override, and every completion event after it is judged again. No other gate is waived."
   fi
 fi
 if $STOP; then
   LIVE=stop
-  write_waiver stop
   "$H/operator-hold.sh" set "$GID"
-  echo "[operator hold: stop directive] The operator asked you to STOP this run. Do it now, in this turn: update-status.sh $GID <current status> --blocked yes --reason \"operator-directed: <their words>\" (this passes every gate while the hold is active, and the completion judge is waived for that one write; it applies again to any later completion event), write and attach the run report describing where things stand, then end your turn. Do not resume the phase, push, or open a PR."
+  echo "[operator hold: stop directive] The operator asked you to STOP this run. Do it now, in this turn: write and attach the run report describing where things stand, run update-status.sh $GID Complete --blocked yes --reason \"operator-directed: <their words>\" (this passes every gate, the completion judge included, while the hold is active), then end your turn. Do not resume the phase, push, or open a PR."
   exit 0
 fi
 if $RELEASE; then
@@ -114,5 +115,5 @@ if [ "$(printf '%s' "$NORM" | hold_trigger)" != hold ]; then
   exit 0
 fi
 "$H/operator-hold.sh" set "$GID"
-echo "[operator hold] A human is steering this session. Answer this prompt, then END YOUR TURN and wait: do not advance agent_status, push, open or land a PR, or start the next phase until a message from the operator starts with go, resume, continue or proceed, or ends with one of those (or "complete") as its own clause (e.g. "... and resume", "..., complete."). Reading, investigating and local edits are fine. If the operator asks you to STOP or BLOCK the task, a `--blocked yes --reason "operator-directed: <their words>"` write passes the gates while held. A Stop hook block will NOT fire while the hold is active; do not read its absence as license to continue."
+echo "[operator hold] A human is steering this session. Answer this prompt, then END YOUR TURN and wait: do not advance agent_status, push, open or land a PR, or start the next phase until a message from the operator starts with go, resume, continue or proceed, or ends with one of those (or "complete") as its own clause (e.g. "... and resume", "..., complete."). Reading, investigating and local edits are fine. If the operator asks you to STOP or BLOCK the task, the run ends as a blocked completion: a `Complete --blocked yes --reason "operator-directed: <their words>"` write passes the gates while held. A Stop hook block will NOT fire while the hold is active; do not read its absence as license to continue."
 exit 0

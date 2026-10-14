@@ -15,14 +15,15 @@
 # (EVIDENCE_ROSTER overrides it). The Vision reader is compiled from
 # frame-vision.swift on first use into ${XDG_CACHE_HOME:-~/.cache}/agent-evidence,
 # keyed by the source hash, so an edited source rebuilds itself. FRAME_VISION
-# names a prebuilt reader to use instead; it is a test seam, and a reader that
-# answers "no text" for every frame turns the check off.
+# names a prebuilt reader to use instead; it is a test seam. A reader that
+# answers "no text" for a frame gets an error record for it (exit 3).
 #
 # Exit codes:
 #   0  every frame has a verdict (read the class from each JSON record)
 #   1  bad usage
-#   3  the detector could not run or could not read a frame. Callers refuse
-#      to publish: a frame with no verdict is never treated as clean.
+#   3  the detector could not run, could not read a frame, or found no roster
+#      file. Callers refuse to publish: a frame with no verdict is never
+#      treated as clean.
 #   4  redact refused a SECRET frame and wrote nothing
 
 set -euo pipefail

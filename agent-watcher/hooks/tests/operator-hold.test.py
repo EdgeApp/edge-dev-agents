@@ -137,8 +137,12 @@ try:
           os.path.exists(WAIVER) and 'operator-directed bypass' in open(WAIVER).read() and 'NEXT completion event only' in out, out[:200])
     clear()
     out = prompt('stop the task')
-    check('stop directive keeps the hold, injects the block-now context, writes the waiver', held() and 'stop directive' in out and '--blocked yes' in out and 'operator-directed stop' in open(WAIVER).read(), out[:80])
-    check('stop text says the judge is waived for that one write only', 'waived for that one write' in out and 'applies again' in out, out[:400])
+    check('stop directive keeps the hold, injects the blocked-completion context, writes no waiver', held() and 'stop directive' in out and f'{GID} Complete --blocked yes' in out and not os.path.exists(WAIVER), out[:80])
+    check('stop text claims no waiver', 'waived' not in out.lower() and 'while the hold is active' in out, out[:400])
+    clear()
+    out = prompt('stop the task. bypass the completion judge')
+    check('a bypass in a stop message still writes its waiver and says so',
+          held() and os.path.exists(WAIVER) and 'operator-directed bypass' in open(WAIVER).read() and 'NEXT completion event only' in out and 'stop directive' in out, out[:300])
     clear()
     out = prompt('<task-notification>\n<task-id>abc</task-id>\n<status>completed</status>\n</task-notification>')
     check('machine prompt stamps nothing, prints nothing', (not held()) and out == '', out[:60])
@@ -157,6 +161,7 @@ try:
     check('oracle: an old stamp is still held (the oracle has no clock; the watchdog expires it)', p.returncode == 0 and p.stdout.startswith('held'))
     check('gate: blocks a push while held', gate('cd /r && git push --force-with-lease origin br') == 2)
     check('gate: allows an operator-directed block while held', gate(f'~/.config/agent-watcher/update-status.sh {GID} Testing --blocked yes --reason x') == 0)
+    check('gate: allows the blocked completion a stop order prescribes while held', gate(f'~/.config/agent-watcher/update-status.sh {GID} Complete --blocked yes --reason x') == 0)
     check('gate: allows a read while held', gate('git status') == 0)
     real = dict(os.environ, AGENT_TASK_GID=GID)
     count = f'/tmp/agent-stop-block-count-{GID}'

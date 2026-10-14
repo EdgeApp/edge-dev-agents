@@ -1,6 +1,6 @@
 # Claude Code hooks on this machine
 
-This file is the reference for every Claude Code hook registered on this box. The registrations themselves live in `~/.claude/settings.canonical.json` under the `.hooks` key; `settings-guard.sh` copies them into `~/.claude/settings.json` (and puts them back when a claude process overwrites them), and convention-sync projects the canonical copy into the edge-dev-agents repo as `claude-settings/hooks.json`; the scripts ship in the `agent-watcher/` tree of the same repo. 57 commands are registered (51 scripts from this directory, 5 site-orch tenant hooks and `socket-guard.mjs`), as 68 registrations in 24 groups (21 distinct event/matcher pairs). Hook scripts are re-read from disk on every invocation, so editing a script takes effect on the next tool call, while adding, removing, or re-matchering a registration needs a settings reload before any session sees it.
+This file is the reference for every Claude Code hook registered on this box. The registrations themselves live in `~/.claude/settings.canonical.json` under the `.hooks` key; `settings-guard.sh` copies them into `~/.claude/settings.json` (and puts them back when a claude process overwrites them), and convention-sync projects the canonical copy into the edge-dev-agents repo as `claude-settings/hooks.json`; the scripts ship in the `agent-watcher/` tree of the same repo. 58 commands are registered (52 scripts from this directory, 5 site-orch tenant hooks and `socket-guard.mjs`), as 69 registrations in 24 groups (21 distinct event/matcher pairs). Hook scripts are re-read from disk on every invocation, so editing a script takes effect on the next tool call, while adding, removing, or re-matchering a registration needs a settings reload before any session sees it.
 
 Most gates no-op unless `AGENT_TASK_GID` is set, which is what confines them to orchestrated runs. The exceptions, verified against the scripts:
 
@@ -30,6 +30,7 @@ Most gates no-op unless `AGENT_TASK_GID` is set, which is what confines them to 
 | `no-interactive-prompt.sh` | PreToolUse / AskUserQuestion | Denies outright with exit 2 and a pick-the-default message | An interactive prompt hard-stalling a run with no human to answer it |
 | `no-self-respawn.sh` | PreToolUse / Bash, ScheduleWakeup, CronCreate | Blocks self-wake tools and `claude --resume`/`-p`/backgrounded `claude`/`/loop` | The fork-storm vector, and backgrounding a wait so the turn ends before the work does |
 | `block-upfront-conflict-probe.sh` | PreToolUse / Bash | Blocks typed `gh` commands fetching `mergeable` or `mergeStateStatus` | Discovering and narrating PR conflicts before landing, and rebasing mid-review to "fix" them |
+| `block-direct-evidence-bucket-write.sh` | PreToolUse / Bash | Blocks a typed `evidence-bucket.sh` (or `node evidence-bucket.js`) call with the verb `put`, `manifest-put` or `delete`, and a command that hands the bucket credentials file to a program; the read verbs pass | Hosting a screenshot no privacy check has read, and deleting a hosted frame while the manifest and the PR body table still point at it |
 | `guard-piped-watcher-scripts.sh` | PreToolUse / Bash | Rewrites a piped watcher-helper call by dropping pure-truncation stages, and blocks when the pipe is not droppable | A status write silently failing its setgid in a subshell while the agent burns retries |
 
 ## Raw-API gates
@@ -97,7 +98,7 @@ Most gates no-op unless `AGENT_TASK_GID` is set, which is what confines them to 
 
 | Script | Event / matcher | What it does | What it prevents |
 |---|---|---|---|
-| `operator-hold-prompt.sh` | UserPromptSubmit / `*` | Classifies a human prompt as stop, release, hold, or steer, sets or clears the hold, prints one context line, and writes a one-shot judge waiver on a completion or stop order; a deferred hold ("hold off", "hold until ...", "wait for my approval") stamps a hold so the run can pause at the decision point | A typed question being read as a steer and the run rolling past it |
+| `operator-hold-prompt.sh` | UserPromptSubmit / `*` | Classifies a human prompt as stop, release, hold, or steer, sets or clears the hold, prints one context line, and writes a one-shot judge waiver on a completion order or a "bypass the judge"; a deferred hold ("hold off", "hold until ...", "wait for my approval") stamps a hold so the run can pause at the decision point | A typed question being read as a steer and the run rolling past it |
 | `operator-hold-gate.sh` | PreToolUse / Bash | While a hold is active, blocks status transitions, pushes, PR creation, and landing, and allows reads, edits, commits, builds, and drives | Run momentum overtaking the human who just interrupted it |
 
 ## Registered but living outside the synced trees
@@ -121,18 +122,23 @@ These registered hooks also spool a row for `lib/jev-shadow.sh`, which only logs
 
 | Hook | What is logged |
 |---|---|
-| `block-sim-wipe.sh`, `block-broad-process-kill.sh`, `block-simctl-booted.sh`, `block-upfront-conflict-probe.sh`, `no-self-respawn.sh`, `block-raw-asana-api.sh`, `block-raw-thread-resolve.sh`, `block-raw-gh-writes.sh` | On a RAW trigger hit (quoted mentions included), an EXIT trap spools "does this command execute X or only quote it" with `live` = block (exit 2) or allow |
+| `block-sim-wipe.sh`, `block-broad-process-kill.sh`, `block-simctl-booted.sh`, `block-upfront-conflict-probe.sh`, `block-direct-evidence-bucket-write.sh`, `no-self-respawn.sh`, `block-raw-asana-api.sh`, `block-raw-thread-resolve.sh`, `block-raw-gh-writes.sh` | On a RAW trigger hit (quoted mentions included), an EXIT trap spools "does this command execute X or only quote it" with `live` = block (exit 2) or allow |
 | `operator-hold-prompt.sh` | The prompt with the branch taken (stop, release, hold, steer); Jev may add a hold in the log, never a release |
 
 Outside the hooks: `check-followup-scope.sh` spools each newer tracker comment, `completion-judge.sh` writes one `~/.config/jev/shadow/blocker/` row per block event with its reason, `no-slop-lint.sh` spools HARD regex hits, `no-slop-judge.sh` spools each haiku verdict, and `session-watchdog.js` spools one anchor's pane. The drain is launchd `com.jontz.jev-shadow`.
 
 ## On disk but not registered
 
-Four files under `~/.config/agent-watcher/hooks/` appear in no registration row.
+Three files under `~/.config/agent-watcher/hooks/` appear in no registration row.
 
 | File | Verdict |
 |---|---|
 | `cmd-executes.sh` | Shared library. A Node helper answering "does this command EXECUTE the named script", called by `operator-hold-gate.sh`, `block-raw-asana-api.sh`, `block-raw-thread-resolve.sh`, `block-raw-gh-writes.sh`, `require-completion-judgment.sh`, `require-subtasks-for-multi-repo-pr.sh`, and `git-history-gate.sh`. Never a hook. |
-| `strip-cmd-mentions.sh` | Shared library. Blanks heredoc bodies and quoted spans while preserving byte length, so trigger matching sees only real invocations. Called by 31 hooks plus `lib/shell-word-resolve.sh` and `lib/phone-capture-ledger.sh`. Never a hook. |
-| `require-concession-validation.sh` | Live compatibility shim, 6 lines, `exec`s `require-completion-judgment.sh`. Sessions spawned before the 2026-09-10 settings change still carry the old path in their startup snapshot, so it must stay until those sessions are gone. The original is preserved at `hooks/retired/require-concession-validation.sh`. |
+| `strip-cmd-mentions.sh` | Shared library. Blanks heredoc bodies and quoted spans while preserving byte length, so trigger matching sees only real invocations. Called by 32 hooks plus `lib/shell-word-resolve.sh` and `lib/phone-capture-ledger.sh`. Never a hook. |
 | `retired/require-block-validation.sh` | Retired, never registered. A PreToolUse gate on `update-status.sh --blocked yes` against a `/tmp/agent-blocker-verdict-<gid>.json` verdict. The block path it guarded is the completion judge's `block` event (`require-completion-judgment.sh`). Kept for history only. |
+
+## Tests
+
+`tests/run.sh` runs every `tests/*.test.*` file and prints one PASS or FAIL line per file. With no environment it tests the installed trees. With `ORCH_TEST_TREE=<checkout of this repo>` it gives each test a scratch `HOME` whose `.cursor` and `.config/agent-watcher` link into that checkout, so a change is tested there before it is installed. Arguments are name substrings that select test files.
+
+Two tests need files outside this repo and fail under `ORCH_TEST_TREE`: `jev-money-route.test.py` (the Jev routing module under `~/.config/jev`) and `lint-locale-strings.test.py` (an edge-react-gui checkout under `~/git`).

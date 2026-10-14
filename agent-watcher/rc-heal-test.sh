@@ -27,7 +27,7 @@ t "awaiting_choice: trust prompt" 0 awaiting_choice 'Do you want to trust the fi
 t "awaiting_choice: idle composer is NOT a choice prompt" 1 awaiting_choice '❯ '
 
 if [[ -n "$ANCHOR" ]]; then
-  live=$(tmux capture-pane -t "claude-asana-$ANCHOR" -p 2>/dev/null) \
+  live=$(tmux capture-pane -t "=claude-asana-$ANCHOR:" -p 2>/dev/null) \
     && t "rc_up: live anchor $ANCHOR reads as bridge UP" 0 rc_up "$live" \
     || { fail=$((fail + 1)); echo "FAIL could not capture claude-asana-$ANCHOR"; }
 fi

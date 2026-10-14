@@ -92,7 +92,7 @@ if [ "$N" -gt "$STOP_BLOCK_MAX" ]; then
     echo "Ended its turn ${N} times without reaching Complete/Archived or a validated blocked=Yes."
     echo "agent_status=$STATUS blocked=$BLOCKED"
     echo "It cannot finish AND cannot legitimately block. Operator attention needed:"
-    echo "  tmux attach -t claude-asana-$GID"
+    echo "  tmux attach -t '=claude-asana-$GID'"
   } > "$STUCK_FILE" 2>/dev/null || true
   rm -f "$COUNT_FILE" 2>/dev/null || true
   exit 0

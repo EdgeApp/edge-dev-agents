@@ -113,8 +113,8 @@ Discipline:
 Applicability: C = complete, P = pr-create, B = block.
 
 ### J1 asks-satisfied (C, P, B)
-Every ask of THIS SEGMENT is delivered, or explicitly surfaced as undelivered with the
-task left non-Complete and a genuine logged attempt behind it. The asks are, per the
+Every ask of THIS SEGMENT is delivered, or explicitly surfaced as undelivered by a
+blocked completion with a genuine logged attempt behind it. The asks are, per the
 Scope section: on a FIRST RUN the task description's requested outcome (plus any
 operator comment as an amendment); on a FOLLOWUP only the operator comments newer than
 the run-report watermark in the "Operator asks" section. Grade each ask on its own line
@@ -125,8 +125,9 @@ in `asks`.
   "Check X's Slack" is delivered by the state file or report recording what X said.
 - `surfaced`: the report or block reason names the ask as undelivered, says why, and an
   attempt-log `failed:`/`blocked:` entry shows a real attempt (not a prediction). Only
-  valid when the event leaves the task non-Complete (block) or the ask is genuinely
-  outside the task and the report says so.
+  valid when the event is a block (the blocked completion, `Complete --blocked yes`,
+  whose reason names the undone part) or the ask is genuinely outside the task and
+  the report says so.
 - `unaddressed`: no evidence either way, or evidence of a narrower delivery than asked
   (one token when "multiple" was asked; a static check when "actually test" was asked).
 - `not-for-run`: the clause hands work or a question to someone else (Scope, "who a

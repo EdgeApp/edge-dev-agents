@@ -190,15 +190,21 @@ const results = await pipeline(
             `(timeout 90000ms+) for the full manifest. Thin reference: ${JSON.stringify(m)}`
           : `Manifest: ${JSON.stringify(m)}`),
         { label: `verify:${m.gid}:${b.id}`, phase: 'Verify', schema: VERDICT_SCHEMA, ...VERIFY_OPT }
-      ).then(v => ({ ...b, refuted: v ? v.refuted : true, verify_reason: v ? v.reason : 'verifier died' }))
+      ).then(v => (v ? { ...b, refuted: v.refuted, verify_reason: v.reason } : null))
     ))
-    const confirmed = [...autoConfirmed, ...verified.filter(Boolean).filter(v => !v.refuted)]
-    const refuted = verified.filter(Boolean).filter(v => v.refuted)
+    // A verifier that died (null result, or a thrown call whose slot is null)
+    // rules on nothing: its finding stays BAD and counts, marked not verified.
+    const settled = verified.map((v, i) => v || { ...bads[i], refuted: false, not_verified: true })
+    const confirmed = [...autoConfirmed, ...settled.filter(v => !v.refuted)]
+    const refuted = settled.filter(v => v.refuted)
+    const unverified = settled.filter(v => v.not_verified)
     // demote refuted BADs to MINOR-with-note rather than dropping silently
     const finalDims = dims.map(d => {
       if (d.verdict !== 'BAD') return d
       const r = refuted.find(x => x.id === d.id && x.evidence === d.evidence)
-      return r ? { ...d, verdict: 'MINOR', evidence: d.evidence + ' [REFUTED on verify: ' + r.verify_reason + ']' } : d
+      if (r) return { ...d, verdict: 'MINOR', evidence: d.evidence + ' [REFUTED on verify: ' + r.verify_reason + ']' }
+      const u = unverified.find(x => x.id === d.id && x.evidence === d.evidence)
+      return u ? { ...d, evidence: d.evidence + ' [NOT VERIFIED: verifier died]' } : d
     })
     const gateFails = confirmed.filter(c => GATES[c.id])
     const notCaptured = finalDims.filter(d => d.verdict === 'NOT_CAPTURED').map(d => d.id)
@@ -209,7 +215,8 @@ const results = await pipeline(
       eval_type: mode === 'report' ? 'report-eval' : 'transcript-eval',
       escalate: (agentF && agentF.escalate) || null,
       gate_failures: gateFails.map(g => GATES[g.id]),
-      confirmed_bad: confirmed.map(c => ({ id: c.id, evidence: c.evidence, citation: c.citation })),
+      confirmed_bad: confirmed.map(c => ({ id: c.id, evidence: c.evidence, citation: c.citation, ...(c.not_verified ? { not_verified: true } : {}) })),
+      not_verified: unverified.map(u => u.id),
       dimensions: finalDims,
       not_captured: notCaptured,
       infra_issues: [...((agentF && agentF.infra_issues) || []), ...((orchF && orchF.infra_issues) || [])],
@@ -233,6 +240,8 @@ const cohort = await agent(
       `outside (post-Complete force-pushes, unresolved reviewer disputes, missing reports).\n`
     : '') +
   `Verdict policy: gates (${Object.values(GATES).join(', ')}) hard-fail; GOLD = all gates green AND zero confirmed BAD${mode === 'report' ? '; report-evals top out at REPORT_CLEAN' : ''}.\n` +
+  `NOT VERIFIED: a confirmed_bad entry with not_verified true is a finding whose verifier died. It counts toward the verdict; ` +
+  `write "not verified" beside it wherever it appears.\n` +
   `Per-run results:\n${JSON.stringify(runs)}\nSkipped: ${JSON.stringify(skipped)}\n` +
   `TIERS (hard rule): read ~/.cursor/skills/agent-eval/references/tiers.md. Every finding and every remediation row belongs to ` +
   `ONE tier (from its dimension; a class with no dimension takes the tier of the consequence it causes). Never merge tiers ` +

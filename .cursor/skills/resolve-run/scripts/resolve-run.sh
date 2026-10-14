@@ -217,8 +217,8 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
   local gid="$1" name_hint="$2" spawned="$3"
 
   local session_state="gone" tmux_session=""
-  if tmux has-session -t "claude-asana-$gid" 2>/dev/null; then session_state="live"; tmux_session="claude-asana-$gid"
-  elif tmux has-session -t "done-asana-$gid" 2>/dev/null; then session_state="retired"; tmux_session="done-asana-$gid"; fi
+  if tmux has-session -t "=claude-asana-$gid" 2>/dev/null; then session_state="live"; tmux_session="claude-asana-$gid"
+  elif tmux has-session -t "=done-asana-$gid" 2>/dev/null; then session_state="retired"; tmux_session="done-asana-$gid"; fi
 
   local worktree="" repo="" branch=""
   if [ -d "$WORKTREES_ROOT/$gid" ]; then
@@ -395,10 +395,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
   # Concession-decision evidence: the attempt-log (authoritative record of value-moving
   # actions / test-drives, written by log-attempt.sh — agent-location-independent, so
   # it holds the attempt even when a separate tester subagent performed it), plus the
-  # last blocker reason + the concession-validator verdict. The verdict file is shared by
-  # BOTH concession kinds and carries `kind: block|downgrade`, so a downgrade-finalize
-  # (Complete/pr-create without reaching in-app success) surfaces here too even though it
-  # set no formal block (last_reason stays null; the verdict's reason_hash is the binding).
+  # last blocker reason.
   # The eval grades A7 (premature yield) and the concession-gating O-dimension against
   # these instead of transcript prose.
   local attempt_log="[]"
@@ -441,8 +438,6 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
 
   local blocker_reason="null"
   [ -r "/tmp/agent-concession-reason-$gid.txt" ] && blocker_reason=$(jq -Rs . "/tmp/agent-concession-reason-$gid.txt" 2>/dev/null || echo null)
-  local blocker_verdict="null"
-  [ -r "/tmp/agent-concession-verdict-$gid.json" ] && blocker_verdict=$(jq -c . "/tmp/agent-concession-verdict-$gid.json" 2>/dev/null || echo null)
   # Completion judge (2026-09-10, supersedes the concession validator): the verdict
   # for the LAST judged event, hash-bound to its evidence bundle, plus the provenance
   # log the judge launcher appends (a verdict whose nonce has no log line is forged).
@@ -459,7 +454,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
     --argjson prs "$prs" --argjson asana "$asana" --argjson slot "$slot" --argjson pool "$pool_entry" \
     --arg run_report "$run_report" --argjson revive "$revive_pings" --argjson operator "$operator_msgs" --argjson wd "$watchdog_mentions" \
     --argjson release_receipt "$release_receipt" \
-    --argjson attempt_log "$attempt_log" --argjson blocker_reason "$blocker_reason" --argjson blocker_verdict "$blocker_verdict" \
+    --argjson attempt_log "$attempt_log" --argjson blocker_reason "$blocker_reason" \
     --argjson judge_verdict "$judge_verdict" --argjson judge_log "$judge_log" \
     --argjson followup "$followup" --argjson probe_index "$probe_index" \
     --argjson versions "$versions" --argjson era "$era" --argjson pr_commit_stats "$pr_commit_stats" \
@@ -483,7 +478,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       pool_entry: $pool,
       run_report: $run_report,
       release_receipt: $release_receipt,
-      blocking: { attempt_log: $attempt_log, last_reason: $blocker_reason, validator_verdict: $blocker_verdict, judge_verdict: $judge_verdict, judge_log: $judge_log },
+      blocking: { attempt_log: $attempt_log, last_reason: $blocker_reason, judge_verdict: $judge_verdict, judge_log: $judge_log },
       followup: $followup,
       versions: $versions,
       era: $era,
@@ -498,7 +493,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
            then {A23: "not a followup (no prior run-report attached)", A24: "not a re-engagement (no prior run-report attached)"}
            else (if ($followup.comments_after_prev_report | length) == 0 then {A23: "no operator comments after the prior report"} else {} end)
            end)
-        + (if ($blocker_verdict == null and $blocker_reason == null and ($asana.blocked != "Yes")) then {O7: "never blocked (no reason file, no verdict, blocked field != Yes)"} else {} end)
+        + (if ($blocker_reason == null and ($asana.blocked != "Yes")) then {O7: "never blocked (no reason file, blocked field != Yes)"} else {} end)
       ),
       signals: { revive_pings_in_transcript: $revive, operator_messages: $operator, watchdog_log_mentions: $wd, forensics_files: $forensics },
       logs: { watcher: $watcher_log, watchdog: $watchdog_log,

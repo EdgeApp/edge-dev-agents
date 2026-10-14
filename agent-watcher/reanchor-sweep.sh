@@ -75,11 +75,11 @@ ANCHORS=$(jq -r '.watcher | (.persistent_anchors // []) - (.reanchor_exclude // 
 
 for name in $ANCHORS; do
   sess="claude-asana-$name"
-  tmux has-session -t "$sess" 2>/dev/null || { echo "$name: no session"; continue; }
+  tmux has-session -t "=$sess" 2>/dev/null || { echo "$name: no session"; continue; }
   [[ -f /tmp/reanchor-hold || -f "/tmp/reanchor-hold-$name" ]] && { echo "$name: HELD (veto file)"; continue; }
 
   # Live claude process + the transcript it actually writes (open .jsonl fd).
-  pane=$(tmux list-panes -s -t "$sess" -F '#{pane_pid}' 2>/dev/null | head -1)
+  pane=$(tmux list-panes -s -t "=$sess:" -F '#{pane_pid}' 2>/dev/null | head -1)
   cpid=""
   for c in $(ps -axo pid=,ppid= | awk -v p="$pane" '$2==p {print $1}'); do
     ps -ww -o command= -p "$c" 2>/dev/null | grep -q '^claude\|/claude ' && { cpid="$c"; break; }
@@ -133,7 +133,7 @@ for name in $ANCHORS; do
   [[ "$compacts" -ge "$MAX_COMPACT" || "$bytes" -ge "$MAX_BYTES" ]] && armed=true
 
   # Idle tracking: content hash vs state (session_activity is unreliable).
-  hash=$(tmux capture-pane -p -t "$sess" 2>/dev/null | shasum -a 256 | cut -c1-16)
+  hash=$(tmux capture-pane -p -t "=$sess:" 2>/dev/null | shasum -a 256 | cut -c1-16)
   prev_hash=$(jq -r --arg n "$name" '.[$n].hash // ""' "$STATE")
   prev_ts=$(jq -r --arg n "$name" '.[$n].ts // 0' "$STATE")
   if [[ "$hash" != "$prev_hash" ]]; then
@@ -162,14 +162,14 @@ for name in $ANCHORS; do
   # The archive sits beside the REAL open file (shared-ledger symlinks).
   closed="$(realpath "$ledger" 2>/dev/null || echo "$ledger")"; closed="${closed%-open-threads.md}-closed-threads.md"
   distill_start=$(date +%s)
-  tmux send-keys -t "$sess" C-u
-  tmux send-keys -t "$sess" -l "Reanchor sweep (automated): this session resets shortly. Update your open-threads ledger NOW: write every open thread, pending decision, and in-flight item (with enough context to resume cold) to $ledger, and move every shipped, settled or dropped entry out of it into $closed (newest first, each under a '# YYYY-MM-DD: title' heading; add with an edit, do not read that file whole). Add/refresh the MEMORY.md index line, then reply with exactly REANCHOR-DISTILL-[DONE] but without the brackets."
+  tmux send-keys -t "=$sess:" C-u
+  tmux send-keys -t "=$sess:" -l "Reanchor sweep (automated): this session resets shortly. Update your open-threads ledger NOW: write every open thread, pending decision, and in-flight item (with enough context to resume cold) to $ledger, and move every shipped, settled or dropped entry out of it into $closed (newest first, each under a '# YYYY-MM-DD: title' heading; add with an edit, do not read that file whole). Add/refresh the MEMORY.md index line, then reply with exactly REANCHOR-DISTILL-[DONE] but without the brackets."
   sleep 1
-  tmux send-keys -t "$sess" Enter
+  tmux send-keys -t "=$sess:" Enter
   ok=false
   for _ in $(seq 1 $((DISTILL_WAIT_S / 10))); do
     sleep 10
-    tmux capture-pane -p -t "$sess" 2>/dev/null | grep -q 'REANCHOR-DISTILL-DONE' && { ok=true; break; }
+    tmux capture-pane -p -t "=$sess:" 2>/dev/null | grep -q 'REANCHOR-DISTILL-DONE' && { ok=true; break; }
   done
   ledger_fresh=false
   if [[ -f "$ledger" ]]; then
@@ -188,17 +188,17 @@ for name in $ANCHORS; do
   [[ -d "${cwd:-}" ]] || cwd="$HOME/git"
 
   # 3. Reset: kill, respawn same name, point the fresh anchor at its ledger.
-  tmux kill-session -t "$sess"
+  tmux kill-session -t "=$sess"
   tmux new-session -d -s "$sess" -c "$cwd"
-  tmux send-keys -t "$sess" C-u
-  tmux send-keys -t "$sess" "$cmd" Enter
+  tmux send-keys -t "=$sess:" C-u
+  tmux send-keys -t "=$sess:" "$cmd" Enter
   for _ in $(seq 1 30); do
     sleep 2
-    tmux capture-pane -p -t "$sess" 2>/dev/null | grep -qE '(^|\s)/rc(\s|$)|bypass permissions on|Remote Control' && break
+    tmux capture-pane -p -t "=$sess:" 2>/dev/null | grep -qE '(^|\s)/rc(\s|$)|bypass permissions on|Remote Control' && break
   done
-  tmux send-keys -t "$sess" -l "Fresh reanchor of $name (previous conversation reset for context hygiene; its transcript remains searchable via session-index). Read $ledger and your MEMORY.md before doing anything else, then summarize the open threads back to the operator. Finished work is in $closed: grep it only when a question needs history, never read it whole."
+  tmux send-keys -t "=$sess:" -l "Fresh reanchor of $name (previous conversation reset for context hygiene; its transcript remains searchable via session-index). Read $ledger and your MEMORY.md before doing anything else, then summarize the open threads back to the operator. Finished work is in $closed: grep it only when a question needs history, never read it whole."
   sleep 1
-  tmux send-keys -t "$sess" Enter
+  tmux send-keys -t "=$sess:" Enter
 
   jq --arg n "$name" --argjson t "$NOW" '.[$n] = ((.[$n] // {}) + {last_reset: $t, hash: "", ts: $t})' "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
   echo "$name: reanchored (fresh conversation; ledger $ledger)"

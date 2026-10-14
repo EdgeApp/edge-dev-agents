@@ -188,6 +188,11 @@ if [[ ${#PINS[@]} -gt 0 ]]; then
   echo ">> install (refresh $GUI_LOCKFILE)"
   "$HOME/.cursor/skills/pm.sh" install
 
+  # The app repo ignores root-level tarballs (/*.tgz), and lint-commit.sh's
+  # scoped `git add` refuses an ignored path. Force-add the pin tarballs so
+  # they are already in the index when it stages.
+  git add -f -- "${TARBALL_FILES[@]}"
+
   # Commit via lint-commit.sh (handles --no-verify, staging, etc.)
   MSG_BODY="$(
     echo "Pin dependencies for cheese build"

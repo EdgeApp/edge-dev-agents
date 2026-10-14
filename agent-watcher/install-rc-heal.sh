@@ -83,7 +83,7 @@ EOF
     LIST=$(launchctl list)
     grep -q "$TMUX_LABEL" <<<"$LIST" && echo "$TMUX_LABEL: armed" || echo "$TMUX_LABEL: NOT armed"
     grep -q "$HEAL_LABEL" <<<"$LIST" && echo "$HEAL_LABEL: armed (idle between ticks shows pid '-')" || echo "$HEAL_LABEL: NOT armed"
-    tmux has-session -t __anchor_keepalive__ 2>/dev/null && echo "keepalive session: alive" || echo "keepalive session: MISSING"
+    tmux has-session -t '=__anchor_keepalive__' 2>/dev/null && echo "keepalive session: alive" || echo "keepalive session: MISSING"
     "$HERE/rc-heal.sh" --status
     ;;
   *) echo "usage: install-rc-heal.sh {install|uninstall|status}"; exit 2 ;;

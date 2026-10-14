@@ -130,7 +130,7 @@ function loadTmux ({ rcState = true } = {}) {
     // just argv-named ones: RC can be armed app-side with no flag in argv.
     const fork = /--fork-session/.test(claudeArgs)
     let rcUp = false
-    if (claudeArgs && rcState) rcUp = rcBridgeUp(sh(`tmux capture-pane -p -t '${name}' 2>/dev/null`), claudePid)
+    if (claudeArgs && rcState) rcUp = rcBridgeUp(sh(`tmux capture-pane -p -t '=${name}:' 2>/dev/null`), claudePid)
     sessions.push({ name, activity: Number(activity) || 0, created: Number(created) || 0, claudeAlive: !!claudeArgs, rc, rcUp, resumeUuid, fork })
   }
   return sessions

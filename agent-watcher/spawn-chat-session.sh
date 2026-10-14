@@ -63,7 +63,7 @@ mkdir -p "$BRIEF_DIR" || { echo "cannot create $BRIEF_DIR" >&2; exit 1; }
 BRIEF_EXT="${BRIEF##*.}"; [ "$BRIEF_EXT" != "$BRIEF" ] || BRIEF_EXT="txt"
 cp "$BRIEF" "$BRIEF_DIR/$S.$BRIEF_EXT" || { echo "cannot copy the brief to $BRIEF_DIR" >&2; exit 1; }
 BRIEF="$BRIEF_DIR/$S.$BRIEF_EXT"
-tmux has-session -t "$S" 2>/dev/null && { echo "session already exists: $S (kill it first or pick another --name)" >&2; exit 1; }
+tmux has-session -t "=$S" 2>/dev/null && { echo "session already exists: $S (kill it first or pick another --name)" >&2; exit 1; }
 
 cmd="claude"
 # The model id is quoted: ids carry a context suffix in brackets
@@ -86,24 +86,24 @@ pdir="$HOME/.claude/projects/$enc"
 newest="$pdir/$SID.jsonl"
 
 tmux new-session -d -s "$S" -c "$CWD"
-tmux send-keys -t "$S" C-u
-tmux send-keys -t "$S" "$cmd" Enter
+tmux send-keys -t "=$S:" C-u
+tmux send-keys -t "=$S:" "$cmd" Enter
 ready=""
 for _ in $(seq 1 30); do
   sleep 2
-  if tmux capture-pane -p -t "$S" | grep -q -E 'bypass permissions on'; then ready=1; break; fi
+  if tmux capture-pane -p -t "=$S:" | grep -q -E 'bypass permissions on'; then ready=1; break; fi
 done
-[ -n "$ready" ] || { echo "claude did not reach its prompt in 60s; pane tail:" >&2; tmux capture-pane -p -t "$S" | grep -v '^\s*$' | tail -6 >&2; exit 1; }
+[ -n "$ready" ] || { echo "claude did not reach its prompt in 60s; pane tail:" >&2; tmux capture-pane -p -t "=$S:" | grep -v '^\s*$' | tail -6 >&2; exit 1; }
 sleep 3   # let the TUI finish attaching its input handler before any paste
 
 pointer="Read $BRIEF and execute it exactly; it is your full brief."
 [ -n "$POINTER" ] && pointer="$pointer $POINTER"
-if [ "${#pointer}" -gt 300 ]; then echo "pointer too long (${#pointer} > 300); shorten --pointer" >&2; tmux kill-session -t "$S"; exit 1; fi
-tmux send-keys -t "$S" C-u
+if [ "${#pointer}" -gt 300 ]; then echo "pointer too long (${#pointer} > 300); shorten --pointer" >&2; tmux kill-session -t "=$S"; exit 1; fi
+tmux send-keys -t "=$S:" C-u
 printf '%s' "$pointer" | tmux load-buffer -b "spawn-$NAME" -
-tmux paste-buffer -b "spawn-$NAME" -d -t "$S"
+tmux paste-buffer -b "spawn-$NAME" -d -t "=$S:"
 sleep 1
-tmux send-keys -t "$S" Enter
+tmux send-keys -t "=$S:" Enter
 
 # Record the spawn (lib/chat-spawns.js): a prompt-spawned transcript carries no
 # --resume id and no /one-shot signature, so this line is the only thing that

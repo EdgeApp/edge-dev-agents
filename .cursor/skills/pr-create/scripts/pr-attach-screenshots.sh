@@ -41,6 +41,8 @@
 #                            the hosted frame into the new batch: no simulator,
 #                            no recapture, no re-upload.
 #   --retire <scene>         the change invalidated it.
+#                            Its object stays hosted: pr-evidence-withdraw.sh
+#                            is the takedown.
 # A frame re-shot in this same invocation needs no flag; supplying it IS the
 # decision. After a human has reviewed, nothing retires and new frames simply
 # append as their own row, so no disposition is ever asked for.
@@ -203,24 +205,48 @@ json_array() { # json_array <item>... -> JSON array on stdout
 }
 
 # ── PR state: head sha, commit list, and the human-action timeline ────────────
-# One GraphQL call rather than four REST ones. A Bot-typed author is what marks
+# One GraphQL call rather than four REST ones when each list fits a page. A Bot-typed author is what marks
 # an automated review; the [bot] suffix is the fallback for an integration that
 # posts as a User. The PR AUTHOR is excluded because the agent posts as the
 # operator's own account, so the author's own comments are agent chatter and must
 # not freeze a batch.
-gh api graphql -f owner="${REPO%/*}" -f name="$REPO_NAME" -F number="$PR" -f query='
-query($owner:String!,$name:String!,$number:Int!){
-  repository(owner:$owner,name:$name){
-    pullRequest(number:$number){
-      author{login}
-      headRefOid
-      commits(last:100){nodes{commit{oid messageHeadline}}}
-      reviews(first:100){nodes{createdAt author{login __typename}}}
-      comments(first:100){nodes{createdAt author{login __typename}}}
-      reviewThreads(first:50){nodes{comments(first:50){nodes{createdAt author{login __typename}}}}}
+# Reviews, comments and review threads are read to the last page (100 a page,
+# oldest first): the newest human action is the one that freezes a batch.
+OWNER="${REPO%/*}" NAME="$REPO_NAME" NUMBER="$PR" node -e '
+  const { spawnSync } = require("child_process")
+  const fs = require("fs")
+  const NODE = "nodes{createdAt author{login __typename}}"
+  const PAGE = "pageInfo{hasNextPage endCursor}"
+  const CONN = {
+    reviews: a => `reviews(first:100${a}){${PAGE} ${NODE}}`,
+    comments: a => `comments(first:100${a}){${PAGE} ${NODE}}`,
+    reviewThreads: a => `reviewThreads(first:100${a}){${PAGE} nodes{comments(first:100){${NODE}}}}`
+  }
+  const ask = (fields, cursor) => {
+    const args = ["api", "graphql", "-f", "owner=" + process.env.OWNER, "-f", "name=" + process.env.NAME,
+      "-F", "number=" + process.env.NUMBER]
+    if (cursor) args.push("-f", "cursor=" + cursor)
+    args.push("-f", "query=query($owner:String!,$name:String!,$number:Int!" + (cursor ? ",$cursor:String" : "") +
+      "){repository(owner:$owner,name:$name){pullRequest(number:$number){" + fields + "}}}")
+    const r = spawnSync("gh", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
+    if (r.status !== 0) { process.stderr.write(r.stderr || ""); process.exit(1) }
+    const out = JSON.parse(r.stdout)
+    if (out.errors) { process.stderr.write(JSON.stringify(out.errors) + "\n"); process.exit(1) }
+    return out.data.repository.pullRequest
+  }
+  const pr = ask("author{login} headRefOid commits(last:100){nodes{commit{oid messageHeadline}}} " +
+    Object.values(CONN).map(f => f("")).join(" "))
+  for (const [key, field] of Object.entries(CONN)) {
+    let page = pr[key].pageInfo
+    for (let i = 1; page && page.hasNextPage; i++) {
+      if (i >= 50) { process.stderr.write("more than 50 pages of " + key + "\n"); process.exit(1) }
+      const next = ask(field(",after:$cursor"), page.endCursor)[key]
+      pr[key].nodes.push(...next.nodes)
+      page = next.pageInfo
     }
   }
-}' > "$WORK/pr.json" || { echo "failed to read $REPO#$PR" >&2; exit 1; }
+  fs.writeFileSync(process.argv[1], JSON.stringify({ data: { repository: { pullRequest: pr } } }))
+' "$WORK/pr.json" || { echo "failed to read $REPO#$PR" >&2; exit 1; }
 
 node -e '
   const fs = require("fs")
