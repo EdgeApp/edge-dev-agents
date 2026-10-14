@@ -12,19 +12,33 @@ set -euo pipefail
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -n "$CMD" ] || exit 0
-# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
-# backticked spans blanked): a command that merely QUOTES a trigger string --
-# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
-# argument extraction, where quoted values are load-bearing. Fail-open to the
-# raw command if the helper is unavailable.
-CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 # Jev shadow, log only (lib/jev-shadow.sh): on a raw trigger hit, log execute-vs-quote beside this hook's decision.
 . "$HOME/.config/agent-watcher/lib/jev-shadow.sh" 2>/dev/null && jev_shadow_cmd_trap block-sim-wipe "simctl uninstall or simctl erase" 'simctl[[:space:]]+(uninstall|erase)' "$CMD" || true
 
-# Match a real invocation (start of command or after ; & | && ||), not the string
-# appearing inside a grep/cat/echo of some file or message.
-if printf '%s' "$CMD_M" | grep -qE '(^|[;&|][[:space:]]*|&&[[:space:]]*|\|\|[[:space:]]*)(xcrun[[:space:]]+)?simctl[[:space:]]+(uninstall|erase)([[:space:]]|$)' \
-   && ! printf '%s' "$CMD_M" | grep -qE '^(grep|rg|cat|sed|awk|echo|printf)[[:space:]]'; then
+# The line is read through cmd-parse.sh: a simctl command counts wherever the
+# line runs one (behind xcrun and its options, in a loop body, inside `bash -c`
+# text) and nowhere the line only names one. The verb is the first argument
+# after simctl's own options. When the line cannot be read, the text match the
+# hook had before decides.
+HOOKS="$HOME/.config/agent-watcher/hooks"
+WIPE=no
+if RECS=$(printf '%s' "$CMD" | "$HOOKS/cmd-parse.sh" 2>/dev/null); then
+  printf '%s' "$RECS" | jq -e -s '
+    any(.[]; select(.name == "simctl" and (.opaque | not))
+      | .argv[1:] as $a
+      | [range(0; $a | length) as $i
+          | select(($a[$i] | startswith("-") | not)
+                   and ($i == 0 or (($a[$i - 1] == "--set" or $a[$i - 1] == "--profiles") | not)))
+          | $a[$i]][0]
+      | . == "uninstall" or . == "erase")' >/dev/null 2>&1 && WIPE=yes
+else
+  CMD_M=$(printf '%s' "$CMD" | "$HOOKS/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+  if printf '%s' "$CMD_M" | grep -qE '(^|[;&|][[:space:]]*|&&[[:space:]]*|\|\|[[:space:]]*)(xcrun[[:space:]]+)?simctl[[:space:]]+(uninstall|erase)([[:space:]]|$)' \
+     && ! printf '%s' "$CMD_M" | grep -qE '^(grep|rg|cat|sed|awk|echo|printf)[[:space:]]'; then
+    WIPE=yes
+  fi
+fi
+if [ "$WIPE" = yes ]; then
   cat >&2 <<'MSG'
 BLOCKED: `simctl uninstall` deletes the app's data container (the logged-in test
 account — not re-provisionable without a manual login), and `simctl erase` wipes

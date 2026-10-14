@@ -55,6 +55,24 @@ BLOCKS = [
     ('gh pr reopen', 'gh pr reopen 485'),
     ('gh pr edit --base', 'gh pr edit 485 --base staging'),
     ('comment op chained with a push', 'gh pr comment 485 --body x && git push origin br'),
+    # The hook reads the line through cmd-parse.sh, so the verb is found behind
+    # a tool's own options and inside a shell's -c text.
+    ('git -C push', 'git -C /r push origin br'),
+    ('git -c k=v push', 'git -c push.default=current push'),
+    ('git --no-pager push', 'git --no-pager push'),
+    ('push inside bash -c', "bash -c 'cd /r && git push origin br'"),
+    ('push inside sh -lc', 'sh -lc "git push"'),
+    ('push inside a substitution', 'OUT="$(git push 2>&1)"; echo "$OUT"'),
+    ('push after a sanctioned script', '~/.cursor/skills/lint-commit.sh -m x && git push'),
+    ('push in a loop body', 'for b in a b; do git push origin $b; done'),
+    ('env-wrapped push', 'GIT_SSH_COMMAND=ssh env A=1 nice git push'),
+    ('gh -R pr create', 'gh -R O/R pr create --fill'),
+    ('gh pr -R ready', 'gh pr -R O/R ready 485'),
+    ('gh pr edit --base=', 'gh pr edit 485 --base=staging'),
+    ('gh pr edit -B', 'gh pr edit 485 -B staging'),
+    ('gh pr edit title then --base', 'gh pr edit 485 --title "a; b" --base staging'),
+    ('gh pr create inside bash -c', "bash -c 'gh pr create --fill'"),
+    ('git-branch-ops push through bash', 'bash ~/.cursor/skills/git-branch-ops.sh push'),
 ]
 
 PASSES = [
@@ -73,6 +91,14 @@ PASSES = [
     ('quoted mention', 'echo "then git push and gh pr ready"'),
     ('heredoc mention', 'cat > /tmp/d.md <<EOF\nrun git push then gh pr create\nEOF\nls'),
     ('unrelated', 'ls -la && cat README.md'),
+    ('title that says --base', 'gh pr edit 485 --title "move --base later"'),
+    ('git stash push', 'git stash push -u -m tag'),
+    ('git log --grep push', 'git -C /r log --grep push'),
+    ('push named inside bash -c text', "bash -c 'echo \"git push\"'"),
+    ('eval text is not read', 'eval "git push"'),
+    ('commented push', 'ls # git push'),
+    ('gh pr view of a base', 'gh pr view 485 --json baseRefName'),
+    ('git-branch-ops other verb', '~/.cursor/skills/git-branch-ops.sh note-scope --note push'),
 ]
 
 # Nothing may block while the task is NOT Complete.

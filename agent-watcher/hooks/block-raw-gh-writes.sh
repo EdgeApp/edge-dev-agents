@@ -66,17 +66,18 @@ gh_target_is_edge() {
 CWD_IN=$(printf '%s' "${INPUT:-}" | jq -r '.cwd // empty' 2>/dev/null || true)
 gh_target_is_edge "$CMD" "$CWD_IN" || exit 0
 
-CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+# The view the triggers match is `cmd-parse.sh --rest`: quoted, heredoc and
+# commented text blanked as before, and every command that runs a companion
+# script (anything under the two sanctioned trees) blanked as well. The
+# scripts call the API themselves, invisible here, so their own words cannot
+# fire the gate, while the rest of the same line is still judged. When the
+# line cannot be read, the plain stripped view is used and no script is
+# excused.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-parse.sh" \
+  --rest --under /.cursor/skills/ --under /.config/agent-watcher/ 2>/dev/null) \
+  || CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 # Jev shadow, log only (lib/jev-shadow.sh): on a raw trigger hit, log execute-vs-quote beside this hook's decision.
 . "$HOME/.config/agent-watcher/lib/jev-shadow.sh" 2>/dev/null && jev_shadow_cmd_trap block-raw-gh-writes "a raw gh PR write (pr create/comment/review/edit --body, or gh api POST to a comment or review endpoint)" 'gh[[:space:]]+pr[[:space:]]+(create|comment|review|edit)|(issues|pulls)/[0-9]+/(comments|reviews)|(issues|pulls)/comments/[0-9]+' "$CMD" || true
-
-# Sanctioned scripts first — they invoke gh internally (invisible here), so
-# this exempts mixed commands that both run a script and match a trigger.
-# Companion scripts are exempt by DIRECTORY, but only when one is actually
-# INVOKED: cmd-executes.sh owns the command-position test and the reason a
-# substring match is not good enough.
-printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" \
-  --under /.cursor/skills/ --under /.config/agent-watcher/ && exit 0
 
 block() {
   echo "BLOCKED: $1" >&2
@@ -101,15 +102,30 @@ if printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])gh[[:space:]]+pr[[:space:
 Structural edits (--add-label, --base, --add-reviewer) are not blocked."
 fi
 
-# Class 4: gh api writes to comment/review endpoints. Trigger = endpoint shape
-# anywhere in the raw command (endpoints sit inside quotes) AND an actual
-# `gh api` invocation AND a write marker in the stripped view. gh api defaults
-# to POST when -f/-F fields are present.
-if echo "$CMD" | grep -qE '(issues|pulls)/[0-9]+/(comments|reviews)|issues/comments/[0-9]+|pulls/comments/[0-9]+'; then
-  if printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])gh[[:space:]]+api([[:space:]]|$)' && \
-     printf '%s' "$CMD_M" | grep -qE '(^|[[:space:]])(-f|-F|--field|--raw-field|--input)([[:space:]]|$|=)|--method[[:space:]=]+(POST|PATCH|DELETE)|-X[[:space:]]+(POST|PATCH|DELETE)'; then
-    block "raw \`gh api\` writes to comment/review endpoints are forbidden in agent sessions — posting goes through pr-address.sh (reply, comment, mark-addressed) or github-pr-review.sh (review submit), which lint the body per /no-slop and keep the addressed-marker arithmetic the Complete gate reads. RETRACTING a comment you posted by mistake also has a sanctioned path: \`pr-address.sh delete-comment --owner <o> --repo <r> --comment-id <id>\`, which refuses any author but you, and EDITING your own comment in place goes through \`pr-address.sh edit-comment --owner <o> --repo <r> --comment-id <id> --body-file <path>\`, which is author-scoped and lints the new body (a review's summary body: \`pr-address.sh edit-review-body --owner <o> --repo <r> --pr <n> --review-id <id> --body-file <path>\`). Reads (bare GET listings) are fine. Read the owning SKILL.md and use its script."
+# Class 4: gh api writes to comment/review endpoints. gh api defaults to POST
+# when -f/-F fields are present. Judged per `gh api` command from the parser
+# records: the endpoint and the write marker must sit in the SAME command, so
+# a graphql read (`-f query=`) beside a GET of a reviews listing is a read.
+# When the line cannot be read, the text match it had before: endpoint shape
+# anywhere in the raw command AND a `gh api` invocation AND a write marker in
+# the stripped view.
+API_ENDPOINT='(issues|pulls)/[0-9]+/(comments|reviews)|issues/comments/[0-9]+|pulls/comments/[0-9]+'
+api_write() {
+  local recs
+  if recs=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-parse.sh" ${CWD_IN:+--cwd "$CWD_IN"} 2>/dev/null); then
+    printf '%s' "$recs" | jq -e --arg ep "$API_ENDPOINT" '
+      select((.opaque | not) and .gh != null and (.gh.sub | startswith("api")))
+      | ((.gh.sub | split(" ")) + .gh.args) as $t
+      | select(any($t[]; test($ep)))
+      | select(any($t[]; test("^(-f|-F|--field|--raw-field|--input)(=.*)?$|^-[fF].|^(POST|PATCH|DELETE)$|^--method=(POST|PATCH|DELETE)$|^-X(POST|PATCH|DELETE)$")))' >/dev/null 2>&1
+    return
   fi
+  echo "$CMD" | grep -qE "$API_ENDPOINT" && \
+    printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])gh[[:space:]]+api([[:space:]]|$)' && \
+    printf '%s' "$CMD_M" | grep -qE '(^|[[:space:]])(-f|-F|--field|--raw-field|--input)([[:space:]]|$|=)|--method[[:space:]=]+(POST|PATCH|DELETE)|-X[[:space:]]+(POST|PATCH|DELETE)'
+}
+if api_write; then
+  block "raw \`gh api\` writes to comment/review endpoints are forbidden in agent sessions — posting goes through pr-address.sh (reply, comment, mark-addressed) or github-pr-review.sh (review submit), which lint the body per /no-slop and keep the addressed-marker arithmetic the Complete gate reads. RETRACTING a comment you posted by mistake also has a sanctioned path: \`pr-address.sh delete-comment --owner <o> --repo <r> --comment-id <id>\`, which refuses any author but you, and EDITING your own comment in place goes through \`pr-address.sh edit-comment --owner <o> --repo <r> --comment-id <id> --body-file <path>\`, which is author-scoped and lints the new body (a review's summary body: \`pr-address.sh edit-review-body --owner <o> --repo <r> --pr <n> --review-id <id> --body-file <path>\`). Reads (bare GET listings) are fine. Read the owning SKILL.md and use its script."
 fi
 
 exit 0

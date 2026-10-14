@@ -202,6 +202,15 @@ def stripmentions():
     same_length('second heredoc unterminated', 'cat <<A\nx\nA\ncat <<B\ny\n')
     same_length('terminated heredoc', "cat > /tmp/a.md <<'EOF'\nbody\nEOF\necho ok")
     same_length('quotes and backticks', 'echo "hi" && ls | head -2 && echo `date`')
+    # A here-string feeds one word; it opens no heredoc body.
+    for label, cmd, want in [
+        ('here-string word', 'cat <<<word; gh pr create', 'cat <<<word; gh pr create'),
+        ('here-string with a space', 'grep x <<< $V && git push', 'grep x <<< $V && git push'),
+        ('here-string, then a real heredoc', "tr a b <<<x; cat <<E\nbody\nE\nls", 'tr a b <<<x; cat <<E' + ' ' * 7 + '\nls'),
+    ]:
+        p = subprocess.run([os.path.join(HOOKS, 'strip-cmd-mentions.sh')], input=cmd,
+                           capture_output=True, text=True, timeout=30)
+        check(f'strip-cmd-mentions {label}', p.stdout == want, f'got={p.stdout!r}')
     # A conflict marker inside a heredoc body opens no heredoc of its own.
     conflict = ("python3 - <<'PY'\nimport re\ns = re.sub(r'<<<<<<< HEAD\\n.*?>>>>>>> x', '', s)\nPY\n"
                 f'{AW}/update-status.sh {TEST_GID} Complete | tail -2')

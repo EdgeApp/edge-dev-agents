@@ -58,17 +58,17 @@
 #
 #   PLUMBING TYPED DIRECTLY: git-branch-ops.sh `push` and `autosquash` (and
 #   pr-address.sh `autosquash`, a wrapper around the latter) live
-#   under the exempt skills directory but carry no review-mode policy, so a
-#   typed `git-branch-ops.sh push` walked past every check below and put a
-#   mid-round HEAD on a PR under review. Both are matched BEFORE the directory
-#   exemption and face the same preserve checks as raw git. The push block
+#   under the skills directory but carry no review-mode policy, so a typed
+#   `git-branch-ops.sh push` puts a mid-round HEAD on a PR under review. Both
+#   face the same preserve checks as raw git. The push block
 #   applies only while the branch carries fixup! commits (an address round in
 #   flight); a landing push after pr-land's prepare has none and passes, as
 #   do all pushes in autosquash mode. Calls made INSIDE a companion script
 #   (pr-finalize-fixups.sh, cheese-build.sh) never reach this hook.
 #
 # Scope: EVERY session, orchestrated or chat. A history rewrite loses the same
-# work either way. Companion scripts are exempt by DIRECTORY.
+# work either way. Every other companion script is simply not a git command:
+# a line is judged by the git commands it runs, wherever it runs them.
 # Was: no-ops unless AGENT_TASK_GID is set (exported by spawn-test-session.sh),
 # so interactive human sessions are never affected.
 # Exit 0 = allow. Exit 2 = block (stderr is fed back to the model).
@@ -91,62 +91,98 @@ in_orch_tenant() {
   root=$(cd "$dir" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) || return 1
   [ -f "$root/orch.config.json" ]
 }
-CMD_DIR=$(printf '%s' "$CMD" | sed -nE 's/^[[:space:]]*cd[[:space:]]+"?([^"&;|[:space:]]+)"?.*/\1/p' | head -1)
-CMD_DIR="${CMD_DIR/#\~/$HOME}"
-IN_TENANT=0
-in_orch_tenant "${CMD_DIR:-${HOOK_CWD:-$PWD}}" && IN_TENANT=1
-# Mention-stripped view for TRIGGER matching (heredoc bodies, quoted and
-# backticked spans blanked): a command that merely QUOTES a trigger string --
-# a report heredoc, an echo -- must not fire this hook. Raw $CMD is kept for
-# argument extraction, where quoted values are load-bearing. Fail-open to the
-# raw command if the helper is unavailable.
-CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+HOOKS="$HOME/.config/agent-watcher/hooks"
+# What the line runs comes from cmd-parse.sh (lib/shell-commands.js): one
+# event per command that matters here, in order, each with the directory it
+# acts on (`git -C <dir>`, else the `cd` in force, else the hook's cwd; empty
+# when the line hides it). A `git commit` inside `bash -c '...'`, behind
+# `git -C <dir>`, or after a sanctioned script on the same line is an event
+# like any other; text in quotes, heredocs and comments is none. Companion
+# scripts need no exemption: their internal git calls never reach this hook,
+# and a script name is not a git command.
+EVENTS=""
+PARSED_OK=0
+if PARSED=$(printf '%s' "$CMD" | "$HOOKS/cmd-parse.sh" --cwd "${HOOK_CWD:-$PWD}" 2>/dev/null) &&
+   EVENTS=$(printf '%s' "$PARSED" | jq -r '
+     def d: (if .git then .git.dir else .cwd end) // "";
+     if .name == "git-branch-ops.sh" and (.argv[1] == "push" or .argv[1] == "autosquash") then "gbo-\(.argv[1])\t\(d)"
+     elif .name == "pr-address.sh" and .argv[1] == "autosquash" then "gbo-autosquash\t\(d)"
+     elif .git and .git.sub == "commit" then
+       (if .git.noVerify then "commit-noverify" elif .git.amend then "commit-amend" else "commit" end) + "\t" + d
+     elif .git and .git.autosquash then "squash\t\(d)"
+     elif .git and .git.sub == "push" then "push\t\(d)"
+     else empty end' 2>/dev/null); then
+  PARSED_OK=1
+fi
 
-# Companion scripts are exempt by DIRECTORY, but only when one is actually
-# INVOKED: cmd-executes.sh owns the command-position test and the reason a
-# substring match is not good enough.
 GBO_OP=""
-if printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" git-branch-ops.sh pr-address.sh; then
-  GBO_OP=$(printf '%s' "$CMD" | grep -oE '(git-branch-ops\.sh"?[[:space:]]+(push|autosquash)|pr-address\.sh"?[[:space:]]+autosquash)([[:space:]]|$)' \
-    | head -1 | sed -E 's/.*[[:space:]](push|autosquash).*/\1/' || true)
-fi
-if [ -z "$GBO_OP" ]; then
-  printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" \
-    --under /.cursor/skills/ --under /.config/agent-watcher/ && exit 0
-fi
-
-# ---- commit discipline ------------------------------------------------------
-if echo "$CMD_M" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+(-[^[:space:]]+[[:space:]]+)*commit([[:space:]]|$)'; then
-  if echo "$CMD_M" | grep -q -- '--no-verify'; then
+NEEDS_MODE=""
+TARGET_DIR=""
+if [ "$PARSED_OK" = 1 ]; then
+  # ---- commit discipline ----------------------------------------------------
+  if printf '%s\n' "$EVENTS" | grep -q '^commit-noverify	'; then
     echo "BLOCKED: 'git commit --no-verify' is forbidden in agent sessions. A failing hook is a halt-on-error signal — fix the underlying failure (tsc/eslint/jest diagnostics are auto-fixable, max 2 attempts) or stop and report. Commit via ~/.cursor/skills/lint-commit.sh." >&2
     exit 2
   fi
-  if echo "$CMD_M" | grep -q -- '--amend'; then
-    exit 0
-  fi
-  [ "$IN_TENANT" = 1 ] && exit 0
-  echo "BLOCKED: raw 'git commit' is forbidden in agent sessions. Use ~/.cursor/skills/lint-commit.sh -m \"...\" [files...] (or --fixup <hash> --for human|auto -m \"<why>\") per ~/.cursor/skills/im/SKILL.md. The only raw-git exception is 'git commit --amend' inside the step-6 watch loop." >&2
-  exit 2
-fi
+  while IFS=$'\t' read -r KIND DIR; do
+    [ "$KIND" = "commit" ] || continue
+    # A directory the line hides cannot be shown to be a tenant.
+    [ -n "$DIR" ] && in_orch_tenant "$DIR" && continue
+    echo "BLOCKED: raw 'git commit' is forbidden in agent sessions. Use ~/.cursor/skills/lint-commit.sh -m \"...\" [files...] (or --fixup <hash> --for human|auto -m \"<why>\") per ~/.cursor/skills/im/SKILL.md. The only raw-git exception is 'git commit --amend' inside the step-6 watch loop." >&2
+    exit 2
+  done <<< "$EVENTS"
 
-# ---- squash + push discipline -----------------------------------------------
-NEEDS_MODE=""
-if [ "$GBO_OP" = "autosquash" ]; then
-  NEEDS_MODE="squash"
-elif [ "$GBO_OP" = "push" ]; then
-  NEEDS_MODE="push"
-elif echo "$CMD_M" | grep -qE -- '--autosquash|git-branch-ops\.sh[[:space:]]+autosquash'; then
-  NEEDS_MODE="squash"
-elif echo "$CMD_M" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+push([[:space:]]|$)'; then
-  NEEDS_MODE="push"
+  # ---- squash + push discipline: which event decides ------------------------
+  # A sanctioned git-branch-ops.sh call first, then any autosquash, then a push.
+  for WANT in gbo squash push; do
+    LINE=$(printf '%s\n' "$EVENTS" | grep -m1 "^$WANT" || true)
+    [ -n "$LINE" ] || continue
+    KIND=${LINE%%	*}
+    TARGET_DIR=${LINE#*	}
+    case "$KIND" in
+      gbo-autosquash) GBO_OP=autosquash; NEEDS_MODE=squash ;;
+      gbo-push)       GBO_OP=push; NEEDS_MODE=push ;;
+      squash)         NEEDS_MODE=squash ;;
+      push)           NEEDS_MODE=push ;;
+    esac
+    break
+  done
+else
+  # cmd-parse.sh could not read the line: the text match this gate had before.
+  CMD_DIR=$(printf '%s' "$CMD" | sed -nE 's/^[[:space:]]*cd[[:space:]]+"?([^"&;|[:space:]]+)"?.*/\1/p' | head -1)
+  CMD_DIR="${CMD_DIR/#\~/$HOME}"
+  IN_TENANT=0
+  in_orch_tenant "${CMD_DIR:-${HOOK_CWD:-$PWD}}" && IN_TENANT=1
+  CMD_M=$(printf '%s' "$CMD" | "$HOOKS/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+  if printf '%s' "$CMD" | "$HOOKS/cmd-executes.sh" git-branch-ops.sh pr-address.sh; then
+    GBO_OP=$(printf '%s' "$CMD" | grep -oE '(git-branch-ops\.sh"?[[:space:]]+(push|autosquash)|pr-address\.sh"?[[:space:]]+autosquash)([[:space:]]|$)' \
+      | head -1 | sed -E 's/.*[[:space:]](push|autosquash).*/\1/' || true)
+  fi
+  if echo "$CMD_M" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+(-[^[:space:]]+[[:space:]]+)*commit([[:space:]]|$)'; then
+    if echo "$CMD_M" | grep -q -- '--no-verify'; then
+      echo "BLOCKED: 'git commit --no-verify' is forbidden in agent sessions. Commit via ~/.cursor/skills/lint-commit.sh." >&2
+      exit 2
+    fi
+    echo "$CMD_M" | grep -q -- '--amend' && exit 0
+    [ "$IN_TENANT" = 1 ] && exit 0
+    echo "BLOCKED: raw 'git commit' is forbidden in agent sessions. Use ~/.cursor/skills/lint-commit.sh -m \"...\" [files...] per ~/.cursor/skills/im/SKILL.md." >&2
+    exit 2
+  fi
+  if [ "$GBO_OP" = "autosquash" ]; then
+    NEEDS_MODE="squash"
+  elif [ "$GBO_OP" = "push" ]; then
+    NEEDS_MODE="push"
+  elif echo "$CMD_M" | grep -qE -- '--autosquash|git-branch-ops\.sh[[:space:]]+autosquash'; then
+    NEEDS_MODE="squash"
+  elif echo "$CMD_M" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+push([[:space:]]|$)'; then
+    NEEDS_MODE="push"
+  fi
+  TARGET_DIR="$CMD_DIR"
 fi
 if [ -n "$NEEDS_MODE" ]; then
-  # Resolve the PR for the branch the command targets. Compound commands are
-  # usually `cd <worktree> && git rebase ...` while the hook's own cwd is
-  # elsewhere — honor the command's leading cd. Fail open when indeterminate.
+  # Resolve the PR for the branch the command targets: the directory of the
+  # deciding command. Fail open when indeterminate.
   MODE=""
-  TARGET_DIR=$(printf '%s' "$CMD" | sed -nE 's/^[[:space:]]*cd[[:space:]]+"?([^"&;|[:space:]]+)"?.*/\1/p' | head -1)
-  TARGET_DIR="${TARGET_DIR/#\~/$HOME}"
   [ -n "$TARGET_DIR" ] && [ -d "$TARGET_DIR" ] && cd "$TARGET_DIR" 2>/dev/null || true
   PRJSON=$(gh pr view --json number,headRepositoryOwner,headRepository 2>/dev/null || true)
   if [ -n "$PRJSON" ]; then

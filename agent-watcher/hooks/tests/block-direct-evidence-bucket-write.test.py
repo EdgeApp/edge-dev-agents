@@ -38,6 +38,14 @@ BLOCK = [
     f"curl --aws-sigv4 aws:amz:auto:s3 -K <(jq -r .accessKeyId {CREDS}) https://example.test/b/k",
     f"node -e 'console.log(require(process.argv[1]))' {CREDS}",
     f"cp {CREDS} /tmp/c.json",
+    # Read through cmd-parse.sh: the write is found wherever the line runs it.
+    f"bash -c '{B}.sh put k x.png'",
+    f'OUT=$({B}.sh delete k); echo "$OUT"',
+    f"for k in a b; do {B}.sh delete $k; done",
+    f"node --no-warnings {B}.js put k x.png",
+    f"S={B}.sh; $S put k x.png",
+    f"V=delete; {B}.sh $V k",
+    f"nice -n 5 {B}.sh manifest-put acme/widget 7 /tmp/m.json",
 ]
 
 ALLOW = [
@@ -60,6 +68,10 @@ ALLOW = [
     f"ls -l {CREDS}",
     f"grep -rn 'site-orch/secrets/r2.json' ~/.cursor/skills",
     "git push origin HEAD",
+    f"bash -c 'echo {B}.sh put'",
+    f'eval "{B}.sh put k x.png"',
+    f"node {B}.js get put /tmp/x",
+    f"node -e 'require(\"x\")' {B}.js put",
     "",
 ]
 

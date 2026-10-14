@@ -26,24 +26,20 @@ CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 # a report heredoc, an echo -- must not fire this hook. The API URL itself
 # legitimately sits INSIDE quotes (a curl argument), so the trigger is: the
 # URL anywhere in the raw command AND an actual HTTP-client invocation in the
-# stripped view. Fail-open to the raw command if the helper is unavailable.
-CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+# stripped view. The stripped view is `cmd-parse.sh --rest`: every command that runs a companion
+# script (anything under the two sanctioned trees) blanked as well. The
+# scripts call the API themselves, invisible here, so their own words cannot
+# fire the gate, while the rest of the same line is still judged. When the
+# line cannot be read, the plain stripped view is used and no script is
+# excused.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-parse.sh" \
+  --rest --under /.cursor/skills/ --under /.config/agent-watcher/ 2>/dev/null) \
+  || CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 # Jev shadow, log only (lib/jev-shadow.sh): on a raw trigger hit, log execute-vs-quote beside this hook's decision.
 . "$HOME/.config/agent-watcher/lib/jev-shadow.sh" 2>/dev/null && jev_shadow_cmd_trap block-raw-asana-api "an HTTP client call (curl, wget) to the Asana API" 'app\.asana\.com/api' "$CMD" || true
 
 echo "$CMD" | grep -q "app.asana.com/api" || exit 0
 printf '%s' "$CMD_M" | grep -qE '(^|[;&|([:space:]])(curl|wget|http|xh)([[:space:]]|$)' || exit 0
-
-# Sanctioned scripts (their internal curls are invisible to this hook anyway;
-# this exempts mixed commands that both run a script and mention the API).
-# Matched by DIRECTORY, not by a name list: every Asana-touching script already
-# lives under one of these two roots, and a name list silently stops covering
-# the next script added there.
-# Companion scripts are exempt by DIRECTORY, but only when one is actually
-# INVOKED: cmd-executes.sh owns the command-position test and the reason a
-# substring match is not good enough.
-printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" \
-  --under /.cursor/skills/ --under /.config/agent-watcher/ && exit 0
 
 echo "BLOCKED: raw Asana API calls are forbidden in every session, chat included — the sanctioned scripts carry contracts a raw curl drops (attachment download, followup-scope watermark arithmetic, authored-text marking, gated status writes). Use instead:
   task ingestion (task+comments+subtasks+ATTACHMENTS): ~/.cursor/skills/asana-get-context.sh <gid>

@@ -45,7 +45,16 @@ gh_target_is_edge() {
 CWD_IN=$(printf '%s' "${INPUT:-}" | jq -r '.cwd // empty' 2>/dev/null || true)
 gh_target_is_edge "$CMD" "$CWD_IN" || exit 0
 
-CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
+# The view the triggers match is `cmd-parse.sh --rest`: quoted, heredoc and
+# commented text blanked as before, and every command that runs a companion
+# script (anything under the two sanctioned trees) blanked as well. The
+# scripts call the API themselves, invisible here, so their own words cannot
+# fire the gate, while the rest of the same line is still judged. When the
+# line cannot be read, the plain stripped view is used and no script is
+# excused.
+CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-parse.sh" \
+  --rest --under /.cursor/skills/ --under /.config/agent-watcher/ 2>/dev/null) \
+  || CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 # Jev shadow, log only (lib/jev-shadow.sh): on a raw trigger hit, log execute-vs-quote beside this hook's decision.
 . "$HOME/.config/agent-watcher/lib/jev-shadow.sh" 2>/dev/null && jev_shadow_cmd_trap block-raw-thread-resolve "a gh api graphql resolveReviewThread mutation" 'resolveReviewThread' "$CMD" || true
 # The mutation string itself legitimately sits INSIDE quotes (a graphql -f
@@ -54,12 +63,6 @@ CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentio
 # that merely quotes the mutation has no graphql invocation.
 echo "$CMD" | grep -q "resolveReviewThread" || exit 0
 printf '%s' "$CMD_M" | grep -qE '(^|[;&|[:space:]])gh[[:space:]]+api[[:space:]]+graphql([[:space:]]|$)' || exit 0
-
-# Companion scripts are exempt by DIRECTORY, but only when one is actually
-# INVOKED: cmd-executes.sh owns the command-position test and the reason a
-# substring match is not good enough.
-printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/cmd-executes.sh" \
-  --under /.cursor/skills/ --under /.config/agent-watcher/ && exit 0
 
 echo "BLOCKED: raw resolveReviewThread mutations are forbidden in agent sessions. Review threads are resolved through the sanctioned flow, which replies IN-THREAD first: /pr-address for human and mixed feedback, /bugbot for cursor[bot] findings (their companion scripts reply then resolve). A resolved thread without an in-thread reply hides the reasoning from reviewers and the audit trail. Read the relevant SKILL.md and use its scripts." >&2
 exit 2

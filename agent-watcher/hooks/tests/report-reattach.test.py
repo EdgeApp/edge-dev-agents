@@ -92,6 +92,7 @@ LINKED = [
     '.config/agent-watcher/hooks/lib/shell-word-resolve.sh',
     '.config/agent-watcher/hooks/lib/completion-event.sh',
     '.config/agent-watcher/hooks/cmd-executes.sh',
+    '.config/agent-watcher/hooks/lib/shell-commands.js',
 ]
 UNDER_TEST.append('.config/agent-watcher/judge-report-section.sh')
 for rel in UNDER_TEST:

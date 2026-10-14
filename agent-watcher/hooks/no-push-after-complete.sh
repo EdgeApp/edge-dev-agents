@@ -64,10 +64,20 @@ CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)
 # Branch/PR-mutating commands only. Anything here changes what a reviewer bot or
 # a human sees on the PR, which is exactly what the finalize gate ruled on.
 #
-# Match INVOCATIONS, not mentions: the shared strip-cmd-mentions.sh blanks
-# heredoc bodies and quoted spans (see its header for the rationale and the
-# known bash -c gap), then the token must sit at a command position (start of
-# string or after a shell separator, allowing the usual wrappers).
+# Match INVOCATIONS, not mentions: cmd-parse.sh (lib/shell-commands.js) lists
+# the commands the line runs, so a push behind `git -C <dir>`, `git -c k=v`,
+# `gh -R <repo>` or inside `bash -c '...'` counts and quoted text does not.
+HOOKS="$HOME/.config/agent-watcher/hooks"
+if PARSED=$(printf '%s' "$CMD" | "$HOOKS/cmd-parse.sh" 2>/dev/null); then
+  MATCHED=$(printf '%s' "$PARSED" | jq -rs '
+    if any(.[];
+      (.git and .git.sub == "push")
+      or (.name == "git-branch-ops.sh" and .argv[1] == "push")
+      or (.gh and (.gh.sub == "pr create" or .gh.sub == "pr ready" or .gh.sub == "pr reopen"))
+      or (.gh and .gh.sub == "pr edit" and any(.gh.args[]; . == "--base" or . == "-B" or startswith("--base="))))
+    then "yes" else "no" end' 2>/dev/null || echo no)
+else
+# cmd-parse.sh could not read the line: the text match this gate had before.
 CMD_M=$(printf '%s' "$CMD" | "$HOME/.config/agent-watcher/hooks/strip-cmd-mentions.sh" 2>/dev/null || printf '%s' "$CMD")
 MATCHED=$(printf '%s' "$CMD_M" | python3 -c '
 import re, sys
@@ -81,6 +91,8 @@ TARGETS = (r"(?:" + PATH_PREFIX + r"git\s+push|" + PATH_PREFIX +
 pat = re.compile(r"(?:^|[;&|(]|\|\||&&|\bthen\b|\bdo\b)\s*" + WRAPPERS + TARGETS)
 print("yes" if pat.search(cmd) else "no")
 ' 2>/dev/null || echo no)
+
+fi
 
 [ "$MATCHED" = "yes" ] || exit 0
 

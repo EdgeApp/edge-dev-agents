@@ -589,6 +589,7 @@ done.
 | | `inject-run-context.sh`, `inject-no-slop-reminder.sh`, `inject-no-slop-line.sh` | Session-start run context, plus the asana-plan + task-review bodies (asana-plan alone on a Task deliverable) on every fresh segment (startup/resume, and compact while unplanned); a fresh segment (startup/resume) expires the prior segment's ingestion + skill-read markers, and compact/clear expire skill-read markers too, since compaction destroys the in-context text the marker attests to (the read-gate then re-delivers bodies lazily); headless `claude -p` children (no-slop judge etc.) inherit the gid but are ignored, since a child's startup is not a run segment; no-slop refresh at session start and every prompt |
 | Shared helpers | `strip-cmd-mentions.sh` | Blanks quoted/heredoc spans so hooks trigger on commands, not on text that merely mentions them |
 | | `cmd-executes.sh` | Command-position matching, so naming a script in a grep never fires the gate that guards executing it |
+| | `cmd-parse.sh`, `lib/shell-commands.js` | One reading of a command line into the commands it runs, so two hooks cannot disagree about the same line |
 
 This table groups the main gates and is not the registry:
 [`agent-watcher/hooks/README.md`](agent-watcher/hooks/README.md) has one row per

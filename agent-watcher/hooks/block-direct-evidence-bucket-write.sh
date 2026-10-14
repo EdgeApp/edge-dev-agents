@@ -16,8 +16,8 @@
 #     A grep, rg or ls over the path passes.
 #
 # The attach and withdraw scripts call the bucket script from inside, so their
-# typed commands never match. Known gap, deliberate: a verb or script path
-# held in a shell variable, and a command inside `bash -c "..."`, are not seen.
+# typed commands never match. Known gap: a verb or script path held in a
+# variable the line does not set, and `eval` text, are not seen.
 #
 # No-op unless AGENT_TASK_GID is set. Exit 0 allow, exit 2 block.
 set -euo pipefail
@@ -42,28 +42,44 @@ deny() {
   exit 2
 }
 
-# A write verb on the bucket script
-VERB=$(RAW="$CMD" STRIPPED="$CMD_M" node -e '
-  const raw = process.env.RAW
-  const stripped = process.env.STRIPPED.length === raw.length ? process.env.STRIPPED : raw
-  // Every place the script is named with a write verb as its first argument.
-  const re = /evidence-bucket\.(?:sh|js)["\x27]?[ \t]+["\x27]?(put|manifest-put|delete)(?=["\x27\s;&|)]|$)/g
-  let m
-  while ((m = re.exec(raw)) != null) {
-    // The name must sit OUTSIDE a heredoc body, or be the quoted word of an
-    // invocation: walk back over the path to the start of its word and read
-    // the stripped view just before it. A segment start, a wrapper word or
-    // `node` there means it runs.
-    let i = m.index
-    while (i > 0 && !/[\s;&|(]/.test(raw[i - 1])) i--
-    const before = stripped.slice(0, i).replace(/[ \t]+$/, "")
-    const tail = before.slice(before.search(/[^;&|(\n]*$/)).trim()
-    if (tail === "" || /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:(?:env|timeout|gtimeout|nice|time|command|exec|bash|sh|sudo|nohup|node)(?:\s+-?[\w.=-]+)*\s*)*$/.test(tail + " ")) {
-      process.stdout.write(m[1])
-      break
+# A write verb on the bucket script. The write is read from cmd-parse.sh records: evidence-bucket.sh or .js run
+# directly, or the .js handed to node, wherever the line runs it (after a cd,
+# behind a wrapper, in a loop or a substitution, inside `bash -c` text). The
+# verb is the script's first argument. When the line cannot be read, the text
+# match the hook had before decides.
+VERB=
+if RECS=$(printf '%s' "$CMD" | "$HOOKS/cmd-parse.sh" 2>/dev/null); then
+  VERB=$(printf '%s' "$RECS" | jq -r -s '
+    [.[] | select(.opaque | not)
+      | if (.name | test("^evidence-bucket\\.(sh|js)$")) then .argv[1]
+        elif .name == "node" then
+          (.argv[1:] | map(select(startswith("-") | not))) as $a
+          | if (($a[0] // "") | test("(^|/)evidence-bucket\\.(sh|js)$")) then $a[1] else empty end
+        else empty end
+      | select(. == "put" or . == "manifest-put" or . == "delete")][0] // empty' 2>/dev/null || true)
+else
+  VERB=$(RAW="$CMD" STRIPPED="$CMD_M" node -e '
+    const raw = process.env.RAW
+    const stripped = process.env.STRIPPED.length === raw.length ? process.env.STRIPPED : raw
+    // Every place the script is named with a write verb as its first argument.
+    const re = /evidence-bucket\.(?:sh|js)["\x27]?[ \t]+["\x27]?(put|manifest-put|delete)(?=["\x27\s;&|)]|$)/g
+    let m
+    while ((m = re.exec(raw)) != null) {
+      // The name must sit OUTSIDE a heredoc body, or be the quoted word of an
+      // invocation: walk back over the path to the start of its word and read
+      // the stripped view just before it. A segment start, a wrapper word or
+      // `node` there means it runs.
+      let i = m.index
+      while (i > 0 && !/[\s;&|(]/.test(raw[i - 1])) i--
+      const before = stripped.slice(0, i).replace(/[ \t]+$/, "")
+      const tail = before.slice(before.search(/[^;&|(\n]*$/)).trim()
+      if (tail === "" || /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:(?:env|timeout|gtimeout|nice|time|command|exec|bash|sh|sudo|nohup|node)(?:\s+-?[\w.=-]+)*\s*)*$/.test(tail + " ")) {
+        process.stdout.write(m[1])
+        break
+      }
     }
-  }
-' 2>/dev/null || true)
+  ' 2>/dev/null || true)
+fi
 [ -z "$VERB" ] || deny "a direct \`$VERB\` on the evidence bucket is forbidden in agent sessions."
 
 # The credentials file handed to a program

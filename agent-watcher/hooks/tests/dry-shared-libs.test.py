@@ -44,6 +44,21 @@ CASES = [
     ('echo "update-status.sh 123 Complete"', ''),
     ('~/.cursor/skills/pr-create/scripts/pr-create.sh --title x', 'pr-create'),
     ('~/.config/agent-watcher/update-status.sh 999 Complete', ''),
+    # Read through cmd-parse.sh: each call is judged on its own arguments.
+    ('~/.config/agent-watcher/update-status.sh 123 Testing && ~/.config/agent-watcher/update-status.sh 123 Complete', 'complete'),
+    ('~/.config/agent-watcher/update-status.sh 999 Complete; ~/.config/agent-watcher/update-status.sh 123 Testing', 'status'),
+    ('~/.config/agent-watcher/update-status.sh 999 Testing # 123 Complete', ''),
+    ('~/.config/agent-watcher/update-status.sh 123 Testing --reason Complete', 'status'),
+    ('~/.config/agent-watcher/update-status.sh 123 Complete --blocked=yes', 'block'),
+    ('~/.config/agent-watcher/update-status.sh "$TASK" Complete', 'complete'),
+    ('T=999; ~/.config/agent-watcher/update-status.sh "$T" Complete', ''),
+    ('T=123; ~/.config/agent-watcher/update-status.sh "$T" Complete', 'complete'),
+    ("bash -c '~/.config/agent-watcher/update-status.sh 123 Complete'", 'complete'),
+    ('cd /r && bash ~/.config/agent-watcher/update-status.sh 123 Complete', 'complete'),
+    ('eval "~/.config/agent-watcher/update-status.sh 123 Complete"', ''),
+    ('cat ~/.config/agent-watcher/update-status.sh | grep Complete # 123', ''),
+    ('~/.config/agent-watcher/update-status.sh 123 Developing; ~/.cursor/skills/pr-create/scripts/pr-create.sh --title x', 'pr-create'),
+    ("cat <<'E'\n~/.config/agent-watcher/update-status.sh 123 Complete\nE", ''),
 ]
 for cmd, want in CASES:
     p = sh(f'source {AW}/hooks/lib/completion-event.sh; completion_event "$C" 123', {'C': cmd})

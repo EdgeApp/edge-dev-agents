@@ -21,17 +21,18 @@
 # falls back to the raw command and loses mention-stripping entirely, so every
 # branch here must replace, never insert or drop.
 #
-# Known gap, deliberate: an invocation smuggled through a quoted string
-# (`bash -c "git push"`) is invisible in the stripped view. That shape does not
-# occur in this workflow, and false-blocking authoring work is the worse
-# failure. Usage: CMD_M=$(printf '%s' "$CMD" | strip-cmd-mentions.sh)
+# Known gap: an invocation inside a quoted string (`bash -c "git push"`) is
+# invisible in the stripped view. A hook that must see it reads the line
+# through cmd-parse.sh instead. Usage: CMD_M=$(printf '%s' "$CMD" | strip-cmd-mentions.sh)
 set -euo pipefail
 
 exec python3 -c '
 import re, sys
 cmd = sys.stdin.read()
 # Blank heredoc bodies: <<EOF / <<"EOF" / <<-EOF ... through the terminator line.
-for m in list(re.finditer(r"<<-?\s*[\x27\"]?(\w+)[\x27\"]?", cmd)):
+# A here-string (<<<word) feeds one word and opens no body; read as a heredoc
+# it blanked the rest of the command.
+for m in list(re.finditer(r"(?<!<)<<(?!<)-?\s*[\x27\"]?(\w+)[\x27\"]?", cmd)):
     # Already inside a blanked body: a git conflict marker or a shift operator in
     # some outer heredoc opens no heredoc of its own, and letting one swallow the
     # rest of the command would hide the real invocations that follow it.
