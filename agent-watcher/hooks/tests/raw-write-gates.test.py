@@ -50,6 +50,9 @@ CASES = [
     ('block-raw-gh-writes.sh', 'echo of the phrase', 'echo "gh pr create"', 0),
     ('block-raw-gh-writes.sh', 'pr edit of a label', 'gh pr edit 5 --add-label x', 0),
     ('block-raw-gh-writes.sh', 'pr view', 'gh pr view 5 --json body', 0),
+    ('block-raw-gh-writes.sh', 'raw comment inside bash -c', "bash -c 'gh pr comment 5 --body x'", 2),
+    ('block-raw-gh-writes.sh', 'raw create in a script on stdin', "bash <<'E'\ngh pr create --fill\nE", 2),
+    ('block-raw-gh-writes.sh', 'echo of the phrase inside bash -c', "bash -c 'echo \"gh pr create\"'", 0),
     # Asana
     ('block-raw-asana-api.sh', 'raw curl', f'curl -s -H "Authorization: Bearer $T" "{URL}"', 2),
     ('block-raw-asana-api.sh', 'companion script alone', f'{AW} --task-gid 1 # {URL}', 0),
@@ -58,6 +61,7 @@ CASES = [
     ('block-raw-asana-api.sh', 'git add of a companion path, then curl', f'git add ~/.config/agent-watcher/x.sh && curl "{URL}"', 2),
     ('block-raw-asana-api.sh', 'URL in an echo', f'echo "{URL}"', 0),
     ('block-raw-asana-api.sh', 'curl of another host', 'curl -s https://example.com', 0),
+    ('block-raw-asana-api.sh', 'raw curl inside bash -c', f"bash -c 'curl -s {URL}'", 2),
     # Thread resolve
     ('block-raw-thread-resolve.sh', 'raw mutation', GQL, 2),
     ('block-raw-thread-resolve.sh', 'companion script given the mutation name', f'{SKILL} resolve --note resolveReviewThread', 0),

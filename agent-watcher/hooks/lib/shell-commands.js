@@ -33,13 +33,17 @@
 // What counts as run: a command at the top level, in a chain or pipeline, in a
 // subshell or brace group, in $( ), backticks or <( ) even inside double
 // quotes, and the text handed to `bash -c` or `sh -c` (zsh, dash, ksh too)
-// when that text is written in the command. What does not: text in single
-// quotes, in a heredoc body, in a comment, or passed to `eval`.
+// when that text is written in the command. A shell reading its script from
+// stdin (no script word, or -s) runs its own heredoc body, its literal <<<
+// string, or the file it reads with < (reported as `bash <file>` is). The
+// command after `find -exec`, `-execdir`, `-ok` or `-okdir` runs. What does
+// not: text in single quotes, in a heredoc body fed to anything but a shell,
+// in a comment, or passed to `eval`.
 //
-// Known gaps, deliberate: `eval`, a script fed to a shell on stdin, a
-// substitution inside a heredoc body, `find -exec`, an alias or function
-// defined in the same line, and a program name held in a variable this line
-// does not assign.
+// Known gaps, deliberate: `eval`, a script piped into a shell from another
+// command, a substitution inside a heredoc body, an alias or function defined
+// in the same line, a program name held in a variable this line does not
+// assign, and a line bash would reject, which is read anyway.
 
 "use strict";
 
@@ -153,7 +157,7 @@ function region(s, i, stop, ctx, st) {
   const endWord = (at) => {
     if (!cur) return;
     cur.e = at;
-    if (expectRedir) { redirs.push({ op: expectRedir, target: cur.x, e: at }); expectRedir = null; }
+    if (expectRedir) { redirs.push({ op: expectRedir, target: cur.x, e: at, w: cur }); expectRedir = null; }
     else {
       words.push(cur);
       if (!cur.quoted && cur.v === "[[" && words.slice(0, -1).every((w) => !w.quoted && RESERVED.has(w.v))) inCond = true;
@@ -205,18 +209,23 @@ function region(s, i, stop, ctx, st) {
   };
   const readHeredocs = (j) => {
     // j is just past a newline. Skip each pending body through its tag line.
+    // A body fed to a shell on stdin is read as that shell's script.
     while (heredocs.length) {
       const h = heredocs.shift();
+      const body = [];
       for (;;) {
-        if (j >= stop) return stop;
+        if (j >= stop) break;
         let k = s.indexOf("\n", j);
         if (k === -1 || k > stop) k = stop;
         let line = s.slice(j, k);
         if (h.dash) line = line.replace(/^\t+/, "");
         j = Math.min(k + 1, stop);
         if (line === h.tag || line.trim() === h.tag) break;
-        if (k === stop) return stop;
+        body.push(line);
+        if (k === stop) break;
       }
+      if (h.shell) { const t = body.join("\n"); region(t, 0, t.length, ctx, { term: null, cwd: h.shell.cwd, nested: true }); }
+      if (j >= stop) return stop;
     }
     return j;
   };
@@ -304,7 +313,7 @@ function region(s, i, stop, ctx, st) {
           } else if (s[k] === "\\") { tag += s[k + 1] || ""; k += 2; }
           else { tag += s[k]; k++; }
         }
-        if (tag) heredocs.push({ tag, dash });
+        if (tag) { const h = { tag, dash, shell: null }; heredocs.push(h); redirs.push({ op: "<<", target: tag, e: k, h }); }
         i = k; continue;
       }
       let op = c;
@@ -358,7 +367,9 @@ function region(s, i, stop, ctx, st) {
       i++; continue;
     }
 
-    open(i); add(c); i++;
+    open(i);
+    if (c === "~" && /^[A-Za-z_][A-Za-z0-9_]*\+?=$/.test(cur.v)) cur.tilde = true;   // X=~/p, unquoted
+    add(c); i++;
   }
   flush(stop);
   ctx.depth--;
@@ -366,6 +377,11 @@ function region(s, i, stop, ctx, st) {
 }
 
 function isAssign(w) { return !w.q0 && /^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(w.v); }
+
+// The text of a shell script word, or "" when it is only an expansion.
+function literalText(x) { return x.replace(/\$\{?[A-Za-z_][A-Za-z0-9_]*\}?|\$\([^)]*\)|`[^`]*`/g, "").trim(); }
+
+const FIND_EXEC = new Set(["-exec", "-execdir", "-ok", "-okdir"]);
 
 // Turn one simple command's words into a record, or into nested records for a
 // shell -c string. Returns the cwd in force after it.
@@ -383,7 +399,7 @@ function emit(words, redirs, ctx, cwd, st, caseDelta) {
       const eq = w.v.indexOf("=");
       const name = w.v.slice(0, eq).replace(/\+$/, "");
       let val = w.x.slice(eq + 1);
-      if (/^~(\/|$)/.test(w.v.slice(eq + 1)) && /^~(\/|$)/.test(val) && ctx.home) val = ctx.home + val.slice(1);
+      if (w.tilde && /^~(\/|$)/.test(val) && ctx.home) val = ctx.home + val.slice(1);
       if (w.dyn) delete ctx.vars[name]; else ctx.vars[name] = val;
     }
     return cwd;
@@ -391,6 +407,8 @@ function emit(words, redirs, ctx, cwd, st, caseDelta) {
 
   const bare = (j) => (j < n && !words[j].quoted ? words[j].v : null);
   let opaqueShell = false;
+  let stdinFile = null;                  // bash < file: the file is the command
+  let stdinText = null;                  // bash <<< 'text': the text is its script
   for (let guard = 0; guard < 32 && k < n; guard++) {
     const w = bare(k);
     if (w !== null && RESERVED.has(w)) { k++; continue; }
@@ -405,10 +423,12 @@ function emit(words, redirs, ctx, cwd, st, caseDelta) {
       let j = k + 1;
       let script = null;
       let noexec = false;                // bash -n: a syntax check runs nothing
+      let fromStdin = false;             // bash -s: the words after are arguments
       while (j < n) {
         const a = words[j].v;
         if (words[j].quoted || !/^[-+]/.test(a) || a === "-" || a === "--") break;
         if (/^-[A-Za-z]*n/.test(a) && !a.startsWith("--")) noexec = true;
+        if (/^-[A-Za-z]*s[A-Za-z]*$/.test(a)) fromStdin = true;
         if (/^-[A-Za-z]*o$/.test(a) && words[j + 1] && words[j + 1].v === "noexec") noexec = true;
         if (/^-[A-Za-z]*c[A-Za-z]*$/.test(a)) { script = words[j + 1] || null; j += 2; break; }
         j += SHELL_VALUE_OPTS.has(a) || /^[-+][A-Za-z]*[oO]$/.test(a) ? 2 : 1;      // -euo pipefail
@@ -417,8 +437,7 @@ function emit(words, redirs, ctx, cwd, st, caseDelta) {
       if (script) {
         // A literal -c string is read as a script of its own. One that is only
         // an expansion cannot be read; the shell is reported as opaque.
-        const literal = script.x.replace(/\$\{?[A-Za-z_][A-Za-z0-9_]*\}?|\$\([^)]*\)|`[^`]*`/g, "").trim();
-        if (literal) {
+        if (literalText(script.x)) {
           region(script.x, 0, script.x.length, ctx, { term: null, cwd, nested: true });
           return cwd;
         }
@@ -426,7 +445,14 @@ function emit(words, redirs, ctx, cwd, st, caseDelta) {
         break;
       }
       if (j < n && words[j].v === "--") j++;
-      if (j >= n) break;                 // a bare shell: itself the command
+      if (fromStdin || j >= n) {
+        // The shell reads its script from stdin: the last stdin redirection.
+        const src = redirs.filter((r) => r.h || r.op === "<<<" || r.op === "<").pop();
+        if (src && src.h) src.h.shell = { cwd };
+        else if (src && src.op === "<<<" && literalText(src.target)) stdinText = src.target;
+        else if (src && src.op === "<" && !src.w.dyn) { stdinFile = { v: src.target, x: src.target, quoted: false }; k = j; }
+        break;                           // otherwise the shell itself is the command
+      }
       k = j; continue;                   // bash <script>: the script is the command
     }
     const wr = Object.prototype.hasOwnProperty.call(WRAPPERS, base) ? WRAPPERS[base] : null;
@@ -448,25 +474,36 @@ function emit(words, redirs, ctx, cwd, st, caseDelta) {
     if (j >= n) break;                   // a bare wrapper: itself the command
     k = j;
   }
-  if (k >= n) return cwd;
+  if (!stdinFile && k >= n) return cwd;
 
-  const cmd = words.slice(k);
+  const cmd = stdinFile ? [stdinFile].concat(words.slice(k)) : words.slice(k);
   const argv = cmd.map((w) => w.x);
   const rec = {
     name: argv[0].split("/").pop(),
     path: argv[0],
     argv,
     words: cmd.map((w) => w.v),
-    redirs: redirs.map((r) => ({ op: r.op, target: r.target })),
+    redirs: redirs.filter((r) => !r.h).map((r) => ({ op: r.op, target: r.target })),
     cwd,
     start: st.nested ? -1 : words[0].s,
-    end: st.nested ? -1 : Math.max(words[n - 1].e, ...redirs.map((r) => r.e)),
+    end: st.nested ? -1 : Math.max(words[n - 1].e, ...redirs.filter((r) => !r.h).map((r) => r.e)),
     nested: !!st.nested,
   };
   if (opaqueShell) rec.opaque = true;
   if (rec.name === "git") rec.git = gitInfo(argv, cwd);
   if (rec.name === "gh") rec.gh = ghInfo(argv);
   ctx.out.push(rec);
+  if (stdinText !== null) region(stdinText, 0, stdinText.length, ctx, { term: null, cwd, nested: true });
+  if (rec.name === "find") {
+    // find -exec <cmd> ... ; and -exec <cmd> ... {} + run <cmd>.
+    for (let a = 1; a < cmd.length; a++) {
+      if (cmd[a].quoted || !FIND_EXEC.has(cmd[a].v)) continue;
+      let b = a + 1;
+      while (b < cmd.length && cmd[b].v !== ";" && !(cmd[b].v === "+" && cmd[b - 1].v === "{}")) b++;
+      if (b > a + 1) emit(cmd.slice(a + 1, b), [], ctx, cwd, st, () => {});
+      a = b;
+    }
+  }
 
   if (rec.name === "cd" || rec.name === "pushd") {
     let j = 1;

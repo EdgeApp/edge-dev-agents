@@ -13,6 +13,12 @@
 //       script under one of the path fragments blanked as well. A hook that
 //       must not fire on its own sanctioned wrapper matches against this view,
 //       so the wrapper is ignored and the rest of the line is still judged.
+//       After the view, one line per command read out of quoted or heredoc
+//       text (a `bash -c` string, a shell's stdin script) that runs no such
+//       script: its words joined by spaces, a word holding a space, quote,
+//       $ or shell operator shown as `_`. Those commands are blank in the
+//       view itself, so a trigger matched against these lines still sees
+//       them.
 //
 // Exit 0 on success (no commands prints nothing), 1 when the command cannot
 // be read, 2 on a usage error. A caller treats 1 as "fall back to the text
@@ -62,4 +68,10 @@ for (const c of cmds) {
   if (c.start < 0 || !dirs.some((d) => c.path.includes(d))) continue;
   for (let i = c.start; i < c.end && i < view.length; i++) if (view[i] !== "\n") view[i] = " ";
 }
-process.stdout.write(view.join(""));
+const SAFE = /^[^\s;&|<>()`$"'\\]*$/;
+let tail = "";
+for (const c of cmds) {
+  if (!c.nested || dirs.some((d) => c.path.includes(d))) continue;
+  tail += "\n" + c.argv.map((w) => (SAFE.test(w) ? w : "_")).join(" ");
+}
+process.stdout.write(view.join("") + tail);

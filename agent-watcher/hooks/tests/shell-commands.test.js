@@ -56,7 +56,10 @@ const RUNS = [
   "bash -c 'X'", 'bash -c "X"', "sh -c 'X'", "zsh -c 'X'", "bash -lc 'X'", "bash -l -c 'X'", "bash -euo pipefail -c 'X'",
   "bash -c 'a && X'", "bash -c 'a; (X)'", "/bin/bash -c 'X'", "env A=1 bash -c 'X'", "timeout 60 bash -c 'X'",
   "bash -c 'bash -c \"X\"'", "sudo sh -c 'X'", "a && bash -c 'X' && b", "bash -c 'cd /tmp && X' arg0",
-  'echo "$(bash -c \'X\')"', 'coproc X', 'time X', 'a; time X', 'exec X', 'a | xargs X', 'find . | xargs -n 1 X'
+  'echo "$(bash -c \'X\')"', 'coproc X', 'time X', 'a; time X', 'exec X', 'a | xargs X', 'find . | xargs -n 1 X',
+  "bash <<'E'\nX\nE", 'bash <<E\nX\nE', 'bash -s <<E\nX\nE', "bash -s -- a b <<'E'\nX\nE", 'sh <<-E\n\tX\n\tE',
+  'bash <<< "X"', "bash -s <<< 'X'", 'a | bash -c "X"', 'find . -exec X \\;', 'find . -name a -exec X {} \\;',
+  'find . -execdir X {} +', 'find . -ok X \\;', 'xargs -0 -r X', 'find . -print0 | xargs -0 -I {} X'
 ]
 for (const t of TARGETS) for (const tpl of RUNS) runs('run', tpl.replace('X', t.text), t.sig)
 
@@ -86,7 +89,7 @@ const MENTIONS = [
   "V='X'; echo \"$V\"", 'tool --reason "X"', "tool --reason 'ran X then stopped'", '[[ $a == "X" ]]',
   "case $a in 'X') echo;; esac", ": 'X'", "python3 -c 'X'", 'node -e "X"', "jq '.x' <<'E'\nX\nE", 'cat > f <<E\nX\nE\necho done',
   "cat <<'E' > f\nline\nX\nE", 'cat <<-E\n\tX\n\tE', 'echo a # X', '# X', 'a # X\nb', 'eval "X"', "eval 'X'",
-  "bash <<'E'\nX\nE", "ssh host 'X'", 'cat <<< "X"', 'echo "a\nX\nb"', "echo 'a\nX\nb'", 'git log --grep="X"',
+  "ssh host 'X'", 'cat <<< "X"', 'echo "a\nX\nb"', "echo 'a\nX\nb'", 'git log --grep="X"',
   "awk '/X/' f", 'tool "$(echo "X")"', "bash -c 'echo \"X\"'", "bash -c \"echo 'X'\"", "bash -c '# X'",
   'echo "X" | cat', 'echo X', 'a --flag X', "echo \"it's X\"", 'echo $\'X\'', 'write-note.sh "status: X"',
   "tool <<'E'\n$(X)\nE"
@@ -190,6 +193,13 @@ same('quotes are removed from argv', one('tool "a b" \'c d\' e\\ f').argv, ['too
 same('adjacent quoted parts join', one('tool a"b c"\'d\'').argv, ['tool', 'ab cd'])
 same('a tilde path expands', one('~/x/tool.sh a').path, '/home/u/x/tool.sh')
 same('a tilde inside quotes stays', one('"~/x/tool.sh" a').path, '~/x/tool.sh')
+same('a stdin script file runs like a script path', sigs('bash < ~/.config/agent-watcher/update-status.sh'), ['update-status.sh'])
+same('bash -s with words still runs bash', sigs('bash -s -- a b'), ['bash'])
+same('a find name that looks like -exec runs nothing', sigs('find . -name "-exec" -print'), ['find'])
+same('find -exec stops at its terminator', sigs('find . -exec rm {} \\; -print'), ['find', 'rm'])
+same('a heredoc fed to cat is not run', sigs("cat <<'E'\ngit push\nE"), ['cat'])
+same('a tilde assignment expands', one('R=~/x; tool "$R"').argv, ['tool', '/home/u/x'])
+same('a quoted tilde assignment stays', one('R="~/x"; tool "$R"').argv, ['tool', '~/x'])
 same('$HOME expands in double quotes', one('"$HOME/x/tool.sh"').path, '/home/u/x/tool.sh')
 same('$HOME stays in single quotes', one("'$HOME/x/tool.sh'").path, '$HOME/x/tool.sh')
 same('an escaped dollar stays', one('tool "\\$HOME"').argv[1], '$HOME')
@@ -303,6 +313,15 @@ function cli (script, args, input) {
   v = rest(raw)
   check('a script run through bash is blanked', !v.out.includes('x.sh') && v.out.includes('gh api z'), v.out)
   check('the rest view keeps newlines', v.out.split('\n').length === 2, v.out)
+  raw = "bash -c 'gh pr comment 5 --body \"x y\"'"
+  v = rest(raw)
+  check('a nested command gets its own line', v.out.split('\n').slice(1).includes('gh pr comment 5 --body _'), v.out)
+  raw = "bash -c 'echo \"gh pr comment\"'"
+  check('quoted text inside a nested command stays blanked', rest(raw).out.split('\n').slice(1).join('|') === 'echo _', rest(raw).out)
+  raw = "bash -c '~/.config/agent-watcher/x.sh y'"
+  check('a sanctioned nested script gets no line', !rest(raw).out.includes('\n'), rest(raw).out)
+  raw = "bash <<'E'\ngh pr create --title t\nE"
+  check('a stdin script gets its own line', rest(raw).out.split('\n').includes('gh pr create --title t'), rest(raw).out)
   raw = '/usr/bin/other.sh "gh api -X POST" && tool'
   check('quoted text is blanked as in the stripped view', !rest(raw).out.includes('gh api') && rest(raw).out.includes('/usr/bin/other.sh'), rest(raw).out)
 }

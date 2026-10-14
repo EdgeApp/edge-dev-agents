@@ -89,7 +89,7 @@ tmp = tempfile.mkdtemp(prefix='hold-')
 home = os.path.join(tmp, 'home')
 os.makedirs(os.path.join(home, '.config/agent-watcher/hooks'))
 os.symlink(os.path.join(AW, 'operator-hold.sh'), os.path.join(home, '.config/agent-watcher/operator-hold.sh'))
-for f in ('operator-hold-prompt.sh', 'operator-hold-gate.sh', 'strip-cmd-mentions.sh', 'cmd-executes.sh', 'lib'):
+for f in ('operator-hold-prompt.sh', 'operator-hold-gate.sh', 'strip-cmd-mentions.sh', 'cmd-executes.sh', 'cmd-parse.sh', 'lib'):
     os.symlink(os.path.join(AW, 'hooks', f), os.path.join(home, '.config/agent-watcher/hooks', f))
 ENV = dict(os.environ, HOME=home, AGENT_TASK_GID=GID)
 HOOK = os.path.join(home, '.config/agent-watcher/hooks/operator-hold-prompt.sh')
@@ -163,6 +163,13 @@ try:
     check('gate: allows an operator-directed block while held', gate(f'~/.config/agent-watcher/update-status.sh {GID} Testing --blocked yes --reason x') == 0)
     check('gate: allows the blocked completion a stop order prescribes while held', gate(f'~/.config/agent-watcher/update-status.sh {GID} Complete --blocked yes --reason x') == 0)
     check('gate: allows a read while held', gate('git status') == 0)
+    # The push and PR triggers read the commands the line runs (cmd-parse.sh).
+    for cmd in ('git -c core.x=1 push origin br', "bash -c 'git push origin br'", 'git -C /r -c a=b push',
+                "bash <<'E'\ngit push origin br\nE", 'gh -R o/r pr merge 5 --squash', 'gh pr ready 5',
+                'find . -maxdepth 0 -exec git push \\;', '~/.cursor/skills/git-branch-ops.sh push'):
+        check(f'gate: blocks {cmd!r} while held', gate(cmd) == 2)
+    for cmd in ('echo "git push origin br"', "cat <<'E'\ngit push\nE", 'git log --grep push', 'gh pr view 5'):
+        check(f'gate: allows {cmd!r} while held', gate(cmd) == 0)
     real = dict(os.environ, AGENT_TASK_GID=GID)
     count = f'/tmp/agent-stop-block-count-{GID}'
     try: os.remove(count)

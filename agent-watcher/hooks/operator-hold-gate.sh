@@ -6,10 +6,12 @@
 # operator may have asked for), git push, PR creation, and landing/publishing.
 # Everything else passes: reads, local edits, commits, builds, drives.
 #
-# Trigger precision: execution-position match (cmd-executes.sh, fed the raw
-# command so a quoted invocation still counts) on the
-# mention-stripped command (strip-cmd-mentions.sh), so a read of a script or a
-# quoted mention never fires.
+# Trigger precision: the commands the line runs, read by the shared parser
+# (cmd-executes.sh and cmd-parse.sh), so a read of a script or a quoted
+# mention never fires, and a push or PR action behind git -C, git -c, gh -R,
+# a cd or bash -c text still does. When the line cannot be read, the push and
+# PR triggers fall back to a text match on the mention-stripped command
+# (strip-cmd-mentions.sh).
 #
 # Scope: no-op unless AGENT_TASK_GID is set. Exit 0 = allow, exit 2 = block
 # (stderr fed to the model). Fail-open on any helper error.
@@ -34,14 +36,20 @@ for s in pr-create.sh pr-land-automerge.sh pr-land-merge.sh pr-land-publish.sh n
   [ -n "$WHAT" ] && break
   executes "$s" && WHAT="a PR/landing action ($s)"
 done
-if [ -z "$WHAT" ] && printf '%s' "$CMD_M" | grep -qE '(^|[;&|(]|\$\()[[:space:]]*git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+push([[:space:]]|$)'; then
-  WHAT="a git push"
-fi
-if [ -z "$WHAT" ] && printf '%s' "$CMD_M" | grep -qE 'git-branch-ops\.sh[[:space:]]+push([[:space:]]|$)'; then
-  WHAT="a git push (git-branch-ops.sh push)"
-fi
-if [ -z "$WHAT" ] && printf '%s' "$CMD_M" | grep -qE '(^|[;&|(]|\$\()[[:space:]]*gh[[:space:]]+pr[[:space:]]+(create|merge|ready)([[:space:]]|$)'; then
-  WHAT="a PR action (gh pr)"
+if [ -z "$WHAT" ] && RECS=$(printf '%s' "$CMD" | "$H/hooks/cmd-parse.sh" 2>/dev/null); then
+  WHAT=$(printf '%s' "$RECS" | jq -rs '
+    if any(.[]; .git.sub == "push") then "a git push"
+    elif any(.[]; .name == "git-branch-ops.sh" and .argv[1] == "push") then "a git push (git-branch-ops.sh push)"
+    elif any(.[]; .gh.sub == "pr create" or .gh.sub == "pr merge" or .gh.sub == "pr ready") then "a PR action (gh pr)"
+    else "" end' 2>/dev/null || true)
+elif [ -z "$WHAT" ]; then
+  if printf '%s' "$CMD_M" | grep -qE '(^|[;&|(]|\$\()[[:space:]]*git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+push([[:space:]]|$)'; then
+    WHAT="a git push"
+  elif printf '%s' "$CMD_M" | grep -qE 'git-branch-ops\.sh[[:space:]]+push([[:space:]]|$)'; then
+    WHAT="a git push (git-branch-ops.sh push)"
+  elif printf '%s' "$CMD_M" | grep -qE '(^|[;&|(]|\$\()[[:space:]]*gh[[:space:]]+pr[[:space:]]+(create|merge|ready)([[:space:]]|$)'; then
+    WHAT="a PR action (gh pr)"
+  fi
 fi
 [ -n "$WHAT" ] || exit 0
 
