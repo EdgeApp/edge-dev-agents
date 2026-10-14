@@ -4,7 +4,8 @@
 // Usage: echo '[{"repo":"edge-exchange-plugins","branch":"master"}]' | ./pr-land-publish.sh
 //
 // How it works:
-//   1. Checks out the branch and fetches latest
+//   1. Checks out the branch and fetches latest; a version commit an earlier
+//      run made and did not push is kept and reported (resumed: true)
 //   2. Parses CHANGELOG.md for unreleased entries
 //   3. Runs verification via ~/.cursor/skills/pm.sh (verify, else tsc + lint)
 //   4. Bumps version (minor for added/changed, patch for fixed)
@@ -22,7 +23,8 @@
 //   0 = Every repo was bumped, committed and tagged, or skipped for having
 //       no unreleased changes. Read published[] (with needsPush) and
 //       skipped[] in the JSON to tell them apart per repo.
-//   1 = Verification failed
+//   1 = Verification failed, or an Unreleased entry has no type tag (the
+//       failed[] entry's error quotes it)
 //   75 = Land lock busy for one of the repos
 
 const { execSync } = require("child_process");
@@ -70,7 +72,12 @@ function parseChangelog(repoDir) {
   for (const entry of entries) {
     const hasValidTag = allowedTags.some(tag => entry.startsWith(tag));
     if (!hasValidTag) {
-      return { entries, patchOnly: true, error: `Invalid entry format: ${entry}` };
+      return {
+        entries,
+        patchOnly: true,
+        invalid: true,
+        error: `Changelog entry has no type tag (added, changed, deprecated, removed, fixed or security): ${entry}`,
+      };
     }
     
     // Minor version bump for added/changed
@@ -134,6 +141,19 @@ function updateChangelog(repoDir, newVersion) {
   writeFileSync(changelogPath, content);
 }
 
+// The version this script committed on an earlier run and nobody pushed: the
+// local branch is exactly one commit ahead of origin/<branch> and not behind
+// it, and that commit is "v<version>" for the version its package.json holds.
+// Returns the version, or null.
+function unpushedBump(repoDir, branch) {
+  const ahead = runGit(`rev-list origin/${branch}..HEAD`, repoDir);
+  const behind = runGit(`rev-list HEAD..origin/${branch}`, repoDir);
+  if (behind !== "" || ahead === "" || ahead.includes("\n")) return null;
+  const subject = runGit(["log", "-1", "--format=%s", "HEAD"], repoDir);
+  const version = JSON.parse(runGit(["show", "HEAD:package.json"], repoDir)).version;
+  return subject === `v${version}` ? version : null;
+}
+
 function checkNpmPublished(packageName, version) {
   try {
     const info = execSync(`npm view ${packageName}@${version} version`, { 
@@ -160,10 +180,22 @@ async function publishRepo(repo, branch, bump) {
   console.error(`\n=== Publishing ${repo} ===`);
   console.error(`Directory: ${repoDir}`);
   
-  // 1. Ensure we're on the right branch and up to date
+  // 1. Ensure we're on the right branch and up to date. A version commit an
+  // earlier run made and nobody pushed yet is kept and reported, never reset
+  // away and bumped a second time.
   try {
     runGit("fetch origin", repoDir);
     runGit(`checkout ${branch}`, repoDir);
+    const unpushed = unpushedBump(repoDir, branch);
+    if (unpushed) {
+      if (!runGit(`tag -l v${unpushed}`, repoDir)) runGit(`tag v${unpushed}`, repoDir);
+      console.error(`Version commit v${unpushed} from an earlier run is not pushed yet; keeping it.`);
+      results.newVersion = unpushed;
+      results.needsPush = true;
+      results.resumed = true;
+      results.success = true;
+      return results;
+    }
     runGit(`reset --hard origin/${branch}`, repoDir);
   } catch (e) {
     results.error = `Git checkout failed: ${e.message}`;
@@ -183,8 +215,9 @@ async function publishRepo(repo, branch, bump) {
     // Version already published - do full version bump flow
     const changelog = parseChangelog(repoDir);
     if (changelog.error) {
+      // An untagged entry is a failure; an empty or missing section is a skip.
       results.error = changelog.error;
-      results.exitCode = 2;
+      results.exitCode = changelog.invalid ? 1 : 2;
       return results;
     }
     

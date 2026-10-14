@@ -105,7 +105,7 @@ asana_followup() { # $1=gid → {last_report_attached_at, prev_report_attached_a
   [ -n "$token" ] || { echo "$empty"; return 0; }
   local att sto sub reports last prev
   att=$(curl -sf --max-time 20 "https://app.asana.com/api/1.0/tasks/$gid/attachments?opt_fields=name,created_at" -H "Authorization: Bearer $token" 2>/dev/null || echo '{"data":[]}')
-  sto=$(curl -sf --max-time 20 "https://app.asana.com/api/1.0/tasks/$gid/stories?opt_fields=resource_subtype,created_at,text" -H "Authorization: Bearer $token" 2>/dev/null || echo '{"data":[]}')
+  sto=$(ASANA_TOKEN="$token" ASANA_MAX_TIME=20 "$HOME/.cursor/skills/asana-paged-get.sh" "tasks/$gid/stories?opt_fields=resource_subtype,created_at,text&limit=100" 2>/dev/null || echo '{"data":[]}')
   sub=$(curl -sf --max-time 20 "https://app.asana.com/api/1.0/tasks/$gid/subtasks?opt_fields=name,completed,created_at" -H "Authorization: Bearer $token" 2>/dev/null || echo '{"data":[]}')
   # ISO8601-UTC created_at strings sort lexicographically, so no date parsing needed.
   reports=$(echo "$att" | jq -c --arg re "$REPORT_ATTACH_RE" '[.data[]? | select((.name // "") | test($re)) | .created_at] | sort | reverse' 2>/dev/null || echo '[]')

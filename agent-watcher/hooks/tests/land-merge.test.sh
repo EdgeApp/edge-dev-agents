@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# land-merge.test.sh: the local merge path rebases, verifies, then merges.
+# land-merge.test.sh: the local merge path rebases, verifies, pushes, then merges.
 #
-#   pr-land-merge.sh  rebases the branch onto the moved base and pushes it,
-#                     asks GitHub to merge only after verification passed,
+#   pr-land-merge.sh  rebases the branch onto the moved base, verifies it, then
+#                     pushes it and asks GitHub to merge; stops before the push
+#                     when someone else pushed to the branch; exits 1 when a PR
+#                     is listed under "failed";
 #                     skips a PR that is already merged, stops with the rebase
 #                     left in progress on a conflict, and takes the repo land
 #                     lock for the whole run.
@@ -11,24 +13,17 @@
 # command, the dependency installer, the verifier and the load wait are
 # stand-ins in a private HOME, so nothing is installed and nothing reaches the
 # network.
-#
-# A line that starts with "gap" marks behavior this test found and did not
-# change: the check prints what the script does and what would be safer, and
-# does not fail the file. It turns into an "ok" line once the script is fixed.
 set -uo pipefail
 
 REAL="$HOME/.cursor/skills"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/land-merge-test.XXXXXX")
 TMP=$(cd "$TMP" && pwd -P)
 trap 'rm -rf "$TMP"' EXIT
-FAILS=0; GAPS=0
+FAILS=0
 ok()   { echo "ok   $1"; }
 fail() { echo "FAIL $1"; FAILS=$((FAILS + 1)); }
 check() { # check <name> <actual> <expected>
   if [[ "$2" == "$3" ]]; then ok "$1"; else fail "$1: got '$2', want '$3'"; fi
-}
-gap() { # gap <name> <actual> <safer value>
-  if [[ "$2" == "$3" ]]; then ok "$1"; else echo "gap  $1: the script gives '$2', safer is '$3'"; GAPS=$((GAPS + 1)); fi
 }
 
 FH="$TMP/home"
@@ -162,11 +157,14 @@ check "an already merged PR is not verified" "$(wc -l < "$FAKE/verify.log" | tr 
 
 # --- verification fails ---
 make_repo red
+base_push red other.txt moved "Move the base"
+REDBEFORE=$(origin red feature)
 FAKE_VERIFY_RC=1 merge "[{\"repo\":\"red\",\"prNumber\":3,\"branch\":\"feature\"},{\"repo\":\"happy\",\"prNumber\":1,\"branch\":\"feature\"}]"
 check "failed verification: exit code" "$RC" 1
 check "failed verification: status" "$(j .status)" verification_failed
 check "failed verification names the PR" "$(j .verificationFailed.prNumber)" 3
 check "failed verification sends no merge request" "$(put_calls)" 0
+check "failed verification pushes nothing" "$(origin red feature)" "$REDBEFORE"
 check "the PRs after a failed one are listed as pending" "$(j '.pending[0].prNumber')" 1
 check "the land lock is released after a failed run" "$(locks)" 0
 
@@ -197,6 +195,13 @@ check "a code conflict names the file" "$(j '.codeConflict.conflictFiles[0]')" f
   || fail "a code conflict leaves the rebase in progress"
 check "a code conflict pushes nothing" "$(origin code feature)" "$BEFORE"
 check "a code conflict sends no merge request" "$(put_calls)" 0
+# Resolved in place and re-run without a push, as prepare.md's code conflict
+# steps say: the first run recorded the remote tip, so this is not divergence.
+printf 'resolved\n' > "$FH/git/code/feature.txt"
+git -C "$FH/git/code" add feature.txt && GIT_EDITOR=true git -C "$FH/git/code" rebase --continue >/dev/null 2>&1
+merge "$(one code 5)"
+check "a resolved code conflict, re-run: exit code" "$RC" 0
+check "a resolved code conflict, re-run: merged" "$(j '.merged[0].merged')" true
 
 # --- failures that the script lists under "failed" ---
 make_repo refused
@@ -204,7 +209,7 @@ echo '{"merged":false,"message":"Base branch was modified"}' > "$FAKE/mergeresp-
 merge "$(one refused 6)"
 check "a merge GitHub refuses is listed as failed" "$(j '.failed[0].message')" "Base branch was modified"
 check "a merge GitHub refuses is not listed as merged" "$(j '.merged | length')" 0
-gap "a merge GitHub refuses: exit code" "$RC" 1
+check "a merge GitHub refuses: exit code" "$RC" 1
 
 make_repo noinstall
 BEFORE=$(origin noinstall feature)
@@ -213,7 +218,7 @@ FAKE_INSTALL_RC=1 merge "$(one noinstall 7)"
 check "a failed install is listed as failed" "$(j '.failed | length')" 1
 check "a failed install pushes nothing" "$(origin noinstall feature)" "$BEFORE"
 check "a failed install sends no merge request" "$(put_calls)" 0
-gap "a failed install: exit code" "$RC" 1
+check "a failed install: exit code" "$RC" 1
 
 # --- a commit someone else pushed to the branch ---
 make_repo theirs
@@ -222,8 +227,31 @@ THEIRS=$(origin theirs feature)
 base_push theirs other.txt moved "Move the base"
 merge "$(one theirs 8)"
 if git --git-dir="$TMP/theirs.origin.git" merge-base --is-ancestor "$THEIRS" feature; then KEPT=kept; else KEPT=overwritten; fi
-gap "a commit pushed by someone else, missing locally" "$KEPT" kept
-gap "a branch that lost a pushed commit is not merged" "$(put_calls)" 0
+check "a commit pushed by someone else, missing locally" "$KEPT" kept
+check "a branch someone else pushed to is not merged" "$(put_calls)" 0
+check "a branch someone else pushed to: exit code" "$RC" 1
+check "a branch someone else pushed to is listed as diverged" "$(j '.failed[0].diverged')" true
+check "a branch someone else pushed to is not verified" "$(wc -l < "$FAKE/verify.log" | tr -d ' ')" 0
+
+# A commit pushed while the run verifies: the lease, pinned to the tip read
+# before the rebase, refuses the push even though a fetch has seen the commit.
+make_repo late
+base_push late other.txt moved "Move the base"
+cat > "$TMP/late-verify.js" <<'JS'
+const { execSync } = require("child_process");
+const C = process.env.LATE_CLONE;
+execSync(`git clone -q -b feature "${process.env.ORIGINS}/late.origin.git" "${C}"`);
+execSync(`printf 'late\\n' >> "${C}/late.txt" && git -C "${C}" add -A && git -C "${C}" commit -q -m Late && git -C "${C}" push -q origin feature`);
+execSync(`git -C "${process.argv[2]}" fetch -q origin`);
+JS
+cp "$SK/verify-repo.sh" "$TMP/verify.saved"
+{ echo 'require(process.env.LATE_JS);'; cat "$TMP/verify.saved"; } > "$SK/verify-repo.sh"
+LATE_JS="$TMP/late-verify.js" LATE_CLONE="$TMP/late.clone" merge "$(one late 10)"
+cp "$TMP/verify.saved" "$SK/verify-repo.sh"
+LATE=$(git -C "$TMP/late.clone" rev-parse HEAD)
+check "a commit pushed during verification is kept" "$(origin late feature)" "$LATE"
+check "a commit pushed during verification: no merge request" "$(put_calls)" 0
+check "a commit pushed during verification: exit code" "$RC" 1
 
 # --- the land lock, sign-in and usage ---
 make_repo busy
@@ -244,5 +272,4 @@ check "no GitHub sign-in: message" "$OUT" PROMPT_GH_AUTH
 merge "$(one happy 1)" fast-forward
 check "an unknown merge method: exit code" "$RC" 1
 
-if [[ "$GAPS" -gt 0 ]]; then echo "$GAPS gaps found and left as they are"; fi
 if [[ "$FAILS" -eq 0 ]]; then echo "all passed"; else echo "$FAILS failed"; exit 1; fi

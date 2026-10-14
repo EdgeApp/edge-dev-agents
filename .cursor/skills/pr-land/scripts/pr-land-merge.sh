@@ -8,10 +8,13 @@
 //
 // For each PR (sequentially):
 //   1. Check if already merged (skip if so — handles re-runs)
-//   2. Fetch + rebase onto latest upstream (picks up prior merges)
-//   3. Push --force-with-lease
+//   2. Fetch; stop with status "diverged" when the local branch lacks commits
+//      the remote branch has (checkDivergence, shared with prepare)
+//   3. Rebase onto latest upstream (picks up prior merges)
 //   4. Run local verification (MANDATORY)
-//   5. Merge via GitHub API
+//   5. Push with a lease pinned to the remote tip read in step 2, so a commit
+//      someone pushes during the run is never replaced
+//   6. Merge via GitHub API
 //
 // SAFETY GUARANTEES:
 //   1. Each PR is rebased onto latest upstream before merge (handles sequential merges)
@@ -22,7 +25,8 @@
 //
 // Exit codes:
 //   0 = All (non-skipped) PRs merged successfully
-//   1 = Verification failed
+//   1 = Verification failed, or a PR is listed under "failed" (merge refused,
+//       install or push failed, or the branch diverged: entry has diverged: true)
 //   4 = Rebase conflict left in progress, CHANGELOG-only or code (status in JSON)
 
 const { spawnSync } = require("child_process");
@@ -36,6 +40,7 @@ const {
   runVerification,
   ghApi,
   installAndPrepare,
+  checkDivergence,
 } = require(path.join(__dirname, "edge-repo.js"));
 
 function sanitizeBranchLabel(branch) {
@@ -112,8 +117,10 @@ if (!["merge", "squash", "rebase"].includes(mergeMethod)) {
 
 /**
  * Rebase a branch onto the latest upstream.
- * Returns: { status, conflictFiles? }
- *   status: "success" | "changelog_conflict" | "code_conflict" | "error"
+ * Returns: { status, remoteTip, conflictFiles?, message? }
+ *   status: "success" | "diverged" | "changelog_conflict" | "code_conflict" | "error"
+ *   remoteTip: origin/<branch> right after the fetch ("" when the remote has no
+ *   such branch); the push lease is pinned to it.
  *
  * On changelog_conflict OR code_conflict, the rebase is LEFT IN PROGRESS for
  * agent resolution. On error (unknown conflict type), the rebase is aborted.
@@ -129,12 +136,21 @@ function rebaseOntoUpstream(repoDir, branch, repo) {
     return { status: "error", message: `Checkout failed: ${e.message}` };
   }
 
+  const remote = runGit(["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${branch}`], repoDir, {
+    allowFailure: true,
+  });
+  const remoteTip = remote.success ? remote.stdout : "";
+  const diverged = checkDivergence(repoDir, branch);
+  if (diverged != null) {
+    return { status: "diverged", remoteTip, message: diverged };
+  }
+
   const rebaseResult = runGit(["rebase", upstream], repoDir, {
     allowFailure: true,
   });
 
   if (rebaseResult.success) {
-    return { status: "success" };
+    return { status: "success", remoteTip };
   }
 
   // Conflict detected — analyze
@@ -337,6 +353,19 @@ async function main() {
       break;
     }
 
+    if (rebaseResult.status === "diverged") {
+      console.error(`✗ ${rebaseResult.message}`);
+      results.failed.push({
+        repo,
+        prNumber,
+        branch,
+        success: false,
+        diverged: true,
+        message: rebaseResult.message,
+      });
+      continue;
+    }
+
     if (rebaseResult.status !== "success") {
       console.error(
         `⚠ Rebase failed: ${rebaseResult.message || rebaseResult.status} — skipping`
@@ -368,30 +397,7 @@ async function main() {
       continue;
     }
 
-    // STEP 2: Push rebased branch
-    console.error("Pushing rebased branch...");
-    const pushResult = runGit(
-      ["push", "--force-with-lease", "origin", branch],
-      repoDir,
-      { allowFailure: true }
-    );
-    if (!pushResult.success) {
-      fetchBranchForPush(repoDir, branch);
-      const branchState = describeBranchState(repoDir, branch);
-      console.error(`✗ Push failed: ${pushResult.stderr}`);
-      console.error(branchState);
-      results.failed.push({
-        repo,
-        prNumber,
-        branch,
-        success: false,
-        message: `Push failed: ${pushResult.stderr}`,
-      });
-      continue;
-    }
-    console.error("✓ Pushed");
-
-    // STEP 3: Run local verification (MANDATORY — no bypass)
+    // STEP 2: Run local verification (MANDATORY — no bypass)
     console.error("Running local verification (MANDATORY)...");
     const verification = runVerification(repoDir, getUpstreamBranch(repo, repoDir), {
       skipInstall: true,
@@ -416,6 +422,31 @@ async function main() {
     }
 
     console.error("✓ Verification passed");
+
+    // STEP 3: Push the verified branch. The lease is pinned to the remote tip
+    // read before the rebase, not to origin/<branch>, which a later fetch can
+    // move to a commit this run never tested.
+    console.error("Pushing rebased branch...");
+    const pushResult = runGit(
+      ["push", `--force-with-lease=${branch}:${rebaseResult.remoteTip}`, "origin", branch],
+      repoDir,
+      { allowFailure: true }
+    );
+    if (!pushResult.success) {
+      fetchBranchForPush(repoDir, branch);
+      const branchState = describeBranchState(repoDir, branch);
+      console.error(`✗ Push failed: ${pushResult.stderr}`);
+      console.error(branchState);
+      results.failed.push({
+        repo,
+        prNumber,
+        branch,
+        success: false,
+        message: `Push failed: ${pushResult.stderr}`,
+      });
+      continue;
+    }
+    console.error("✓ Pushed");
 
     // STEP 4: Merge via GitHub API
     console.error("Merging via GitHub API...");
@@ -483,6 +514,8 @@ async function main() {
       console.error(`  ⏸ ${p.repo}#${p.prNumber}`);
     }
   }
+
+  if (exitCode === 0 && results.failed.length > 0) exitCode = 1;
 
   console.log(JSON.stringify(results, null, 2));
   process.exit(exitCode);

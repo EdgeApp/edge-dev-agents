@@ -21,8 +21,10 @@
 #   squash-stale is a noop, and finalize only pushes: no fold, no TDD stamp
 #   fold, no condense. A PR we don't own is never autosquashed or otherwise
 #   rewritten: fixups are left as committed for the owner to squash at merge.
-#   The push is plain when the remote tip is an ancestor of HEAD, and
-#   force-with-lease only when the caller's slotting reordered the tip. This
+#   The push is always plain: slot-fixup.sh leaves such a PR's new fixups on
+#   top in commit order, so the remote tip is an ancestor of HEAD. When it is
+#   not (the owner pushed since, or the local branch was rewritten), finalize
+#   exits 1 and pushes nothing rather than force a branch it does not own. This
 #   takes precedence over the activity-based derivation below.
 #
 #   Modes — derived from the latest human activity on the PR (formal review,
@@ -237,17 +239,16 @@ run_condense_and_push() {
   emit_json "{action: '$(prefix_action push)', mode: '$MODE', newHead: '$(git rev-parse --short=10 HEAD)', folded: $FOLDED, condensed: $CONDENSED, stamped: $TDD_STAMPED}"
 }
 
-# A PR someone else owns: push the fixups as committed. Plain push when the
-# remote tip is an ancestor of HEAD; the lease form only when it is not.
+# A PR someone else owns: push the fixups as committed, plain push only.
 run_push_unowned() {
   local branch remote_tip
   branch="$(git branch --show-current)"
   remote_tip="$(git rev-parse --verify -q "refs/remotes/origin/$branch" 2>/dev/null || true)"
-  if [[ -z "$remote_tip" ]] || git merge-base --is-ancestor "$remote_tip" HEAD 2>/dev/null; then
-    "$GIT_BRANCH_OPS_SH" push >&2
-  else
-    "$GIT_BRANCH_OPS_SH" push --force-with-lease >&2
+  if [[ -n "$remote_tip" ]] && ! git merge-base --is-ancestor "$remote_tip" HEAD 2>/dev/null; then
+    echo "Error: origin/$branch ($(git rev-parse --short=10 "$remote_tip")) is not part of the local branch. This PR belongs to someone else, so it is never force-pushed; pull their commits and put the fixups on top, then finalize again." >&2
+    exit 1
   fi
+  "$GIT_BRANCH_OPS_SH" push >&2
   emit_json "{action: '$(prefix_action push)', mode: '$MODE', newHead: '$(git rev-parse --short=10 HEAD)', folded: 0, condensed: 0, stamped: false, reason: 'not PR owner: fixups pushed as committed'}"
 }
 

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # pagination.test.sh: The reads that must follow pagination to the last page:
-# asana-paged-get.sh (the shared Asana page loop), its two callers
-# (asana-get-context.sh and one-shot's asana-on-complete-actions.sh), and the
-# review-thread read in pr-land-comments.sh.
+# asana-paged-get.sh (the shared Asana page loop), its callers that read a
+# task's stories (asana-get-context.sh, one-shot's asana-on-complete-actions.sh,
+# check-followup-scope.sh, the Complete gate require-followup-scope-on-complete.sh,
+# the run-context hook inject-run-context.sh, resolve-run.sh and
+# kanban-category.sh detail), and the review-thread read in pr-land-comments.sh.
 #
 # Nothing reaches the network: curl and gh are shims on PATH that answer from
 # files and log their arguments.
@@ -131,6 +133,44 @@ prpage "[]" false "" > "$FAKE_API/threads-first.json"
 : > "$FAKE_API/gh-log"
 OUT=$(echo '[{"repo":"widget","prNumber":7,"branch":"b"}]' | node "$SKILLS/pr-land/scripts/pr-land-comments.sh" 2> "$TMP/err")
 check "land comments: one page is one call and no finding" "$(grep -c '^api graphql' "$FAKE_API/gh-log") $(jq -r 'length' <<<"$OUT")" "1 0"
+
+# ── the five other story readers: a comment on page three is seen ─────────────
+dated() { # dated <gid> <created_at> <text> -> one comment story, both shapes
+  jq -cn --arg g "$1" --arg at "$2" --arg t "$3" '{gid:$g,type:"comment",resource_subtype:"comment_added",text:$t,created_at:$at,created_by:{gid:"2",name:"Someone"}}'
+}
+datedpages() { # page one oldest, page three newest
+  jq -cn --argjson s "$(dated s1 2026-01-01T00:00:00.000Z "oldest comment")" '{data:[$s],next_page:{offset:"p2"}}' > "$FAKE_API/stories-first.json"
+  jq -cn --argjson s "$(dated s2 2026-01-02T00:00:00.000Z "middle comment")" '{data:[$s],next_page:{offset:"p3"}}' > "$FAKE_API/stories-p2.json"
+  jq -cn --argjson s "$(dated s3 2026-01-03T00:00:00.000Z "newest comment kx07")" '{data:[$s],next_page:null}' > "$FAKE_API/stories-p3.json"
+  : > "$FAKE_API/log"
+}
+CFG="$HOME/.config/agent-watcher"
+MARKER="/tmp/agent-followup-scope-$GID.json"
+trap 'rm -rf "$TMP" "/tmp/asana-task-$GID" "$MARKER" "/tmp/agent-own-stories-$GID"' EXIT
+
+datedpages
+"$CFG/check-followup-scope.sh" --task-gid "$GID" > "$TMP/out" 2> "$TMP/err"
+check "followup scope: exit 0" "$?" 0
+check "followup scope: the newest comment is the page-three one" "$(jq -r '.newest_comment_at' "$MARKER")" 2026-01-03T00:00:00.000Z
+
+datedpages
+jq -cn '{newest_comment_at:"2026-01-01T00:00:00.000Z",agent_comments_after_watermark:0}' > "$MARKER"
+jq -cn --arg c "~/.config/agent-watcher/update-status.sh $GID Complete" '{tool_input:{command:$c}}' \
+  | AGENT_TASK_GID="$GID" "$CFG/hooks/require-followup-scope-on-complete.sh" > /dev/null 2> "$TMP/err"
+check "complete gate: a page-three comment newer than the check blocks" "$?" 2
+check "complete gate: it names the live newest" "$(grep -c 'live newest is 2026-01-03' "$TMP/err")" 1
+
+datedpages
+OUT=$(echo '{"source":"startup"}' | AGENT_TASK_GID="$GID" "$CFG/hooks/inject-run-context.sh" 2> /dev/null)
+check "run context: the page-three comment is injected" "$(grep -c 'newest comment kx07' <<<"$OUT")" 1
+
+datedpages
+OUT=$("$SKILLS/resolve-run/scripts/resolve-run.sh" --gid "$GID" 2> /dev/null)
+check "resolve-run: the page-three comment is in the followup" "$(jq -r '.[0].followup.comments_after_prev_report[-1].text' <<<"$OUT")" "newest comment kx07"
+
+datedpages
+OUT=$("$SKILLS/kanban-categorize/scripts/kanban-category.sh" detail --task "$GID" 2> /dev/null)
+check "kanban detail: three comments, the page-three one last" "$(jq -r '"\(.comments | length) \(.comments[-1].text)"' <<<"$OUT")" "3 newest comment kx07"
 
 echo "$FAILS failed"
 [[ $FAILS -eq 0 ]]

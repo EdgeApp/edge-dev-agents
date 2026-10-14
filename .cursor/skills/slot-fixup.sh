@@ -8,6 +8,12 @@
 # Designed to be called after `lint-commit.sh` creates a fixup, keeping the
 # "every fixup sits next to its target" invariant continuously.
 #
+# A PR the authenticated gh user does not own (pr-address.sh review-mode says
+# isOwner false) is never reordered: the fixup stays on top in commit order,
+# its subject still naming its target, so pr-finalize-fixups.sh pushes it
+# without a force and the owner squashes at merge. No PR, or an oracle that
+# cannot answer, slots as usual.
+#
 # Usage:
 #   slot-fixup.sh [--base <ref>]
 #
@@ -17,7 +23,8 @@
 #                when that script fails).
 #
 # Exit codes:
-#   0 — slotted cleanly (HEAD now points to the slotted fixup)
+#   0 — slotted cleanly (HEAD now points to the slotted fixup), or left on
+#       top because the PR belongs to someone else
 #   1 — error (HEAD not a fixup, target not found, rebase conflict, etc.)
 #
 # On conflict the script aborts the rebase and exits non-zero so the caller
@@ -51,6 +58,21 @@ fi
 HEADLINE="${HEAD_MSG#fixup! }"
 HEAD_SHA_FULL="$(git rev-parse HEAD)"
 
+# owner_of_pr: prints the review-mode isOwner value (true|false) for this
+# branch's open PR, or nothing when there is no PR or the oracle cannot answer.
+owner_of_pr() {
+  local prjson prnum owner rname
+  prjson="$(gh pr view --json number,headRepositoryOwner,headRepository 2>/dev/null || true)"
+  [[ -n "$prjson" ]] || return 0
+  prnum="$(printf '%s' "$prjson" | jq -r '.number // empty' 2>/dev/null || true)"
+  owner="$(printf '%s' "$prjson" | jq -r '.headRepositoryOwner.login // empty' 2>/dev/null || true)"
+  rname="$(printf '%s' "$prjson" | jq -r '.headRepository.name // empty' 2>/dev/null || true)"
+  [[ -n "$prnum" && -n "$owner" && -n "$rname" ]] || return 0
+  "$HOME/.cursor/skills/pr-address/scripts/pr-address.sh" review-mode \
+    --owner "$owner" --repo "$rname" --pr "$prnum" 2>/dev/null \
+    | jq -r 'if .isOwner == false then "false" elif .isOwner == true then "true" else empty end' 2>/dev/null || true
+}
+
 # Literal comparison, never a dynamic regex: subjects contain regex
 # metacharacters ("Fix send scene (Stealth Send)") that silently broke the
 # old `$0 ~ ("^[0-9a-f]+ " h "$")` match, and set -e then killed the script
@@ -64,6 +86,11 @@ TARGET_FOUND="$(git log "$BASE..HEAD~1" --format='%H %s' \
 if [[ -z "$TARGET_FOUND" ]]; then
   echo "Error: target commit with subject \"$HEADLINE\" not found in $BASE..HEAD~1" >&2
   exit 1
+fi
+
+if [[ "$(owner_of_pr)" == "false" ]]; then
+  echo ">> Not the PR author: fixup '$HEADLINE' stays on top in commit order (no reorder, so the push needs no force)"
+  exit 0
 fi
 
 # If HEAD is already next to its target group, no-op.

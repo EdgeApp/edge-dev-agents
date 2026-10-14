@@ -391,9 +391,10 @@ CLNODE
   else
     say "$pkg: no refresh changes; continuing to the publish check (resumes an interrupted release, no-ops a current one)"
   fi
-  # Clear tag debris from an interrupted run: pr-land-publish.sh hard-resets to
-  # origin/<branch>, orphaning any unpushed local bump commit, and its re-bump
-  # then dies on `tag already exists`. A local tag that is neither reachable
+  # Clear tag debris from an interrupted run: pr-land-publish.sh keeps an
+  # unpushed bump commit that sits right on origin/<branch> (and tags it again),
+  # but hard-resets past one that origin has moved beyond, and its re-bump would
+  # then die on `tag already exists`. A local tag that is neither reachable
   # from origin/master nor present on the remote is that debris; delete it.
   local t
   for t in $(git -C "$repo_dir" tag --no-merged "$REMOTE/master" 2>/dev/null); do

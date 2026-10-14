@@ -15,7 +15,7 @@ Governs steps 6-7 of `/pr-land` (batched npm publish and GUI dependency bumps); 
 
 | Script | Exit 0 | Exit 1 | Exit 2 | Exit 3 | Exit 4 |
 |--------|--------|--------|--------|--------|--------|
-| `pr-land-publish.sh` | Ready or skipped (read the JSON per repo) | Verify fail | - | - | - |
+| `pr-land-publish.sh` | Ready or skipped (read the JSON per repo) | Verify fail, or an Unreleased entry with no type tag | - | - | - |
 | `npm-publish-web.sh` | Published | npm exited without publishing | Auth never completed | Terminal registry rejection | Tarball shrank |
 | `npm-auth-wait.sh` | New lines (relay, re-run) | Usage | - | Every log finished | Cap passed, nothing new (re-run) |
 
@@ -47,7 +47,7 @@ Exit 0 → GUI dep: publish here, upgrade in step 7. Non-zero (not a dependency 
    cd <repoDir> && git push origin master && git push origin v<version>
    ```
 
-   `pr-land-publish.sh` exit codes: `0` = every repo was bumped/committed/tagged or skipped, so read the JSON per repo: a `published[]` entry is pushed when its `needsPush` is true, a `skipped[]` entry (no unreleased changes) bumped nothing and gets no push; `1` = verification failed (report; that repo leaves the publish set). **Idempotent resume:** if the version at HEAD is already bumped but missing from npm (a prior run's publish was abandoned), the script skips the bump and returns the repo in `published[]`; keep it in the publish set; `npm-publish-web.sh` detects an already-published version and exits 0.
+   `pr-land-publish.sh` exit codes: `0` = every repo was bumped/committed/tagged or skipped, so read the JSON per repo: a `published[]` entry is pushed when its `needsPush` is true, a `skipped[]` entry (no unreleased changes) bumped nothing and gets no push; `1` = verification failed, or an `## Unreleased` entry has no type tag and the `failed[]` error quotes it (report; that repo leaves the publish set; an untagged entry is fixed through a PR, then the publish re-runs). **Idempotent resume:** if the version at HEAD is already bumped but missing from npm (a prior run's publish was abandoned), the script skips the bump and returns the repo in `published[]`; a version commit a prior run made and did not push is kept, re-tagged if its tag is gone, and returned with `needsPush: true` and `resumed: true`. Keep either in the publish set; `npm-publish-web.sh` detects an already-published version and exits 0.
 
 2. **Log in once.** Start the login in the background, then wait in the foreground per `npm-publish-auth`, re-running the wait after each relay until it exits 3:
 

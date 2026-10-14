@@ -33,11 +33,6 @@ check() { # check <name> <actual> <expected>
 has() { # has <name> <haystack> <needle>
   if [[ "$2" == *"$3"* ]]; then ok "$1"; else fail "$1: '$3' not in '$2'"; fi
 }
-# gap <name> <actual> <wanted>: a known shortfall. Printed, never a failure;
-# it turns into an ok line once the script is fixed.
-gap() {
-  if [[ "$2" == "$3" ]]; then ok "$1"; else echo "gap  $1: got '$2', want '$3'"; fi
-}
 
 FH="$TMP/home"
 mkdir -p "$FH"
@@ -126,11 +121,10 @@ printf 'rewritten\n' > "$R/a.txt"; git -C "$R" commit -q -am "Rewrite a"
 printf 'rewritten again\n' > "$R/a.txt"; git -C "$R" commit -q -am "fixup! Add a"
 TIP=$(tip clash feature)
 ops clash autosquash
-[[ "$RC" -ne 0 ]] && ok "a fixup that cannot be squashed exits non-zero" \
-  || fail "a fixup that cannot be squashed exits non-zero: got 0"
-gap "a fixup that cannot be squashed leaves no rebase in progress" "$(in_rebase clash)" no
-git -C "$R" rebase --abort >/dev/null 2>&1
-check "aborting the rebase puts the branch back" "$(tip clash feature)" "$TIP"
+check "a fixup that cannot be squashed: exit code" "$RC" 1
+check "a fixup that cannot be squashed leaves no rebase in progress" "$(in_rebase clash)" no
+check "a fixup that cannot be squashed leaves the branch as it was" "$(tip clash feature)" "$TIP"
+has "a fixup that cannot be squashed: the message says the rebase was aborted" "$ERR" "Aborting the rebase"
 
 # --- push ---
 make_repo plain

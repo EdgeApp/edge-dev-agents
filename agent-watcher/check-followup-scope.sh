@@ -80,8 +80,8 @@ API="https://app.asana.com/api/1.0"
 ATT="$(curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" \
   "$API/tasks/$TASK_GID/attachments?opt_fields=name,created_at,gid")" || { echo "check-followup-scope: attachments fetch failed" >&2; exit 1; }
 OP_GID="$(curl -sS --max-time 10 -H "Authorization: Bearer $TOKEN" "$API/users/me?opt_fields=gid" 2>/dev/null | jq -r '.data.gid // empty')"
-STORIES="$(curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" \
-  "$API/tasks/$TASK_GID/stories?opt_fields=created_at,resource_subtype,text,created_by.name,created_by.gid")" || { echo "check-followup-scope: stories fetch failed" >&2; exit 1; }
+STORIES="$(ASANA_TOKEN="$TOKEN" "$HOME/.cursor/skills/asana-paged-get.sh" \
+  "tasks/$TASK_GID/stories?opt_fields=created_at,resource_subtype,text,created_by.name,created_by.gid&limit=100")" || { echo "check-followup-scope: stories fetch failed" >&2; exit 1; }
 echo "$ATT" | jq -e '.data' >/dev/null 2>&1 || { echo "check-followup-scope: attachments response invalid: $(echo "$ATT" | head -c 200)" >&2; exit 1; }
 echo "$STORIES" | jq -e '.data' >/dev/null 2>&1 || { echo "check-followup-scope: stories response invalid: $(echo "$STORIES" | head -c 200)" >&2; exit 1; }
 

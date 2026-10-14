@@ -9,6 +9,8 @@
 # The query must carry a limit: Asana only pages a request that sets one.
 #
 # Requires env var: ASANA_TOKEN
+# Optional: ASANA_MAX_TIME, the seconds each page request may take (default
+# 30); a hook on a short budget passes less.
 #
 # Output: {"data":[...]} holding the rows of every page, in the order the API
 #         returned them.
@@ -22,6 +24,7 @@ API="https://app.asana.com/api/1.0"
 URL="$API/${1#/}"
 [[ "$URL" == *\?* ]] && SEP="&" || SEP="?"
 MAX="${ASANA_MAX_PAGES:-50}"
+MAX_TIME="${ASANA_MAX_TIME:-30}"
 
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/asana-pages.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
@@ -30,7 +33,7 @@ I=0
 while :; do
   I=$((I + 1))
   PAGE=$(printf '%s/p%04d.json' "$TMP" "$I")
-  curl -sf --max-time 30 -H "Authorization: Bearer $ASANA_TOKEN" \
+  curl -sf --max-time "$MAX_TIME" -H "Authorization: Bearer $ASANA_TOKEN" \
     "$URL${OFFSET:+${SEP}offset=$OFFSET}" > "$PAGE" \
     || { echo "Error: request failed on page $I of $1" >&2; exit 1; }
   OFFSET=$(jq -r '.next_page.offset // empty' "$PAGE")

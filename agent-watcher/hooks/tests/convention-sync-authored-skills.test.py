@@ -25,6 +25,13 @@ Covers:
      B4 .syncignore is the escape hatch: with the key file ignored, the stage
         runs and lands exactly the authored files (bucket and unrecognized
         skills stay out of the repo).
+  C. Where and when it commits
+     C1 a linked worktree of the repo is refused, and the message names the
+        main checkout to pass instead.
+     C2 a commit message the lint refuses is exit 3 with the tree staged.
+     C3 the re-run with a clean message commits that staged tree, though it
+        finds nothing new to copy.
+     C4 --commit with nothing staged makes no commit and reports committed false.
 
 Offline under a throwaway HOME and a throwaway fixture repo. No network, and
 nothing outside the temp directory is written.
@@ -73,9 +80,13 @@ def git(*args, cwd=REPO):
         cwd=cwd, capture_output=True, text=True)
 
 
-def run(*args, expect_json=True):
-    proc = subprocess.run(['bash', SCRIPT, REPO, *args], capture_output=True, text=True,
-                          env={**os.environ, 'HOME': HOME})
+GIT_ID = {'GIT_AUTHOR_NAME': 'test', 'GIT_AUTHOR_EMAIL': 'test@example.com',
+          'GIT_COMMITTER_NAME': 'test', 'GIT_COMMITTER_EMAIL': 'test@example.com'}
+
+
+def run(*args, expect_json=True, repo=REPO):
+    proc = subprocess.run(['bash', SCRIPT, repo, *args], capture_output=True, text=True,
+                          env={**os.environ, **GIT_ID, 'HOME': HOME})
     data = None
     if expect_json and proc.stdout.strip():
         try:
@@ -215,6 +226,38 @@ check('B4 exclusions still reported on the staging run',
       data is not None and {'skills/synced', 'skills/gamma', 'skills/delta'}
       <= {e['entry'] for e in data['excludedSkills']},
       data and data.get('excludedSkills'))
+
+# --- C. where and when it commits --------------------------------------------
+WT = os.path.join(TMP, 'linked', 'edge-dev-agents')
+git('worktree', 'add', '-q', '-b', 'side', WT)
+proc, _ = run(expect_json=False, repo=WT)
+check('C1 linked worktree refused', proc.returncode == 1, proc.stderr[-300:])
+check('C1 refusal names the main checkout',
+      'linked worktree' in proc.stderr and os.path.realpath(REPO) in proc.stderr, proc.stderr[-300:])
+git('worktree', 'remove', '--force', WT)
+
+# A stand-in lint: any message holding BADWORD is refused.
+write(os.path.join(SKILLS, 'no-slop/scripts/no-slop-lint.sh'),
+      '#!/usr/bin/env bash\n! grep -q BADWORD "$1"\n')
+os.chmod(os.path.join(SKILLS, 'no-slop/scripts/no-slop-lint.sh'), 0o755)
+before = git('rev-list', '--count', 'HEAD').stdout.strip()
+proc, _ = run('--commit', '-m', 'Sync BADWORD', expect_json=False)
+check('C2 refused message is exit 3', proc.returncode == 3, proc.stderr[-300:])
+check('C2 nothing committed', git('rev-list', '--count', 'HEAD').stdout.strip() == before)
+check('C2 tree stays staged', git('diff', '--cached', '--quiet').returncode == 1)
+proc, data = run('--commit', '-m', 'Sync the fixture')
+check('C3 re-run exits 0', proc.returncode == 0, proc.stderr[-300:])
+check('C3 re-run commits the staged tree',
+      int(git('rev-list', '--count', 'HEAD').stdout.strip()) == int(before) + 1
+      and git('log', '-1', '--format=%s').stdout.strip() == 'Sync the fixture',
+      git('log', '-1', '--format=%s').stdout)
+check('C3 committed is true', data is not None and data.get('committed') is True, data)
+check('C3 index is clean after', git('diff', '--cached', '--quiet').returncode == 0)
+proc, data = run('--commit', '-m', 'Sync again')
+check('C4 nothing staged is exit 0', proc.returncode == 0, proc.stderr[-300:])
+check('C4 nothing staged makes no commit',
+      git('log', '-1', '--format=%s').stdout.strip() == 'Sync the fixture')
+check('C4 committed is false', data is not None and data.get('committed') is False, data)
 
 shutil.rmtree(TMP, ignore_errors=True)
 print(f'\n{len(fails)} failure(s)' if fails else '\nall checks passed')

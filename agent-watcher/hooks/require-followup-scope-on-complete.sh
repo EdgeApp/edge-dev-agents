@@ -64,8 +64,8 @@ fi
 # failure here fails OPEN (marker exists, Asana/API may be down).
 TOKEN="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$HOME/.config/agent-watcher/credentials.json" 2>/dev/null || true)}"
 if [ -n "$TOKEN" ]; then
-  LIVE_STORIES="$(curl -sS --max-time 15 -H "Authorization: Bearer $TOKEN" \
-    "https://app.asana.com/api/1.0/tasks/$GID/stories?opt_fields=gid,created_at,resource_subtype" 2>/dev/null || true)"
+  LIVE_STORIES="$(ASANA_TOKEN="$TOKEN" ASANA_MAX_TIME=15 "$HOME/.cursor/skills/asana-paged-get.sh" \
+    "tasks/$GID/stories?opt_fields=gid,created_at,resource_subtype&limit=100" 2>/dev/null || true)"
   LIVE_NEWEST="$(printf '%s' "$LIVE_STORIES" \
     | jq -r '[.data[]? | select(.resource_subtype == "comment_added") | .created_at] | sort | last // empty' 2>/dev/null || true)"
   MARKER_NEWEST="$(jq -r '.newest_comment_at // empty' "$MARKER" 2>/dev/null || true)"

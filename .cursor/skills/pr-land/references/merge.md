@@ -13,14 +13,14 @@ Governs step 5 of `/pr-land` (auto-merge, watch, local fallback) and step 8 (the
 |--------|---------|
 | `pr-land-automerge.sh` | Arm GitHub auto-merge (or turn it off with `--disarm`), gated on reviewer bots being done and bot threads clear (see `bot-thread-gate`); `--no-bugbot-wait` drops the reviewer wait only |
 | `pr-merge-watch.sh` | Babysit armed PRs: poll until all merge (`ALL_MERGED <repo#num>=<mergeSha> ...`), a check fails, one needs a rebase (DIRTY, or BEHIND with green checks — auto-merge never updates a BEHIND branch), or one is green but blocked solely on a missing approving review |
-| `pr-land-merge.sh` | Rebase + verify + merge via GitHub API |
+| `pr-land-merge.sh` | Rebase + verify + push + merge via GitHub API |
 | `force-land-rationale.sh` | Post the pre-merge rationale comment an admin merge requires and write the marker its gate reads (see `force-land-review-bypass`) |
 
 | Script | Exit 0 | Exit 1 | Exit 2 | Exit 3 | Exit 4 |
 |--------|--------|--------|--------|--------|--------|
 | `pr-land-automerge.sh` | All armed/disarmed/merged | Blocked / unsupported / error | Usage or missing dep | - | - |
 | `pr-merge-watch.sh` | All merged | Usage error | - | Needs rebase (re-prepare listed PRs) | Check failed |
-| `pr-land-merge.sh` | Merged | Verify fail | - | - | Conflict needs resolution (CHANGELOG or code) |
+| `pr-land-merge.sh` | Merged | Verify fail, or a PR listed under `failed` | - | - | Conflict needs resolution (CHANGELOG or code) |
 | `force-land-rationale.sh` | Posted (marker written) | Checks not green / error | Usage, or no Force Land authority | - | - |
 
 (`pr-land-automerge.sh` exit 75 = another session holds the repo land lease, per `repo-land-mutex`. Exit 76 = at least one PR is only WAITING on a reviewer bot: nothing to fix and nothing armed — let the bots finish, then re-run the same call.)
@@ -69,19 +69,22 @@ echo '[{"repo":"...","prNumber":123,"branch":"<prefix>/..."}]' | ~/.cursor/skill
 The local merge script processes PRs **sequentially** with automatic rebase-before-merge:
 
 1. **Check if already merged** — skip (handles re-runs after CHANGELOG resolution)
-2. **Fetch + rebase onto upstream** — ALWAYS done, even for first PR
-3. **Conflict handling during rebase:**
+2. **Fetch + divergence check**: local branch lacks commits `origin/<branch>` has → `failed` entry with `diverged: true`, nothing pushed (same check as prepare's `diverged`)
+3. **Rebase onto upstream**: ALWAYS done, even for first PR
+4. **Conflict handling during rebase:**
    - No conflict → continue
    - CHANGELOG-only (any section) → **exit 4** (agent resolves, re-runs)
    - Code conflict → **exit 4**, rebase left in progress (resolve per `code-conflicts`, else abort and skip the PR)
-4. **Push `--force-with-lease`**
-5. **Run local verification** (MANDATORY)
-6. **Merge via GitHub API**
+5. **Run local verification** (MANDATORY): a failure pushes nothing
+6. **Push with a lease pinned to the remote tip read at step 2**: a commit someone pushes during the run is never replaced; the push fails and the PR is listed under `failed`
+7. **Merge via GitHub API**
 
 **Exit codes:**
 - `0` = All (non-skipped) PRs merged
-- `1` = Verification failed
+- `1` = Verification failed (`status: verification_failed`), or a PR is listed under `failed`: merge refused, install or push failed, or `diverged: true`. Read each `failed[].message`.
 - `4` = Conflict needs resolution (rebase left in progress) — CHANGELOG-only OR code
+
+**On a `failed` entry with `diverged: true`:** handle it as prepare's `diverged` status (prepare's status table). Never force-push to clear it.
 
 **On exit 4:** Resolve per the conflict type (CHANGELOG → `changelog-conflicts`; code → `code-conflicts`, only if confidently determinable, else `git rebase --abort` and skip), push `--force-with-lease`, re-run merge. Script detects already-merged PRs and skips them.
 </step>

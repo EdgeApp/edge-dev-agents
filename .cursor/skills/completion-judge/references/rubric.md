@@ -62,7 +62,7 @@ The bundle's "Segment scope" line decides what the bar is:
 
   | Field delta | The ask | Delivered when |
   |---|---|---|
-  | Force Land set | land the PR | git section shows the PR MERGED, or the report says auto-merge is armed |
+  | Force Land set | land the PR | git section shows the PR MERGED; armed auto-merge is not delivery |
   | Build (staging/cheese) set or changed | route the build (cheese pushed, staging noted) | the Finalize Gate build box is checked with the routing named |
   | TDD? set | the TDD flow: design doc in the first commit, kept current | the report's tdd fields and the diff show the doc |
   | tested changed to a platform | re-verify on that platform | an attempt-log success drive on it and matching proof frames |
@@ -77,7 +77,7 @@ The bundle's "Segment scope" line decides what the bar is:
   | unresolved review threads on an owned PR (any author) | address each: fix or answer, reply, then resolve | `github_blocking_threads` reads zero and the diff or replies show the fixes |
   | unanswered review bodies or top-level PR comments on an owned PR | reply to each and mark it addressed | `github_unanswered_bodies` reads zero |
   | reviewDecision CHANGES_REQUESTED | the two rows above, then ready for re-review | counters zero; Complete means "ready for re-review", never "re-approved" |
-  | reviewDecision APPROVED with checks green | land per the landing rules | PR MERGED or auto-merge armed |
+  | reviewDecision APPROVED with checks green | land per the landing rules | git section shows the PR MERGED; armed auto-merge is not delivery |
   | a failing or missing check on HEAD | fix the failure | checks green or completed on HEAD. The one sanctioned red: on a PR whose `labels` include `awaiting-dep-publish` and whose `awaiting_dep_publish` names a package, a failed CI check is delivered when the report's Finalize Gate names it as excused under that label and names the awaited package. The label excuses CI checks only, never a reviewer-bot check or a thread, and with an empty `awaiting_dep_publish` it excuses nothing |
   | reviewer bots incomplete on HEAD | let them run and conclude | `github_bots_incomplete` reads zero. That count already excludes bots listed in `github_bots_waived` (an outage watch-pr recorded on this HEAD): a waived bot is delivered as one unchecked Finalize Gate box, and no wait, retrigger or outage confirmation is owed for it |
   | threads on a PR the run does NOT own | reply only, no resolving, no Complete on their behalf | replies present; the thread count is not this segment's to zero |

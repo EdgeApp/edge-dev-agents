@@ -91,6 +91,19 @@ validate_repo_dir() {
   return 1
 }
 
+# A linked worktree cannot check out the default branch while the main checkout
+# holds it, so the branch switch below would fail half way. Refuse it up front
+# and name the main checkout to pass instead.
+refuse_linked_worktree() {
+  local repo_dir="$1" git_dir common_dir
+  git_dir="$(git -C "$repo_dir" rev-parse --path-format=absolute --git-dir 2>/dev/null)" || return 0
+  common_dir="$(git -C "$repo_dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 0
+  [[ "$git_dir" == "$common_dir" ]] && return 0
+  echo "ERROR: $repo_dir is a linked worktree; the sync checks out the default branch itself and runs only in the main checkout." >&2
+  echo "  Pass the main checkout instead: convention-sync.sh $(dirname "$common_dir")" >&2
+  return 1
+}
+
 ORIG_ARGS=("$@")
 
 while [[ $# -gt 0 ]]; do
@@ -113,7 +126,7 @@ if [[ -z "$REPO_DIR" ]]; then
   fi
 fi
 
-if ! validate_repo_dir "$REPO_DIR"; then
+if ! validate_repo_dir "$REPO_DIR" || ! refuse_linked_worktree "$REPO_DIR"; then
   exit 1
 fi
 
@@ -1016,26 +1029,6 @@ if [[ "$DO_STAGE" == true ]] && (( total + extra_total > 0 )); then
     process_extra "stage"
     extra_total=$(echo "$extra_json" | jq 'length')
 
-    if [[ "$DO_COMMIT" == true ]]; then
-      # The commit message is outward prose (it becomes the Slack announcement
-      # verbatim), so it passes the shared no-slop lint BEFORE the commit exists;
-      # the Slack gate downstream would otherwise catch it only after the push.
-      # Mechanical tier only (deterministic, no judge call); findings abort the
-      # commit with the staged tree left in place, exit 3.
-      local_lint="$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh"
-      if [[ -x "$local_lint" ]]; then
-        msg_file=$(mktemp -t sync-commit-msg.XXXXXX)
-        printf '%s\n' "$COMMIT_MSG" > "$msg_file"
-        if ! lint_out=$("$local_lint" "$msg_file" 2>&1); then
-          echo "convention-sync: commit message fails no-slop-lint; nothing committed (tree stays staged):" >&2
-          echo "$lint_out" >&2
-          rm -f "$msg_file"
-          exit 3
-        fi
-        rm -f "$msg_file"
-      fi
-      git commit -m "$COMMIT_MSG" >&2   # keep stdout pure JSON
-    fi
   else
     while IFS= read -r f; do
       [[ -z "$f" ]] && continue
@@ -1066,6 +1059,33 @@ if [[ "$DO_STAGE" == true ]] && (( total + extra_total > 0 )); then
   fi
 fi
 
+# The commit reads the index, not this run's diff: a run whose message the lint
+# refused leaves its tree staged, so the re-run finds nothing new to copy and
+# still commits what is staged. committed is true only when a commit was made.
+COMMITTED=false
+if [[ "$DO_COMMIT" == true && "$DIRECTION" == "user-to-repo" ]] \
+  && ! git -C "$REPO_DIR" diff --cached --quiet; then
+  # The commit message is outward prose (it becomes the Slack announcement
+  # verbatim), so it passes the shared no-slop lint BEFORE the commit exists;
+  # the Slack gate downstream would otherwise catch it only after the push.
+  # Mechanical tier only (deterministic, no judge call); findings abort the
+  # commit with the staged tree left in place, exit 3.
+  local_lint="$HOME/.cursor/skills/no-slop/scripts/no-slop-lint.sh"
+  if [[ -x "$local_lint" ]]; then
+    msg_file=$(mktemp -t sync-commit-msg.XXXXXX)
+    printf '%s\n' "$COMMIT_MSG" > "$msg_file"
+    if ! lint_out=$("$local_lint" "$msg_file" 2>&1); then
+      echo "convention-sync: commit message fails no-slop-lint; nothing committed (tree stays staged):" >&2
+      echo "$lint_out" >&2
+      rm -f "$msg_file"
+      exit 3
+    fi
+    rm -f "$msg_file"
+  fi
+  git -C "$REPO_DIR" commit -m "$COMMIT_MSG" >&2   # keep stdout pure JSON
+  COMMITTED=true
+fi
+
 jq -n \
   --arg repoDir "$REPO_DIR" \
   --argjson new "$new_json" \
@@ -1084,5 +1104,5 @@ jq -n \
   --argjson secretFindings "$secret_findings_json" \
   --arg settingsBackup "$settings_backup" \
   --arg staged "$DO_STAGE" \
-  --arg committed "$DO_COMMIT" \
+  --arg committed "$COMMITTED" \
   '{repoDir: $repoDir, originBranch: $originBranch, originAhead: $originAhead, total: $total, new: $new, modified: $modified, deleted: $deleted, ignored: $ignored, warnings: $warnings, extra: $extra, extraTotal: $extraTotal, skippedNewer: $skippedNewer, droppedHooks: $droppedHooks, excludedSkills: $excludedSkills, secretFindings: $secretFindings, settingsBackup: $settingsBackup, staged: ($staged == "true"), committed: ($committed == "true")}'

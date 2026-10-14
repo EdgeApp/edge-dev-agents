@@ -12,24 +12,17 @@
 # Runs the real script against throwaway repos with a bare origin. The npm
 # command, the package manager wrapper, the dependency installer and the load
 # wait are stand-ins, so nothing is installed and nothing reaches the network.
-#
-# A line that starts with "gap" marks behavior this test found and did not
-# change. It does not fail the file, and turns into an "ok" line once the
-# script is fixed.
 set -uo pipefail
 
 REAL="$HOME/.cursor/skills"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/land-publish-test.XXXXXX")
 TMP=$(cd "$TMP" && pwd -P)
 trap 'rm -rf "$TMP"' EXIT
-FAILS=0; GAPS=0
+FAILS=0
 ok()   { echo "ok   $1"; }
 fail() { echo "FAIL $1"; FAILS=$((FAILS + 1)); }
 check() { # check <name> <actual> <expected>
   if [[ "$2" == "$3" ]]; then ok "$1"; else fail "$1: got '$2', want '$3'"; fi
-}
-gap() { # gap <name> <actual> <safer value>
-  if [[ "$2" == "$3" ]]; then ok "$1"; else echo "gap  $1: the script gives '$2', safer is '$3'"; GAPS=$((GAPS + 1)); fi
 }
 
 FH="$TMP/home"
@@ -166,9 +159,10 @@ make_repo badentry "$VERIFY" "- Fixed a bug with no tag"
 BEFORE=$(git -C "$FH/git/badentry" rev-parse HEAD)
 publish "$(one badentry)"
 check "an entry with no type tag: nothing is committed" "$(git -C "$FH/git/badentry" rev-parse HEAD)" "$BEFORE"
-check "an entry with no type tag: the result quotes the entry" "$(j '.skipped[0].error')" \
-  "Invalid entry format: - Fixed a bug with no tag"
-gap "an entry with no type tag: exit code" "$RC" 1
+check "an entry with no type tag: the result quotes the entry" "$(j '.failed[0].error')" \
+  "Changelog entry has no type tag (added, changed, deprecated, removed, fixed or security): - Fixed a bug with no tag"
+check "an entry with no type tag: exit code" "$RC" 1
+check "an entry with no type tag: nothing is verified" "$(wc -l < "$FAKE/pm.log" | tr -d ' ')" 0
 
 # --- verification fails ---
 make_repo red "$VERIFY" "- fixed: A bug"
@@ -185,12 +179,24 @@ check "failed verification: the checkout is clean" "$(git -C "$FH/git/red" statu
 # The first run left the bump as a local commit and tag, not pushed.
 make_repo again "$VERIFY" "- fixed: A bug"
 publish "$(one again)"
+FIRST=$(git -C "$FH/git/again" rev-parse HEAD)
 publish "$(one again)"
-gap "a second run before the push: exit code" "$RC" 0
-gap "a second run before the push reports the same version" "$(j '.published[0].newVersion // "none"')" 1.2.4
-has_error=$(j '.failed[0].error // ""')
-[[ "$RC" -eq 0 || "$has_error" == *"already exists"* ]] && ok "a second run before the push fails on the existing tag" \
-  || fail "a second run before the push fails on the existing tag: $has_error"
+check "a second run before the push: exit code" "$RC" 0
+check "a second run before the push reports the same version" "$(j '.published[0].newVersion // "none"')" 1.2.4
+check "a second run before the push keeps the first bump" "$(git -C "$FH/git/again" rev-parse HEAD)" "$FIRST"
+check "a second run before the push asks for a push" "$(j '.published[0].needsPush')" true
+check "a second run before the push says it resumed" "$(j '.published[0].resumed')" true
+check "a second run before the push verifies nothing" "$(wc -l < "$FAKE/pm.log" | tr -d ' ')" 0
+# The same, with the tag gone (develop-staging deletes unpushed tags first).
+git -C "$FH/git/again" tag -d v1.2.4 >/dev/null
+publish "$(one again)"
+check "a second run with the tag gone: the tag is made again" "$(git -C "$FH/git/again" rev-parse v1.2.4 2>/dev/null)" "$FIRST"
+# A local commit that is not a version commit is still reset away.
+make_repo stray "$VERIFY" "- fixed: A bug"
+commit_stray() { printf 'x\n' >> "$FH/git/stray/stray.txt"; git -C "$FH/git/stray" add -A; git -C "$FH/git/stray" commit -q -m "Stray"; }
+commit_stray
+publish "$(one stray)"
+check "a stray local commit is reset away and the bump made" "$(git -C "$FH/git/stray" log -1 --format=%s HEAD~1)" Base
 
 # The bump is pushed and the package is not on npm yet.
 make_repo pushed "$VERIFY" "- fixed: A bug"
@@ -215,5 +221,4 @@ check "a busy land lock: the version is not written" "$(version busy)" 1.2.3
 check "a busy land lock keeps the other owner's lease" \
   "$(jq -r .owner "$TMP/state/agent-watcher/land-locks/busy.json" 2>/dev/null)" someone-else
 
-if [[ "$GAPS" -gt 0 ]]; then echo "$GAPS gaps found and left as they are"; fi
 if [[ "$FAILS" -eq 0 ]]; then echo "all passed"; else echo "$FAILS failed"; exit 1; fi

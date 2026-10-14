@@ -239,7 +239,16 @@ run_autosquash() {
   resolve_base
 
   rm -f "$(git rev-parse --git-path index.lock)"
-  GIT_EDITOR=true GIT_SEQUENCE_EDITOR=: git rebase -i "$BASE" --autosquash
+  # A conflict aborts the rebase, as fold-one and fold-before do, so the branch
+  # is never left mid-rebase.
+  if ! GIT_EDITOR=true GIT_SEQUENCE_EDITOR=: git rebase -i "$BASE" --autosquash; then
+    echo "Error: autosquash rebase failed (base: $BASE)" >&2
+    if [[ -d "$(git rev-parse --git-path rebase-merge)" ]] || [[ -d "$(git rev-parse --git-path rebase-apply)" ]]; then
+      echo "Aborting the rebase; every fixup stays where it was" >&2
+      git rebase --abort 2>&1 | sed 's/^/  /' >&2 || true
+    fi
+    exit 1
+  fi
   echo ">> Autosquash complete (base: $BASE)"
 }
 

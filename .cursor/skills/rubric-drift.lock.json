@@ -557,7 +557,7 @@
       ]
     },
     "file:require-followup-scope-on-complete.sh": {
-      "hash": "6baeb0563785",
+      "hash": "8227e032816c",
       "dims": [
         "A14",
         "A9"
@@ -907,8 +907,8 @@
       "hash": "c82cc648a11d"
     },
     "bugbot:slot-after-each-fixup": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "c3122674c28e"
+      "reason": "2026-10-14: mechanically decided by slot-fixup.sh (moves the fixup next to its target on an owned PR, leaves it on top on a PR the run does not own); the agent only runs it after lint-commit.sh, and A12/A24 grade the resulting fixup shape and push",
+      "hash": "1bea4b4434ad"
     },
     "bugbot:fixup-target-headline": {
       "reason": "2026-09-11: target choice is judgment inside bugbot cycles; A24 grades the fixup model, bugbot is a delegate of pr-address",
@@ -1135,8 +1135,8 @@
       "hash": "0603d97670c0"
     },
     "pr-address:slot-after-each-fixup": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "14718b3cf86d"
+      "reason": "2026-10-14: mechanically decided by slot-fixup.sh (moves the fixup next to its target on an owned PR, leaves it on top on a PR the run does not own); the agent only runs it after lint-commit.sh, and A12/A24 grade the resulting fixup shape and push",
+      "hash": "4bbbeb9cacd6"
     },
     "pr-address:script-timeouts": {
       "reason": "2026-09-23: timeout list gained edit-review-body; mechanical call hygiene, not eval-graded behavior",

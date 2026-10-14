@@ -135,8 +135,8 @@ detail)
     "$API/tasks/$TASK?opt_fields=name,notes,completed,tags.name,custom_fields.name,custom_fields.enum_value.name,custom_fields.multi_enum_values.name")
   s=$(curl -sf --max-time 30 "${auth[@]}" \
     "$API/tasks/$TASK/subtasks?limit=25&opt_fields=name,completed")
-  c=$(curl -sf --max-time 30 "${auth[@]}" \
-    "$API/tasks/$TASK/stories?opt_fields=type,text,created_at,created_by.name")
+  c=$(ASANA_TOKEN="$TOKEN" "$HOME/.cursor/skills/asana-paged-get.sh" \
+    "tasks/$TASK/stories?opt_fields=type,text,created_at,created_by.name&limit=100")
   jq -n --argjson t "$t" --argjson s "$s" --argjson c "$c" '{
     gid: $t.data.gid, name: $t.data.name, completed: $t.data.completed,
     notes: (($t.data.notes // "")[0:3000]),

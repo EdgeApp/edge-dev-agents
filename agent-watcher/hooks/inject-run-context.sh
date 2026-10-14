@@ -78,8 +78,8 @@ emit_run() {
     if [[ "${nreports:-0}" -gt 0 ]]; then
       echo "DESCRIPTION STALENESS: this task has $nreports completed run report(s); the CURRENT STATE section, the TDD, and run reports record what was DELIVERED and may postdate the operator prose. For what is REQUIRED, operator text still outranks all agent-authored text, newest operator statement first (task-review operator-final-say); reconcile delivered-vs-required before treating either as scope."
     fi
-    stories=$(curl -s --max-time 6 -H "Authorization: Bearer $tok" \
-      "https://app.asana.com/api/1.0/tasks/$gid/stories?opt_fields=type,created_at,text,created_by.gid&limit=100" 2>/dev/null \
+    stories=$(ASANA_TOKEN="$tok" ASANA_MAX_TIME=6 "$HOME/.cursor/skills/asana-paged-get.sh" \
+      "tasks/$gid/stories?opt_fields=type,created_at,text,created_by.gid&limit=100" 2>/dev/null \
       | jq -L "$HOME/.config/agent-watcher/lib" -r --arg wm "$wm" --arg gid "$gid" --arg op "$(curl -s --max-time 6 -H "Authorization: Bearer $tok" "https://app.asana.com/api/1.0/users/me?opt_fields=gid" 2>/dev/null | jq -r '.data.gid // empty')" --argjson ceil "${ASANA_TEXT_CEILING:-20000}" 'include "agent-authored";
 
           [.data[]? | select(.type == "comment" and .created_at > $wm) | "  [\(.created_at)] [\(authored_class($op))] \(.text | gsub("\n"; "\n    "))"]

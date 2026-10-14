@@ -6,12 +6,18 @@
 #                          branch has; its own earlier rewrite of the local
 #                          branch does not trip the stop on a re-run.
 #   pr-finalize-fixups.sh  on a PR someone else owns, pushes the fixups as
-#                          committed (no condense); on an owned PR it condenses.
+#                          committed (no condense) with a plain push, and
+#                          stops without pushing when the remote tip is not
+#                          part of the local branch; on an owned PR it
+#                          condenses.
+#   slot-fixup.sh          on a PR someone else owns, leaves a new fixup on
+#                          top in commit order; on an owned PR it moves the
+#                          fixup next to its target.
 #
 # Runs the real scripts against throwaway repos with a bare origin. The
-# dependency installer, the verifier, the review-mode lookup and the branch-base
-# lookup are stand-ins in a private HOME, so nothing is installed and nothing
-# reaches the network.
+# dependency installer, the verifier, the review-mode lookup, the branch-base
+# lookup and gh are stand-ins in a private HOME, so nothing is installed and
+# nothing reaches the network.
 set -uo pipefail
 
 REAL="$HOME/.cursor/skills"
@@ -30,7 +36,14 @@ SK="$FH/.cursor/skills"
 mkdir -p "$SK/pr-land/scripts" "$SK/pr-address/scripts" "$FH/git" "$TMP/state"
 cp "$REAL/pr-land/scripts/pr-land-prepare.sh" "$REAL/pr-land/scripts/edge-repo.js" \
    "$REAL/pr-land/scripts/repo-land-lock.sh" "$SK/pr-land/scripts/"
-cp "$REAL/pr-finalize-fixups.sh" "$REAL/git-branch-ops.sh" "$SK/"
+cp "$REAL/pr-finalize-fixups.sh" "$REAL/git-branch-ops.sh" "$REAL/slot-fixup.sh" "$SK/"
+mkdir -p "$TMP/bin"
+cat > "$TMP/bin/gh" <<'SH'
+#!/usr/bin/env bash
+[[ "$1 $2" == "pr view" ]] && echo '{"number":1,"headRepositoryOwner":{"login":"o"},"headRepository":{"name":"r"}}'
+SH
+chmod +x "$TMP/bin/gh"
+export PATH="$TMP/bin:$PATH"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$SK/install-deps.sh"
 printf 'process.exit(0)\n' > "$SK/verify-repo.sh"
 printf '#!/usr/bin/env bash\necho origin/master\n' > "$SK/git-branch-base.sh"
@@ -153,6 +166,37 @@ OUT=$(finalize owned true); RC=$?
 check "owner: exit code" "$RC" 0
 check "owner: fixups condensed to one on the remote" \
   "$(git -C "$TMP/owned.origin.git" log --format=%s master..feature | grep -c '^fixup! ')" 1
+
+# The owner pushed after this checkout last fetched it: no push, exit 1.
+make_repo moved
+R="$FH/git/moved"
+other_push moved theirs.txt "Owner change"
+git -C "$R" fetch -q origin
+commit "$R" feature.txt two -m "fixup! Add feature" -m "Round" -m "Fixup-for: auto"
+REMOTE_BEFORE=$(git -C "$TMP/moved.origin.git" rev-parse feature)
+(cd "$R" && HOME="$FH" FAKE_IS_OWNER=false "$SK/pr-finalize-fixups.sh" \
+  --owner o --repo r --pr 1 >/dev/null 2>"$TMP/finalize.err"); RC=$?
+check "not the owner, remote moved: exit code" "$RC" 1
+check "not the owner, remote moved: remote untouched" \
+  "$(git -C "$TMP/moved.origin.git" rev-parse feature)" "$REMOTE_BEFORE"
+check "not the owner, remote moved: the message says it is never force-pushed" \
+  "$(grep -c 'never force-pushed' "$TMP/finalize.err")" 1
+
+# slot <name> <is-owner>: a fixup for the first of two commits, then
+# slot-fixup.sh. Prints the exit code and the branch subjects, oldest first.
+slot() {
+  local R="$FH/git/$1" RC
+  make_repo "$1"
+  commit "$R" other.txt one -m "Add other"
+  commit "$R" feature.txt two -m "fixup! Add feature"
+  (cd "$R" && HOME="$FH" FAKE_IS_OWNER="$2" "$SK/slot-fixup.sh" >"$TMP/slot.out" 2>&1); RC=$?
+  echo "$RC $(git -C "$R" log --reverse --format=%s origin/master..HEAD | paste -sd '|' -)"
+}
+check "slot, not the owner: fixup stays on top" "$(slot slot-unowned false)" \
+  "0 Add feature|Add other|fixup! Add feature"
+check "slot, not the owner: says why" "$(grep -c 'Not the PR author' "$TMP/slot.out")" 1
+check "slot, owner: fixup moves next to its target" "$(slot slot-owned true)" \
+  "0 Add feature|fixup! Add feature|Add other"
 
 echo "---"
 if [[ $FAILS -eq 0 ]]; then echo "all passed"; else echo "$FAILS failed"; exit 1; fi
