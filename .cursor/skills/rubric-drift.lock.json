@@ -20,7 +20,7 @@
       ]
     },
     "file:update-status.sh": {
-      "hash": "d9f6acad88d3",
+      "hash": "b086607db505",
       "dims": [
         "A4",
         "O8"
@@ -222,7 +222,7 @@
       ]
     },
     "file:set-tested.sh": {
-      "hash": "d3b40d2b73de",
+      "hash": "c3a49ef3aed5",
       "dims": [
         "A22"
       ]
@@ -246,25 +246,25 @@
       ]
     },
     "file:asana-watcher.js": {
-      "hash": "0844669b1ac7",
+      "hash": "8ff1dbc417f5",
       "dims": [
         "O1"
       ]
     },
     "file:runaway-guard.sh": {
-      "hash": "927d3a2be08a",
+      "hash": "6f41fa149edd",
       "dims": [
         "O2"
       ]
     },
     "file:memory-monitor.sh": {
-      "hash": "f076efc0fb0b",
+      "hash": "bd44c4c34f10",
       "dims": [
         "O3"
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "8a49666ac4fc",
+      "hash": "a67bd8292330",
       "dims": [
         "O4",
         "O5",
@@ -273,7 +273,7 @@
       ]
     },
     "file:setup-task-workspace.sh": {
-      "hash": "1dc160a97806",
+      "hash": "7cce7ae08e9b",
       "dims": [
         "O8"
       ]
@@ -417,7 +417,7 @@
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "52cbbd11b956",
+      "hash": "58f140a348cc",
       "dims": [
         "A9"
       ]
@@ -485,7 +485,7 @@
     "file:asana-field-value.sh": {
       "hash": "0558fd01ecf1",
       "dims": [
-        "A29"
+        "A31"
       ]
     },
     "tdd:draft-gate": {
@@ -539,7 +539,7 @@
       ]
     },
     "file:tdd-doc-links.sh": {
-      "hash": "f69f1e424e4a",
+      "hash": "e5f75c3ec160",
       "dims": [
         "A31"
       ]
@@ -557,14 +557,14 @@
       ]
     },
     "file:require-followup-scope-on-complete.sh": {
-      "hash": "add3bf7c6af8",
+      "hash": "6baeb0563785",
       "dims": [
         "A14",
         "A9"
       ]
     },
     "file:lint-commit.sh": {
-      "hash": "9dd80b357ef8",
+      "hash": "137b11a992c2",
       "dims": [
         "A12"
       ]
@@ -612,7 +612,7 @@
       ]
     },
     "file:tdd-stamp.sh": {
-      "hash": "0df36cf7a9c9",
+      "hash": "635273489b44",
       "dims": [
         "A31"
       ]
@@ -648,7 +648,7 @@
       ]
     },
     "file:operator-hold-gate.sh": {
-      "hash": "e540a32624a8",
+      "hash": "cfec07daa2aa",
       "dims": [
         "A7"
       ]
@@ -667,13 +667,13 @@
       ]
     },
     "file:require-completion-judgment.sh": {
-      "hash": "0d65c972e498",
+      "hash": "ec894d3275a7",
       "dims": [
         "O9"
       ]
     },
     "file:completion-judge.sh": {
-      "hash": "ae62c0994787",
+      "hash": "455c22997bae",
       "dims": [
         "O9"
       ]
@@ -721,7 +721,7 @@
       ]
     },
     "file:block-raw-gh-writes.sh": {
-      "hash": "293b687654ba",
+      "hash": "b6a3620b6db2",
       "dims": [
         "A36"
       ]
@@ -1761,14 +1761,14 @@
   },
   "excluded_skills": {
     "resume-session": "2026-07-19: operator/discussion tooling; not an orch dependent",
-    "tdd": "2026-07-19: operator/discussion tooling; not an orch dependent",
+    "tdd": "2026-10-13: left out of the uncovered-rule check only. It IS an orch dependent: one-shot delegates to it (tdd-when-flagged), and the six tdd rules that dimensions A29, A30, A31 and A33 cite stay anchored and tracked. The earlier reason (operator/discussion tooling; not an orch dependent) contradicted those anchors. Its other rules have not been judged one by one.",
     "author": "2026-07-19: operator/discussion tooling; not an orch dependent",
     "q": "2026-07-19: operator/discussion tooling; not an orch dependent",
     "obsidian": "2026-07-19: operator/discussion tooling; not an orch dependent",
     "chat-audit": "2026-07-19: operator/discussion tooling; not an orch dependent",
     "convention-sync": "2026-07-19: operator/discussion tooling; not an orch dependent",
     "local-research": "2026-07-19: operator/discussion tooling; not an orch dependent",
-    "pr-review": "2026-07-19: operator/discussion tooling; not an orch dependent",
+    "pr-review": "2026-10-13: left out of the uncovered-rule check only. It IS an orch dependent: one-shot routes review tasks and its self-review phase to it, and the two pr-review rules that dimensions A33 and A36 cite stay anchored and tracked. The earlier reason (operator/discussion tooling; not an orch dependent) contradicted those anchors. Its other rules have not been judged one by one.",
     "asana-task-create": "2026-07-19: operator/discussion tooling; not an orch dependent",
     "standup": "2026-07-19: operator/discussion tooling; not an orch dependent",
     "agent-eval": "2026-07-19: the eval layer itself; grades orch runs, is not one",
@@ -1782,5 +1782,6 @@
     "slack": "2026-08-26: operator comms tooling driven from anchors/chats; orch runs draft comms as gists for human review and never invoke /slack",
     "fleet-panel": "2026-09-10: operator tooling: the fleet anchor's artifact loop; never invoked inside an orchestrated run",
     "claude-usage": "2026-09-25: operator/agent query tool, not part of the orch run workflow; its token rules are enforced by the script itself"
-  }
+  },
+  "file_fingerprint": 2
 }

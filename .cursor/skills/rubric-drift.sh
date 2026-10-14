@@ -20,12 +20,22 @@
 # token resolving under ~/.config/agent-watcher is a file anchor; any
 # templates/*.md token resolving under a skill dir is a file anchor.
 #
+# What a FILE anchor's fingerprint covers (lock field file_fingerprint: 2):
+#   narrowed  when every dimension citing the file names, in backticks, a
+#             top-level function, constant or variable of it (or, for a .md
+#             file, a <tag> block): the header comment plus those blocks.
+#   whole     otherwise: the header comment plus every line that is not a
+#             full-line comment (.md: the whole file). A comment edit below
+#             the header no longer trips the anchor; any code edit still does.
+# --fingerprints lists which mode each file anchor is in and why. A lock
+# without the field holds the older whole-file fingerprint; --narrow moves it.
+#
 # State: rubric-drift.lock.json next to this script (syncs via convention-sync).
 # Holds last-reconciled hashes + the acknowledged-uncovered list (rules triaged
 # as not-eval-relevant, with reasons). Rules are NOT tagged in their SKILL.md.
 #
 # Usage:
-#   rubric-drift.sh                          # check; exit 0 clean, 1 drift found
+#   rubric-drift.sh                          # check; reads the lock, never writes it
 #   rubric-drift.sh --baseline [--reason R]  # snapshot all hashes; ack all
 #                                            #   currently-uncovered rules as R
 #   rubric-drift.sh --forget A [A...]        # drop a lock anchor the rubric no longer
@@ -40,14 +50,38 @@
 #                                            # (operator/discussion tooling never runs
 #                                            # inside an orch run), so its rules are
 #                                            # never flagged UNCOVERED and need no acks
+#   rubric-drift.sh --prune                  # drop acks the lock no longer needs: for
+#                                            #   rules a dimension now anchors, and for
+#                                            #   rules that were deleted
+#   rubric-drift.sh --lapsed                 # list the lapsed blanket acks. Reads only
+#   rubric-drift.sh --fingerprints           # list each file anchor: narrowed (with the
+#                                            #   blocks) or whole (with the dimensions
+#                                            #   that name no block). Reads only
+#   rubric-drift.sh --narrow                 # one-time: move a lock from the whole-file
+#                                            #   fingerprint to the narrowed one. Refuses
+#                                            #   unless every file anchor is clean first
 #   rubric-drift.sh --map                    # emit {dim: {name, gate, file, line}} JSON
 #                                            #   (consumed by eval-run report annotation)
+#
+# Only --baseline, --reconcile, --forget, --ack, --exclude-skill, --prune and
+# --narrow write the lock. The check and --map read it and leave it byte for byte as found.
 #
 # Acks are PER-VERSION (store the rule's hash at ack time): if an acked rule's
 # content later changes it re-flags once as UNCOVERED-CHANGED for re-triage.
 #
-# Env (for testing): RD_SKILLS_DIR, RD_RULES_DIR, RD_WATCHER_DIR, RD_LOCK.
-# Exit: 0 = clean, 1 = drift/coverage findings, 2 = usage/parse error.
+# A BLANKET ack is one --baseline wrote for every rule at once, with nobody
+# judging the rule. It lapses 90 days after its date: the check then prints one
+# LAPSED-ACK summary line and --lapsed lists the rules. A lapsed ack is a
+# reminder to judge the rule, never a finding: it does not change the exit
+# code. --ack on the rule replaces it with a judged one.
+#
+# Env (for testing): RD_SKILLS_DIR, RD_RULES_DIR, RD_WATCHER_DIR, RD_LOCK,
+# RD_TODAY (YYYY-MM-DD in place of the clock).
+# Exit (check): 0 = clean; 1 = an anchored rule or file drifted (CHANGED,
+#   MISSING, NEW-ANCHOR, UNANCHORED), with or without uncovered rules;
+#   3 = no drift, but a rule is uncovered (UNCOVERED, UNCOVERED-CHANGED);
+#   2 = usage/parse error. STALE-ACK, REDUNDANT-ACK, LAPSED-ACK and PARSE-WARN
+#   lines are notes and never change the exit code.
 set -euo pipefail
 
 # Bash 3.2 cannot nest a heredoc inside "$(...)", so the node payload lives
@@ -80,7 +114,7 @@ const vals = (f) => { // all non-flag tokens after f
   for (let j = i + 1; j < argv.length && !argv[j].startsWith('--'); j++) out.push(argv[j])
   return out
 }
-const MODE = has('--baseline') ? 'baseline' : has('--forget') ? 'forget' : has('--reconcile') ? 'reconcile' : has('--ack') ? 'ack' : has('--map') ? 'map' : has('--exclude-skill') ? 'exclude' : 'check'
+const MODE = has('--baseline') ? 'baseline' : has('--forget') ? 'forget' : has('--reconcile') ? 'reconcile' : has('--ack') ? 'ack' : has('--map') ? 'map' : has('--exclude-skill') ? 'exclude' : has('--prune') ? 'prune' : has('--narrow') ? 'narrow' : has('--fingerprints') ? 'fingerprints' : has('--lapsed') ? 'lapsed' : 'check'
 
 const sha = (s) => crypto.createHash('sha256').update(s.replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 12)
 
@@ -123,9 +157,10 @@ for (const key of ruleIndex.keys()) {
 // anchors: Map key -> { dims:Set, kind:'rule'|'file', hash|null, path? }
 const anchors = new Map()
 const parseErrors = []
-function addAnchor(key, dim, kind, hash, p) {
-  if (!anchors.has(key)) anchors.set(key, { dims: new Set(), kind, hash, path: p })
+function addAnchor(key, dim, kind, hash, p, tokens) {
+  if (!anchors.has(key)) anchors.set(key, { dims: new Set(), kind, hash, path: p, named: new Map() })
   anchors.get(key).dims.add(dim)
+  if (tokens) anchors.get(key).named.set(dim, tokens)
 }
 function resolveFile(tok) {
   const isFile = (c) => { try { return fs.statSync(c).isFile() } catch { return false } }
@@ -175,7 +210,9 @@ for (const rubric of RUBRICS) {
     for (const tok of fileToks) {
       const p = resolveFile(tok)
       if (!p) { parseErrors.push(`${dim}: unresolvable file anchor "${tok}"`); continue }
-      addAnchor('file:' + path.basename(tok), dim, 'file', sha(fs.readFileSync(p, 'utf8')), p)
+      // hash is filled in once the lock says which fingerprint it holds
+      const ticks = [...grounding.matchAll(/`<?([A-Za-z_][\w-]*)>?`/g)].map((t) => t[1])
+      addAnchor('file:' + path.basename(tok), dim, 'file', null, p, ticks)
     }
   }
 }
@@ -187,35 +224,145 @@ const lock = fs.existsSync(LOCK)
   ? JSON.parse(fs.readFileSync(LOCK, 'utf8'))
   : { baselined_at: null, anchors: {}, acked_uncovered: {} }
 const save = () => fs.writeFileSync(LOCK, JSON.stringify(lock, null, 2) + '\n')
-const today = new Date().toISOString().slice(0, 10)
+
+// ---- file anchor fingerprints ----
+// The header is the leading run of comment and blank lines (shebang included).
+function headerEnd(lines, ext) {
+  const c = ext === '.js' ? '//' : '#'
+  let i = 0, inBlock = false
+  for (; i < lines.length; i++) {
+    const t = lines[i].trim()
+    if (inBlock) { if (t.includes('*/')) inBlock = false; continue }
+    if (ext === '.js' && t.startsWith('/*')) { if (!t.includes('*/')) inBlock = true; continue }
+    if (t === '' || t.startsWith(c) || t.startsWith('#!')) continue
+    break
+  }
+  return i
+}
+// A named block: a top-level definition of the token, through its closing
+// line when the definition line opens a bracket. null when the file has none.
+function blockOf(lines, tok, ext) {
+  if (ext === '.md') {
+    const i = lines.findIndex((l) => new RegExp('<' + tok + '[\\s>]').test(l))
+    if (i < 0) return null
+    let j = i
+    while (j < lines.length && !lines[j].includes('</' + tok + '>')) j++
+    return { name: tok, start: i, end: Math.min(j, lines.length - 1) }
+  }
+  const re = new RegExp('^(?:(?:async\\s+)?function\\s+' + tok + '\\b|(?:const|let|var)\\s+' + tok + '\\b|' + tok + '\\s*\\(\\)|(?:readonly\\s+|export\\s+|declare\\s+(?:-\\w+\\s+)?)?' + tok + '=)')
+  const i = lines.findIndex((l) => re.test(l))
+  if (i < 0) return null
+  let j = i
+  if (/[{(\[]\s*$/.test(lines[i])) {
+    j = i + 1
+    while (j < lines.length && !/^[})\]]/.test(lines[j])) j++
+    j = Math.min(j, lines.length - 1)
+  }
+  return { name: tok, start: i, end: j }
+}
+function fingerprintFile(a) {
+  const text = fs.readFileSync(a.path, 'utf8')
+  const ext = path.extname(a.path)
+  const lines = text.split('\n')
+  const hEnd = ext === '.md' ? 0 : headerEnd(lines, ext)
+  const header = lines.slice(0, hEnd).join('\n')
+  const blocks = new Map(), unnamed = []
+  for (const dim of [...a.dims].sort()) {
+    const found = (a.named.get(dim) || []).map((t) => blockOf(lines, t, ext)).filter(Boolean)
+    if (!found.length) unnamed.push(dim)
+    for (const b of found) blocks.set(b.name, b)
+  }
+  const v1 = sha(text)
+  if (!unnamed.length) {
+    const ordered = [...blocks.values()].sort((x, y) => x.start - y.start)
+    const body = ordered.map((b) => lines.slice(b.start, b.end + 1).join('\n')).join('\n')
+    return { v1, v2: sha(header + '\n' + body), mode: 'narrowed', blocks: ordered.map((b) => b.name), unnamed }
+  }
+  if (ext === '.md') return { v1, v2: v1, mode: 'whole', blocks: [], unnamed }
+  const c = ext === '.js' ? '//' : '#'
+  const code = lines.slice(hEnd).filter((l) => !l.trim().startsWith(c)).join('\n')
+  return { v1, v2: sha(header + '\n' + code), mode: 'whole', blocks: [], unnamed }
+}
+// --baseline always writes the narrowed fingerprint; otherwise the lock decides.
+const FP = MODE === 'baseline' || lock.file_fingerprint === 2 ? 2 : 1
+for (const a of anchors.values()) {
+  if (a.kind !== 'file') continue
+  a.fp = fingerprintFile(a)
+  a.hash = FP === 2 ? a.fp.v2 : a.fp.v1
+}
+const fileAnchors = [...anchors].filter(([, a]) => a.kind === 'file')
+
+if (MODE === 'fingerprints') {
+  for (const [key, a] of fileAnchors) {
+    console.log(a.fp.mode === 'narrowed'
+      ? `NARROWED ${key} (dims ${[...a.dims].sort()}) header + ${a.fp.blocks.join(', ')}`
+      : `WHOLE ${key} (dims ${[...a.dims].sort()}) no block named by ${a.fp.unnamed.join(', ')}`)
+  }
+  console.log(`${fileAnchors.filter(([, a]) => a.fp.mode === 'narrowed').length} narrowed, ${fileAnchors.filter(([, a]) => a.fp.mode === 'whole').length} whole; lock holds the ${FP === 2 ? 'narrowed' : 'whole-file'} fingerprint`)
+  process.exit(0)
+}
+
+if (MODE === 'narrow') {
+  if (lock.file_fingerprint === 2) { console.error('NARROW-FAIL the lock already holds the narrowed fingerprint'); process.exit(2) }
+  // Both fingerprints side by side: the old one must match the lock for every
+  // file anchor, so the rewrite cannot hide a change nobody has read.
+  const dirty = []
+  for (const [key, a] of fileAnchors) {
+    const prev = lock.anchors[key]
+    if (!prev) dirty.push(`${key}: not in the lock`)
+    else if (prev.hash !== a.fp.v1) dirty.push(`${key}: changed since the last reconcile (${prev.hash} -> ${a.fp.v1})`)
+  }
+  for (const key of Object.keys(lock.anchors)) {
+    if (key.startsWith('file:') && !anchors.has(key)) dirty.push(`${key}: in the lock, no longer cited`)
+  }
+  if (dirty.length) {
+    for (const d of dirty) console.error('NARROW-FAIL ' + d)
+    console.error('Reconcile or forget these first, then run --narrow again.')
+    process.exit(1)
+  }
+  for (const [key, a] of fileAnchors) {
+    lock.anchors[key] = { hash: a.fp.v2, dims: [...a.dims].sort() }
+    console.log(`${a.fp.mode === 'narrowed' ? 'NARROWED' : 'WHOLE'} ${key} ${a.fp.v1} -> ${a.fp.v2}`)
+  }
+  lock.file_fingerprint = 2
+  save()
+  console.log(`MOVED ${fileAnchors.length} file anchor(s) to the narrowed fingerprint`)
+  process.exit(0)
+}
+const today = process.env.RD_TODAY || new Date().toISOString().slice(0, 10)
+const LAPSE_DAYS = 90
 
 // Acks are PER-VERSION: each stores the rule's hash at ack time, so a later
-// content change re-flags once (UNCOVERED-CHANGED) for re-triage. Migrate
-// legacy string acks in place; drop acks for rules a dimension now anchors
-// (anchored rules are hash-tracked, the ack is redundant).
-{
-  let migrated = 0, dropped = 0
-  for (const k of Object.keys(lock.acked_uncovered)) {
-    if (typeof lock.acked_uncovered[k] === 'string') {
-      lock.acked_uncovered[k] = { reason: lock.acked_uncovered[k], hash: ruleIndex.has(k) ? ruleIndex.get(k).hash : null }
-      migrated++
-    }
-    if (anchors.has(k)) { delete lock.acked_uncovered[k]; dropped++ }
+// content change re-flags once (UNCOVERED-CHANGED) for re-triage. Legacy
+// string acks are converted in memory, so only a write mode stores the new
+// shape. An ack for a rule a dimension now anchors is redundant (anchored
+// rules are hash-tracked): the check notes it and --prune removes it.
+const redundantAcks = []
+for (const k of Object.keys(lock.acked_uncovered)) {
+  if (typeof lock.acked_uncovered[k] === 'string') {
+    lock.acked_uncovered[k] = { reason: lock.acked_uncovered[k], hash: ruleIndex.has(k) ? ruleIndex.get(k).hash : null }
   }
-  if (migrated || dropped) {
-    save()
-    console.log(`MIGRATED ${migrated} ack(s) to per-version format; dropped ${dropped} now-anchored ack(s)`)
-  }
+  if (anchors.has(k)) redundantAcks.push(k)
+}
+const staleAcks = Object.keys(lock.acked_uncovered).filter((k) => !ruleIndex.has(k))
+
+if (MODE === 'prune') {
+  for (const k of redundantAcks) delete lock.acked_uncovered[k]
+  for (const k of staleAcks) delete lock.acked_uncovered[k]
+  save()
+  console.log(`PRUNED ${redundantAcks.length} now-anchored ack(s) and ${staleAcks.length} ack(s) for deleted rules`)
+  process.exit(0)
 }
 
 if (MODE === 'baseline') {
   const reason = val('--reason') || 'pre-baseline (not triaged individually)'
   lock.baselined_at = today
+  lock.file_fingerprint = 2
   lock.anchors = {}
   for (const [key, a] of anchors) lock.anchors[key] = { hash: a.hash, dims: [...a.dims].sort() }
   for (const key of ruleIndex.keys()) {
     if (!anchors.has(key) && !lock.acked_uncovered[key]) {
-      lock.acked_uncovered[key] = { reason: `${today}: ${reason}`, hash: ruleIndex.get(key).hash }
+      lock.acked_uncovered[key] = { reason: `${today}: ${reason}`, hash: ruleIndex.get(key).hash, blanket: true }
     }
   }
   save()
@@ -276,8 +423,28 @@ if (MODE === 'ack') {
 
 // ---- check ----
 if (!lock.baselined_at) { console.error('No baseline. Run: rubric-drift.sh --baseline'); process.exit(2) }
-let findings = 0
-const out = (s) => { console.log(s); findings++ }
+const excluded = lock.excluded_skills || {}
+// Blanket acks past the lapse period, among the acks still in force (rule
+// exists, unanchored, skill in scope, content unchanged since the ack).
+const lapsed = []
+for (const [key, ack] of Object.entries(lock.acked_uncovered)) {
+  if (!ruleIndex.has(key) || anchors.has(key) || excluded[key.slice(0, key.indexOf(':'))]) continue
+  if (ack.hash && ack.hash !== ruleIndex.get(key).hash) continue
+  const date = (String(ack.reason).match(/^(\d{4}-\d\d-\d\d):/) || [])[1]
+  const blanket = ack.blanket === true || /^\d{4}-\d\d-\d\d: pre-baseline/.test(String(ack.reason))
+  if (!blanket || !date) continue
+  const days = Math.floor((Date.parse(today) - Date.parse(date)) / 86400000)
+  if (days > LAPSE_DAYS) lapsed.push({ key, date, days })
+}
+lapsed.sort((a, b) => a.date.localeCompare(b.date) || a.key.localeCompare(b.key))
+if (MODE === 'lapsed') {
+  for (const l of lapsed) console.log(`LAPSED-ACK ${l.key} (blanket ack of ${l.date}, ${l.days} days old)`)
+  console.log(`${lapsed.length} blanket ack(s) older than ${LAPSE_DAYS} days`)
+  process.exit(0)
+}
+let drift = 0, uncovered = 0
+const out = (s) => { console.log(s); drift++ }
+const cov = (s) => { console.log(s); uncovered++ }
 // drift on anchored items
 for (const [key, a] of anchors) {
   const prev = lock.anchors[key]
@@ -293,18 +460,18 @@ for (const key of Object.keys(lock.anchors)) {
 // coverage: corpus rules with no anchor and no current-version ack.
 // Skills in excluded_skills are categorically OUT OF SCOPE (rubrics grade
 // orch-dependent behavior only): never flagged, no per-rule acks needed.
-const excluded = lock.excluded_skills || {}
 for (const key of ruleIndex.keys()) {
   if (excluded[key.slice(0, key.indexOf(':'))]) continue
   if (anchors.has(key)) continue
   const ack = lock.acked_uncovered[key]
-  if (!ack) out(`UNCOVERED ${key} — new rule with no rubric dimension; propose a dimension or --ack with a reason`)
-  else if (ack.hash && ack.hash !== ruleIndex.get(key).hash) out(`UNCOVERED-CHANGED ${key} ${ack.hash} -> ${ruleIndex.get(key).hash} — acked rule's content changed since the ack; re-triage: propose a dimension or --ack ${key} again`)
+  if (!ack) cov(`UNCOVERED ${key} — new rule with no rubric dimension; propose a dimension or --ack with a reason`)
+  else if (ack.hash && ack.hash !== ruleIndex.get(key).hash) cov(`UNCOVERED-CHANGED ${key} ${ack.hash} -> ${ruleIndex.get(key).hash} — acked rule's content changed since the ack; re-triage: propose a dimension or --ack ${key} again`)
 }
-// hygiene: acks pointing at dead rules
-for (const key of Object.keys(lock.acked_uncovered)) {
-  if (!ruleIndex.has(key)) console.log(`STALE-ACK ${key} — rule deleted; safe to remove from lock`)
-}
+// hygiene notes: acks the lock no longer needs. Neither is a finding.
+for (const key of staleAcks) console.log(`STALE-ACK ${key} — rule deleted; --prune removes the ack`)
+for (const key of redundantAcks) console.log(`REDUNDANT-ACK ${key} — a dimension now anchors this rule; --prune removes the ack`)
+if (lapsed.length) console.log(`LAPSED-ACK ${lapsed.length} blanket ack(s) are older than ${LAPSE_DAYS} days (oldest ${lapsed[0].date}); nobody judged these rules one by one. --lapsed lists them; --ack <skill:rule-id> --reason R settles one`)
 for (const e of parseErrors) console.log('PARSE-WARN ' + e)
-if (!findings) console.log(`CLEAN — ${anchors.size} anchors tracked, baseline ${lock.baselined_at}`)
-process.exit(findings ? 1 : 0)
+if (FP === 1 && fileAnchors.length) console.log('NOTE the lock holds the whole-file fingerprint for file anchors; --narrow moves it to the narrowed one')
+if (!drift && !uncovered) console.log(`CLEAN — ${anchors.size} anchors tracked, baseline ${lock.baselined_at}`)
+process.exit(drift ? 1 : uncovered ? 3 : 0)

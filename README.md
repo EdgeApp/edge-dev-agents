@@ -763,8 +763,15 @@ finding carrying a citation an auditor can open.
   and script content it grades against, by content digest. A changed anchor
   means dimensions may grade against stale expectations; CHANGED/UNCOVERED
   findings block until reconciled (`--forget` drops an anchor the rubric
-  stopped citing on purpose). The era table keeps old runs graded by the
-  rules in force when they ran; rubric rows themselves carry no dates.
+  stopped citing on purpose). The check reads the lock and never writes it,
+  and exits 1 for drift on an anchored rule or file, 3 when the only
+  findings are uncovered rules. A script anchor's digest skips comments
+  below the header, and covers only the blocks its rubric rows name when
+  every citing row names one (`--fingerprints` lists which). A blanket
+  acknowledgment written by `--baseline` lapses after 90 days: the check
+  prints a count and `--lapsed` lists them, without failing. The era table
+  keeps old runs graded by the rules in force when they ran; rubric rows
+  themselves carry no dates.
 - **Friction scorecard** (`friction-scorecard.sh`): a zero-LLM trend table
   between cohorts (hook blocks, tool errors, builds, compactions, drives,
   attempt walls) straight from manifests.
