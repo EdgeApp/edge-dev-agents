@@ -46,7 +46,7 @@ Each example below is a rewrite of the corresponding bad example from [bad-examp
 
 ## Example 4: Documentation
 
-> This module handles communication between microservices. It serializes messages, retries failed calls with exponential backoff, and trips a circuit breaker after five consecutive failures. Errors are caught at the transport layer and returned as typed results, so callers do not need try/catch blocks.
+> This module handles communication between microservices. It serializes messages, retries failed calls with exponential backoff, and trips a circuit breaker after five consecutive failures. Errors are caught at the transport layer and returned as typed results. Callers do not need try/catch blocks.
 
 **Why this works:**
 - `handles` instead of `plays a crucial role in facilitating`
@@ -54,6 +54,7 @@ Each example below is a rewrite of the corresponding bad example from [bad-examp
 - `is` and `are` as copulas
 - No `additionally,` no `holistic,` no `robust`
 - Technical detail instead of vague claims about `reliability`
+- Two sentences where "returned as typed results, so callers..." would glue the consequence on with "so"
 
 ---
 

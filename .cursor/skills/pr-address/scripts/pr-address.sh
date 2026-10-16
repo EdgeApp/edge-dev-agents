@@ -30,6 +30,14 @@
 #                                                          already carries an addressed-marker. Body is linted
 #                                                          like every outbound verb. Prints `edited: <url>`
 #                                                          or `unchanged: <id>`.
+#   dismiss-review --owner <o> --repo <r> --pr <n> --review-id <id> --task-gid <gid> --body <text>|--body-file <path>
+#                                                          Dismiss another reviewer's CHANGES_REQUESTED review so a
+#                                                          Force Land merge can proceed (pr-land
+#                                                          `force-land-review-bypass`). Refuses unless the task's
+#                                                          Force Land was set to Land Approved AFTER the review was
+#                                                          submitted, and every review thread that reviewer opened
+#                                                          is resolved. Message linted like every outbound verb.
+#                                                          Prints `dismissed: <review-id> (<login>)`.
 #   mark-addressed --owner <o> --repo <r> --pr <n> --type <review|comment> --target-id <id> --body <text>
 #   comment        --owner <o> --repo <r> --pr <n> --body <text>|--body-file <path>
 #                                                          Post a standalone top-level PR comment (no
@@ -52,7 +60,7 @@ set -euo pipefail
 CMD="${1:-}"
 shift || true
 
-OWNER="" REPO="" PR="" COMMENT_ID="" NODE_ID="" BODY="" BODY_FILE="" SHA="" THREAD_ID="" TARGET_TYPE="" TARGET_ID="" REVIEW_ID=""
+OWNER="" REPO="" PR="" COMMENT_ID="" NODE_ID="" BODY="" BODY_FILE="" SHA="" THREAD_ID="" TARGET_TYPE="" TARGET_ID="" REVIEW_ID="" TASK_GID=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --owner) OWNER="$2"; shift 2 ;;
@@ -67,6 +75,7 @@ while [[ $# -gt 0 ]]; do
     --type) TARGET_TYPE="$2"; shift 2 ;;
     --target-id) TARGET_ID="$2"; shift 2 ;;
     --review-id) REVIEW_ID="$2"; shift 2 ;;
+    --task-gid) TASK_GID="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -533,6 +542,62 @@ case "$CMD" in
     fi
     ;;
 
+  dismiss-review)
+    # The one path that clears a human CHANGES_REQUESTED review, so a Force
+    # Land PR can reach pr-merge-watch's BLOCKED_ON_REVIEW verdict (which reads
+    # reviewDecision REVIEW_REQUIRED) and the admin merge after it. Gates:
+    #   - the review is CHANGES_REQUESTED and not the caller's own;
+    #   - Force Land was set to Land Approved AFTER the review was submitted
+    #     (asana-force-land.sh --since): the operator saw the objection and
+    #     still approved the land. A change request filed after Force Land is
+    #     a fresh objection and parks the PR (pr-land comments path 3);
+    #   - zero unresolved review threads opened by that reviewer: each
+    #     objection was answered and resolved before the dismissal.
+    # The dismissal message is the reader-facing record and is linted.
+    require_gh
+    if [[ -n "$BODY_FILE" ]]; then
+      [[ -f "$BODY_FILE" ]] || { echo "Error: --body-file not found: $BODY_FILE" >&2; exit 1; }
+      BODY="$(cat "$BODY_FILE")"
+    fi
+    if [[ -z "$OWNER" || -z "$REPO" || -z "$PR" || -z "$REVIEW_ID" || -z "$TASK_GID" || -z "$BODY" ]]; then
+      echo "Error: --owner, --repo, --pr, --review-id, --task-gid, and --body or --body-file required" >&2; exit 1
+    fi
+    ME=$(gh api user --jq '.login')
+    GOT=$(gh api "repos/$OWNER/$REPO/pulls/$PR/reviews/$REVIEW_ID" 2>/dev/null) || {
+      echo "Error: review $REVIEW_ID not found on $OWNER/$REPO#$PR" >&2; exit 1
+    }
+    STATE=$(echo "$GOT" | jq -r '.state // empty')
+    REVIEWER=$(echo "$GOT" | jq -r '.user.login // empty')
+    SUBMITTED=$(echo "$GOT" | jq -r '.submitted_at // empty')
+    if [[ "$STATE" != "CHANGES_REQUESTED" ]]; then
+      echo "Error: review $REVIEW_ID is $STATE, not CHANGES_REQUESTED. Only a change request blocks the land." >&2; exit 1
+    fi
+    if [[ "$REVIEWER" == "$ME" ]]; then
+      echo "Error: review $REVIEW_ID is your own. Re-review it instead of dismissing it." >&2; exit 1
+    fi
+    AUTHORITY=$("$HOME/.cursor/skills/asana-force-land.sh" "$TASK_GID" --since "$SUBMITTED")
+    if [[ "$AUTHORITY" != "land-approved" ]]; then
+      echo "BLOCKED: task $TASK_GID has no Force Land set after $REVIEWER's review ($SUBMITTED). A change request the operator has not overridden parks the PR; it is never dismissed." >&2
+      exit 2
+    fi
+    OPEN=$(gh api graphql -F owner="$OWNER" -F repo="$REPO" -F pr="$PR" -f query='
+      query($owner:String!,$repo:String!,$pr:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$pr){
+        reviewThreads(first:100){nodes{isResolved comments(first:1){nodes{author{login}}}}}}}}' \
+      --jq "[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | select(.comments.nodes[0].author.login == \"$REVIEWER\")] | length")
+    if [[ "$OPEN" -gt 0 ]]; then
+      echo "BLOCKED: $REVIEWER has $OPEN unresolved review thread(s) on $OWNER/$REPO#$PR. Answer and resolve each before dismissing the review." >&2
+      exit 1
+    fi
+    lint_outbound_body "$BODY"
+    RESULT=$(jq -n --arg m "$BODY" '{message: $m, event: "DISMISS"}' | \
+      gh api "repos/$OWNER/$REPO/pulls/$PR/reviews/$REVIEW_ID/dismissals" -X PUT --input -)
+    if [[ "$(echo "$RESULT" | jq -r '.state // empty')" == "DISMISSED" ]]; then
+      echo "dismissed: $REVIEW_ID ($REVIEWER)"
+    else
+      echo "Dismiss failed: $RESULT" >&2; exit 1
+    fi
+    ;;
+
   resolve-thread)
     require_gh
     if [[ -z "$THREAD_ID" ]]; then
@@ -798,7 +863,7 @@ case "$CMD" in
     ;;
 
   *)
-    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|delete-comment|delete-pending-review|edit-comment|edit-review-body|resolve-thread|mark-addressed|comment|resolve-id|headline|fetch-pr-body|ensure-branch|review-mode|autosquash} [args]" >&2
+    echo "Usage: pr-address.sh {fetch|fetch-thread|reply|delete-comment|delete-pending-review|edit-comment|edit-review-body|dismiss-review|resolve-thread|mark-addressed|comment|resolve-id|headline|fetch-pr-body|ensure-branch|review-mode|autosquash} [args]" >&2
     exit 1
     ;;
 esac

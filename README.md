@@ -321,6 +321,13 @@ just a viewport.
   resume-agent resumes; the watchdog's RC respawn carries the flag over from the
   old argv. Left at `auto` a long session re-sends its whole history on every
   call, so the cap is what keeps a long run's cost linear.
+- **Fleet control as JSON.** `fleet-ctl.sh` (wrapping `lib/fleet-ctl.js`) is
+  the fleet for clients that are not a terminal, such as the `fleet` Claude
+  Code mod, locally or over `ssh <host> fleet-ctl.sh`: `snapshot`, `search`,
+  `fork`, `resume`, `revive`, `kill` and `new`, each calling the script the
+  session TUI calls for the same key. Free text arrives only on stdin and every
+  argument is checked against a fixed pattern, so a remote shell re-parsing
+  the command line has nothing to interpret.
 - **The orch TUI repaints by row.** `orch-tui.js` and `session-tui.js` paint
   through `lib/frame.js`, which rewrites only the rows that changed since the
   last paint. A clear-and-redraw on every refresh tick made Terminal.app leak
@@ -695,6 +702,13 @@ the app.
   served `.json` modules equal to disk); `scripts/pin-agent-login.sh` pins a
   checkout's auto-login to the roster's default role and prints each file's
   account as `<username> (<role>)`.
+- **DevTools windows close with the slot.** Slot Metro opens React Native
+  DevTools through `scripts/metro-devtools-chrome.sh` (its `CHROME_PATH`), a
+  separate Chrome instance profiled at `/tmp/metro-devtools/<metro port>`.
+  Plain Chrome hands the window to the operator's own Chrome, where no
+  teardown can reach it. The watchdog's retirement sweep and
+  `cleanup-task-workspace.sh` close that instance when they kill the
+  worktree's Metro.
 - **One account by default.** Drives run on the roster's `agent` role, which
   funds its wallets and creates new ones by swapping (multi-hop included).
   Another roster account is only for what that one cannot supply: an old or
@@ -867,7 +881,8 @@ it is), and then describes all of it by subject, as one body of work, in the
 commit and the Slack announcement. This README and the hook registry
 (`agent-watcher/hooks/README.md`) are brought current in the same commit;
 `readme-gaps.sh` lists added files no README names and deleted files one still
-names, and blocks the commit until they are dealt with.
+names, and blocks the commit until they are dealt with. A README names a file
+by its path, or by its file name when no other synced file shares it.
 
 `/convention-sync` keeps all of the above in sync (home to repo) and hard-blocks
 staging when the remote is ahead, the branch is wrong, or the sync would delete
@@ -964,7 +979,6 @@ scripts, not be re-described independently across skills.
 | [`/staging-cherry-pick`](.cursor/skills/staging-cherry-pick/SKILL.md) | Cherry-pick landed staging-targeted commits onto staging |
 | [`/cheese`](.cursor/skills/cheese/SKILL.md) | Push a test-branch build, pinning unpublished dep PRs when required |
 | [`/changelog`](.cursor/skills/changelog/SKILL.md) | Update CHANGELOG entries using repo conventions |
-| [`/dep-pr`](.cursor/skills/dep-pr/SKILL.md) | Create dependent Asana tasks and downstream PR work in another repo; the dep task joins the parent's projects, inherits its Engineering Priority and Release, and blocks it |
 | [`/tdd`](.cursor/skills/tdd/SKILL.md) | Write or update a technical design document for shipped work |
 
 ### Guards and validators

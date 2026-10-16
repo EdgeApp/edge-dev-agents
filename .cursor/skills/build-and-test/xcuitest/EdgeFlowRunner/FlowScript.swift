@@ -20,14 +20,37 @@ final class FlowScript {
   }
 
   /// Evaluates one JavaScript expression or statement.
+  ///
+  /// Maestro (GraalJS) reads a variable nothing defined as `undefined`, so
+  /// `${MAESTRO_APP_ID || 'co.edgesecure.app'}` or a subflow reading an env
+  /// key its caller did not pass falls through to the default. JavaScriptCore
+  /// throws a ReferenceError instead; declare the missing name as undefined
+  /// and re-run, once per distinct name, to match Maestro.
   func evaluate(_ source: String) throws -> JSValue {
-    lastException = nil
-    let value = context.evaluateScript(source)
-    if let error = lastException {
-      throw FlowError("JavaScript error in `\(source)`: \(error)")
+    var declared: Set<String> = []
+    while true {
+      lastException = nil
+      let value = context.evaluateScript(source)
+      if let error = lastException {
+        if let name = Self.missingVariable(error), !declared.contains(name), !isDefined(name) {
+          declared.insert(name)
+          set(name, nil)
+          continue
+        }
+        throw FlowError("JavaScript error in `\(source)`: \(error)")
+      }
+      guard let value = value else { throw FlowError("JavaScript returned nothing for `\(source)`") }
+      return value
     }
-    guard let value = value else { throw FlowError("JavaScript returned nothing for `\(source)`") }
-    return value
+  }
+
+  /// The identifier in JavaScriptCore's "ReferenceError: Can't find variable: NAME".
+  private static func missingVariable(_ error: String) -> String? {
+    let prefix = "ReferenceError: Can't find variable: "
+    guard error.hasPrefix(prefix) else { return nil }
+    let name = String(error.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
+    let valid = name.range(of: "^[A-Za-z_$][A-Za-z0-9_$]*$", options: .regularExpression) != nil
+    return valid ? name : nil
   }
 
   /// Replaces every `${expr}` in the string with the expression's result

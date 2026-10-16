@@ -63,20 +63,29 @@ const a = process.argv.slice(2)
 fs.appendFileSync(path.join(dir, 'log'), JSON.stringify(a) + '\\n')
 const read = f => fs.readFileSync(path.join(dir, f), 'utf8')
 if (a[0] === 'api' && a[1] === 'graphql') { process.stdout.write(read('pr.json')); process.exit(0) }
+// The comment lists, one JSON object per line as --jq '.[]' prints them.
+const list = a[0] === 'api' && a[1] === '--paginate' && /^repos[/][^/]+[/][^/]+[/](issues|pulls)[/][0-9]+[/](comments|reviews)$/.exec(a[2])
+if (list) {
+  const f = path.join(dir, list[1] + '-' + list[2] + '.json')
+  if (fs.existsSync(path.join(dir, 'fail-comments'))) { process.stderr.write('HTTP 502'); process.exit(1) }
+  for (const c of fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : []) process.stdout.write(JSON.stringify(c) + '\\n')
+  process.exit(0)
+}
 if (a[0] === 'api' && /^repos\\/[^/]+\\/[^/]+\\/pulls\\/\\d+$/.test(a[1])) { process.stdout.write(read('body.md')); process.exit(0) }
 if (a[0] === 'pr' && a[1] === 'edit') { fs.copyFileSync(a[a.indexOf('--body-file') + 1], path.join(dir, 'body.md')); process.exit(0) }
 process.stderr.write('fake gh: unexpected call ' + JSON.stringify(a) + '\\n')
 process.exit(1)
 `, { mode: 0o755 })
 
-const PR_STATE = JSON.stringify({ data: { repository: { pullRequest: {
-  author: { login: 'the-author' },
+const prState = (author = 'the-author') => JSON.stringify({ data: { viewer: { login: 'the-author' }, repository: { pullRequest: {
+  author: { login: author },
   headRefOid: HEAD,
   commits: { nodes: [{ commit: { oid: HEAD, messageHeadline: 'Do the thing' } }] },
   reviews: { nodes: [] },
   comments: { nodes: [] },
   reviewThreads: { nodes: [] }
 } } } })
+const PR_STATE = prState()
 
 const ROSTER = path.join(TMP, 'roster.json')
 fs.writeFileSync(ROSTER, JSON.stringify({ roster: { agent: { username: 'zq-probe-41x', pin: '1111' } } }))
@@ -231,6 +240,56 @@ async function main () {
     assert.strictEqual(r.status, 0, r.stderr)
     assert.ok(r.stderr.includes(`WARN: ${gone} is still quoted`))
     assert.match(r.stderr, /pr-evidence-relink\.sh/)
+  })
+
+  await t('a PR another account opened is refused and nothing changes', async () => {
+    await seed('01-wallet-list', '02-settings')
+    fs.writeFileSync(path.join(GH_DIR, 'pr.json'), prState('someone-else'))
+    const before = snapshot()
+    const r = await withdraw('wallet-list')
+    assert.strictEqual(r.status, 1)
+    assert.match(r.stderr, /opened by someone-else, not the-author: nothing changed/)
+    assert.strictEqual(snapshot(), before)
+    assert.strictEqual(requests.length, 0, 'the bucket was touched')
+    assert.strictEqual(ghEdits(), 0)
+  })
+
+  await t('a withdrawn URL quoted in a PR comment or review is named, and no comment is edited', async () => {
+    await seed('01-wallet-list', '02-settings')
+    const gone = urlOf('wallet-list')
+    const kept = urlOf('settings')
+    fs.writeFileSync(path.join(GH_DIR, 'issues-comments.json'), JSON.stringify([
+      { html_url: 'https://gh.test/c/1', body: `Look: ![x](${gone})` },
+      { html_url: 'https://gh.test/c/2', body: `Only ${kept}` }
+    ]))
+    fs.writeFileSync(path.join(GH_DIR, 'pulls-comments.json'), JSON.stringify([{ html_url: 'https://gh.test/rc/3', body: gone }]))
+    fs.writeFileSync(path.join(GH_DIR, 'pulls-reviews.json'), JSON.stringify([{ html_url: 'https://gh.test/r/4', body: null }]))
+    const r = await withdraw('wallet-list')
+    assert.strictEqual(r.status, 0, r.stderr)
+    assert.ok(r.stderr.includes(`WARN: ${gone} is quoted in a PR comment https://gh.test/c/1`))
+    assert.ok(r.stderr.includes(`WARN: ${gone} is quoted in a PR comment https://gh.test/rc/3`))
+    assert.ok(!r.stderr.includes('https://gh.test/c/2'))
+    assert.ok(!r.stderr.includes('https://gh.test/r/4'))
+    assert.strictEqual(ghEdits(), 1, 'only the body edit')
+  })
+
+  await t('a dry run names quoting comments too', async () => {
+    await seed('01-wallet-list', '02-settings')
+    const gone = urlOf('wallet-list')
+    fs.writeFileSync(path.join(GH_DIR, 'issues-comments.json'), JSON.stringify([{ html_url: 'https://gh.test/c/9', body: gone }]))
+    const r = await withdraw('--dry-run', 'wallet-list')
+    assert.strictEqual(r.status, 0, r.stderr)
+    assert.ok(r.stderr.includes('is quoted in a PR comment https://gh.test/c/9'))
+    assert.strictEqual(ghEdits(), 0)
+  })
+
+  await t('a failed comment read is a WARN and the withdraw still finishes', async () => {
+    await seed('01-wallet-list', '02-settings')
+    fs.writeFileSync(path.join(GH_DIR, 'fail-comments'), '')
+    const r = await withdraw('wallet-list')
+    assert.strictEqual(r.status, 0, r.stderr)
+    assert.match(r.stderr, /WARN: could not read repos\/acme\/edge-widget\/issues\/7\/comments/)
+    assert.match(r.stderr, /PASS: withdrew 1 frame/)
   })
 
   await t('no manifest for the PR exits 1 with nothing to withdraw', async () => {

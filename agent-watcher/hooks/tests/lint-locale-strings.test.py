@@ -15,6 +15,12 @@ LINT = os.path.expanduser('~/.cursor/skills/no-slop/scripts/no-slop-lint.sh')
 HOOK = os.path.expanduser('~/.config/agent-watcher/hooks/lint-md-on-write.sh')
 GUI = os.path.expanduser('~/git/edge-react-gui/src/locales/en_US.ts')
 LUI = os.path.expanduser('~/git/edge-login-ui-rn/src/common/locales/strings/enUS.json')
+# The two locale files live in the app repos, outside the synced trees, so a
+# machine or a checkout run without them skips this file rather than failing it.
+ABSENT = [f for f in (GUI, LUI) if not os.path.exists(f)]
+if ABSENT:
+    print('skip: lint-locale-strings needs the app repos\' locale files, absent here: ' + ', '.join(ABSENT))
+    sys.exit(0)
 fails = []
 def check(name, cond, detail=''):
     print(('ok   ' if cond else 'FAIL ') + name + ('' if cond else f'  {detail}'))

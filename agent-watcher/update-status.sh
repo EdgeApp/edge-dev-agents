@@ -60,7 +60,7 @@ done
 if [[ "$BLOCKED" == "yes" ]]; then
   printf '%s\n' "$REASON" > "/tmp/agent-concession-reason-$TASK_GID.txt" 2>/dev/null || true
 elif [[ "$BLOCKED" == "no" ]]; then
-  rm -f "/tmp/agent-concession-reason-$TASK_GID.txt" "/tmp/agent-concession-verdict-$TASK_GID.json" "/tmp/agent-completion-verdict-$TASK_GID.json" 2>/dev/null || true
+  rm -f "/tmp/agent-concession-reason-$TASK_GID.txt" "/tmp/agent-completion-verdict-$TASK_GID.json" 2>/dev/null || true
 fi
 
 TOKEN=$(jq -r .asana_token "$CRED")

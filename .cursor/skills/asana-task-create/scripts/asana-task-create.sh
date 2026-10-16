@@ -16,13 +16,16 @@
 #                         fill them, then exit (read-only; for choosing values)
 #
 # Usage:
-#   asana-task-create.sh --name "<task name>" --notes-file /tmp/notes.txt \
+#   asana-task-create.sh --name "<Area> (<scope>) - <short observation>" --notes-file /tmp/notes.txt \
 #     [--release 53.0] [--repo core,gui] \
 #     [--set "Priority=High"] [--set "LOE=M"] [--set "Category=Feature"] \
 #     [--set "Release Notes=Needs To Be Added"] [--set "Estimate (hrs)=6"] \
 #     [--attach-file /path/one.md]... \
 #     [--jon-claude-section Refinement] [--dry-run] \
 #     [--comms-authorized "<the operator's words authorizing it>"]
+#
+# Title gate: --name must read "<Area>[ (<scope>)] - <short observation>"
+# (SKILL.md `title-format`); violations exit 1 with TITLE_FORMAT on stderr.
 #
 # Comms gate (../../asana-notes-comms-gate.sh): notes that tell the implementing
 # agent to message anyone exit 1 with the matching lines unless
@@ -185,6 +188,29 @@ if $SHOW_CONTEXT; then
 fi
 
 [[ -n "$NAME" ]] || { echo "ERROR: --name is required" >&2; exit 1; }
+
+# Title gate (SKILL.md `title-format`): "<Area>[ (<scope>)] - <observation>".
+# Checks the mechanical half only; whether the right side names an observation
+# rather than a fix stays a judgment call in the skill. Orch per-PR subtasks
+# ("<repo> #<num>: <title>") are created by asana-task-update.sh, not here.
+title_fail() {
+  echo "ERROR: TITLE_FORMAT: $1" >&2
+  echo "  got: \"$NAME\"" >&2
+  echo "  want: \"<Area>[ (<scope>)] - <short observation>\", e.g. \"Swap (XMR) - Quoting Issue\"" >&2
+  exit 1
+}
+[[ "$NAME" == *" - "* ]] || title_fail 'no " - " separator between the area and the short title'
+TITLE_AREA="${NAME%% - *}"
+TITLE_SHORT="${NAME#* - }"
+[[ "$NAME" =~ ^[A-Za-z0-9_.-]+:[[:space:]] ]] && title_fail 'leading "<prefix>:" (repo/type prefixes are not part of a title; the Repo field carries the repo)'
+[[ "$NAME" =~ \.$ ]] && title_fail 'trailing period (the title is a short phrase, not a sentence)'
+[[ "$TITLE_SHORT" == *" - "* ]] && title_fail 'more than one " - " separator'
+_area_words="$(printf '%s' "$TITLE_AREA" | sed -E 's/\([^)]*\)//g' | tr -s '[:space:]' '\n' | grep -c . || true)"
+(( _area_words >= 1 && _area_words <= 4 )) || title_fail "area must be 1-4 words outside the (scope), got $_area_words"
+printf '%s' "$TITLE_AREA" | grep -qiwE 'bugs?|investigat(e|ion)|research|fix(es)?|issues?|tasks?' \
+  && title_fail 'area names the kind of work (Bug, Investigate, Research, Fix); name the product area instead'
+_short_words="$(printf '%s' "$TITLE_SHORT" | tr -s '[:space:]' '\n' | grep -c . || true)"
+(( _short_words >= 1 && _short_words <= 6 )) || title_fail "short title must be 1-6 words, got $_short_words"
 [[ -n "$NOTES_FILE" ]] || { echo "ERROR: --notes-file is required" >&2; exit 1; }
 [[ -f "$NOTES_FILE" ]] || { echo "ERROR: notes file not found: $NOTES_FILE" >&2; exit 1; }
 

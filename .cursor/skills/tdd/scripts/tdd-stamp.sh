@@ -17,7 +17,8 @@
 #   tdd-stamp.sh <repo-dir> <doc-path> --check    # exit 0 when stamp == HEAD, 1 when
 #                                                 # stale, 3 when the doc has no stamp
 #   tdd-stamp.sh <repo-dir> <doc-path> --fold     # stamp, then commit the doc as a
-#                                                 # fixup of the branch's FIRST commit
+#                                                 # fixup of the oldest branch commit
+#                                                 # touching the doc, else the FIRST
 #                                                 # (lint-commit.sh, body names the
 #                                                 # fingerprint) and slot it; no-op
 #                                                 # when the stamp is already current
@@ -90,7 +91,12 @@ if [[ "$MODE" == "--fold" ]]; then
   fi
   UPSTREAM="$("$HOME/.cursor/skills/git-branch-base.sh" -C "$REPO" 2>/dev/null || echo "origin/master")"
   MB="$(git -C "$REPO" merge-base "$UPSTREAM" HEAD 2>/dev/null || true)"
-  FIRST="$(git -C "$REPO" rev-list --reverse "${MB:+$MB..}HEAD" 2>/dev/null | head -1)"
+  # Fold into the oldest branch commit that touches the doc, else the first
+  # branch commit. A doc that exists on the base and is first edited by a later
+  # branch commit has its stamp line in that commit, so a fixup of the first
+  # commit conflicts with it when slotted.
+  FIRST="$(git -C "$REPO" rev-list --reverse "${MB:+$MB..}HEAD" -- "$DOC_REL" 2>/dev/null | head -1)"
+  [[ -n "$FIRST" ]] || FIRST="$(git -C "$REPO" rev-list --reverse "${MB:+$MB..}HEAD" 2>/dev/null | head -1)"
   [[ -n "$FIRST" ]] || { echo "tdd-stamp: no branch commit to fold the doc into (upstream $UPSTREAM)" >&2; exit 1; }
   ( cd "$REPO" && "$HOME/.cursor/skills/lint-commit.sh" --fixup "$FIRST" --for auto \
       -m "Stamp the design doc with the fingerprint of the code tree it documents ($FP)" "$DOC_REL" ) >&2

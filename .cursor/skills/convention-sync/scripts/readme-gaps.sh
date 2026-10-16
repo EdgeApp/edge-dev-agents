@@ -4,9 +4,13 @@
 # whose name a README still carries. Behavior changes inside an already-listed
 # file are judgment and are not checked here.
 #
-# A file counts as documented when its basename appears in either README:
+# A file counts as documented when either README names it:
 #   ~/.cursor/README.md                        (the repo front page)
 #   ~/.config/agent-watcher/hooks/README.md    (the hook registry)
+# A README names a file by its repo path, by its path under the hook registry's
+# folder, by its skill folder link (for a SKILL.md), or by its bare file name
+# when no other file in the synced tree has that name. A shared name such as
+# SKILL.md therefore never documents a file on its own.
 # Tests, fixtures and retired files never need a mention and are skipped.
 #
 # Usage: readme-gaps.sh [repo-dir]
@@ -31,7 +35,36 @@ skip() {  # paths that never need a README mention
   esac
   return 1
 }
-documented() { grep -qF -- "$1" "$FRONT" || { [ -r "$HOOKS" ] && grep -qF -- "$1" "$HOOKS"; }; }
+ADDED=$(printf '%s' "$DRY" | jq -r --arg repo "$REPO" '
+    [.new[]? | ".cursor/" + .] + [.extra[]? | select(test(": deleting$") | not) | sub("/\\./"; "/")] | unique | .[]' |
+  while IFS= read -r rp; do
+    [ -n "$rp" ] || continue
+    git -C "$REPO" cat-file -e "HEAD:$rp" 2>/dev/null || echo "$rp"
+  done)
+DELETED=$(printf '%s' "$DRY" | jq -r '
+    [.deleted[]? | ".cursor/" + .] + [.extra[]? | select(test(": deleting$")) | sub(": deleting$"; "") | sub("/\\./"; "/")] | unique | .[]')
+
+# The synced tree after this sync: what the repo tracks, plus additions, minus deletions.
+TREE=$( { git -C "$REPO" ls-files; printf '%s\n' "$ADDED"; } | grep -vxF -f <(printf '%s\n' "$DELETED" | grep . || echo $'\x01') | grep . | sort -u)
+
+# Every string that names <rel> in a README, one per line.
+names() {
+  local rel="$1" base="${1##*/}"
+  printf '%s\n' "$rel"
+  [[ "$rel" == agent-watcher/hooks/* ]] && printf '%s\n' "${rel#agent-watcher/hooks/}"
+  [[ "$base" == SKILL.md ]] && printf '%s)\n' "${rel%/SKILL.md}"
+  # A bare name counts only when no other file in the tree carries it.
+  printf '%s\n' "$TREE" | grep -vxF -- "$rel" | awk -F/ -v b="$base" '$NF == b { found = 1 } END { exit found ? 1 : 0 }' && printf '%s\n' "$base"
+  return 0
+}
+# The README files that name <rel>, one per line.
+naming_readmes() {
+  local f
+  for f in "$FRONT" "$HOOKS"; do
+    [ -r "$f" ] && grep -qF -f <(names "$1") -- "$f" && echo "$f"
+  done
+  return 0
+}
 
 GAPS=0
 # Added: `.new` is relative to ~/.cursor; an `.extra` row is new when the repo
@@ -39,23 +72,16 @@ GAPS=0
 while IFS= read -r rel; do
   [ -n "$rel" ] || continue
   skip "$rel" && continue
-  documented "${rel##*/}" || { echo "MISSING $rel"; GAPS=1; }
-done < <(printf '%s' "$DRY" | jq -r --arg repo "$REPO" '
-    [.new[]? | ".cursor/" + .] + [.extra[]? | select(test(": deleting$") | not) | sub("/\\./"; "/")] | unique | .[]' |
-  while IFS= read -r rp; do
-    [ -n "$rp" ] || continue
-    git -C "$REPO" cat-file -e "HEAD:$rp" 2>/dev/null || echo "$rp"
-  done)
+  [ -n "$(naming_readmes "$rel")" ] || { echo "MISSING $rel"; GAPS=1; }
+done <<< "$ADDED"
 
-# Deleted: a name a README still carries describes something that is gone.
+# Deleted: a README that still names it describes something that is gone.
 while IFS= read -r rel; do
   [ -n "$rel" ] || continue
   skip "$rel" && continue
-  base="${rel##*/}"
-  for f in "$FRONT" "$HOOKS"; do
-    [ -r "$f" ] && grep -qF -- "$base" "$f" && { echo "STALE $rel (${f/#$HOME/~})"; GAPS=1; }
-  done
-done < <(printf '%s' "$DRY" | jq -r '
-    [.deleted[]? | ".cursor/" + .] + [.extra[]? | select(test(": deleting$")) | sub(": deleting$"; "") | sub("/\\./"; "/")] | unique | .[]')
+  while IFS= read -r f; do
+    [ -n "$f" ] && { echo "STALE $rel (${f/#$HOME/~})"; GAPS=1; }
+  done < <(naming_readmes "$rel")
+done <<< "$DELETED"
 
 exit "$GAPS"

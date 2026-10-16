@@ -170,6 +170,14 @@ try:
         check(f'gate: blocks {cmd!r} while held', gate(cmd) == 2)
     for cmd in ('echo "git push origin br"', "cat <<'E'\ngit push\nE", 'git log --grep push', 'gh pr view 5'):
         check(f'gate: allows {cmd!r} while held', gate(cmd) == 0)
+    # A retired session (orch-run-context.sh exit 1) is operator context: the
+    # prompt hook cannot release a stamp there, so the gate must not enforce it.
+    occ = os.path.join(home, '.config/agent-watcher/orch-run-context.sh')
+    with open(occ, 'w') as f: f.write('#!/usr/bin/env bash\nexit 1\n')
+    os.chmod(occ, 0o755)
+    check('gate: allows a status write in a retired session while held', gate(f'~/.config/agent-watcher/update-status.sh {GID} Pending') == 0)
+    os.remove(occ)
+    check('gate: blocks a status write in an in-flight run while held', gate(f'~/.config/agent-watcher/update-status.sh {GID} Pending') == 2)
     real = dict(os.environ, AGENT_TASK_GID=GID)
     count = f'/tmp/agent-stop-block-count-{GID}'
     try: os.remove(count)

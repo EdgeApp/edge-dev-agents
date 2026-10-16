@@ -614,6 +614,16 @@ function freeWorktreeListeners(taskGid) {
   for (const pid of [...new Set(pids)]) {
     const cwd = sh(`lsof -a -p ${pid} -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'`).split('\n')[0] || ''
     if (cwd === root || cwd.startsWith(`${root}/`)) {
+      // A Metro opens React Native DevTools in its own Chrome instance, profiled
+      // at /tmp/metro-devtools/<metro port> (build-and-test metro-devtools-chrome.sh).
+      // Close it with the Metro that owns the port; once Metro is gone nothing maps
+      // the window back to this worktree. The [s] keeps the pattern from matching
+      // the shell that runs pkill.
+      const ports = sh(`lsof -a -p ${pid} -nP -iTCP -sTCP:LISTEN -Fn 2>/dev/null | sed -n 's/^n.*:\\([0-9][0-9]*\\)$/\\1/p'`).split('\n').filter(Boolean)
+      for (const port of new Set(ports)) {
+        if (sh(`pkill -f -- '--user-data-dir=/tmp/metro-devtool[s]/${port} ' && echo killed`).includes('killed'))
+          log(`  [metro] closed DevTools Chrome for port ${port} (retired worktree ${taskGid})`)
+      }
       sh(`kill ${pid}`)
       log(`  [metro] killed listener pid ${pid} (cwd ${cwd} under retired worktree ${taskGid})`)
     }
@@ -967,6 +977,10 @@ function retireSession(session, taskGid, agentStatus = 'Complete') {
   try { slot = slots.get(taskGid) } catch { /* slots.json unreadable */ }
   const metroPort = slot?.metro_port ?? null
   sh(`tmux rename-session -t "=${session}" "${dest}"`)
+  // An operator hold set in the Complete-to-rename window can never be released
+  // from the retired pane (the prompt hook and the expiry branch both skip it), and
+  // a re-armed run would resume under it. The run is over: drop it with the slot.
+  sh(`"${HOME}/.config/agent-watcher/operator-hold.sh" release ${taskGid}`)
   releaseSimAndSlot(taskGid)
   freeMetroPort(metroPort)
   writeReleaseReceipt(taskGid, slot, metroPort)

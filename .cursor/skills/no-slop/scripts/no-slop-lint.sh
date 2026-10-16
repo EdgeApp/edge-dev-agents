@@ -10,11 +10,9 @@
 #           1. colon-terminated count NP:   "Three things:" "A few points:"
 #           2. bare count-NP sentence:      "Two supporting facts." (no verb)
 #           3. existential:                 "There are two issues ..."
-#           4. mid-line counted padding header over a GENERIC-counter noun:
-#              "Two defects compound: the engine ..." (the colon does not end
-#              the line, so shape 1's label-colon exemption would pass it; the
-#              generic-noun list keeps precision vs the legit label idiom
-#              "One visible seam: the race ...")
+#           4. mid-line counted lead-in: "Two defects compound: the engine
+#              ...", "One visible seam: the race ..." (the colon does not end
+#              the line; a counted noun governing a real verb is exempt)
 #         (also matched after a greeting clause: "Hi team, two issues on X.")
 #   WARN  count + contentless predicate:   "Two consequences are easy to miss."
 #         (finite predicate list; incomplete by nature, hence warn-only)
@@ -22,7 +20,10 @@
 #         now", "at the moment", "currently" ... the destination already carries
 #         a timestamp; a date is fine, a relative stamp is not.
 #   HARD  intro label over a stamp/observation word: "What we get today:",
-#         "Measured today:", "Observed:" (line is only the label + colon)
+#         "Measured today:", "Observed:" (line is only the label + colon or
+#         period)
+#   HARD  "so" joins (SKILL rule 20): ", so Y" and "X. So Y"; position-
+#         independent, so it also runs under --fragment
 #   HARD  locator repeated (SKILL rule 22): "on our side/end", "on your
 #         side/end", "ours:" more than once per document (whole-document
 #         count; skipped under --fragment)
@@ -44,7 +45,8 @@
 #
 # --fragment: the input is a text FRAGMENT (an Edit new_string, a Bash command
 # carrying a heredoc), not a whole document. Runs only the checks that are
-# position-independent (em dashes, banned vocabulary, session links, loudness)
+# position-independent (em dashes, banned vocabulary, session links, loudness,
+# "so" joins)
 # and skips the sentence-shape checks, which false-positive without the
 # surrounding document.
 #
@@ -235,11 +237,21 @@ LINES.forEach((raw, i) => {
   // Intro label: a line that is only a label word (+ optional stamp) and a
   // colon. "We see:" is the accepted form; anything narrating when or that an
   // observation happened is the slop shape.
-  const LABEL = /^(?:measured|observed|what we (?:get|see|saw|found)|results?|findings?|tested|as of)\b[^:]{0,24}:\s*$/i
+  // The period form ("Observed.") is the same label with its colon swapped out.
+  const LABEL = /^(?:measured|observed|what we (?:get|see|saw|found)|results?|findings?|tested|as of)\b[^:.]{0,24}[:.]\s*$/i
   if (LABEL.test(noCode.trim()))
-    findings.push(["HARD", n, `intro label: "${noCode.trim().slice(0, 40)}" (use "We see:" or drop the label)`])
+    findings.push(["HARD", n, `intro label: "${noCode.trim().slice(0, 40)}" (use "We see:" or drop the label; a period in place of the colon keeps it)`])
   else if (stampHit)
     findings.push(["HARD", n, `send-time stamp "${stampHit[0]}": the message carries its own timestamp; use a date only when it is not the send date`])
+  // "So" joins (SKILL rule 20): ", so Y" and a sentence opening "So" after a
+  // period split into "X. Y". Purpose, a hidden link, and an explanation each
+  // have their own rewrite, named in the message. "so that/far/much/many/long"
+  // are not joins. Double-quoted spans are text under discussion, not a join
+  // the writer made.
+  const noQuote = noCode.replace(/"[^"]*"|“[^”]*”/g, " ")
+  if (/,\s+(?:and\s+)?so\s+(?!that\b|far\b|much\b|many\b|long\b|to speak\b)\S/i.test(noQuote)
+      || /(?:^|[.!?]\s+)So\s+(?!that\b|far\b|much\b|many\b|long\b)[a-z]/.test(noQuote.trim()))
+    findings.push(["HARD", n, `"so" join: split into two sentences ("X. Y"); purpose takes "so that" or "to", a link the reader would miss takes "because", an explanation of the first clause takes a colon`])
   // Locators: counted per document below; collected here (code spans excluded).
   for (const m of noCode.matchAll(/\bon (?:our|your|their) (?:side|end)\b|\bours:/gi)) locators.push([n, m[0]])
   if (FRAGMENT && !STRINGS) return  // sentence-shape checks need the whole document; a locale value is whole
@@ -275,15 +287,17 @@ LINES.forEach((raw, i) => {
     // wallet work:", the noun "work" granted a blanket exemption. Check only the
     // head position, the token right after the counted noun.
     const headVerb = toks.length > 1 && VERBS.has(toks[1].toLowerCase().replace(/[,;]$/, ""))
-    // Shape 1 requires the LINE to end with the colon: "One visible seam: the
-    // race is..." is the legitimate label-colon idiom, not an announcement.
+    // Shape 1: the LINE ends with the colon ("Three things:").
     if (/:$/.test(s.trim()) && /:\s*$/.test(line) && toks.length <= 6 && !hasVerb)
-      findings.push(["HARD", n, `count-announcement opener: "${s.trim().slice(0, 60)}"`])
-    // Shape 4: counted padding header whose colon does NOT end the line
-    // ("Two defects compound: the engine ..."). Restricted to generic
-    // counter nouns so the legitimate label-colon idiom stays exempt.
-    else if (/:$/.test(s.trim()) && !/:\s*$/.test(line) && countedNounAt >= 0 && toks.length <= 8 && !headVerb)
-      findings.push(["HARD", n, `counted padding header (mid-line): "${s.trim().slice(0, 60)}"`])
+      findings.push(["HARD", n, `count-announcement opener: "${s.trim().slice(0, 60)}" (delete it; a period in place of the colon keeps the violation)`])
+    // Shape 4: a counted lead-in whose colon does NOT end the line, over any
+    // noun ("Two defects compound: the engine ...", "One visible seam: the
+    // race ..."). The claim after the colon stands alone; the count is
+    // padding. A counted noun governing a real verb ("Two engines start
+    // concurrently: ...") is a claim. Uncounted labels ("Root cause: ...")
+    // never reach this loop.
+    else if (/:$/.test(s.trim()) && !/:\s*$/.test(line) && toks.length <= 8 && !headVerb && (countedNounAt >= 0 || !hasVerb))
+      findings.push(["HARD", n, `counted lead-in (mid-line): "${s.trim().slice(0, 60)}" (delete it and start with the claim after the colon)`])
     // Shape 2 applies to PROSE sentences only: a bare-NP BULLET ("- One
     // EdgeCurrencyWallet implementation.") is normal list style.
     else if (!isListItem && /\.$/.test(s.trim()) && toks.length >= 1 && toks.length <= 8 && !hasVerb)

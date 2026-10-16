@@ -124,7 +124,12 @@ selector fails in about 11s instead of 42s.
   `index` orders on-screen matches top to bottom, then left to right.
 - `${...}` and `evalScript` are JavaScript. A script error fails the step and
   prints the source. `when: { true: ... }` is false for blank, `false`, `0`,
-  `null` and `undefined`.
+  `null` and `undefined`. A variable nothing defined reads as `undefined`,
+  as in Maestro, so `${MAESTRO_APP_ID || 'co.edgesecure.app'}` or a subflow
+  reading an env key its caller did not pass takes the default (JavaScriptCore
+  throws a ReferenceError there; the runner declares the name and re-runs).
+- `when:` keys AND together; `true` is evaluated first, so a false `true`
+  skips the `visible` / `notVisible` wait.
 - A subflow's header `env:` is evaluated after the caller's `runFlow env:`, so
   the header's `KEY: ${KEY || default}` idiom sees the caller's value.
 

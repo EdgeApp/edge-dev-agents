@@ -11,6 +11,12 @@ metadata:
 <rules description="Non-negotiable constraints.">
 <rule id="no-mcp">Use the companion script `~/.cursor/skills/asana-task-create/scripts/asana-task-create.sh` and the shared Asana scripts. Never use mcp__*Asana* tools for this workflow: they cannot upload attachments and their field handling drifts from the shared scripts' mappings.</rule>
 <rule id="standard-homes">Every task created here lands on all three boards: Edge 4.x Kanban (Master) and Engineering Board in their default incoming sections, and the jon-claude board in Refinement (override only with an explicit `--jon-claude-section` from the user). The script enforces this; do not create partial-home tasks.</rule>
+<rule id="title-format">Title is `<Area>[ (<scope>)] - <short observation>`, e.g. `Ramps (Paybis) - Max Sell Calculation`, `Swap (XMR) - Quoting Issue`.
+- Area: one to a few nouns naming the product area or feature (Swap, Send, Transaction List, Ramps, Reports, UI), with an optional parenthetical narrowing it (a chain, provider, or sub-feature). Pick the most general scope that is still accurate.
+- Right side: a few words that fit the narrowest Asana list view, never a sentence. For a bug, name the observed defect (`Multitap Bug`), never the fix (`Add copy button to popup menu`). Generalize the request; the specifics go in the description and fields.
+- Leave out details that carry no information for the reader (a provider name when the feature has only one provider).
+- Existing Asana titles are not a model: the board holds both good and bad patterns. `--show-field-context` peers are for field values only.
+The script refuses the mechanical violations (no ` - ` separator, a `prefix:` lead, a trailing period, a work-type area like Bug/Investigate/Research, more than 6 words on the right) with exit 1 `TITLE_FORMAT`; rewrite the title, never work around the gate.</rule>
 <rule id="release-optional">Release (4.x.x) is the ONLY optional field concern: pass `--release` when the user names a target release, omit it otherwise. The script normalizes app-version spellings to the field's option naming (`4.53`, `4.53.0`, `53`, and `53.0` all mean option "53.0"); pass the user's spelling as-is. A missing Release option (e.g. a new "54.0") is auto-created by the script; so are missing Repo options. All other enum fields reject unknown values and list the valid ones; never force-create options on them.</rule>
 <rule id="fill-eng-fields">Fill every Engineering-board field you can justify from the task content: Repo, Priority, LOE, Category, and (when inferable) Release Notes, Severity, Estimate (hrs). Leave a field unset rather than guessing; an empty field is recoverable, a wrong one misroutes automations.</rule>
 <rule id="automation-fields-off-limits">Never set automation- or orchestration-owned fields at creation: anything with 🤖 in the name (Board State 🤖, Departments 🤖, 🤖 - Developer), agent_* fields, blocked, tested, Force Land, Build (staging/cheese), Status, Proposal Status. Board automations and the orchestrator own these. The script blocklists them.</rule>
@@ -30,13 +36,13 @@ metadata:
 </field-reference>
 
 <step id="1" name="Gather context">
-Collect from the user request: task name, target release (optional), repos touched, and the description content. If field choices are unclear, fetch how recent Engineering tasks are filled (read-only) and mirror their conventions:
+Collect from the user request: task name (per `title-format`), target release (optional), repos touched, and the description content. If field choices are unclear, fetch how recent Engineering tasks are filled (read-only) and mirror their conventions:
 
 ```bash
 ~/.cursor/skills/asana-task-create/scripts/asana-task-create.sh --show-field-context
 ```
 
-Choose Priority/LOE/Category/Severity/Estimate the way comparable peer tasks do. Ask the user only when the content genuinely supports conflicting choices (per `fill-eng-fields`, no guessing).
+Choose Priority/LOE/Category/Severity/Estimate the way comparable peer tasks do. Never copy a peer's title style (per `title-format`). Ask the user only when the content genuinely supports conflicting choices (per `fill-eng-fields`, no guessing).
 </step>
 
 <step id="2" name="Write the notes file">

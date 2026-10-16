@@ -22,6 +22,14 @@
 # fixup where it is; that is the fold lint-commit.sh performs after creating a
 # fixup.
 #
+# amend! commits (lint-commit.sh --reword) replace their target's message. Git
+# autosquash applies them, so `autosquash` and pr-land's prepare need nothing
+# extra. `fold-one` folds one with `fixup -C` (git drops the amend! line and
+# keeps the new message), and refuses while any OTHER pending fixup!/amend!/
+# squash! commit names the same target: the fold renames the target, which
+# would orphan them. `fold-before` and `condense-fixups` leave amend! commits
+# where they are, so a reword folds at the next whole-branch autosquash.
+#
 # fold-before --before <iso-ts>: fold every fixup! whose AUTHOR date is older
 # than <iso-ts> into the commit its subject names, in ONE rebase, and leave
 # every newer fixup where it is. This is the stale-fixup fold: a reviewer who
@@ -435,7 +443,10 @@ const commits = log ? log.split('\x1e').map(l => l.replace(/^\n/, '')).filter(Bo
   return { sha, subj, body: (body || '').replace(/^Fixup-for:.*$/mg, '').trim(), kind: m ? m[1] : '' }
 }) : []
 const targets = new Map()
+// amend!/squash! commits are neither targets nor members: they stay put.
+const pending = s => /^(amend|squash)! /.test(s)
 for (const c of commits) {
+  if (pending(c.subj)) continue
   if (strip(c.subj).depth === 0 && !targets.has(c.subj)) targets.set(c.subj, { sha: c.sha, subj: c.subj, groups: [] })
 }
 const member = new Map()
@@ -559,6 +570,8 @@ const commits = log ? log.split('\x1e').map(l => l.replace(/^\n/, '')).filter(Bo
 const targets = new Map()
 const stale = []
 for (const c of commits) {
+  // amend!/squash! commits stay where they are (whole-branch autosquash folds them).
+  if (/^(amend|squash)! /.test(c.subj)) continue
   if (!c.subj.startsWith('fixup! ')) { if (!targets.has(c.subj)) targets.set(c.subj, c.sha); continue }
   const t = targets.get(strip(c.subj))
   if (t && c.at < before) stale.push({ ...c, target: t })
@@ -607,14 +620,15 @@ NODEEOF
   printf '%s\n' "$plan"
 }
 
-# fold-one --fixup <sha>: squash exactly ONE fixup! commit into the commit its
-# subject names. Every other pending fixup on the branch keeps its own commit,
+# fold-one --fixup <sha>: squash exactly ONE fixup! (or amend!) commit into the
+# commit its subject names. Every other pending fixup on the branch keeps its own commit,
 # which is the whole point: `autosquash` rewrites the branch from the merge
 # base and sweeps up fixups a reviewer is still waiting to read.
 # The sequence editor drops the named fixup's `pick` line and re-inserts it as
-# `fixup` directly after its target's line; every other line stays `pick`.
+# `fixup` (`fixup -C` for an amend!) directly after its target's line; every
+# other line stays `pick`.
 run_fold_one() {
-  local fixup_sha target_sha subject headline short_fix short_tgt tmp
+  local fixup_sha target_sha subject headline short_fix short_tgt tmp fold_cmd="fixup" others
   if [[ -z "$FIXUP" ]]; then
     echo "Error: fold-one needs --fixup <sha>" >&2
     exit 1
@@ -634,12 +648,16 @@ run_fold_one() {
     exit 1
   fi
   subject="$(git log -1 --format=%s "$fixup_sha")"
-  if [[ "$subject" != fixup!\ * ]]; then
-    echo "Error: $(git rev-parse --short=10 "$fixup_sha") is not a fixup! commit (subject: $subject)" >&2
+  if [[ "$subject" == amend!\ * ]]; then
+    fold_cmd="fixup -C"
+    headline="${subject#amend! }"
+  elif [[ "$subject" == fixup!\ * ]]; then
+    headline="$subject"
+    while [[ "$headline" == fixup!\ * ]]; do headline="${headline#fixup! }"; done
+  else
+    echo "Error: $(git rev-parse --short=10 "$fixup_sha") is not a fixup! or amend! commit (subject: $subject)" >&2
     exit 1
   fi
-  headline="$subject"
-  while [[ "$headline" == fixup!\ * ]]; do headline="${headline#fixup! }"; done
   # Literal subject comparison, never a dynamic regex: subjects carry regex
   # metacharacters. %H is 40 chars, so the subject starts at column 42. Search
   # below the fixup only, so the target is always an ancestor of it.
@@ -652,6 +670,21 @@ run_fold_one() {
   fi
   short_fix="$(git rev-parse --short=10 "$fixup_sha")"
   short_tgt="$(git rev-parse --short=10 "$target_sha")"
+  if [[ "$fold_cmd" == "fixup -C" ]]; then
+    # Literal comparison after stripping every fixup!/amend!/squash! prefix.
+    others="$(git log "$BASE..HEAD" --format='%H %s' 2>/dev/null \
+      | FIX="$fixup_sha" HEADLINE="$headline" awk '
+          $1 == ENVIRON["FIX"] { next }
+          { s = substr($0, 42); n = 0
+            while (s ~ /^(fixup|amend|squash)! /) { s = substr(s, index(s, " ") + 1); n++ }
+            if (n > 0 && s == ENVIRON["HEADLINE"]) print substr($1, 1, 10) " " substr($0, 42) }' || true)"
+    if [[ -n "$others" ]]; then
+      echo "Error: other pending commits name \"$headline\":" >&2
+      printf '%s\n' "$others" | sed 's/^/  /' >&2
+      echo "  Folding amend! $short_fix renames $short_tgt and would orphan them. The reword stays at HEAD and folds at the next whole-branch autosquash (pr-finalize-fixups.sh, pr-land)." >&2
+      exit 1
+    fi
+  fi
   tmp="$(mktemp -d -t fold-one.XXXXXX)"
   # shellcheck disable=SC2064  # expand now: the local is gone when EXIT fires
   trap "rm -rf '$tmp'" EXIT
@@ -660,6 +693,7 @@ const fs = require('fs')
 const todoPath = process.argv[2]
 const fixup = process.env.FOLD_FIXUP_SHA
 const target = process.env.FOLD_TARGET_SHA
+const cmd = process.env.FOLD_CMD || 'fixup'
 const shaOf = l => { const m = l.match(/^(?:pick|p)\s+([0-9a-f]+)/); return m ? m[1] : null }
 // git abbreviates todo shas; either side may be the prefix.
 const same = (a, b) => !!a && !!b && (a.startsWith(b) || b.startsWith(a))
@@ -674,11 +708,11 @@ for (const line of lines) {
 if (fixupLine === null) { console.error('ERROR: fixup ' + fixup + ' is not in the rebase todo'); process.exit(1) }
 const at = kept.findIndex(l => { const sha = shaOf(l); return sha && same(target, sha) })
 if (at < 0) { console.error('ERROR: target ' + target + ' is not in the rebase todo'); process.exit(1) }
-kept.splice(at + 1, 0, fixupLine.replace(/^(?:pick|p)\s+/, 'fixup '))
+kept.splice(at + 1, 0, fixupLine.replace(/^(?:pick|p)\s+/, cmd + ' '))
 fs.writeFileSync(todoPath, kept.join('\n'))
 NODEEOF
   rm -f "$(git rev-parse --git-path index.lock)"
-  if ! FOLD_FIXUP_SHA="$fixup_sha" FOLD_TARGET_SHA="$target_sha" \
+  if ! FOLD_FIXUP_SHA="$fixup_sha" FOLD_TARGET_SHA="$target_sha" FOLD_CMD="$fold_cmd" \
       GIT_SEQUENCE_EDITOR="node $tmp/fold-one.js" GIT_EDITOR=true \
       git rebase --autostash -i "$BASE" >"$tmp/rebase.log" 2>&1; then
     echo "Error: rebase failed while folding $short_fix into $short_tgt" >&2
@@ -689,7 +723,7 @@ NODEEOF
     fi
     exit 1
   fi
-  echo ">> Folded fixup $short_fix into $short_tgt (\"$headline\"); other pending fixups untouched"
+  echo ">> Folded ${subject%%!*}! $short_fix into $short_tgt (\"$headline\"); other pending fixups untouched"
 }
 
 run_fold_mode() {

@@ -53,7 +53,17 @@ BRANCH="$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 # directory under this worktree (robust regardless of port).
 if [[ -d "$WT" ]]; then
   WT_REAL="$(cd "$WT" 2>/dev/null && pwd -P || echo "$WT")"
-  for pid in $(lsof -a -d cwd -Fpn 2>/dev/null | awk -v wt="$WT_REAL" '/^p/{p=substr($0,2)} /^n/{if (index(substr($0,2), wt)==1) print p}' | sort -u); do
+  WT_PIDS="$(lsof -a -d cwd -Fpn 2>/dev/null | awk -v wt="$WT_REAL" '/^p/{p=substr($0,2)} /^n/{if (index(substr($0,2), wt)==1) print p}' | sort -u)"
+  # A Metro rooted here opens React Native DevTools in its own Chrome instance,
+  # profiled at /tmp/metro-devtools/<metro port> (build-and-test's
+  # metro-devtools-chrome.sh). Kill that instance by the ports this worktree's
+  # processes listen on, before the Metro that owns the port goes away. The
+  # session watchdog does the same when it frees a retired worktree's listeners.
+  for port in $(for pid in $WT_PIDS; do lsof -a -p "$pid" -nP -iTCP -sTCP:LISTEN -Fn 2>/dev/null | sed -n 's/^n.*:\([0-9][0-9]*\)$/\1/p'; done | sort -u); do
+    pkill -f -- "--user-data-dir=/tmp/metro-devtool[s]/$port " 2>/dev/null \
+      && echo ">> cleanup-task-workspace: closed DevTools Chrome for Metro port $port" >&2
+  done
+  for pid in $WT_PIDS; do
     kill "$pid" 2>/dev/null && echo ">> cleanup-task-workspace: killed dev-server/proc pid $pid rooted in worktree" >&2
   done
 fi

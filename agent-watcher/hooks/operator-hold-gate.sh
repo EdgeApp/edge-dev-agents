@@ -13,12 +13,18 @@
 # PR triggers fall back to a text match on the mention-stripped command
 # (strip-cmd-mentions.sh).
 #
-# Scope: no-op unless AGENT_TASK_GID is set. Exit 0 = allow, exit 2 = block
-# (stderr fed to the model). Fail-open on any helper error.
+# Scope: no-op unless AGENT_TASK_GID is set and the session is an in-flight run
+# (orch-run-context.sh), the same scope the prompt hook sets and releases in and
+# the watchdog expires in. A retired done-asana-* session keeps AGENT_TASK_GID,
+# but every action there is the operator's: a stamp set in the Complete-to-rename
+# window would otherwise block it forever, since nothing can release it there.
+# Exit 0 = allow, exit 2 = block (stderr fed to the model). Fail-open on any
+# helper error.
 set -uo pipefail
 [ -n "${AGENT_TASK_GID:-}" ] || exit 0
 GID="$AGENT_TASK_GID"
 H="$HOME/.config/agent-watcher"
+if [ -x "$H/orch-run-context.sh" ] && ! "$H/orch-run-context.sh" >/dev/null 2>&1; then exit 0; fi
 STATE=$("$H/operator-hold.sh" status "$GID" 2>/dev/null) || exit 0   # clear (or oracle missing) → allow
 
 CMD=$(jq -r '.tool_input.command // empty' 2>/dev/null || true)

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # slot-fixup.sh
-# Move HEAD (a fixup! commit) to sit immediately after its target's group.
-# A target's group = the target commit + any same-headline fixups already
-# slotted next to it. The new fixup goes at the END of that group, preserving
+# Move HEAD (a fixup! or amend! commit) to sit immediately after its target's
+# group. A target's group = the target commit + any same-headline fixup! and
+# amend! commits already slotted next to it. The new fixup goes at the END of that group, preserving
 # chronological order among siblings.
 #
 # Designed to be called after `lint-commit.sh` creates a fixup, keeping the
@@ -50,12 +50,12 @@ if [[ -z "$BASE" ]]; then
 fi
 
 HEAD_MSG="$(git log -1 --format='%s')"
-if [[ ! "$HEAD_MSG" =~ ^fixup!\  ]]; then
-  echo "Error: HEAD is not a fixup! commit (subject: $HEAD_MSG)" >&2
+if [[ ! "$HEAD_MSG" =~ ^(fixup|amend)!\  ]]; then
+  echo "Error: HEAD is not a fixup! or amend! commit (subject: $HEAD_MSG)" >&2
   exit 1
 fi
 
-HEADLINE="${HEAD_MSG#fixup! }"
+HEADLINE="${HEAD_MSG#*! }"
 HEAD_SHA_FULL="$(git rev-parse HEAD)"
 
 # owner_of_pr: prints the review-mode isOwner value (true|false) for this
@@ -93,12 +93,20 @@ if [[ "$(owner_of_pr)" == "false" ]]; then
   exit 0
 fi
 
-# If HEAD is already next to its target group, no-op.
-PARENT_MSG="$(git log -1 --format='%s' HEAD~1)"
-if [[ "$PARENT_MSG" == "$HEADLINE" || "$PARENT_MSG" == "fixup! $HEADLINE" ]]; then
-  echo ">> Already slotted next to target group ($HEADLINE) — no-op"
-  exit 0
-fi
+# If HEAD is already next to its target group, no-op. Walk back over
+# same-headline siblings and require the target itself at the end of the run:
+# a sibling fixup on HEAD~1 is not proof of slotting when the siblings are
+# stacked away from the target.
+WALK="HEAD~1"
+while :; do
+  WALK_MSG="$(git log -1 --format='%s' "$WALK")"
+  if [[ "$WALK_MSG" == "$HEADLINE" ]]; then
+    echo ">> Already slotted next to target group ($HEADLINE) — no-op"
+    exit 0
+  fi
+  [[ "$WALK_MSG" == "fixup! $HEADLINE" || "$WALK_MSG" == "amend! $HEADLINE" ]] || break
+  WALK="$WALK~1"
+done
 
 EDITOR_SCRIPT="$(mktemp -t slot-fixup-editor.XXXXXX.js)"
 trap 'rm -f "$EDITOR_SCRIPT"' EXIT
@@ -163,7 +171,8 @@ if (targetIdx < 0) {
 }
 
 let slotIdx = targetIdx + 1
-while (slotIdx < remaining.length && getMsg(remaining[slotIdx]) === 'fixup! ' + headline) {
+const inGroup = m => m === 'fixup! ' + headline || m === 'amend! ' + headline
+while (slotIdx < remaining.length && inGroup(getMsg(remaining[slotIdx]))) {
   slotIdx++
 }
 

@@ -31,11 +31,12 @@ Items previously marked with `<!-- addressed:review:ID -->` or `<!-- addressed:c
       - Treat the feedback as re-review-blocking
       - If the user wants it addressed now, make the fix as a visible fixup commit, push it with `~/.cursor/skills/pr-finalize-fixups.sh --owner <o> --repo <r> --pr <n>` (the review is active, so the plumbing push is gate-blocked while fixups are on the branch), reply/resolve the feedback, and **remove the PR from the merge set** so it can go back for review
       - If the user does not want to address it now, leave the PR out of the merge set and report it as blocked by requested changes
+      - Exception: with Force Land authority and every one of the reviewer's threads already resolved, the PR stays in the merge set; step 5 dismisses the review per `force-land-review-bypass`
    2. **`approved: true` and `changesRequested: false`**:
       - DEFAULT: **address** the comments via the /pr-address flow below, without asking — the reviewer already approved, so follow-up comments are nits to fix, not re-review gates. Ask the user ONLY when a comment is ambiguous, expands scope beyond the PR, or you cannot determine the concrete change it wants.
       - To address each comment:
         1. Read the comment and understand the requested change
-        2. Make the fix as a fixup commit: `~/.cursor/skills/lint-commit.sh --fixup <hash> --for human -m "<what changed and which comment it answers>" [files...]`
+        2. Make the fix as a fixup commit: `~/.cursor/skills/lint-commit.sh --fixup <hash> --for human -m "<what changed and which comment it answers>" [files...]` (a requested commit-message change is `lint-commit.sh --reword <hash> -m "<complete new message>"` instead)
         3. Push the updated branch with `~/.cursor/skills/git-branch-ops.sh push --force-with-lease --branch <branch>`. Use `--force-with-lease` because `lint-commit.sh --fixup` may autosquash immediately.
         4. Reply on the PR item explaining what was fixed (1 sentence, factual):
            - **Inline** (`type: "inline"`): Use `commentId` and `threadId` from `pr-land-comments.sh` output with `~/.cursor/skills/pr-address/scripts/pr-address.sh reply ...` followed by `resolve-thread ...`

@@ -20,12 +20,16 @@
 # last so a run that fails part-way still finds its frames there, and running
 # the same command again finishes the job (deleting a deleted object succeeds).
 #
-# The table is the only part of the body this rewrites. A withdrawn URL quoted
-# elsewhere (prose, a PR comment) is named on stderr; pr-evidence-relink.sh
-# with a null map value removes those.
+# Only the PR's author may withdraw: a PR opened by another account is refused
+# before anything is read or changed, because its body is not ours to edit.
 #
-# Exit codes: 0 = withdrawn (or dry run), 1 = error or no such frame (nothing
-# was changed when no frame matched).
+# The table is the only part of the body this rewrites. A withdrawn URL quoted
+# elsewhere is named on stderr: in the body's prose, and in any PR comment,
+# review or review comment (a dry run checks the comments too). Nothing here
+# edits a comment; pr-evidence-relink.sh with a null map value removes those.
+#
+# Exit codes: 0 = withdrawn (or dry run), 1 = error, not the PR's author, or no
+# such frame (nothing was changed in the last two cases).
 
 set -euo pipefail
 
@@ -50,6 +54,24 @@ log() { echo ">> pr-evidence-withdraw: $*" >&2; }
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
+
+# -- Refuse a PR another account opened -----------------------------------------
+OWNERS=$(OWNER="${REPO%/*}" NAME="${REPO#*/}" NUMBER="$PR" node -e '
+  const { spawnSync } = require("child_process")
+  const r = spawnSync("gh", ["api", "graphql", "-f", "owner=" + process.env.OWNER, "-f", "name=" + process.env.NAME, "-F", "number=" + process.env.NUMBER,
+    "-f", "query=query($owner:String!,$name:String!,$number:Int!){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$number){author{login}}}}"],
+    { encoding: "utf8" })
+  if (r.status !== 0) { process.stderr.write(r.stderr || ""); process.exit(1) }
+  const d = JSON.parse(r.stdout).data
+  const me = (d.viewer || {}).login || ""
+  const author = ((d.repository.pullRequest || {}).author || {}).login || ""
+  if (!me || !author) process.exit(1)
+  process.stdout.write(me + " " + author)
+') || { echo "could not read the author of $REPO#$PR: nothing changed." >&2; exit 1; }
+if [[ "${OWNERS% *}" != "${OWNERS#* }" ]]; then
+  echo "$REPO#$PR was opened by ${OWNERS#* }, not ${OWNERS% *}: nothing changed. A PR another account opened is not ours to edit; ask its author to take the frame down." >&2
+  exit 1
+fi
 
 "$BUCKET" check || { echo "no asset bucket configured (see the config path in evidence-bucket.js): nothing changed." >&2; exit 1; }
 
@@ -97,6 +119,31 @@ node -e '
 # Print one expression over the plan, newline-terminated so `read` sees the last line.
 plan() { node -e 'const p = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const out = String(eval(process.argv[2])); if (out !== "") console.log(out)' "$WORK/plan.json" "$1"; }
 
+# Name every PR comment, review and review comment that quotes a withdrawn URL.
+# Report only: a comment is never edited here, and a failed read is a WARN.
+scan_comments() {
+  local urls="$1" ep
+  [[ -n "$urls" ]] || return 0
+  : > "$WORK/comments.jsonl"
+  for ep in "issues/$PR/comments" "pulls/$PR/comments" "pulls/$PR/reviews"; do
+    gh api --paginate "repos/$REPO/$ep" --jq '.[]' >> "$WORK/comments.jsonl" 2> "$WORK/comments.err" \
+      || { log "WARN: could not read repos/$REPO/$ep, so its comments were not checked for withdrawn URLs: $(cat "$WORK/comments.err")"; }
+  done
+  URLS="$urls" node -e '
+    const urls = process.env.URLS.split("\n").filter(Boolean)
+    for (const line of require("fs").readFileSync(process.argv[1], "utf8").split("\n")) {
+      if (!line.trim()) continue
+      let c
+      try { c = JSON.parse(line) } catch { continue }
+      for (const u of urls) {
+        if (typeof c.body === "string" && c.body.includes(u)) {
+          console.error(">> pr-evidence-withdraw: WARN: " + u + " is quoted in a PR comment " + (c.html_url || "(no link)") + "; remove it with pr-evidence-relink.sh (map it to null)")
+        }
+      }
+    }
+  ' "$WORK/comments.jsonl"
+}
+
 UNMATCHED="$(plan 'p.unmatched.join("\n")')"
 if [[ -n "$UNMATCHED" ]]; then
   {
@@ -110,6 +157,7 @@ fi
 
 if [[ "$DRY" -eq 1 ]]; then
   plan 'p.frames.map(f => "would withdraw " + f.scene + " " + f.url + (f.key ? "" : f.shared ? " (object kept: another entry uses it)" : " (not a bucket object: table entry only)")).join("\n")'
+  scan_comments "$(plan 'p.frames.filter(f => !f.shared).map(f => f.url).join("\n")')"
   exit 0
 fi
 
@@ -164,6 +212,7 @@ while IFS= read -r url; do
     log "WARN: $url is still quoted in the PR body outside the table; remove it with pr-evidence-relink.sh (map it to null)"
   fi
 done < <(plan 'p.frames.filter(f => !f.shared).map(f => f.url).join("\n")')
+scan_comments "$(plan 'p.frames.filter(f => !f.shared).map(f => f.url).join("\n")')"
 
 LEFT=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).entries.length)' "$WORK/new.json")
 log "PASS: withdrew $(plan 'p.frames.length') frame(s) from $REPO#$PR; the table now holds $LEFT"

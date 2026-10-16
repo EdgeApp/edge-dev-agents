@@ -199,7 +199,10 @@ ensure_metro_ready_and_pin() {
   assert_metro_port_free_or_ours
   if [[ -z "$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)" ]]; then
     echo ">> ios-rn-build: no Metro on port $PORT; starting one (log: /tmp/metro-$PORT.log)" >&2
-    nohup npx react-native start --port "$PORT" >/tmp/metro-"$PORT".log 2>&1 &
+    # Metro opens React Native DevTools in a Chrome instance teardown can kill
+    # (see metro-devtools-chrome.sh).
+    CHROME_PATH="$HOME/.cursor/skills/build-and-test/scripts/metro-devtools-chrome.sh" \
+      nohup npx react-native start --port "$PORT" >/tmp/metro-"$PORT".log 2>&1 &
     local ready=false
     for _ in $(seq 1 60); do
       if curl -fsS --max-time 2 "http://localhost:$PORT/status" 2>/dev/null | grep -q "packager-status:running"; then

@@ -334,8 +334,8 @@ try:
           and 'b 0 fixed' in sh('git show HEAD:b.txt', fr).stdout, '')
 
     p = ops('fold-one', '--fixup', sh('git rev-parse HEAD', fr).stdout.strip() + '~1')
-    check('fold-one: refuses a commit that is not a fixup!',
-          p.returncode == 1 and 'not a fixup! commit' in p.stderr, f'rc={p.returncode} {p.stderr[:200]}')
+    check('fold-one: refuses a commit that is not a fixup! or amend!',
+          p.returncode == 1 and 'not a fixup! or amend! commit' in p.stderr, f'rc={p.returncode} {p.stderr[:200]}')
 
     write(fr, 'c.txt', ['c 0'])
     orphan = commit(fr, 'fixup! A target that is not on this branch', 'c.txt')

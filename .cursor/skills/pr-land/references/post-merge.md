@@ -68,7 +68,7 @@ Then restore the previous branch.
       ```
    2. Create the follow-up task: run once with `--dry-run`, check the payload, then the same command without it:
       ```bash
-      ~/.cursor/skills/asana-task-create/scripts/asana-task-create.sh --name "Address post-merge bot findings: <repo>" --notes-file /tmp/pr-land-bot-followup-<repo>.txt --release <release.selected> --repo <Repo option> --set "Category=Bugfix/Tweak" --dry-run
+      ~/.cursor/skills/asana-task-create/scripts/asana-task-create.sh --name "Code Review (<repo>) - Post-merge bot findings" --notes-file /tmp/pr-land-bot-followup-<repo>.txt --release <release.selected> --repo <Repo option> --set "Category=Bugfix/Tweak" --dry-run
       ```
       Repo option: `jq -r --arg r <repo> '.custom_fields.repo.github_repo_options[$r] // empty' ~/.config/agent-watcher/asana-config.json` (the one copy of the map); an empty result omits `--repo`. Omit `--release` when discovery returned no `release`. Keep the printed `TASK_URL`.
    3. For EVERY thread in that repo's `botThreads`, reply with the task link, then resolve (an unresolved thread fails one-shot's finalize-gate):

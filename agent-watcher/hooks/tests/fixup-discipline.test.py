@@ -18,6 +18,15 @@ Run: python3 ~/.config/agent-watcher/hooks/tests/fixup-discipline.test.py
      but is later in time stays), leaving newer fixups and the tree intact.
   5. condense-fixups falls back to one group per target in original order when
      the per-kind regroup conflicts (interleaved human/auto edits of one line).
+  6. lint-commit.sh --reword commits a message-only "amend! <subject>" whose body
+     is the target's whole new message, bounces bad input (no or fixup-shaped
+     message, subject over 50, files, staged changes, a pending target, an
+     unchanged message, a base commit, a raw -m "amend! ..."), and folds when
+     there is no PR.
+  7. amend! through the branch tools: condense-fixups and fold-before leave it
+     alone, slot-fixup slots it next to its target, and fold-one rewrites the
+     target's message with the tree untouched, refusing while another pending
+     fixup names the same target.
 pr-finalize-fixups.sh wires 2, 3 and 4 into every push but needs a live PR for its
 review-mode oracle, so it is exercised by real runs, not here.
 """
@@ -27,6 +36,7 @@ SK = os.path.expanduser('~/.cursor/skills')
 LC = f'{SK}/lint-commit.sh'
 OPS = f'{SK}/git-branch-ops.sh'
 STAMP = f'{SK}/tdd/scripts/tdd-stamp.sh'
+SLOT = f'{SK}/slot-fixup.sh'
 fails = []
 
 
@@ -148,6 +158,68 @@ try:
     check('one fixup left for X, kind human', s5 == ['fixup! Add X', 'Add X'] and git('log -1 --format=%b', r5).strip().endswith('Fixup-for: human'), s5)
     check('fallback keeps the tree', git('rev-parse HEAD^{tree}', r5) == tree5)
     check('no rebase left in progress', not os.path.isdir(os.path.join(r5, '.git/rebase-merge')))
+
+    # ---- 6. --reword: a message-only amend! commit ----
+    r6 = os.path.join(tmp, 'r6'); os.makedirs(r6)
+    sh(f'git init -q -b master && git commit -q --allow-empty -m Base && git remote add origin {remote} && git push -q -f origin master && git fetch -q origin && git checkout -q -b f6', r6)
+    sh('echo p > p.txt && git add p.txt && git commit -q -m "Add P" -m "Old P body"', r6); P = git('rev-parse HEAD', r6)
+    sh('echo q > q.txt && git add q.txt && git commit -q -m "Add Q"', r6); Q = git('rev-parse HEAD', r6)
+    head6 = git('rev-parse HEAD', r6)
+    p = sh(f'{LC} --reword {P} -m "Add the P file\n\nNew P body" --no-reorder', r6)
+    check('--reword commits amend! with the full new message, no trailer',
+          p.returncode == 0 and git('log -1 --format=%B', r6) == 'amend! Add P\n\nAdd the P file\n\nNew P body'
+          and git('rev-parse HEAD~1', r6) == head6 and git('show --name-only --format= HEAD', r6) == '', p.stderr[-200:] + git('log -1 --format=%B', r6))
+    AM = git('rev-parse HEAD', r6)
+    for name, cmd, needle in (
+        ('--reword with no -m is bounced', f'--reword {Q}', 'needs -m'),
+        ('--reword subject over 50 chars is bounced', f'--reword {Q} -m "{"x" * 51}"', 'cap is 50'),
+        ('--reword with files is bounced', f'--reword {Q} -m "Add Q file" q.txt', 'takes no files'),
+        ('--reword with a fixup! subject is bounced', f'--reword {Q} -m "fixup! Add Q"', 'not a fixup subject'),
+        ('--reword of a pending amend! is bounced', f'--reword {AM} -m "Add Q file"', 'reword the commit it targets'),
+        ('--reword to the same message is bounced', f'--reword {Q} -m "Add Q"', 'nothing to reword'),
+        ('--reword of a base commit is bounced', f'--reword {git("rev-parse origin/master", r6)} -m "Base two"', 'not a commit on this branch'),
+        ('raw -m "amend! ..." is bounced', '-m "amend! Add Q\n\nAdd Q file" q.txt', 'with --reword'),
+    ):
+        p = sh(f'{LC} {cmd} --no-reorder', r6)
+        check(name, p.returncode == 1 and needle in p.stderr and git('rev-parse HEAD', r6) == AM, p.stderr[-200:])
+    sh('echo q2 >> q.txt && git add q.txt', r6)
+    p = sh(f'{LC} --reword {Q} -m "Add Q file" --no-reorder', r6)
+    check('--reword with staged changes is bounced', p.returncode == 1 and 'staged changes' in p.stderr and git('rev-parse HEAD', r6) == AM, p.stderr[-200:])
+    sh('git reset -q --hard', r6)
+    # No PR for this branch, so fold-mode folds: the reword lands on Q right away.
+    p = sh(f'{LC} --reword {Q} -m "Add the Q file\n\nQ body"', r6)
+    s6 = git('log --format=%s origin/master..HEAD', r6).split('\n')
+    check('--reword with no PR folds into the target', p.returncode == 0 and s6 == ['amend! Add P', 'Add the Q file', 'Add P']
+          and git('log -1 --format=%B HEAD~1', r6) == 'Add the Q file\n\nQ body', repr(git('log -1 --format=%B HEAD~1', r6)) + str(s6))
+
+    # ---- 7. amend! through fold-one, condense, fold-before and slot-fixup ----
+    tree6 = git('rev-parse HEAD^{tree}', r6)
+    p = sh(f'{OPS} condense-fixups', r6)
+    check('condense leaves a lone amend! alone', p.returncode == 0 and 'amend! Add P' in git('log --format=%s', r6), p.stdout + p.stderr[-200:])
+    p = sh(f'{OPS} fold-before --before 2999-01-01T00:00:00Z --base origin/master', r6)
+    check('fold-before leaves amend! alone', p.returncode == 0 and 'amend! Add P' in git('log --format=%s', r6), p.stdout + p.stderr[-200:])
+    r7 = os.path.join(tmp, 'r7'); os.makedirs(r7)
+    sh(f'git init -q -b master && git remote add origin {remote} && git fetch -q origin && git reset -q --hard origin/master && git checkout -q -b f7', r7)
+    sh('echo p > p.txt && git add p.txt && git commit -q -m "Add P" -m "Old P body"', r7); P7 = git('rev-parse HEAD', r7)
+    sh('echo q > q.txt && git add q.txt && git commit -q -m "Add Q"', r7)
+    sh(f'{LC} --reword {P7} -m "Add the P file\n\nNew P body" --no-reorder', r7)
+    p = sh(SLOT, r7)
+    s7 = git('log --reverse --format=%s origin/master..HEAD', r7).split('\n')
+    check('slot-fixup slots an amend! HEAD right after its target',
+          p.returncode == 0 and s7 == ['Add P', 'amend! Add P', 'Add Q'], f'{s7} {p.stderr[-200:]}')
+    AM7 = git('log -1 --format=%H --grep="^amend! Add P"', r7)
+    sh('echo p2 >> p.txt && git add p.txt && git commit -q -m "fixup! Add P" -m "p2"', r7)
+    p = sh(f'{OPS} fold-one --fixup {AM7}', r7)
+    check('fold-one refuses an amend! while another fixup names the same target',
+          p.returncode == 1 and 'fixup! Add P' in p.stderr and 'amend! Add P' in git('log --format=%s', r7), p.stderr[-300:])
+    sh('git reset -q --hard HEAD~1', r7)
+    tree7 = git('rev-parse HEAD^{tree}', r7)
+    p = sh(f'{OPS} fold-one --fixup {AM7}', r7)
+    s7 = git('log --reverse --format=%s origin/master..HEAD', r7).split('\n')
+    check('fold-one folds an amend!: new subject and body, tree untouched',
+          p.returncode == 0 and s7 == ['Add the P file', 'Add Q']
+          and git('log -1 --format=%B HEAD~1', r7) == 'Add the P file\n\nNew P body'
+          and git('rev-parse HEAD^{tree}', r7) == tree7, f'{s7} {p.stderr[-300:]}')
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 print(f'\n{len(fails)} failure(s)' if fails else '\nall passed')

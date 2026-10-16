@@ -73,3 +73,15 @@ Each example below contains multiple AI tells. The bracketed annotations explain
 - "Additionally": banned sentence starter
 - "utilizes": banned word (use "uses")
 - "streamline": banned word
+
+---
+
+## Example 6: Incident note
+
+> One visible seam: the DevTools window belongs to the operator's Chrome. Metro hands the window off and exits, so teardown never sees it. So the window stays open after the run. Observed.
+
+**What is wrong:**
+- "One visible seam:": counted lead-in; start with "The DevTools window belongs..."
+- "exits, so teardown never sees it": "so" join; split into "Metro hands the window off and exits. Teardown never sees it."
+- "So the window stays open": the same join moved behind a period; drop "So"
+- "Observed.": intro label with its colon swapped for a period; delete it

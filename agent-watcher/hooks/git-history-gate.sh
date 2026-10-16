@@ -61,8 +61,8 @@
 #   under the skills directory but carry no review-mode policy, so a typed
 #   `git-branch-ops.sh push` puts a mid-round HEAD on a PR under review. Both
 #   face the same preserve checks as raw git. The push block
-#   applies only while the branch carries fixup! commits (an address round in
-#   flight); a landing push after pr-land's prepare has none and passes, as
+#   applies only while the branch carries fixup! or amend! commits (an address
+#   round in flight); a landing push after pr-land's prepare has none and passes, as
 #   do all pushes in autosquash mode. Calls made INSIDE a companion script
 #   (pr-finalize-fixups.sh, cheese-build.sh) never reach this hook.
 #
@@ -217,7 +217,7 @@ if [ -n "$NEEDS_MODE" ]; then
     MB=$(git merge-base "$UPSTREAM" HEAD 2>/dev/null || true)
     # Capture first: `git log | grep -q` dies of SIGPIPE under pipefail.
     SUBJECTS=$([ -n "$MB" ] && git log "$MB..HEAD" --format=%s 2>/dev/null || true)
-    if ! printf '%s\n' "$SUBJECTS" | grep -q '^fixup! '; then
+    if ! printf '%s\n' "$SUBJECTS" | grep -qE '^(fixup|amend)! '; then
       exit 0
     fi
   fi
@@ -260,8 +260,8 @@ what changed since their review — squashing now destroys that.
 MSG
     else
       cat >&2 <<'MSG'
-BLOCKED: `git push` (raw, or git-branch-ops.sh push with fixup! commits on the
-branch) while review-mode is PRESERVE (a review is active on this PR). Reviewer bots bill PER PUSH (bugbot credit gate, 2026-07-31): finish
+BLOCKED: `git push` (raw, or git-branch-ops.sh push with fixup!/amend! commits on
+the branch) while review-mode is PRESERVE (a review is active on this PR). Reviewer bots bill PER PUSH (bugbot credit gate, 2026-07-31): finish
 the WHOLE address round locally (one fixup per target and kind per one-fixup-
 per-target-per-turn), then push ONCE via ~/.cursor/skills/pr-finalize-fixups.sh — it owns
 the push, the squash-vs-preserve decision, and the condense to one fixup per

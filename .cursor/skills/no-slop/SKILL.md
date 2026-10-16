@@ -92,7 +92,7 @@ literally.
 ## 13. Write like a human
 
 - Vary sentence length naturally. Mix short and long.
-- Start some sentences with "But," "And," "So," or "Or."
+- Start some sentences with "But," "And," or "Or." (Not "So": rule 20.)
 - Use contractions (don't, isn't, can't) in informal contexts.
 - Be specific over general. Numbers over adjectives. Evidence over claims.
 - It's OK to be blunt, dry, or even terse. Humans are.
@@ -108,6 +108,8 @@ A sentence must carry a claim, not an evaluation or preview of the claim you're 
 - No stance-validation preambles: "your concern is fair," "good question," "you're right to push on this." When the reader is right, the confirmation is the fact itself: "Confirmed: the rules were in force; 4 of 7 runs violated them."
 - No forward references: "here's the precise failure:", "here's what matters:", "the key thing is this:".
 - No structure announcements: "Summary, in three parts.", "Three things:", "Let me break this down." Just write the parts.
+- No counted lead-ins before a claim: "One visible seam: the race is..." is "The race is...". A count opening a colon lead-in is padding wherever the colon sits; a label that classifies the claim ("Root cause: the race...", "Workaround: restart Metro") is not.
+- Colons are fine. A colon that introduces the specific content (a definition, an explanation of the preceding clause, an example, a list) is correct punctuation. The violations above are the contentless lead-ins; fix one by deleting the lead-in. Swapping its colon for a period keeps the violation and degrades the punctuation.
 - No pre-verdicts the next sentence restates: "it's the opposite of a penalty" followed by the terms that show that.
 - No per-item self-grading in lists: "Cheapest item on the list.", "The easy one.", "Most important of these." If ordering matters, the list header states the principle once ("in rough order of effort, smallest first", "by impact", "no particular order") and the items carry only content.
 - No "say the word" closers. When a decision is genuinely open, end with the decision stated directly: the current state plus a direct question ("Em-dash ban now also covers Asana comments. Keep it?") or the default plus the cost of changing it ("Default: included. Excluding it is a one-line change."). Banned framings: "say the word", "just say the word", "let me know if you'd like", "if you want, I can...". If no decision is open, end on the last substantive sentence.
@@ -156,14 +158,21 @@ Docs, code comments, and descriptions state what IS, not what changed: "Uses a h
 - Hedge stacks: `could potentially possibly` → one hedge, chosen deliberately (a hedge the reader acts on is information; a stack is noise).
 - Generic upbeat conclusions: `exciting times ahead`, `a major step in the right direction`; cut them and end on the last concrete fact (rule 14's closer discipline).
 
-## 20. Vary sentence shape: no uniform connector cadence
+## 20. Split "so" joins; vary sentence shape
 
-"X, so Y" and "X, and Y" are fine sentences; a RUN of them is a tell. AI prose collapses toward one safe explanatory frame (claim, connector, justification), so adjacent sentences come out the same length with the connector in the same place. Each instance passes every other rule; the violation is set-level uniformity. Tests:
+"X, so Y" and "X. So Y" become "X. Y". Readers infer a consequence from adjacency. The connector adds nothing the period does not and parks the payload at the tail of the sentence. Rewrite with a different connector only where the bare split changes or hides the meaning:
 
-- **Connector deletion**: replace ", so" with a period. If both halves stand and the causality is still obvious, the connector was glue: split the sentence. Keep "so" only when the reader would miss the link.
-- **Payload position**: "X, so Y" buries the consequence at the end. When the consequence is the point (warnings, error copy, verdicts), lead with it or give it its own sentence.
+- **Purpose**: "start Metro with the flag, so teardown can find it" states intent, not consequence. Write "so that" or "to": "start Metro with the flag so that teardown can find it."
+- **A link the reader would miss**: when the reader lacks the context to connect X and Y, name the cause with "because": "The migration never ran because the flag defaults to false."
+- **Cause that would read as sequence**: "The test passed. We shipped." reads as "then". When the cause matters, use "because".
+- **Explanation**: when the second clause explains the first, a colon is the split: "The window outlives Metro: your Chrome owns it."
+
+"So that", "so far", "so much", and degree uses ("so slow that") are not joins.
+
+"X, and Y" and "X, but Y" are fine sentences; a RUN of them is a tell. AI prose collapses toward one safe explanatory frame (claim, connector, justification), and adjacent sentences come out the same length with the connector in the same place. Each instance passes every other rule; the violation is set-level uniformity. Tests:
+
 - **Coordinate test for "and"**: clean when the clauses are true parallels ("the wallet pays the provider, and the provider pays the recipient"); slop when "and" welds unrelated claims together to dodge a second sentence.
-- **Set-level variance**: one two-clause compound per paragraph is English; three in adjacent sentences is cadence, even when each survives the other tests. Break the run with a bare statement, a reason-first sentence, or a two-sentence pair.
+- **Set-level variance**: one two-clause compound per paragraph is English; three in adjacent sentences is cadence. Break the run with a bare statement, a reason-first sentence, or a two-sentence pair. Splitting every join produces the opposite tell, a run of short declaratives; vary length in both directions.
 
 ## 21. Name the mechanism, not the volume
 

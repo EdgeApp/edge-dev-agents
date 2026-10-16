@@ -505,6 +505,12 @@ final class FlowInterpreter {
     if let platform = condition["platform"] {
       if try script.interpolate("\(platform)").lowercased() != "ios" { return false }
     }
+    // `true` first: it costs nothing, and a false one skips the element waits.
+    if let value = condition["true"] {
+      let result = try script.interpolate("\(value)")
+      let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
+      if trimmed.isEmpty || ["false", "undefined", "null", "0"].contains(trimmed.lowercased()) { return false }
+    }
     if let visible = condition["visible"] {
       let selector = try parseSelector(visible)
       if try waitForElement(selector, timeout: adjusted(options.optionalLookupTimeout)) == nil { return false }
@@ -512,11 +518,6 @@ final class FlowInterpreter {
     if let hidden = condition["notVisible"] {
       let selector = try parseSelector(hidden)
       if try !waitForAbsence(selector, timeout: adjusted(options.optionalLookupTimeout)) { return false }
-    }
-    if let value = condition["true"] {
-      let result = try script.interpolate("\(value)")
-      let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
-      if trimmed.isEmpty || ["false", "undefined", "null", "0"].contains(trimmed.lowercased()) { return false }
     }
     return true
   }

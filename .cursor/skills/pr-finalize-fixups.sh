@@ -181,10 +181,11 @@ DEFAULT_UPSTREAM="$("$HOME/.cursor/skills/git-branch-base.sh" 2>/dev/null || ech
 MERGE_BASE="$(git merge-base "$DEFAULT_UPSTREAM" HEAD 2>/dev/null || true)"
 
 # Capture before grepping: under pipefail, `git log | grep -q` dies of SIGPIPE
-# once grep exits on the first match, which reads as "no fixups".
+# once grep exits on the first match, which reads as "no fixups". An amend!
+# commit (lint-commit.sh --reword) is a pending fixup too: autosquash folds it.
 HAS_FIXUPS="false"
 BRANCH_SUBJECTS="$([[ -n "$MERGE_BASE" ]] && git log "$MERGE_BASE..HEAD" --format='%s' || true)"
-if grep -q '^fixup! ' <<<"$BRANCH_SUBJECTS"; then
+if grep -qE '^(fixup|amend)! ' <<<"$BRANCH_SUBJECTS"; then
   HAS_FIXUPS="true"
 fi
 

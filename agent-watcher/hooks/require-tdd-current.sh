@@ -64,9 +64,14 @@ BASE=$(git -C "$REPO_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{upstrea
 # The branch's FIRST commit is measured from its BASE branch, not @{upstream}
 # (after a push, origin/<branch>..HEAD would name the first unpushed commit).
 DEFAULT_UPSTREAM=$("$HOME/.cursor/skills/git-branch-base.sh" -C "$REPO_DIR" 2>/dev/null || echo HEAD)
-FIRST_SHA=$(git -C "$REPO_DIR" rev-list --reverse "$(git -C "$REPO_DIR" merge-base "$DEFAULT_UPSTREAM" HEAD 2>/dev/null || echo HEAD)..HEAD" 2>/dev/null | head -1)
 STAMP_SH="$HOME/.cursor/skills/tdd/scripts/tdd-stamp.sh"
 DOC_REL="${DOC#$REPO_DIR}"; DOC_REL="${DOC_REL#/}"
+# Fixup target: the oldest branch commit touching the doc, else the first branch
+# commit (same choice as tdd-stamp.sh --fold; a doc that exists on the base is
+# owned by the commit that first edits it).
+BRANCH_RANGE="$(git -C "$REPO_DIR" merge-base "$DEFAULT_UPSTREAM" HEAD 2>/dev/null || echo HEAD)..HEAD"
+FIRST_SHA=$(git -C "$REPO_DIR" rev-list --reverse "$BRANCH_RANGE" -- "$DOC_REL" 2>/dev/null | head -1)
+[ -n "$FIRST_SHA" ] || FIRST_SHA=$(git -C "$REPO_DIR" rev-list --reverse "$BRANCH_RANGE" 2>/dev/null | head -1)
 # Stamped doc: compare against the COMMITTED doc at HEAD (the gate is about what
 # ships, not what sits unstaged in the worktree).
 DOC_AT_HEAD=$(git -C "$REPO_DIR" show "HEAD:$DOC_REL" 2>/dev/null || true)
@@ -84,7 +89,7 @@ Code changed after the doc was last stamped. Re-read the WHOLE doc against
 patching one section while the rest describes an earlier phase, tdd
 current-state-body-phases-in-one-section), rewrite what reality moved, append
 this phase's entry under ## Phase history, then commit the edit as a fixup of
-the branch's FIRST commit with a body, and push through the finalize script,
+the oldest branch commit touching the doc with a body, and push through the finalize script,
 which re-stamps the edited doc against the pushed tree:
   ~/.cursor/skills/lint-commit.sh --fixup ${FIRST_SHA:-<first-commit-sha>} --for human|auto -m "<what the doc now says and why>" $DOC_REL
   ~/.cursor/skills/pr-finalize-fixups.sh --owner <o> --repo <r> --pr <n>
@@ -117,7 +122,7 @@ the rest still describes an earlier phase (one-shot tdd-when-flagged, tdd
 current-state-body-phases-in-one-section):
   - BODY: rewrite every section that reality moved, so it reads as current truth.
   - ## Phase history: append THIS phase's entry (queued / shipped / diverged).
-  - Commit it as a fixup of the branch's FIRST commit with a body
+  - Commit it as a fixup of the oldest branch commit touching the doc with a body
     (~/.cursor/skills/lint-commit.sh --fixup ${FIRST_SHA:-<first-commit-sha>} --for human|auto -m "<what the doc now says and why>" $DOC_REL)
     and push through ~/.cursor/skills/pr-finalize-fixups.sh, which stamps it
     (tdd doc-rides-the-first-commit).

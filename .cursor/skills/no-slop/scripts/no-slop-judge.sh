@@ -12,9 +12,11 @@
 #   aphorism-formula     an ordinary claim dressed as a maxim (SKILL rule 17)
 #   second-proof         a second observation restating a proven point (rule 22)
 #   extra-ask            a second request or history aside on a message (rule 22)
-#   uniform-connector-cadence  a run of adjacent "X, so Y"/"X, and Y" compound
+#   uniform-connector-cadence  a run of adjacent "X, and Y"/"X, but Y" compound
 #                        sentences sharing one shape (SKILL rule 20); nominated
-#                        per WINDOW of consecutive sentences, not per sentence
+#                        per WINDOW of consecutive sentences, not per sentence.
+#                        "so" joins are a mechanical HARD check in
+#                        no-slop-lint.sh, not judged here
 #
 # Why a judge: "Happy to re-review once the token bridge lands" and "happy path
 # returns the cached token" share every token a regex can see; only reading
@@ -89,10 +91,10 @@ fs.readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
 })
 
 // Window-level net (SKILL rule 20): 3+ CONSECUTIVE sentences each carrying a
-// mid-sentence ", so/and/but " join nominate as ONE candidate — the whole run,
+// mid-sentence ", and/but " join nominate as ONE candidate — the whole run,
 // joined with " | ". The net is wide (list commas match too); the judge owns
 // precision, same as the per-sentence nets.
-const COMPOUND = /,\s+(so|and|but)\s+\S/i
+const COMPOUND = /,\s+(and|but)\s+\S/i
 for (let i = 0; i < prose.length; ) {
   let j = i
   while (j < prose.length && COMPOUND.test(prose[j].sentence)) j++
@@ -134,7 +136,7 @@ if (toJudge.length) {
     "Rule aphorism-formula: an ordinary claim dressed as a maxim instead of stated plainly: \"That is the difference between shipping a claim flow and shipping a warning\", \"It all boils down to trust\", \"Latency becomes a trap\". NOT a violation when the construction carries a real comparison or measurement the reader needs (\"the difference between the two timeouts is 90 seconds\", \"the cost comes down to one extra round trip\"); judge whether a concrete fact would be lost by rewriting it flat.",
     "Rule second-proof: a sentence that adds a SECOND observation confirming a point the previous sentence already proved: \"Our production plugin sees this too: quotes fail with 401\" after \"every endpoint returns 401 for any key\". NOT a violation when the second observation adds a different fact the reader acts on (a different endpoint, a different user impact, a number the first lacked).",
     "Rule extra-ask: a message-level rule. Violation when the sentence is a SECOND request piggybacking on the message\x27s real ask (\"If the key changed, please send us the current one\" after \"Was the key revoked or rotated?\"), or a history aside the recipient does not need to act on (\"It was disabled once before, on Apr 27\"). NOT a violation when the sentence is the only request in the message, or when the prior incident changes what the recipient must do now.",
-    "Rule uniform-connector-cadence: applies ONLY to entries containing \" | \", which mark a RUN of consecutive sentences from the document. Violation when the run shares one repeated two-clause shape — independent clause, comma, connector (so/and/but), clause — so the passage reads as a drumbeat: \"The cache was cold, so the first load was slow. | The index was stale, so the query scanned. | The pool was small, and the workers queued.\" NOT a violation when a matched comma joins list items rather than clauses (\"a, b, and c\"), when the sentences otherwise vary clearly in shape and length, or when splitting any of the connectors would lose a causal or coordinate link the reader needs. Judge the run as a whole, not each sentence.",
+    "Rule uniform-connector-cadence: applies ONLY to entries containing \" | \", which mark a RUN of consecutive sentences from the document. Violation when the run shares one repeated two-clause shape — independent clause, comma, connector (and/but), clause, and the passage reads as a drumbeat: \"The cache was cold, and the first load was slow. | The index was stale, and the query scanned. | The pool was small, but the workers queued.\" NOT a violation when a matched comma joins list items rather than clauses (\"a, b, and c\"), when the sentences otherwise vary clearly in shape and length, or when splitting any of the connectors would lose a causal or coordinate link the reader needs. Judge the run as a whole, not each sentence.",
     "",
     "Sentences:",
     ...cap.map((c, i) => (i + 1) + ". " + c.sentence.replace(/\n/g, " ")),

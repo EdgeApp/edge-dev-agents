@@ -256,7 +256,7 @@ try {
     .filter(Boolean)
     .filter((l) => {
       const s = l.split("\t")[1] ?? "";
-      if (/^(fixup! |squash! |Revert "|Merge )/.test(s)) return false;
+      if (/^(fixup! |squash! |amend! |Revert "|Merge )/.test(s)) return false;
       return s.length > 50;
     });
   if (longSubjects.length > 0) {

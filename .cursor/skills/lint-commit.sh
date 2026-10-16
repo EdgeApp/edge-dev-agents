@@ -8,6 +8,9 @@
 #   lint-commit.sh --for human|auto -m "fixup! Original commit
 #
 #   why this fixup" [file ...]
+#   lint-commit.sh --reword <hash> -m "New subject
+#
+#   new body"
 #
 # Options:
 #   -m "msg"       Commit message. With --fixup it is the fixup's BODY (git
@@ -37,6 +40,17 @@
 #                  it. Outside an agent session (no AGENT_TASK_GID) an explicit
 #                  --reorder forces the fold.
 #   --no-reorder   Never fold, whatever the oracle says
+#   --reword <hash> Change <hash>'s commit MESSAGE, not its code: commits a
+#                  message-only `amend! <target subject>` whose body is -m, the
+#                  target's complete new message (subject and body). Autosquash
+#                  replaces the target's message with it, so it carries no
+#                  Fixup-for trailer and takes no --for or files. The 50-char
+#                  cap applies to the new subject. Refused while the index has
+#                  staged changes (they would ride along). Folds by the same
+#                  oracle as a fixup (fold-one, which refuses while other
+#                  pending fixups name the same target: the reword renames it
+#                  and would orphan them). A raw -m "amend! ..." is BLOCKED in
+#                  favor of this flag.
 #
 # If files are given, they are the primary scope for linting/committing.
 # The script may also auto-include generated companion files like:
@@ -81,8 +95,58 @@ run_yarn() {
     yarn "$@"
 }
 
+# Scrub the commit message: Claude-Session trailer lines and claude.ai
+# session URLs (operator ruling 2026-08-18: outward surfaces never carry
+# them), and Co-authored-by trailers (operator ruling 2026-08-20: attribution
+# is deliberately blanked and must never reappear via a trailer). Then
+# collapse the trailing blank lines the strip can leave. Stripping over
+# blocking: the rest of the message is fine, and this path must never bounce
+# a commit for content it can mechanically remove.
+scrub_message() {
+  [[ -n "$MESSAGE" ]] || return 0
+  MESSAGE=$(printf '%s\n' "$MESSAGE" \
+    | sed -E -e '/^[[:space:]]*Claude-Session:/d' \
+             -e '/^[[:space:]]*Co-authored-by:/Id' \
+             -e 's#https?://claude\.ai/(code|share|chat)/[^[:space:]]*##g' \
+    | sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}')
+}
+
+# Fold the fixup! or amend! commit at HEAD into its target when the review-mode
+# oracle allows. $1 = the target sha, or empty when it could not be resolved
+# (fold-mode then answers without checking an approval's scope against it).
+# fold-one, never `autosquash`: the whole-branch autosquash would also squash
+# every OTHER pending fixup on the branch, including ones a reviewer has not
+# read yet. fold-one aborts its own rebase on a conflict and leaves the commit.
+fold_head_into_target() {
+  local target="$1" kind fold_json fold_mode fold_reason fold="false"
+  local args=(fold-mode)
+  kind="$(git log -1 --format=%s | cut -d' ' -f1)"
+  [[ -n "$target" ]] && args+=(--target "$target")
+  fold_json="$(~/.cursor/skills/git-branch-ops.sh "${args[@]}" 2>/dev/null || echo '{"fold":true,"mode":"unknown","reason":"fold-mode unavailable"}')"
+  fold_mode="$(printf '%s' "$fold_json" | jq -r '.mode // "unknown"' 2>/dev/null || echo unknown)"
+  fold_reason="$(printf '%s' "$fold_json" | jq -r '.reason // ""' 2>/dev/null || true)"
+  if [[ "$(printf '%s' "$fold_json" | jq -r '.fold' 2>/dev/null)" == "true" ]]; then
+    fold="true"
+  elif [[ "$REORDER" == "true" && -z "${AGENT_TASK_GID:-}" ]]; then
+    fold="true"; fold_reason="explicit --reorder in an interactive session overrides $fold_mode"
+  fi
+  if [[ "$fold" != "true" ]]; then
+    echo ">> $kind commit left at HEAD (review-mode $fold_mode: $fold_reason)." >&2
+    echo ">> Slot it next to its target with ~/.cursor/skills/slot-fixup.sh; it squashes at the next sanctioned autosquash (pr-finalize-fixups.sh)." >&2
+    return 0
+  fi
+  echo ">> Folding this $kind commit into its target ($fold_reason)..."
+  if ~/.cursor/skills/git-branch-ops.sh fold-one --fixup "$(git rev-parse HEAD)"; then
+    echo ">> $kind commit folded into its target"
+  else
+    echo ">> Warning: Could not fold the $kind commit (see the error above). It remains at HEAD." >&2
+    echo ">> Slot it next to its target with ~/.cursor/skills/slot-fixup.sh; pr-finalize-fixups.sh folds it at the next sanctioned rewrite." >&2
+  fi
+}
+
 MESSAGE=""
 FIXUP=""
+REWORD=""
 FOR=""
 REORDER="auto"  # auto = fold when the review-mode oracle allows; true = forced (interactive only); false = never
 FILES=()
@@ -96,6 +160,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --fixup)
       FIXUP="$2"
+      shift 2
+      ;;
+    --reword)
+      REWORD="$2"
       shift 2
       ;;
     --for)
@@ -119,6 +187,87 @@ done
 
 if [[ ${#FILES[@]} -gt 0 ]]; then
   PRIMARY_SCOPE_DECLARED="true"
+fi
+
+# Reword: a message-only amend! commit. No lint, staging or snapshot work
+# applies, so it commits and exits here. The amend! body becomes the target's
+# whole landed message, which is why it is built from -m alone.
+if [[ -n "$REWORD" ]]; then
+  REWORD_USAGE='  ~/.cursor/skills/lint-commit.sh --reword <target-sha> -m "<new subject>
+
+<new body>"'
+  if [[ -n "$FIXUP" || ${#FILES[@]} -gt 0 ]]; then
+    echo "BLOCKED: --reword changes only a commit's message and takes no files or --fixup. Commit code changes as their own fixup, then reword:" >&2
+    echo "$REWORD_USAGE" >&2
+    exit 1
+  fi
+  REWORD_TARGET="$(git rev-parse --verify -q "${REWORD}^{commit}" 2>/dev/null || true)"
+  if [[ -z "$REWORD_TARGET" ]]; then
+    echo "Error: '$REWORD' is not a commit in this repo" >&2
+    exit 1
+  fi
+  REWORD_UPSTREAM=$("$HOME/.cursor/skills/git-branch-base.sh" 2>/dev/null || echo "origin/master")
+  REWORD_BASE="$(git merge-base "$REWORD_UPSTREAM" HEAD 2>/dev/null || true)"
+  if ! git rev-list "${REWORD_BASE:+$REWORD_BASE..}HEAD" 2>/dev/null | grep -qx "$REWORD_TARGET"; then
+    echo "Error: $(git rev-parse --short=10 "$REWORD_TARGET") is not a commit on this branch above ${REWORD_BASE:0:10}; only the branch's own commits can be reworded" >&2
+    exit 1
+  fi
+  TARGET_SUBJECT="$(git log -1 --format=%s "$REWORD_TARGET")"
+  case "$TARGET_SUBJECT" in
+    "fixup! "*|"amend! "*|"squash! "*)
+      echo "Error: $(git rev-parse --short=10 "$REWORD_TARGET") is itself a pending $(printf '%s' "$TARGET_SUBJECT" | cut -d' ' -f1) commit; reword the commit it targets" >&2
+      exit 1 ;;
+  esac
+  scrub_message
+  if [[ -z "$(printf '%s' "$MESSAGE" | tr -d '[:space:]')" ]]; then
+    echo "BLOCKED: --reword needs -m with the target's complete new message (subject, blank line, body):" >&2
+    echo "$REWORD_USAGE" >&2
+    exit 1
+  fi
+  NEW_SUBJECT="$(printf '%s\n' "$MESSAGE" | head -1)"
+  case "$NEW_SUBJECT" in
+    "fixup! "*|"amend! "*|"squash! "*)
+      echo "BLOCKED: -m is the target's new message, not a fixup subject; --reword writes the amend! line itself:" >&2
+      echo "$REWORD_USAGE" >&2
+      exit 1 ;;
+  esac
+  if [[ ${#NEW_SUBJECT} -gt 50 ]]; then
+    echo "BLOCKED: the new subject is ${#NEW_SUBJECT} characters; the cap is 50. Shorten the first line and retry:" >&2
+    echo "  $NEW_SUBJECT" >&2
+    exit 1
+  fi
+  CURRENT_MESSAGE="$(git log -1 --format=%B "$REWORD_TARGET" | sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}')"
+  if [[ "$CURRENT_MESSAGE" == "$MESSAGE" ]]; then
+    echo "Error: $(git rev-parse --short=10 "$REWORD_TARGET") already has exactly this message; nothing to reword" >&2
+    exit 1
+  fi
+  if ! git diff --cached --quiet 2>/dev/null; then
+    echo "BLOCKED: the index has staged changes, and a reword commit would carry them. Commit them first (their own fixup or commit), or unstage them, then reword." >&2
+    exit 1
+  fi
+  REWORD_FILE="$(mktemp -t lint-commit-reword.XXXXXX)"
+  printf 'amend! %s\n\n%s\n' "$TARGET_SUBJECT" "$MESSAGE" > "$REWORD_FILE"
+  if ! git commit --no-verify --allow-empty --cleanup=whitespace -q -F "$REWORD_FILE"; then
+    rm -f "$REWORD_FILE"
+    exit 1
+  fi
+  rm -f "$REWORD_FILE"
+  echo ">> Reword committed: amend! $TARGET_SUBJECT -> $NEW_SUBJECT"
+  if [[ "$REORDER" != "false" ]]; then
+    fold_head_into_target "$REWORD_TARGET"
+  fi
+  echo ">> Done"
+  exit 0
+fi
+
+# A raw amend! message would get the fixup trailer handling wrong and ship
+# whatever its body says as the target's message; --reword builds it.
+if [[ "$MESSAGE" == amend!* ]]; then
+  echo "BLOCKED: write a reword with --reword, which writes the amend! line and keeps the target's new message clean:" >&2
+  echo "  ~/.cursor/skills/lint-commit.sh --reword <target-sha> -m \"<new subject>
+
+<new body>\"" >&2
+  exit 1
 fi
 
 if [[ -z "$MESSAGE" && -z "$FIXUP" ]]; then
@@ -297,20 +446,7 @@ if node -e "process.exit(require('./package.json').scripts?.localize ? 0 : 1)" 2
   fi
 fi
 
-# Scrub the commit message: Claude-Session trailer lines and claude.ai
-# session URLs (operator ruling 2026-08-18: outward surfaces never carry
-# them), and Co-authored-by trailers (operator ruling 2026-08-20: attribution
-# is deliberately blanked and must never reappear via a trailer). Then
-# collapse the trailing blank lines the strip can leave. Stripping over
-# blocking: the rest of the message is fine, and this path must never bounce
-# a commit for content it can mechanically remove.
-if [[ -n "$MESSAGE" ]]; then
-  MESSAGE=$(printf '%s\n' "$MESSAGE" \
-    | sed -E -e '/^[[:space:]]*Claude-Session:/d' \
-             -e '/^[[:space:]]*Co-authored-by:/Id' \
-             -e 's#https?://claude\.ai/(code|share|chat)/[^[:space:]]*##g' \
-    | sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}')
-fi
+scrub_message
 
 # Commit-subject length gate (Edge convention, stated three times by Paul in
 # the week of 2026-08-17: "commit subjects must be at most 50 characters",
@@ -493,7 +629,6 @@ elif [[ "$MESSAGE" == fixup!* ]]; then
   IS_FIXUP="true"
 fi
 
-FOLD="false"
 if [[ "$IS_FIXUP" == "true" && "$REORDER" != "false" ]]; then
   # The commit this fixup targets. fold-mode checks an operator rewrite
   # approval's scope against it, so a fixup whose target the operator did not
@@ -509,34 +644,7 @@ if [[ "$IS_FIXUP" == "true" && "$REORDER" != "false" ]]; then
     FIXUP_TARGET="$(git log "${FOLD_BASE:+$FOLD_BASE..}HEAD~1" --format='%H %s' 2>/dev/null \
       | HEADLINE="$FIXUP_HEADLINE" awk 'substr($0, 42) == ENVIRON["HEADLINE"] { print $1; exit }' || true)"
   fi
-  FOLD_MODE_ARGS=(fold-mode)
-  [[ -n "$FIXUP_TARGET" ]] && FOLD_MODE_ARGS+=(--target "$FIXUP_TARGET")
-  FOLD_JSON="$(~/.cursor/skills/git-branch-ops.sh "${FOLD_MODE_ARGS[@]}" 2>/dev/null || echo '{"fold":true,"mode":"unknown","reason":"fold-mode unavailable"}')"
-  FOLD_MODE="$(printf '%s' "$FOLD_JSON" | jq -r '.mode // "unknown"' 2>/dev/null || echo unknown)"
-  FOLD_REASON="$(printf '%s' "$FOLD_JSON" | jq -r '.reason // ""' 2>/dev/null || true)"
-  if [[ "$(printf '%s' "$FOLD_JSON" | jq -r '.fold' 2>/dev/null)" == "true" ]]; then
-    FOLD="true"
-  elif [[ "$REORDER" == "true" && -z "${AGENT_TASK_GID:-}" ]]; then
-    FOLD="true"; FOLD_REASON="explicit --reorder in an interactive session overrides $FOLD_MODE"
-  fi
-  if [[ "$FOLD" != "true" ]]; then
-    echo ">> Fixup left at HEAD (review-mode $FOLD_MODE: $FOLD_REASON)." >&2
-    echo ">> Slot it next to its target with ~/.cursor/skills/slot-fixup.sh; it squashes at the next sanctioned autosquash (pr-finalize-fixups.sh)." >&2
-  fi
-fi
-
-if [[ "$FOLD" == "true" ]]; then
-  echo ">> Folding this fixup into its target ($FOLD_REASON)..."
-
-  # fold-one, never `autosquash`: the whole-branch autosquash would also squash
-  # every OTHER pending fixup on the branch, including ones a reviewer has not
-  # read yet. It aborts its own rebase on a conflict and leaves the fixup here.
-  if ~/.cursor/skills/git-branch-ops.sh fold-one --fixup "$(git rev-parse HEAD)"; then
-    echo ">> Fixup folded into its target"
-  else
-    echo ">> Warning: Could not fold the fixup (see the error above). Fixup remains at HEAD." >&2
-    echo ">> Slot it next to its target with ~/.cursor/skills/slot-fixup.sh; pr-finalize-fixups.sh folds it at the next sanctioned rewrite." >&2
-  fi
+  fold_head_into_target "$FIXUP_TARGET"
 fi
 
 echo ">> Done"

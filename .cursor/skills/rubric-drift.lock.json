@@ -20,7 +20,7 @@
       ]
     },
     "file:update-status.sh": {
-      "hash": "b086607db505",
+      "hash": "28ee23d36208",
       "dims": [
         "A4",
         "O8"
@@ -264,7 +264,7 @@
       ]
     },
     "file:session-watchdog.js": {
-      "hash": "d75912707331",
+      "hash": "aa95da4b1c6f",
       "dims": [
         "O4",
         "O5",
@@ -405,13 +405,13 @@
       ]
     },
     "one-shot:land-on-approval": {
-      "hash": "b990afa05efa",
+      "hash": "d5a8b24a4b91",
       "dims": [
         "A8"
       ]
     },
     "file:asana-force-land.sh": {
-      "hash": "23009f1e77b0",
+      "hash": "98bfaeb36967",
       "dims": [
         "A8"
       ]
@@ -465,7 +465,7 @@
       ]
     },
     "pr-land:force-land-review-bypass": {
-      "hash": "518cf6759287",
+      "hash": "18e086b00243",
       "dims": [
         "A8"
       ]
@@ -564,7 +564,7 @@
       ]
     },
     "file:lint-commit.sh": {
-      "hash": "137b11a992c2",
+      "hash": "643de1ae3226",
       "dims": [
         "A12"
       ]
@@ -606,13 +606,13 @@
       ]
     },
     "tdd:doc-rides-the-first-commit": {
-      "hash": "4a7862af7971",
+      "hash": "3c275d000b4e",
       "dims": [
         "A31"
       ]
     },
     "file:tdd-stamp.sh": {
-      "hash": "635273489b44",
+      "hash": "1d10c25caa1c",
       "dims": [
         "A31"
       ]
@@ -648,7 +648,7 @@
       ]
     },
     "file:operator-hold-gate.sh": {
-      "hash": "b4cc5dd5e20f",
+      "hash": "8f74e0dd4a90",
       "dims": [
         "A7"
       ]
@@ -1030,30 +1030,6 @@
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "00d100b8eec9"
     },
-    "dep-pr:parent-required": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "0518e1a1754a"
-    },
-    "dep-pr:check-existence": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "041bd531e878"
-    },
-    "dep-pr:script-timeouts": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "50fd6c49dcb7"
-    },
-    "dep-pr:no-impl-before-task": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "c07724e93299"
-    },
-    "dep-pr:same-project": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "d422a7a8204d"
-    },
-    "dep-pr:initial-assignee": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "4917ff0538f4"
-    },
     "fix-eslint:tsc-after-fix": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "18a11a6fbfa7"
@@ -1131,8 +1107,8 @@
       "hash": "49ebf1156326"
     },
     "pr-address:commit-via-script": {
-      "reason": "2026-09-16: 2026-09-15: mechanically enforced: lint-commit.sh picks the fold path itself (git-branch-ops.sh fold-mode --target, then fold-one for that one fixup); A12 grades the outcome",
-      "hash": "0603d97670c0"
+      "reason": "2026-10-15: mechanically enforced: lint-commit.sh picks the fold path (fold-mode --target, then fold-one) for fixups and --reword amend! commits alike; A12 grades the outcome",
+      "hash": "0cba95b76cb4"
     },
     "pr-address:slot-after-each-fixup": {
       "reason": "2026-10-14: mechanically decided by slot-fixup.sh (moves the fixup next to its target on an owned PR, leaves it on top on a PR the run does not own); the agent only runs it after lint-commit.sh, and A12/A24 grade the resulting fixup shape and push",
@@ -1563,8 +1539,8 @@
       "hash": "2c3f32241f59"
     },
     "review-standards:commit-subject-50": {
-      "reason": "2026-08-20: review-side checklist item for /pr-review on others' PRs; the authoring side is graded by A12 (era note 2026-08-20) and gated by lint-commit.sh",
-      "hash": "69bbec3fd1e4"
+      "reason": "2026-10-15: review-side checklist item for /pr-review on others' PRs; the authoring side is graded by A12 and gated by lint-commit.sh, --reword subjects included",
+      "hash": "f8146275771b"
     },
     "review-standards:no-attribution-trailers": {
       "reason": "2026-08-20: review-side checklist item; authoring side is scrub-enforced in lint-commit.sh and graded under A12",

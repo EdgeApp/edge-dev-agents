@@ -8,6 +8,14 @@ import importlib.util, json, os, re, subprocess, sys, tempfile
 
 ROUTING = os.path.expanduser("~/.config/jev/routing")
 HOOKS = os.path.expanduser("~/.config/agent-watcher/hooks")
+# The router and its criterion live outside the synced trees, so a machine or a
+# checkout run without them skips this file rather than failing it.
+NEEDED = [os.path.join(ROUTING, f) for f in ("jev_route.py", "jev_diffcheck.py", "jev-pair.py", "jev-shadow-run.sh")] + [
+    os.path.expanduser(os.environ.get("JEV_MONEY_DEFINITION", "~/.config/jev/results/2026-09-29-money-split/DEFINITION.md"))]
+ABSENT = [f for f in NEEDED if not os.path.exists(f)]
+if ABSENT:
+    print("skip: jev-money-route needs files that are not part of the synced trees, absent here: " + ", ".join(ABSENT))
+    sys.exit(0)
 TMP = tempfile.mkdtemp(prefix="jev-route-test-")
 os.environ["JEV_SHADOW_ROOT"] = TMP  # no vector may write to the live shadow logs
 sys.path.insert(0, ROUTING)
