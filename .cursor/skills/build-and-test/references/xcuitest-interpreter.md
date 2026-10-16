@@ -113,8 +113,9 @@ against XCTest.
 
 `--steps '<yaml>'` runs a command list, one `command: args` map or a bare
 command name against the app as it is. Probes default to a 3s element lookup
-(`--lookup-timeout`) and skip xcodebuild's failure diagnostics, so a missed
-selector fails in about 11s instead of 42s.
+(`--lookup-timeout`): a missed selector fails in about 11s. Every run, probe
+or flow, skips xcodebuild's failure diagnostics, which cost about 25s after a
+failed test.
 
 ## Maestro semantics the runner keeps
 

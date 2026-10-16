@@ -12,6 +12,9 @@
 #                 `walletListRow.My Bitcoin 3.BTC`). Use it when the account
 #                 holds several wallets the search text matches. Unset keeps
 #                 the SEARCH_TERM + MATCH_INDEX pick.
+#   AGENT_TEST_MODE — "true" on an agent test build (`xcuitest-run.sh` sets
+#                 it). Default "false". Only then is the "Not Now" check
+#                 skipped.
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
@@ -19,6 +22,7 @@ env:
   SEARCH_TERM: ${SEARCH_TERM || "Bitcoin"}
   MATCH_INDEX: ${MATCH_INDEX || "0"}
   ROW_ID: ${ROW_ID || ""}
+  AGENT_TEST_MODE: ${AGENT_TEST_MODE || "false"}
 ---
 # Home is still mounting cards in the first seconds after a login and a tab
 # tap in that window is swallowed with no error, so settle first.
@@ -33,8 +37,12 @@ env:
 # The search text survives navigation; clear it or inputText appends.
 - eraseText: 40
 - inputText: ${SEARCH_TERM}
+# "Not Now" was the free FIO handle modal's button, removed from the app on
+# 2026-04-28. An agent test build skips the check and its 7s wait; `true` is
+# evaluated before `visible`.
 - runFlow:
     when:
+      true: ${AGENT_TEST_MODE != 'true'}
       visible: "Not Now"
     commands:
       - tapOn: "Not Now"

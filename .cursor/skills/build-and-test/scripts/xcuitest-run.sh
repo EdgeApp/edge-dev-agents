@@ -35,8 +35,9 @@
 #     screen after the last step, and after a failed step.
 #   --lookup-timeout: how long a tap or an assert waits for its element.
 #     Default with --flow: Maestro's 17 (7 for optional steps). Default with
-#     --steps: 3, so a selector that misses fails fast. A failed probe also
-#     skips xcodebuild's failure diagnostics (about 25s).
+#     --steps: 3, which makes a missed selector fail fast.
+#   Every run skips xcodebuild's failure diagnostics (about 25s after a failed
+#   test); nothing reads them from result.xcresult.
 #   --quiescence-cap: cap on XCUITest's app-idle wait per event (default 1,
 #     0 disables the wait). A flow can override it with env EDGE_QUIESCENCE_CAP.
 #   --animations: test-mode animation switch passed to the app as
@@ -164,11 +165,8 @@ else
   FLOW_NAME="inspect"
   SOURCE=(--steps "[]")
 fi
-DIAGNOSTICS=()
-if [[ -z "$FLOW" ]]; then
-  LOOKUP="${LOOKUP:-3}"
-  DIAGNOSTICS=(-collect-test-diagnostics never)
-fi
+DIAGNOSTICS=(-collect-test-diagnostics never)
+[[ -n "$FLOW" ]] || LOOKUP="${LOOKUP:-3}"
 LOOKUP_MS=""
 if [[ -n "$LOOKUP" ]]; then
   LOOKUP_MS="$(awk -v s="$LOOKUP" 'BEGIN { if (s ~ /^[0-9]+(\.[0-9]+)?$/) printf "%d", s * 1000 }')"
