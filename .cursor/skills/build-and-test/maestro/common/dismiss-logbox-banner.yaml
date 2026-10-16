@@ -16,10 +16,11 @@
 # where the close button is.
 #
 # AGENT TEST BUILDS (AGENT_TEST_MODE "true", set by `xcuitest-run.sh`) look
-# for the toast for 1.5s instead of the 7s optional lookup. Run logs since
-# 2026-10-10 found a present toast within 1.46s every time (87 of 87). When the
-# toast is absent the 1.5s wait logs a FAILED line inside an optional runFlow,
-# which absorbs it.
+# for the toast for 3s instead of the 7s optional lookup. Run logs since
+# 2026-10-10 found a present toast within 1.46s every time (87 of 87); 3s
+# leaves room for a slower machine, because a missed toast covers taps at the
+# bottom of the screen. When the toast is absent the 3s wait logs a FAILED line
+# inside an optional runFlow, which absorbs it.
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
@@ -36,7 +37,7 @@ env:
     commands:
       - extendedWaitUntil:
           visible: ${LOGBOX_TOAST}
-          timeout: 1500
+          timeout: 3000
       - evalScript: ${output.logboxBanner = 'yes'}
 - runFlow:
     when:
