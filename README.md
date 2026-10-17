@@ -704,6 +704,12 @@ the app.
   (`AGENT_TEST_MODE` and `LOGBOX_DISABLE`: no post-login modals, notification
   cards or LogBox toast) and prints each file's account as
   `<username> (<role>)`.
+- **App logs per slot.** `scripts/app-log-capture.sh` points an agent
+  worktree's `config.json` `LOG_SERVER` at `scripts/app-log-server.js`,
+  listening on the Metro port + 1000, which appends every console line (core
+  and plugin logs included) to `/tmp/applog-<port>.log`. `ios-rn-build.sh`
+  starts it before every launch; a drive greps the file (`path` prints it).
+  The listener runs from the worktree, so slot teardown stops it.
 - **DevTools windows close with the slot.** Slot Metro opens React Native
   DevTools through `scripts/metro-devtools-chrome.sh` (its `CHROME_PATH`), a
   separate Chrome instance profiled at `/tmp/metro-devtools/<metro port>`.

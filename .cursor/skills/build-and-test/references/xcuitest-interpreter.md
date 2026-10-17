@@ -85,7 +85,9 @@ signs out and back in without a relaunch passes `LOGIN_MODE: pin` in that
 modal or notification card, and `common/dismiss-startup-modals.yaml` skips
 its modal gates. `LOGBOX_DISABLE=true` means the app shows no LogBox toast
 and `common/dismiss-logbox-banner.yaml` returns at once. Warnings and errors
-then reach the JS console (React Native DevTools) only, not Metro's terminal. An agent test checkout sets both. Without `LOGBOX_DISABLE`, a LogBox
+then reach only the console: the slot's app log in an agent worktree
+(`references/drive.md` `app-log-capture-and-read`), React Native DevTools
+elsewhere, never Metro's terminal. An agent test checkout sets both. Without `LOGBOX_DISABLE`, a LogBox
 toast with any label but `! Open debugger to view warnings.` is an error:
 the session that meets it fixes the cause, and a dismissal is not a fix.
 

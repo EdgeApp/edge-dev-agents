@@ -1679,8 +1679,8 @@
       "hash": "34bab6dc4b68"
     },
     "build-and-test:agent-account-first": {
-      "reason": "2026-10-17: pin now also sets LOGBOX_DISABLE; the script enforces it, no new gradeable expectation",
-      "hash": "7c4cdbe051e6"
+      "reason": "2026-10-17: re-ack: only the cross-reference changed (now points to app-log-capture-and-read); behavior unchanged",
+      "hash": "bd9601408fc2"
     },
     "asana-task-update:set-notes-when-no-run-is-live": {
       "reason": "2026-10-08: status gate mechanically enforced by asana-task-update.sh: refused at Pending and every phase status, so a run cannot rewrite its own task's prose; the operator-asked condition on other tasks is not graded",
@@ -1733,6 +1733,10 @@
     "pr-create:evidence-withdraw": {
       "reason": "2026-10-14: 2026-10-13: a takedown is a rare corrective action with no per-run expectation an eval can grade; the deny hook block-direct-evidence-bucket-write.sh closes the direct route",
       "hash": "d300b874144a"
+    },
+    "build-and-test:app-log-capture-and-read": {
+      "reason": "2026-10-17: drive-time guidance on where to read the slot app log; no orch-graded outcome beyond existing evidence dimensions",
+      "hash": "e48c0c5d9826"
     }
   },
   "excluded_skills": {

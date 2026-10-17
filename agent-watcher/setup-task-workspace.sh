@@ -301,7 +301,8 @@ ensure_env_json() {
   # older branches; pin both when present. config.json also gets
   # AGENT_TEST_MODE and LOGBOX_DISABLE = true (no post-login modals,
   # notification cards or LogBox toast in the app; warnings and errors go to
-  # the JS console in React Native DevTools; a branch without a schema key ignores it). A run
+  # the console, which build-and-test's app-log-capture.sh sends to a per-slot
+  # file; a branch without a schema key ignores it). A run
   # that tests one of those surfaces turns it off with build-and-test's
   # scripts/pin-agent-login.sh --agent-test-mode off.
   for f in env.json config.json; do

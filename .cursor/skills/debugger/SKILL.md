@@ -110,6 +110,8 @@ Use this when the target runs in edge-core-js's plugin WebView (per `pick-the-ri
 
 Prerequisite: the dep must be linked via its `DEBUG_*` dev-server (e.g. `DEBUG_EXCHANGES=true` in the gui `config.json` + the dep's `yarn start` on :8083) so your source edits are what the WebView loads. See `/build-and-test`'s `gui-dependency-integration` and `[[dep-linking-debug-flags]]`.
 
+Check the slot's app log first: core and plugin lines at warn and above already reach it with no source edit (`/build-and-test` `references/drive.md` `app-log-capture-and-read`). Instrument only what the code does not log.
+
 ### 5a. Start the capture server (per-slot port + paths — parallel-agent safe)
 
 The capture port and file paths MUST be unique per slot, or concurrent agents collide (EADDRINUSE, interleaved logs, truncating/killing each other's capture). Derive everything from the slot's Metro port:

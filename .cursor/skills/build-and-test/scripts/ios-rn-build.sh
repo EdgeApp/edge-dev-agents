@@ -191,12 +191,28 @@ assert_metro_port_free_or_ours() {
   echo ">> ios-rn-build: reusing Metro already running on port $PORT for this repo" >&2
 }
 
+# Agent worktrees send the app's console (core and plugin logs included) to a
+# per-slot file, /tmp/applog-<Metro port + 1000>.log (app-log-capture.sh). Runs
+# before Metro starts so the first bundle carries LOG_SERVER. Exit 2 means this
+# checkout is not an agent gui worktree: nothing to capture. A capture failure
+# warns and the build goes on; the app runs the same without it.
+start_app_log_capture() {
+  local out rc=0
+  out="$("$HOME/.cursor/skills/build-and-test/scripts/app-log-capture.sh" start --port "$PORT" "$PWD" 2>&1)" || rc=$?
+  case "$rc" in
+    0) echo ">> ios-rn-build: app log capture: $out" >&2 ;;
+    2) ;;
+    *) echo ">> ios-rn-build: WARN, app log capture failed: $out" >&2 ;;
+  esac
+}
+
 # Ensure a Metro bundler is serving THIS repo on $PORT and PIN the app to it, so a
 # `simctl launch` bundles from the right place instead of showing the red
 # "No script URL provided (null)" screen. Used by BOTH the cached-launch path and
 # the run-ios fallback (the fallback used to launch unpinned — the ZEC fake-proof).
 ensure_metro_ready_and_pin() {
   assert_metro_port_free_or_ours
+  start_app_log_capture
   if [[ -z "$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)" ]]; then
     echo ">> ios-rn-build: no Metro on port $PORT; starting one (log: /tmp/metro-$PORT.log)" >&2
     # Metro opens React Native DevTools in a Chrome instance teardown can kill

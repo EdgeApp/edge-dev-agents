@@ -3,7 +3,8 @@
 # default role (the `agent` account) and set its agent test mode
 # (`AGENT_TEST_MODE` and `LOGBOX_DISABLE` in config.json, set together: no
 # post-login modals, no notification cards, no LogBox toast; warnings and
-# errors go to the JS console in React Native DevTools). Workspace init does this for a worktree;
+# errors go to the console, which app-log-capture.sh sends to a per-slot file
+# in an agent worktree). Workspace init does this for a worktree;
 # a run that drives an app built from a checkout it did not initialize (a
 # Task-shape run on the primary checkout) calls this before its first drive
 # (references/drive.md `agent-account-first`).

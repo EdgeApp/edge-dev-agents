@@ -17,7 +17,8 @@
 #
 # LOGBOX_DISABLE "true" (set by `xcuitest-run.sh` from the checkout's
 # config.json) means the app called LogBox.ignoreAllLogs(): no toast ever
-# shows, warnings and errors reach the JS console (React Native DevTools) only, and this flow returns at
+# shows, warnings and errors reach only the console (the slot's app log in an
+# agent worktree, React Native DevTools elsewhere), and this flow returns at
 # once without looking. Agent test checkouts set it with AGENT_TEST_MODE.
 appId: ${APP_ID}
 env:
