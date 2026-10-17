@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # pin-agent-login.sh: pin a gui checkout's YOLO auto-login to the roster's
 # default role (the `agent` account) and set its agent test mode
-# (`AGENT_TEST_MODE` in config.json: no post-login modals, no notification
-# cards, no LogBox warning toast). Workspace init does this for a worktree;
+# (`AGENT_TEST_MODE` and `LOGBOX_DISABLE` in config.json, set together: no
+# post-login modals, no notification cards, no LogBox toast; warnings and
+# errors go to the JS console in React Native DevTools). Workspace init does this for a worktree;
 # a run that drives an app built from a checkout it did not initialize (a
 # Task-shape run on the primary checkout) calls this before its first drive
 # (references/drive.md `agent-account-first`).
@@ -15,19 +16,20 @@
 #                       check of that run.
 #
 # YOLO_* lives in config.json on develop and env.json on older branches; both
-# are handled when present. AGENT_TEST_MODE goes in config.json only, and a
-# branch whose src/configKeysSchema.ts lacks the key ignores it. The app reads
+# are handled when present. AGENT_TEST_MODE and LOGBOX_DISABLE go in
+# config.json only, and a branch whose src/configKeysSchema.ts lacks a key
+# ignores it. The app reads
 # these at bundle time: after a pin run `metro-fresh.sh --file config.json`,
 # then relaunch (YOLO auto-login signs in).
 #
 # Output: one line per file, `<file>: <username> (<role>)|unpinned|<username>
 # (not-a-roster-account)`, with ` agent-test-mode=on|off` on the config.json
-# line, then `PINNED=<username> (<role>) agent-test-mode=on|off` or
-# `CHECK=ok|drift`.
+# line (`partial` when only one of the two keys is set), then
+# `PINNED=<username> (<role>) agent-test-mode=on|off` or `CHECK=ok|drift`.
 # Exit: 0 = pinned to the default role with the asked test mode (or --check
 #           found it so)
 #       1 = --check found a file unpinned or on another account, or
-#           config.json on the other test mode
+#           config.json with either key not matching the asked test mode
 #       2 = usage error, roster missing, or no config file in the checkout
 set -euo pipefail
 
@@ -43,7 +45,7 @@ while [ $# -gt 0 ]; do
         on|off) shift ;;
         *) echo "pin-agent-login: --agent-test-mode takes on or off" >&2; exit 2 ;;
       esac ;;
-    -h|--help) sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "pin-agent-login: unknown flag $1" >&2; exit 2 ;;
     *) DIR="$1" ;;
   esac
@@ -79,15 +81,18 @@ for (const f of files) {
   const beforeName = env.YOLO_USERNAME
   const before = roleOf(beforeName)
   const hasMode = f === "config.json"
-  const beforeMode = env.AGENT_TEST_MODE === true
+  const modeMatches = env.AGENT_TEST_MODE === wantMode && env.LOGBOX_DISABLE === wantMode
+  const beforeLabel = (env.AGENT_TEST_MODE === true) === (env.LOGBOX_DISABLE === true)
+    ? modeLabel(env.AGENT_TEST_MODE === true)
+    : " agent-test-mode=partial"
   if (check === "true") {
-    console.log(f + ": " + show(env.YOLO_USERNAME) + (hasMode ? modeLabel(beforeMode) : ""))
-    if (before !== role || (hasMode && beforeMode !== wantMode)) drift = true
+    console.log(f + ": " + show(env.YOLO_USERNAME) + (hasMode ? beforeLabel : ""))
+    if (before !== role || (hasMode && !modeMatches)) drift = true
     continue
   }
   env.YOLO_USERNAME = acct.username
   env.YOLO_PIN = acct.pin
-  if (hasMode) env.AGENT_TEST_MODE = wantMode
+  if (hasMode) { env.AGENT_TEST_MODE = wantMode; env.LOGBOX_DISABLE = wantMode }
   fs.writeFileSync(p, JSON.stringify(env, null, 2) + "\n")
   console.log(f + ": " + show(beforeName) + " -> " + show(acct.username) + (hasMode ? modeLabel(wantMode) : ""))
 }

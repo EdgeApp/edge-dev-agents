@@ -273,7 +273,7 @@
       ]
     },
     "file:setup-task-workspace.sh": {
-      "hash": "7cce7ae08e9b",
+      "hash": "03af1635b11a",
       "dims": [
         "O8"
       ]
@@ -1679,8 +1679,8 @@
       "hash": "34bab6dc4b68"
     },
     "build-and-test:agent-account-first": {
-      "reason": "2026-10-09: operator left account choice ungraded; the pin check (now including the AGENT_TEST_MODE pin) and the PIN-scene guard are enforced by pin-agent-login.sh and xcuitest-run.sh --login-role; the added sentence only names when to pass --agent-test-mode off",
-      "hash": "50caa2dc58f9"
+      "reason": "2026-10-17: pin now also sets LOGBOX_DISABLE; the script enforces it, no new gradeable expectation",
+      "hash": "7c4cdbe051e6"
     },
     "asana-task-update:set-notes-when-no-run-is-live": {
       "reason": "2026-10-08: status gate mechanically enforced by asana-task-update.sh: refused at Pending and every phase status, so a run cannot rewrite its own task's prose; the operator-asked condition on other tasks is not graded",

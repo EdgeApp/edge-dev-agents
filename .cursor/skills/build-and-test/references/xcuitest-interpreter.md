@@ -75,18 +75,19 @@ passes it to the flow as env `EXPECT_USERNAME` and `PIN_DIGIT`.
 tapped, when the PIN scene shows another account. Step lines and inspect
 output show the account name and the tapped digits as they are.
 
-Every run also gets env `LOGIN_MODE` and `AGENT_TEST_MODE`, read from the
+Every run also gets env `LOGIN_MODE`, `AGENT_TEST_MODE` and `LOGBOX_DISABLE`, read from the
 config of the gui checkout that the Metro on `$AGENT_METRO_PORT` serves
 (the script header has the derivation). `LOGIN_MODE=yolo` means the bundle
 signs in on launch: `common/login-if-needed.yaml` waits for the home scene
 and probes no PIN scene. YOLO signs in once per app process, so a flow that
 signs out and back in without a relaunch passes `LOGIN_MODE: pin` in that
 `runFlow`'s env. `AGENT_TEST_MODE=true` means the app raises no post-login
-modal, notification card or LogBox warning toast, and
-`common/dismiss-startup-modals.yaml` skips its modal gates. In either mode,
-a LogBox toast with any label but `! Open debugger to view warnings.` is an
-error: the session that meets it fixes the cause, and a dismissal is not a
-fix.
+modal or notification card, and `common/dismiss-startup-modals.yaml` skips
+its modal gates. `LOGBOX_DISABLE=true` means the app shows no LogBox toast
+and `common/dismiss-logbox-banner.yaml` returns at once. Warnings and errors
+then reach the JS console (React Native DevTools) only, not Metro's terminal. An agent test checkout sets both. Without `LOGBOX_DISABLE`, a LogBox
+toast with any label but `! Open debugger to view warnings.` is an error:
+the session that meets it fixes the cause, and a dismissal is not a fix.
 
 ## Inspect and probe
 

@@ -700,8 +700,10 @@ the app.
 - **Stale bundle and login checks.** `scripts/metro-fresh.sh` answers whether
   the Metro on a port sees edits to its checkout (watchman still observing,
   served `.json` modules equal to disk); `scripts/pin-agent-login.sh` pins a
-  checkout's auto-login to the roster's default role and prints each file's
-  account as `<username> (<role>)`.
+  checkout's auto-login to the roster's default role, sets its agent test mode
+  (`AGENT_TEST_MODE` and `LOGBOX_DISABLE`: no post-login modals, notification
+  cards or LogBox toast) and prints each file's account as
+  `<username> (<role>)`.
 - **DevTools windows close with the slot.** Slot Metro opens React Native
   DevTools through `scripts/metro-devtools-chrome.sh` (its `CHROME_PATH`), a
   separate Chrome instance profiled at `/tmp/metro-devtools/<metro port>`.
@@ -723,7 +725,8 @@ the app.
   reusable maestro flows (login, `relaunch-and-login.yaml`, wallet find,
   send-to-address, swap pair selection, ramp region/fiat, throwaway-account
   lifecycle, slider confirm, `dismiss-logbox-banner.yaml` for the debug-build
-  toast that swallows taps at the bottom of a scene). Every wait names each
+  toast that swallows taps at the bottom of a scene; it returns at once on an
+  agent test build, which shows no toast). Every wait names each
   ending it can reach, and a long wait never directly follows a tap.
   Task-specific flows an agent writes mid-run stay local and are excluded from
   sync; recurring sequences get promoted into the library through eval

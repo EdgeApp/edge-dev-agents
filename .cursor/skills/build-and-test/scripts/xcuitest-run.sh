@@ -67,7 +67,11 @@
 #                      config.json sets it: common/dismiss-startup-modals.yaml
 #                      skips the modal gates the app no longer raises.
 #                      Otherwise `false`.
-#   No Metro on the port, or no config file: `pin` and `false`.
+#     LOGBOX_DISABLE   `true` when the checkout's schema has the key and
+#                      config.json sets it: the app shows no LogBox toast and
+#                      common/dismiss-logbox-banner.yaml returns at once.
+#                      Otherwise `false`.
+#   No Metro on the port, or no config file: `pin`, `false` and `false`.
 #   Relative takeScreenshot paths resolve against the current directory, as
 #   with `maestro test`.
 # Output: `[edge-flow]` step lines and the inspect lines, then
@@ -134,6 +138,7 @@ fi
 
 LOGIN_MODE="pin"
 AGENT_TEST_MODE="false"
+LOGBOX_DISABLE="false"
 METRO_PID=""
 [[ "${AGENT_METRO_PORT:-}" =~ ^[0-9]+$ ]] && METRO_PID="$(lsof -nP -iTCP:"$AGENT_METRO_PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)"
 if [[ -n "$METRO_PID" ]]; then
@@ -149,9 +154,13 @@ if [[ -n "$METRO_PID" ]]; then
       && [[ "$(jq -r '.AGENT_TEST_MODE == true' "$GUI_DIR/config.json" 2>/dev/null)" == true ]]; then
       AGENT_TEST_MODE="true"
     fi
+    if grep -q LOGBOX_DISABLE "$GUI_DIR/src/configKeysSchema.ts" 2>/dev/null \
+      && [[ "$(jq -r '.LOGBOX_DISABLE == true' "$GUI_DIR/config.json" 2>/dev/null)" == true ]]; then
+      LOGBOX_DISABLE="true"
+    fi
   fi
 fi
-ENV_ARGS=(--env "LOGIN_MODE=$LOGIN_MODE" --env "AGENT_TEST_MODE=$AGENT_TEST_MODE" ${ENV_ARGS[@]+"${ENV_ARGS[@]}"})
+ENV_ARGS=(--env "LOGIN_MODE=$LOGIN_MODE" --env "AGENT_TEST_MODE=$AGENT_TEST_MODE" --env "LOGBOX_DISABLE=$LOGBOX_DISABLE" ${ENV_ARGS[@]+"${ENV_ARGS[@]}"})
 
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 START=$(date +%s)
@@ -198,7 +207,7 @@ else
   xcrun simctl spawn "$UDID" defaults write "$BUNDLE_ID" EdgeTestAnimations "$ANIMATIONS" >/dev/null 2>&1 || true
 fi
 
-echo "xcuitest-run: ${FLOW:-$FLOW_NAME} on $UDID (cap ${CAP}s, animations $ANIMATIONS, login $LOGIN_MODE, agent test mode $AGENT_TEST_MODE${INSPECT:+, inspect $INSPECT}), run dir $RUN_DIR"
+echo "xcuitest-run: ${FLOW:-$FLOW_NAME} on $UDID (cap ${CAP}s, animations $ANIMATIONS, login $LOGIN_MODE, agent test mode $AGENT_TEST_MODE, logbox disabled $LOGBOX_DISABLE${INSPECT:+, inspect $INSPECT}), run dir $RUN_DIR"
 TEST_RUNNER_EDGE_FLOW_FILE="$RUN_DIR/flow.json" \
 TEST_RUNNER_EDGE_FLOW_CWD="$(pwd)" \
 TEST_RUNNER_EDGE_QUIESCENCE_CAP="$CAP" \

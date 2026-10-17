@@ -6,35 +6,19 @@
 #                    Default "false". `xcuitest-run.sh` sets it from the
 #                    checkout the slot's Metro serves. That build shows none
 #                    of the modals below, so none is probed.
+#   LOGBOX_DISABLE   read by dismiss-logbox-banner.yaml, which returns at once
+#                    when it is "true".
 appId: ${APP_ID}
 env:
   APP_ID: co.edgesecure.app
   AGENT_TEST_MODE: ${AGENT_TEST_MODE || "false"}
 ---
-# Agent test build: warnings go to the plain log, so only an error raises the
-# LogBox toast. The check starts from absence (`notVisible` returns at once on
-# a clean screen, where `visible` would wait out its lookup), and the dismiss
-# flow runs only when the toast is up.
-- runFlow:
-    when:
-      true: ${AGENT_TEST_MODE == 'true'}
-    commands:
-      - evalScript: ${output.logboxToast = 'yes'}
-      - runFlow:
-          when:
-            notVisible: "! [\\s\\S]*"
-          commands:
-            - evalScript: ${output.logboxToast = 'no'}
-      - runFlow:
-          when:
-            true: ${output.logboxToast == 'yes'}
-          file: dismiss-logbox-banner.yaml
+# A debug build's LogBox toast covers the tab bar and swallows taps there.
+- runFlow: dismiss-logbox-banner.yaml
 - runFlow:
     when:
       true: ${AGENT_TEST_MODE != 'true'}
     commands:
-      # A debug build's LogBox toast covers the tab bar and swallows taps there.
-      - runFlow: dismiss-logbox-banner.yaml
       # "Verify your password" (PasswordReminderModal) covers the scene when the
       # account is due a password check, and can also open when a tap meant for
       # something else lands on the password notification card. Its close button

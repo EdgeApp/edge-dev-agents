@@ -299,8 +299,9 @@ ensure_env_json() {
   # local-only (~/.config/edge-secrets/test-accounts.json) so account names never
   # land in the synced tree. YOLO_* lives in config.json on develop, env.json on
   # older branches; pin both when present. config.json also gets
-  # AGENT_TEST_MODE = true (no post-login modals, notification cards or LogBox
-  # warning toast in the app; a branch without the schema key ignores it). A run
+  # AGENT_TEST_MODE and LOGBOX_DISABLE = true (no post-login modals,
+  # notification cards or LogBox toast in the app; warnings and errors go to
+  # the JS console in React Native DevTools; a branch without a schema key ignores it). A run
   # that tests one of those surfaces turns it off with build-and-test's
   # scripts/pin-agent-login.sh --agent-test-mode off.
   for f in env.json config.json; do
@@ -312,7 +313,7 @@ ensure_env_json() {
       if (acct == null) throw new Error("no default roster account");
       const env = JSON.parse(fs.readFileSync(p, "utf8"));
       env.YOLO_USERNAME = acct.username; env.YOLO_PIN = acct.pin;
-      if (p.endsWith("/config.json")) env.AGENT_TEST_MODE = true;
+      if (p.endsWith("/config.json")) { env.AGENT_TEST_MODE = true; env.LOGBOX_DISABLE = true; }
       fs.writeFileSync(p, JSON.stringify(env, null, 2) + "\n");
     ' "$WT/$f" "$HOME/.config/edge-secrets/test-accounts.json" 2>/dev/null \
       && echo ">> setup-task-workspace: $f YOLO login pinned to the default roster account" >&2 \
