@@ -198,4 +198,5 @@ Provide a summary in the chat response:
 
 <reference>
 The path diagram (also synced to edge-dev-agents): `~/.cursor/skills/pr-review/review-path.md`.
+Review-comment mining (not part of the review path): `scripts/mine-review-comments.py` exports every review thread on an org's PRs merged in a date window as JSONL (one row per thread, root plus replies, each comment tagged human, operator or bot) with a counts summary, for rule-gap and acceptance-rate analysis. Read-only GraphQL through `gh`; per-PR responses cache under `<out>/cache/`. Author logins come from `~/.config/pr-review/mining/accounts.json` (machine-local, never synced); `scripts/mining-accounts.example.json` is the template. Defaults: EdgeApp, 2025-10-23 to 2026-10-23, output `~/.config/pr-review/mining/`.
 </reference>

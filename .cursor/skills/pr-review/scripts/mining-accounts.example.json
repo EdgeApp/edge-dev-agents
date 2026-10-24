@@ -1,0 +1,5 @@
+{
+  "humans": ["<reviewer-login>", "<reviewer-login>"],
+  "operator": "<operator-login>",
+  "knownBots": ["cursor[bot]", "chatgpt-codex-connector[bot]", "Copilot", "copilot-pull-request-reviewer[bot]", "github-code-quality[bot]"]
+}
