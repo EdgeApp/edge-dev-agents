@@ -59,7 +59,7 @@ server.on('error', err => {
   process.exit(1)
 })
 // Loopback only: the iOS sim shares the host's loopback. An Android emulator
-// needs `adb reverse tcp:<port> tcp:<port>` to reach it.
+// needs `adb reverse tcp:<port> tcp:<port>` to reach it (android-dev-server.sh runs it).
 server.listen(port, '127.0.0.1', () => {
   console.error(`app-log-server: port ${port} -> ${out}`)
 })

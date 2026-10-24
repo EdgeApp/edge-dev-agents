@@ -722,9 +722,17 @@ the app.
   Another roster account is only for what that one cannot supply: an old or
   large-UTXO wallet, many-wallet performance, account-specific state, ramps
   KYC.
-- **Android helpers.** `scripts/android-dev-server.sh` points one emulator's
+- **Android helpers.** One master AVD (`edge-android-master`) holds the debug
+  app with the roster accounts seeded and a boot snapshot;
+  `scripts/android-emulator.sh` starts each slot's `-read-only` instance of it
+  in seconds (serial derived from the slot's Metro port, writes discarded at
+  stop), and `scripts/android-master-refresh.sh` reinstalls the app, re-seeds
+  the accounts from the iOS master and re-saves the snapshot.
+  `scripts/android-dev-server.sh` points one emulator's
   debug app at its slot's Metro port through the app's own dev-server
-  setting, so no host-global 8081 forwarder is shared between slots;
+  setting, so no host-global 8081 forwarder is shared between slots, and
+  reverses the app-log-server port, without which the app's JS thread
+  saturates on failed log POSTs;
   `scripts/android-type-text.sh` types one character per `adb` call on screens
   that drop characters, reading secrets from an env var.
 - **Flow library** (`build-and-test/maestro/common/`): parameterized,

@@ -963,8 +963,8 @@
       "hash": "950f8470769b"
     },
     "build-and-test:platform-ios-default-android-on-callout": {
-      "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged",
-      "hash": "b00daeb8b7be"
+      "reason": "2026-10-19: edit points in-app Android drives at the slot emulator scripts; testing-depth dimensions already grade drive-to-terminal-success per platform credit",
+      "hash": "62b13b193e77"
     },
     "build-and-test:unrunnable-asset-proxy-verification": {
       "reason": "2026-10-01: 2026-10-01 core+references split: rule moved or de-narrated, imperative and eval expectation unchanged; graded by the testing-depth dimension",

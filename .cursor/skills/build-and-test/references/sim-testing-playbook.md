@@ -241,24 +241,43 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   wallet raises the wallet-empty modal. EVM chains block a SECOND send while
   one is unconfirmed — wait for confirmation before chaining sends.
 
-## Android physical device
-Working knowledge for the physical test device (a Samsung Galaxy S9).
+## Android emulator
+One master AVD, `edge-android-master`, holds the debug app with the roster
+accounts seeded and a `default_boot` snapshot. Every slot runs a `-read-only`
+instance of it. Never pick or create another AVD.
 
-- **Android emulator + slot Metro:** an RN debug build on an emulator connects
-  to the dev server at `10.0.2.2:8081` (the emulator's host-loopback alias) and
-  IGNORES `adb reverse`. Point the app at the slot's Metro instead:
-  `~/.cursor/skills/build-and-test/scripts/android-dev-server.sh --serial <emulator-NNNN> --port "$AGENT_METRO_PORT"`
-  (writes RN's per-app `debug_http_host` pref, then relaunches). Re-run it after
-  a fresh install or `pm clear`. Do NOT run a host-side `127.0.0.1:8081`
-  forwarder: 8081 is host-global, so a second emulator loads the other slot's
-  bundle with no error. Symptom when unpointed: red "Unable to load script" +
-  repeating logcat `Failed to connect to /10.0.2.2:8081`.
+- **Start the slot's emulator:**
+  `~/.cursor/skills/build-and-test/scripts/android-emulator.sh start`
+  (serial derives from `$AGENT_METRO_PORT`; prints `EMULATOR: <serial> ...`).
+  It boots from the snapshot in seconds. Everything it writes is discarded
+  at stop, so a restarted instance comes back as the master.
+  Install the slot's build with `adb -s <serial> install -r <apk>`: the
+  debug keystore matches, so the seeded accounts survive.
+- **Then point the app at the slot:**
+  `~/.cursor/skills/build-and-test/scripts/android-dev-server.sh --serial <serial> --port "$AGENT_METRO_PORT" --checkout <gui-worktree>`.
+  Run it after every emulator start and before each drive session. It sets
+  the Metro host and reverses the log-server port. Expect a `LOG_REVERSE:`
+  line naming the port whenever app-log-capture is on. Without the reverse
+  the app's JS thread saturates and taps land minutes late. Never run a
+  host-side `127.0.0.1:8081` forwarder: 8081 is host-global, and a second
+  emulator would load the other slot's bundle. Unpointed symptom: red
+  "Unable to load script" + logcat `Failed to connect to /10.0.2.2:8081`.
+- **Accounts:** YOLO auto-login signs in the pinned agent account. Switch
+  accounts through the side menu's account dropdown and the PIN keypad.
+  `edge-funds` and `jon-claude` both stay responsive on the master's 8 GB
+  and 6 cores.
+- **Refresh the master** (new accounts on the iOS master, or a new native
+  build): stop every instance, then run
+  `~/.cursor/skills/build-and-test/scripts/android-master-refresh.sh [--apk <debug.apk>] [--seed]`.
 - **Android screens that never go idle (the password modal):** maestro `tapOn`
   and `uiautomator dump` hang there, and one `adb shell input text` call drops
   characters. Locate targets from `adb exec-out screencap -p` or a dump taken
   before the modal opened, focus with `adb shell input tap <x> <y>`, and type
   with `~/.cursor/skills/build-and-test/scripts/android-type-text.sh --serial <emulator-NNNN> --env <VAR>`
   (one character per call; secrets stay in the env var).
+
+## Android physical device
+Working knowledge for the physical test device (a Samsung Galaxy S9).
 
 - **Builds**: `gradlew` lives under `android/`, not repo root; `sfw ./gradlew`
   fails (spawn ENOENT) — run gradle directly (it spawns `node`, not npx, so the
