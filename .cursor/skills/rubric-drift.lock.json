@@ -1175,8 +1175,8 @@
       "hash": "8ffce8c6b95d"
     },
     "staging-cherry-pick:changelog-conflicts": {
-      "reason": "2026-09-08: conflict-resolution mechanics; the graded outcome (no native staging commit, no hand-merged lockfile) is A8 via cherry-picks-only and lockfile-conflicts",
-      "hash": "f5fd009836b8"
+      "reason": "2026-10-21: fingerprint-stamp conflicts are resolved inside staging-cherry-pick.sh and never reach the agent; the agent-facing stop-on-code-conflict expectation is unchanged",
+      "hash": "d5aa0fbf55d5"
     },
     "staging-cherry-pick:no-editors": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",

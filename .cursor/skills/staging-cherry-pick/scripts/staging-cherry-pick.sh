@@ -18,6 +18,9 @@
 //   1 = Error (code conflict, git failure)
 //   2 = gh auth needed (prints PROMPT_GH_AUTH)
 //   3 = CHANGELOG-only conflict (agent resolves)
+//
+// A conflict confined to tdd-code-fingerprint stamp lines in a markdown
+// doc resolves mechanically to the incoming commit's stamp.
 
 const { spawnSync } = require("child_process");
 const path = require("path");
@@ -30,6 +33,53 @@ const authCheck = spawnSync("gh", ["auth", "status"], { encoding: "utf8" });
 if (authCheck.status !== 0) {
   console.error("PROMPT_GH_AUTH");
   process.exit(2);
+}
+
+const FINGERPRINT_LINE = /^<!-- tdd-code-fingerprint: [0-9a-f]+ -->$/;
+
+// Resolve a conflicted markdown file whose every conflict hunk differs only
+// in tdd-code-fingerprint stamp lines, taking the incoming side. Returns true
+// when the file was resolved and staged.
+function resolveFingerprintOnlyConflict(repoDir, file) {
+  if (!file.endsWith(".md")) return false;
+  const fs = require("fs");
+  const full = path.join(repoDir, file);
+  let text;
+  try {
+    text = fs.readFileSync(full, "utf8");
+  } catch (e) {
+    return false;
+  }
+  const lines = text.split("\n");
+  const out = [];
+  let hunks = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith("<<<<<<< ")) {
+      out.push(lines[i]);
+      continue;
+    }
+    const ours = [];
+    const theirs = [];
+    let side = ours;
+    let j = i + 1;
+    for (; j < lines.length; j++) {
+      const l = lines[j];
+      if (l.startsWith("||||||| ")) side = null;
+      else if (l === "=======") side = theirs;
+      else if (l.startsWith(">>>>>>> ")) break;
+      else if (side != null) side.push(l);
+    }
+    if (j >= lines.length) return false;
+    const stampOnly = (ls) =>
+      ls.every((l) => l.trim() === "" || FINGERPRINT_LINE.test(l.trim()));
+    if (!stampOnly(ours) || !stampOnly(theirs)) return false;
+    out.push(...theirs);
+    hunks++;
+    i = j;
+  }
+  if (hunks === 0) return false;
+  fs.writeFileSync(full, out.join("\n"));
+  return runGit(["add", file], repoDir, { allowFailure: true }).success;
 }
 
 function getMergeCommit(repo, prNumber) {
@@ -202,10 +252,51 @@ async function main() {
         const statusResult = runGit(["status", "--porcelain"], repoDir, {
           allowFailure: true,
         });
-        const conflictFiles = statusResult.stdout
+        const allConflictFiles = statusResult.stdout
           .split("\n")
           .filter((l) => l.startsWith("UU ") || l.startsWith("AA "))
           .map((l) => l.slice(3).trim());
+
+        // A TDD's code-fingerprint stamp changes with every code commit, so
+        // a doc conflict confined to that stamp is mechanical: take the
+        // incoming commit's stamp, which describes the commit's own code.
+        const conflictFiles = allConflictFiles.filter(
+          (f) => !resolveFingerprintOnlyConflict(repoDir, f)
+        );
+        if (allConflictFiles.length > 0 && conflictFiles.length === 0) {
+          console.error(
+            `  Resolved fingerprint-only conflict in: ${allConflictFiles.join(", ")}`
+          );
+          // A clean pick commits without hooks; the resolved pick must too,
+          // or the pre-commit tsc gates one commit of an already-merged PR.
+          const continueResult = runGit(
+            [
+              "-c",
+              "core.editor=true",
+              "-c",
+              "core.hooksPath=/dev/null",
+              "cherry-pick",
+              "--continue",
+            ],
+            repoDir,
+            { allowFailure: true }
+          );
+          if (continueResult.success) {
+            console.error(`  ✓ Applied`);
+            continue;
+          }
+          console.error(
+            `✗ cherry-pick --continue failed: ${continueResult.stderr}`
+          );
+          runGit(["cherry-pick", "--abort"], repoDir, { allowFailure: true });
+          results.skipped.push({
+            repo,
+            prNumber,
+            reason: `cherry-pick --continue failed: ${continueResult.stderr}`,
+          });
+          exitCode = 1;
+          break;
+        }
 
         if (conflictFiles.length > 0) {
           const isChangelogOnly =
@@ -288,6 +379,7 @@ async function main() {
           prNumber,
           reason: `Cherry-pick failed: ${cpResult.stderr}`,
         });
+        exitCode = 1;
         break;
       }
 
