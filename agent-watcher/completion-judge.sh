@@ -199,7 +199,7 @@ if(v.verdict==="allow"){
 }
 const out={gid,event,evidence_hash:hash,nonce,ts:new Date().toISOString(),model,cost_usd:wrapper.total_cost_usd??null,duration_ms:wrapper.duration_ms??null,cached:false,...v};
 fs.writeFileSync(process.argv[7],JSON.stringify(out,null,2));
-console.log(JSON.stringify({verdict:out.verdict,fails,cost:out.cost_usd,duration_ms:out.duration_ms,fail_ids:v.items.filter(i=>i.status==="fail").map(i=>i.id),summary:String(v.summary||"").slice(0,200)}));
+console.log(JSON.stringify({verdict:out.verdict,fails,cost:out.cost_usd,duration_ms:out.duration_ms,fail_ids:v.items.filter(i=>i.status==="fail").map(i=>i.id),summary:String(v.summary||"")}));
 ' "$RAW_OUT" "$GID" "$EVENT" "$HASH" "$NONCE" "$MODEL" "$VERDICT.tmp" "$DIM_IDS" 2>"$WORK/parse.err") || fail_unavailable "$(cat "$WORK/parse.err")"
 mv -f "$VERDICT.tmp" "$VERDICT"
 

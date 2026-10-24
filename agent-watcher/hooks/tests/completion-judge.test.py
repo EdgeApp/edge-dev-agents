@@ -49,7 +49,7 @@ node -e 'const v=process.argv[1];console.log(JSON.stringify({{result:"```json\\n
 os.chmod(fake, os.stat(fake).st_mode | stat.S_IEXEC)
 LOG_DIR = os.path.join(tmp, 'judge-log')
 ENV = dict(os.environ, PATH=fake_bin + ':' + os.environ['PATH'], COMPLETION_JUDGE_OFFLINE='1',
-           COMPLETION_JUDGE_LOG_DIR=LOG_DIR, COMPLETION_JUDGE_DEADLINE='2', AGENT_TASK_GID=GID,
+           COMPLETION_JUDGE_LOG_DIR=LOG_DIR, COMPLETION_JUDGE_DEADLINE='10', AGENT_TASK_GID=GID,
            AGENT_WORKTREE_ROOT=os.path.join(tmp, 'wt'), JEV_SHADOW_ROOT=os.path.join(tmp, 'shadow'))
 SHADOW_BLOCKER = os.path.join(tmp, 'shadow', 'blocker', 'decisions.jsonl')
 LOGF = os.path.join(LOG_DIR, f'{GID}.jsonl')

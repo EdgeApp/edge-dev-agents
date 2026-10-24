@@ -24,6 +24,10 @@ node -e '
 const fs=require("fs");
 const rows=fs.readFileSync(process.argv[1],"utf8").split("\n").filter(Boolean).map(l=>{try{return JSON.parse(l)}catch{return null}}).filter(Boolean);
 if(!rows.length){console.log("_No judge call yet._");process.exit(0)}
+// Rows logged before the provenance log kept the full summary hold a cut one; the
+// verdict file still carries the full text for the latest call (matched by nonce).
+let vf={};try{vf=JSON.parse(fs.readFileSync(process.argv[2],"utf8"))}catch{}
+rows.forEach(r=>{if(vf.nonce&&r.nonce===vf.nonce&&vf.summary)r.summary=vf.summary});
 const esc=s=>String(s||"").replace(/\|/g,"\\|").replace(/\s+/g," ").trim();
 const ts=r=>(r.ts||"").replace(/^\d{4}-/,"").replace("T"," ");
 const last={};rows.forEach((r,i)=>{if(r.event)last[r.event]=i});
@@ -37,9 +41,9 @@ console.log("|---|---|---|---|---|---|");
 rows.forEach((r,i)=>{
   const t=ts(r);
   let failed="", summary="";
-  if(r.verdict==="override"){failed="";const via=r.comment_at?`via Asana comment ${r.comment_at.replace(/^\d{4}-/,"")}`:`via ${esc(r.source)||"operator waiver"}`;summary=`operator override (${r.override||"?"}) ${via}: ${esc(r.directive).slice(0,120)}`}
+  if(r.verdict==="override"){failed="";const via=r.comment_at?`via Asana comment ${r.comment_at.replace(/^\d{4}-/,"")}`:`via ${esc(r.source)||"operator waiver"}`;summary=`operator override (${r.override||"?"}) ${via}: ${esc(r.directive)}`}
   else if(r.verdict==="unavailable"){summary=`judge unavailable: ${esc(r.error)}`}
-  else {failed=(r.fail_ids||[]).join(", ")||(r.fails?`${r.fails} item(s)`:"");summary=esc(r.summary).slice(0,160)}
+  else {failed=(r.fail_ids||[]).join(", ")||(r.fails?`${r.fails} item(s)`:"");summary=esc(r.summary)}
   console.log(`| ${i+1} | ${t} | ${r.event||""} | ${r.verdict||""} | ${failed} | ${summary} |`);
 });
-' "$LOG"
+' "$LOG" "/tmp/agent-completion-verdict-$GID.json"
