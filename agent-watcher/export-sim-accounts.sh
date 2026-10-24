@@ -84,7 +84,23 @@ done
 echo ">> accounts imported into the master sim ($UDID)."
 if [ -x "$HOME/.config/agent-watcher/ensure-sim-pool.sh" ]; then
   echo ">> refreshing the sim pool so clones inherit the logged-in master (~minutes)..."
-  rm -f "$HOME/.config/agent-watcher/pool.json"
+  # Mark every not-in_use slot dirty so ensure-sim-pool reclones it from the
+  # logged-in master (refresh-master-build.sh's pattern). Never delete pool.json:
+  # in_use slots belong to live runs.
+  POOL="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/pool.json"
+  POOL_LOCK="$HOME/.config/agent-watcher/pool.lock"
+  if [ -f "$POOL" ]; then
+    i=0
+    while ! ( set -C; : > "$POOL_LOCK" ) 2>/dev/null; do
+      i=$((i + 1)); [ $i -gt 300 ] && { echo ">> (could not lock the pool; rerun ensure-sim-pool.sh later)"; break; }
+      sleep 0.1
+    done
+    if [ $i -le 300 ]; then
+      tmp=$(mktemp)
+      jq '(.pool[] | select(.state != "in_use") | .state) = "dirty"' "$POOL" > "$tmp" && mv "$tmp" "$POOL"
+      rm -f "$POOL_LOCK"
+    fi
+  fi
   # SKIP_MASTER_REFRESH: the master was JUST given a build by the import above, so
   # don't let ensure-sim-pool immediately rebuild it from develop on a fresh machine.
   SKIP_MASTER_REFRESH=1 "$HOME/.config/agent-watcher/ensure-sim-pool.sh" --size 2 || echo ">> (pool refresh failed; rerun it later)"

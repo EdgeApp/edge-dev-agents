@@ -155,12 +155,17 @@ if (STRINGS) {
 }
 const PARA = new Array(LINES.length).fill(null)
 {
-  let f = false, start = -1, buf = []
+  let f = false, start = -1, buf = [], fm = 0
   const flush = () => {
     if (start >= 0 && buf.length) PARA[start] = buf.join(" ")
     start = -1; buf = []
   }
   LINES.forEach((raw, i) => {
+    // The leading --- block is YAML data (run-report stamps such as
+    // "slot_index: 3" over "metro_port: 8184"), never prose: joined into a
+    // paragraph, "3 metro_port:" reads as a counted lead-in.
+    if (i === 0 && /^---\s*$/.test(raw)) { fm = 1; return }
+    if (fm === 1) { if (/^---\s*$/.test(raw)) fm = 2; return }
     if (/^\s*```/.test(raw)) { f = !f; flush(); return }
     // A blank line, or any construct the per-line loop already skips, ends the
     // paragraph. A new list marker starts one, so sibling items never merge.
