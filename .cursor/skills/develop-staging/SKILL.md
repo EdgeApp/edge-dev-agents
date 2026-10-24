@@ -103,7 +103,12 @@ a directory needs a trailing wildcard: `--allow 'src/locales/strings/*'`, not
 
 <step id="4" name="Push">
 Re-run the same command without `--dry-run`. The script confirms interactively before pushing;
-`--yes` skips that prompt. It pushes the bump to `develop` first, then the merge to `staging`.
+`--yes` skips that prompt. It pushes the bump to `develop` first, then the merge to `staging`, then
+deletes the version's inspection tags. What it pushes is the inspection tags' commits when the rebuild
+matches them (same base, tree and commit contents), else the rebuild with a `warn` Reviewed row naming
+why: relay that row, since the shipped commits are then not the ones the operator reviewed. After a
+plain dry run, Crowdin or dep phases that land work on `develop` move its base, so the rebuild ships;
+after `--no-gui-push` those phases are already done and the held commits ship.
 
 There is no PR in this flow. The merge goes straight to `origin/staging`, which is how every prior
 develop-into-staging merge in this repo was done.
@@ -140,7 +145,7 @@ Exit `0` with `RESULT: ok`; `2` with `RESULT: conflicts`, `parity-mismatch` or `
 <case name="No `(staging)` heading to date">Normal: the previous release was already dated, so the script only opens the new section. Undated headings elsewhere in the CHANGELOG are backfilled from their tags in the same pass, per the checklist's "if there are missing dates in other published versions, add the dates"; versions with no tag are left alone and counted in the report.</case>
 <case name="No tag for the release being retired">The script dates it today and says so. Re-run with `--prev-date` if that is wrong.</case>
 <case name="CHANGELOG conflict the union refuses">Only happens when the two sides order their release sections differently, which is an editing mistake on one branch. Fix the ordering on the source branch and re-run.</case>
-<case name="A stale dryrun tag from an earlier attempt">Re-running force-updates the two tags in place, so they always point at the latest attempt for that version. Tags from older versions persist; delete them with `git push origin :refs/tags/dryrun/<version>-staging` when a release ships.</case>
+<case name="A stale dryrun tag from an earlier attempt">Re-running force-updates the two tags in place, so they always point at the latest attempt for that version, and the real push deletes them. Tags from an abandoned version persist; delete them with `git push origin :refs/tags/dryrun/<version>-staging`.</case>
 <case name="The dependency files conflict on every release">Expected. `package.json`, `package-lock.json` and `ios/Podfile.lock` carry pins that moved on both branches, so they conflict on nearly every cut and classify as *develop supersedes staging*. Clear them with the printed re-run.</case>
 <case name="A single staging-targeted commit mid-cycle">That goes onto staging through `/staging-cherry-pick`, which cherry-picks individual merged commits. This skill is the whole-release merge at the end of a cycle.</case>
 <case name="A repo other than edge-react-gui">The flow is generic but the precondition warnings are edge-react-gui's. Pass `--repo` and read those warnings as advisory.</case>

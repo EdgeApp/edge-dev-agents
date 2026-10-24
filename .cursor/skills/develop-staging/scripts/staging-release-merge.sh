@@ -3,7 +3,10 @@ set -euo pipefail
 
 # staging-release-merge.sh — cut a release by merging develop into staging:
 # bump the version, open the new CHANGELOG release section, date the release the
-# bump retires, merge, prove the two branches end up equivalent, then push.
+# bump retires, merge, prove the two branches end up equivalent, then push. A
+# real run pushes the commits a dry run or --no-gui-push run published as
+# inspection tags when the rebuild matches them (same base, tree, and commit
+# contents), else the rebuild, and deletes those tags after the push.
 #
 # Everything happens in a THROWAWAY git worktree on temp branches cut from
 # <remote>/<develop> and <remote>/<staging>. The caller's checkout, HEAD, index
@@ -79,7 +82,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-PHASES="Preflight Crowdin-gui Crowdin-login-ui Workspace zcash chain-registry Release-dates Version-bump Merge Parity Verify Push"
+PHASES="Preflight Crowdin-gui Crowdin-login-ui Workspace zcash chain-registry Release-dates Version-bump Merge Parity Verify Reviewed Push"
 # shellcheck source=../../release-merge-lib.sh
 . "$HOME/.cursor/skills/release-merge-lib.sh"
 
@@ -675,10 +678,28 @@ else
   fi
 fi
 
+# --------------------------------------------------------------- reviewed ----
+# The real run rebuilds and re-gates everything, then pushes the commits the
+# operator reviewed at the inspection tags when the rebuild matches them
+# (release-merge-lib.sh release_prefer_reviewed), and the rebuild otherwise.
+# Work the real run's Crowdin or dep phases land on develop moves its base, so
+# the rebuild is what ships then.
+DEV_PUSH="$(git -C "$WT" rev-parse "$TMP_DEV")"
+STG_PUSH="$(git -C "$WT" rev-parse "$TMP_STG")"
+if [ -n "$DRY_RUN" ] || [ -n "$NO_GUI_PUSH" ]; then
+  step Reviewed dry-run "a real run pushes the inspection tags' commits when its rebuild matches them"
+else
+  release_prefer_reviewed "$REPO" "$REMOTE" \
+    "$TAG_PREFIX/$VERSION-develop" "$DEV_REF" "$DEV_PUSH" \
+    "$TAG_PREFIX/$VERSION-staging" "$STG_REF" "$STG_PUSH"
+  DEV_PUSH="${RELEASE_PUSH[0]}"; STG_PUSH="${RELEASE_PUSH[1]}"
+  release_reviewed_step Reviewed "$TAG_PREFIX/$VERSION-*"
+fi
+
 # ------------------------------------------------------------------- push ----
 hdr "Push"
-echo "  $TMP_DEV -> $REMOTE/$DEVELOP   ($(git -C "$WT" rev-parse --short "$TMP_DEV"))"
-echo "  $TMP_STG -> $REMOTE/$STAGING   ($(git -C "$WT" rev-parse --short "$TMP_STG"))"
+echo "  $REMOTE/$DEVELOP <- $(git -C "$REPO" rev-parse --short "$DEV_PUSH")"
+echo "  $REMOTE/$STAGING <- $(git -C "$REPO" rev-parse --short "$STG_PUSH")"
 if [ -n "$DRY_RUN" ] || [ -n "$NO_GUI_PUSH" ]; then
   if [ -n "$DRY_RUN" ]; then
     hdr "DRY RUN, neither $DEVELOP nor $STAGING was pushed"
@@ -728,7 +749,7 @@ NOT A RELEASE. Nothing was pushed to $DEVELOP or $STAGING."
     say "release $VERSION is ready; re-run without --dry-run to push"
     step Push dry-run "nothing pushed to $DEVELOP or $STAGING${DEV_TAG:+; inspection tags $DEV_TAG, $STG_TAG}"
   else
-    say "release $VERSION is ready and held; push later from the kept workspace or a re-run"
+    say "release $VERSION is ready and held; a re-run pushes these commits when its rebuild matches them"
     step Push held "--no-gui-push: $DEVELOP and $STAGING untouched${DEV_TAG:+; inspection tags $DEV_TAG, $STG_TAG}"
   fi
   finish ok 0
@@ -741,9 +762,12 @@ if [ -z "$ASSUME_YES" ]; then
     *) say "declined by operator, nothing pushed"; step Push declined "operator answered no at the confirmation"; finish aborted 2 ;;
   esac
 fi
-git -C "$WT" push "$REMOTE" "$TMP_DEV:$DEVELOP" || die "push to $DEVELOP failed"
-git -C "$WT" push "$REMOTE" "$TMP_STG:$STAGING" || die "push to $STAGING failed"
+git -C "$REPO" push "$REMOTE" "$DEV_PUSH:refs/heads/$DEVELOP" || die "push to $DEVELOP failed"
+git -C "$REPO" push "$REMOTE" "$STG_PUSH:refs/heads/$STAGING" || die "push to $STAGING failed"
 say "pushed $DEVELOP and $STAGING"
 say "release $VERSION is on $STAGING"
-step Push ok "$DEVELOP <- $(git -C "$WT" rev-parse --short "$TMP_DEV"), $STAGING <- $(git -C "$WT" rev-parse --short "$TMP_STG")"
+step Push ok "$DEVELOP <- $(git -C "$REPO" rev-parse --short "$DEV_PUSH"), $STAGING <- $(git -C "$REPO" rev-parse --short "$STG_PUSH")"
+for br in develop staging; do
+  git -C "$REPO" push "$REMOTE" ":refs/tags/$TAG_PREFIX/$VERSION-$br" >/dev/null 2>&1 || true
+done
 finish ok 0

@@ -79,7 +79,9 @@ After the operator says go, re-run the last dry-run command without `--dry-run`,
 plus `--build-config-ready` if they confirmed it in 3e. The script runs the repo verify on master and
 staging, confirms interactively, then pushes develop, staging, master (never forced), tags `vX.Y.Z`
 on master's bump commit and deletes the inspection tags. Pass `--yes` only when the operator asked to
-skip the prompt.
+skip the prompt. What it pushes and tags is the inspection tags' commits when the rebuild matches them
+(same base, tree and commit contents), else the rebuild with a `warn` Reviewed row naming why: relay
+that row, since the shipped commits are then not the ones the operator reviewed.
 
 A push failure part-way is finished by re-running the same command: work already on the remote is
 detected and skipped.

@@ -4,7 +4,9 @@ set -euo pipefail
 # master-release-merge.sh — ship an X.Y.0 release by merging staging into
 # master: merge with git's default message, date the release's CHANGELOG
 # heading, prove master ends up with staging's tree, verify, push master, then
-# push the lightweight vX.Y.0 tag on the merge commit.
+# push the lightweight vX.Y.0 tag on the merge commit. A real run pushes the
+# merge the dry run published as its inspection tag when the rebuild matches it
+# (same base, tree, and commit contents), else the rebuild.
 #
 # Point releases (X.Y.Z with Z > 0, shipped by /point-release) are out of
 # scope; the preflight refuses them.
@@ -79,7 +81,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-PHASES="Preflight Master-only Workspace Merge Release-date Parity Build-config Commit Verify Push Tag"
+PHASES="Preflight Master-only Workspace Merge Release-date Parity Build-config Commit Verify Reviewed Push Tag"
 # shellcheck source=../../release-merge-lib.sh
 . "$HOME/.cursor/skills/release-merge-lib.sh"
 
@@ -452,11 +454,24 @@ else
   fi
 fi
 
+# ---------------------------------------------------------------- reviewed ---
+# The real run rebuilds and re-gates the merge, then pushes the commit the
+# operator reviewed at the inspection tag when the rebuild matches it
+# (release-merge-lib.sh release_prefer_reviewed), and the rebuild otherwise.
+INSPECT_TAG="$TAG_PREFIX/$VERSION-master"
+if [ -n "$DRY_RUN" ]; then
+  step Reviewed dry-run "a real run pushes $INSPECT_TAG's commit when its rebuild matches it"
+else
+  release_prefer_reviewed "$REPO" "$REMOTE" "$INSPECT_TAG" "$MASTER_REF" "$MERGE_SHA"
+  MERGE_SHA="${RELEASE_PUSH[0]}"
+  MERGE_SHORT="$(git -C "$REPO" rev-parse --short "$MERGE_SHA")"
+  release_reviewed_step Reviewed "$INSPECT_TAG"
+fi
+
 # -------------------------------------------------------------- push + tag ---
 hdr "Push"
-echo "  $TMP_BR -> $REMOTE/$MASTER   ($MERGE_SHORT)"
+echo "  $REMOTE/$MASTER <- $MERGE_SHORT"
 echo "  tag v$VERSION -> $MERGE_SHORT"
-INSPECT_TAG="$TAG_PREFIX/$VERSION-master"
 if [ -n "$DRY_RUN" ]; then
   hdr "DRY RUN, $MASTER was not pushed and v$VERSION was not tagged"
   if [ -n "$PUBLISH" ]; then
@@ -496,7 +511,7 @@ if [ -z "$ASSUME_YES" ]; then
     *) say "declined by operator, nothing pushed"; step Push declined "operator answered no at the confirmation"; finish aborted 2 ;;
   esac
 fi
-git -C "$WT" push "$REMOTE" "$TMP_BR:$MASTER" \
+git -C "$REPO" push "$REMOTE" "$MERGE_SHA:refs/heads/$MASTER" \
   || { step Push failed "push rejected ($MASTER moved since the fetch?); nothing changed on $REMOTE"; die "push to $MASTER failed; re-run to merge onto the new tip"; }
 step Push ok "$MASTER <- $MERGE_SHORT"
 say "pushed $MASTER"

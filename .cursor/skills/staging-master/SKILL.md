@@ -91,7 +91,10 @@ continues, so surface it before asking for the go in step 4.
 After the operator says go, re-run the last dry-run command without `--dry-run`, with the same
 flags, plus `--build-config-ready` if they confirmed it in 3c. The script confirms interactively
 before pushing; pass `--yes` only when the operator asked to skip that prompt. It pushes `master`,
-then the lightweight `vX.Y.0` tag on the merge commit, then deletes the inspection tag.
+then the lightweight `vX.Y.0` tag on the merge commit, then deletes the inspection tag. What it
+pushes and tags is the inspection tag's commit when the rebuild matches it (same base, tree and commit
+contents), else the rebuild with a `warn` Reviewed row naming why: relay that row, since the shipped
+merge is then not the one the operator reviewed.
 
 There is no PR in this flow; every prior staging-into-master merge went straight to `origin/master`.
 </step>
@@ -124,7 +127,7 @@ Exit `0` with `RESULT: ok`; `2` with `conflicts`, `parity-mismatch`, `build-conf
 </params>
 
 <edge-cases>
-<case name="Staging moved after the dry run">The real run fetches and ships the current staging tip, so its merge can differ from the reviewed preview. Re-run the dry run first whenever staging moved since the operator reviewed it.</case>
+<case name="Staging moved after the dry run">The real run fetches and ships the current staging tip, so its merge differs from the reviewed preview and the Reviewed row is `warn`. Re-run the dry run first whenever staging moved since the operator reviewed it.</case>
 <case name="Master moved after the dry run">The master push is non-force and fails if master moved; nothing changes on the remote. Re-run the dry run to merge onto the new tip.</case>
 <case name="The vX.Y.0 tag already exists">The preflight refuses. A remote tag means the release already shipped. A local-only tag is debris from an earlier attempt; the error names the delete command, which the operator runs.</case>
 <case name="No `(staging)` heading for the version">The preflight refuses. The release section on staging was already dated or never opened; that is fixed on staging through develop, not here.</case>

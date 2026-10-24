@@ -1,6 +1,7 @@
 # release-merge-lib.sh — shared helpers for the edge-react-gui release merges:
-# develop-staging/scripts/staging-release-merge.sh (develop → staging) and
-# staging-master/scripts/master-release-merge.sh (staging → master).
+# develop-staging/scripts/staging-release-merge.sh (develop → staging),
+# staging-master/scripts/master-release-merge.sh (staging → master) and
+# point-release/scripts/point-release-ship.sh (picks onto master and staging).
 #
 # SOURCED, never executed. The caller owns `set -euo pipefail` and these
 # globals, read by the ledger and cleanup paths:
@@ -189,6 +190,91 @@ release_restore_hook_rewrites() {
     && git -C "$wt" commit --quiet --amend --no-edit --no-verify >>"$log" 2>&1 \
     || die "could not restore the staged $f into the merge commit (full log: $log)"
   say "restored $f as staged (the pre-commit hook rewrote it in the merge commit)"
+}
+
+# release_prefer_reviewed <repo> <remote> <tag> <base> <built> [<tag> <base> <built> ...]
+# A real run rebuilds what its dry run built, so every gate still runs, but the
+# rebuild has new SHAs. This picks what to push: the reviewed dry-run tag
+# commits when the rebuild matches them, else the rebuild. One triple per
+# pushed branch: its inspection tag on <remote>, the <base> ref the branch
+# fast-forwards from, and the <built> commit. All or nothing, because one
+# reviewed commit can cite another by SHA (a `cherry picked from` line).
+# A match needs, per triple: <base> still an ancestor of the tag, the same final
+# tree, and the same commits in <base>..tip by tree, author and message (built
+# SHAs that a message cites are read as their reviewed counterparts), resting on
+# the same boundary commits. Commit dates are ignored; they are what a rebuild
+# changes. Verify ran on the rebuild's trees, which the match proves equal.
+# Sets RELEASE_PUSH (one SHA per triple, in order) and RELEASE_REVIEWED_NOTE
+# (empty on a match, else why the rebuild is pushed). Always returns 0.
+release_prefer_reviewed() {
+  local repo="$1" remote="$2" ref out args=()
+  shift 2
+  RELEASE_PUSH=(); RELEASE_REVIEWED_NOTE=""
+  while [ $# -ge 3 ]; do
+    RELEASE_PUSH+=("$(git -C "$repo" rev-parse "$3^{commit}")")
+    # A private ref, not FETCH_HEAD or a local tag: other sessions fetch in this
+    # repo too, and the dry run deletes its local copies of these tags.
+    ref="refs/release-reviewed/$1"
+    if [ -z "$RELEASE_REVIEWED_NOTE" ] && git -C "$repo" fetch --quiet --no-tags "$remote" "+refs/tags/$1:$ref" 2>/dev/null; then
+      args+=("$1" "$2" "$(git -C "$repo" rev-parse "$ref^{commit}")" "${RELEASE_PUSH[${#RELEASE_PUSH[@]}-1]}")
+      git -C "$repo" update-ref -d "$ref" 2>/dev/null || true
+    else
+      RELEASE_REVIEWED_NOTE="${RELEASE_REVIEWED_NOTE:-no $1 on $remote}"
+    fi
+    shift 3
+  done
+  [ -z "$RELEASE_REVIEWED_NOTE" ] || return 0
+  out="$(node - "$repo" ${args[@]+"${args[@]}"} <<'NODE'
+const { execFileSync } = require("child_process");
+const [repo, ...rest] = process.argv.slice(2);
+const git = (...a) => execFileSync("git", ["-C", repo, ...a], { encoding: "utf8", maxBuffer: 1 << 28 });
+const isAncestor = (a, b) => {
+  try { execFileSync("git", ["-C", repo, "merge-base", "--is-ancestor", a, b]); return true; } catch { return false; }
+};
+const items = [];
+for (let i = 0; i < rest.length; i += 4) items.push({ tag: rest[i], base: rest[i + 1], reviewed: rest[i + 2], built: rest[i + 3] });
+const toReviewed = (s) => items.reduce((acc, it) => acc.split(it.built).join(it.reviewed), s);
+const id = (s) => s;
+const commits = (base, tip, map) =>
+  git("log", "-z", "--format=%T%n%an <%ae>%n%B", `${base}..${tip}`).split("\0").filter(Boolean).map((r) => map(r.trimEnd())).sort();
+const boundary = (base, tip, map) =>
+  git("rev-list", "--boundary", `${base}..${tip}`).split("\n").filter((l) => l.startsWith("-")).map((l) => map(l.slice(1))).sort();
+const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+const differs = (it) => {
+  if (it.reviewed === it.built) return "";
+  if (!isAncestor(it.base, it.reviewed)) return `${it.base} moved since ${it.tag}`;
+  if (git("rev-parse", `${it.reviewed}^{tree}`) !== git("rev-parse", `${it.built}^{tree}`)) return `the tree differs from ${it.tag}`;
+  if (!same(commits(it.base, it.reviewed, id), commits(it.base, it.built, toReviewed))
+    || !same(boundary(it.base, it.reviewed, id), boundary(it.base, it.built, toReviewed))) {
+    return `the commits on ${it.base}..${it.tag} differ from the rebuild`;
+  }
+  return "";
+};
+const why = items.map(differs).find(Boolean);
+console.log(why ? `NO ${why}` : ["OK", ...items.map((it) => it.reviewed)].join("\n"));
+NODE
+)" || { RELEASE_REVIEWED_NOTE="the comparison with the inspection tags failed"; return 0; }
+  case "$out" in
+    OK*)
+      RELEASE_PUSH=()
+      while IFS= read -r ref; do RELEASE_PUSH+=("$ref"); done < <(tail -n +2 <<< "$out")
+      ;;
+    *) RELEASE_REVIEWED_NOTE="${out#NO }" ;;
+  esac
+  return 0
+}
+
+# release_reviewed_step <phase> <what>
+# Records the <phase> row for the last release_prefer_reviewed call: ok when it
+# chose the reviewed commits, warn with the reason when it chose the rebuild.
+release_reviewed_step() {
+  if [ -z "$RELEASE_REVIEWED_NOTE" ]; then
+    say "pushing the reviewed commits from $2"
+    step "$1" ok "pushing the reviewed $2 commits; the rebuild matches them"
+  else
+    warn "pushing the rebuild, not the reviewed $2: $RELEASE_REVIEWED_NOTE"
+    step "$1" warn "pushing the rebuild, not $2: $RELEASE_REVIEWED_NOTE"
+  fi
 }
 
 # release_verify <worktree> <log>

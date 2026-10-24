@@ -27,7 +27,9 @@ set -euo pipefail
 # (CHANGELOG.md aside) and all three branches the same X.Y.Z section, in the
 # shared entry type order (release-lib.js orderErrors). A real run
 # verifies master and staging, pushes develop, staging, master (never forced),
-# then the lightweight vX.Y.Z tag on master's bump commit.
+# then the lightweight vX.Y.Z tag on master's bump commit. What it pushes is
+# the commits the dry run published as inspection tags when the rebuild
+# matches them (same base, tree, and commit contents), else the rebuild.
 #
 # Everything happens in THROWAWAY git worktrees on temp branches. The caller's
 # checkout is never touched. staging-cherry-pick.sh is not reused: it checks
@@ -110,7 +112,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-PHASES="Preflight Tasks Workspace Develop-bump Master-picks Master-bump Staging-picks Staging-bump Parity Build-config Verify Push Tag"
+PHASES="Preflight Tasks Workspace Develop-bump Master-picks Master-bump Staging-picks Staging-bump Parity Build-config Verify Reviewed Push Tag"
 # shellcheck source=../../release-merge-lib.sh
 . "$HOME/.cursor/skills/release-merge-lib.sh"
 # Entry type order, entry shape and the app version bump, shared with
@@ -536,6 +538,27 @@ else
   step Verify ok "repo verify passed on $MASTER and $STAGING"
 fi
 
+# --------------------------------------------------------------- reviewed ----
+# The real run rebuilds and re-gates everything, then pushes the commits the
+# operator reviewed at the inspection tags when the rebuild matches them
+# (release-merge-lib.sh release_prefer_reviewed), and the rebuild otherwise.
+if [ -n "$DRY_RUN" ]; then
+  step Reviewed dry-run "a real run pushes the inspection tags' commits when its rebuild matches them"
+else
+  TRIPLES=()
+  [ -n "$DEV_NEW" ] && TRIPLES+=("$TAG_PREFIX/$VERSION-$DEVELOP" "$REMOTE/$DEVELOP" "$DEV_BUMP")
+  TRIPLES+=("$TAG_PREFIX/$VERSION-$STAGING" "$REMOTE/$STAGING" "$STG_HEAD"
+            "$TAG_PREFIX/$VERSION-$MASTER" "$REMOTE/$MASTER" "$MASTER_BUMP")
+  release_prefer_reviewed "$REPO" "$REMOTE" "${TRIPLES[@]}"
+  i=0
+  [ -n "$DEV_NEW" ] && { DEV_BUMP="${RELEASE_PUSH[0]}"; i=1; }
+  STG_HEAD="${RELEASE_PUSH[$i]}"; MASTER_BUMP="${RELEASE_PUSH[$((i + 1))]}"
+  DEV_BUMP_SHORT="$(git -C "$REPO" rev-parse --short "$DEV_BUMP")"
+  STG_SHORT="$(git -C "$REPO" rev-parse --short "$STG_HEAD")"
+  MASTER_BUMP_SHORT="$(git -C "$REPO" rev-parse --short "$MASTER_BUMP")"
+  release_reviewed_step Reviewed "$TAG_PREFIX/$VERSION-*"
+fi
+
 # ------------------------------------------------------------- push + tag ----
 hdr "Push"
 DEV_PUSH=""; [ -n "$DEV_NEW" ] && DEV_PUSH="$DEV_BUMP"
@@ -585,12 +608,12 @@ fi
 # develop first, so every change is on develop before it is anywhere else; a
 # failure part-way leaves the rest for a re-run.
 if [ -n "$DEV_PUSH" ]; then
-  git -C "$WT_DEV" push "$REMOTE" "HEAD:$DEVELOP" \
+  git -C "$REPO" push "$REMOTE" "$DEV_PUSH:refs/heads/$DEVELOP" \
     || { step Push failed "$DEVELOP push rejected ($DEVELOP moved?); nothing pushed"; die "push to $DEVELOP failed; re-run"; }
 fi
-git -C "$WT_STG" push "$REMOTE" "HEAD:$STAGING" \
+git -C "$REPO" push "$REMOTE" "$STG_HEAD:refs/heads/$STAGING" \
   || { step Push failed "$STAGING push rejected; ${DEV_PUSH:+$DEVELOP is pushed; }re-run"; die "push to $STAGING failed; re-run to finish"; }
-git -C "$WT_MASTER" push "$REMOTE" "HEAD:$MASTER" \
+git -C "$REPO" push "$REMOTE" "$MASTER_BUMP:refs/heads/$MASTER" \
   || { step Push failed "$MASTER push rejected; $DEVELOP and $STAGING are pushed; re-run"; die "push to $MASTER failed; re-run to finish"; }
 step Push ok "${DEV_PUSH:+$DEVELOP <- $DEV_BUMP_SHORT, }$STAGING <- $STG_SHORT, $MASTER <- $MASTER_BUMP_SHORT"
 
