@@ -58,12 +58,8 @@ node -e '
 const fs = require("fs");
 const file = process.argv[1];
 const releaseMerge = process.argv[2] === "1";
-const TYPE_ORDER = ["added", "changed", "deprecated", "fixed", "removed", "security"];
-const typeRank = (line) => {
-  const m = line.match(/^- (\w+):/);
-  const i = m ? TYPE_ORDER.indexOf(m[1]) : -1;
-  return i === -1 ? TYPE_ORDER.length : i;
-};
+// The entry type order is shared with verify-repo.sh and the release scripts.
+const { typeRank } = require(require("os").homedir() + "/.cursor/skills/release-lib.js");
 
 const lines = fs.readFileSync(file, "utf8").split("\n");
 const out = [];

@@ -16,7 +16,7 @@ metadata:
 </rules>
 
 <step id="1" name="Locate the section">
-Find the target section with `grep -n '^## ' CHANGELOG.md | head -5`. In `edge-react-gui` the choice between `Unreleased (develop)` and the `(staging)` section follows the im skill's CHANGELOG placement rules; every other repo takes the top `Unreleased` section. Types are grouped in order: `added`, `changed`, `fixed`, then the rest.
+Find the target section with `grep -n '^## ' CHANGELOG.md | head -5`. In `edge-react-gui` the choice between `Unreleased (develop)` and the `(staging)` section follows the im skill's CHANGELOG placement rules; every other repo takes the top `Unreleased` section. Types are grouped in the order `release-lib.js` defines: `added`, `changed`, `deprecated`, `fixed`, `removed`, `security`.
 </step>
 
 <step id="2" name="Calibrate on old entries">

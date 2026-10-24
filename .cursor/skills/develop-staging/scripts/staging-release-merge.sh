@@ -79,43 +79,9 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-say()  { printf '>> %s\n' "$*"; }
-WARN_COUNT=0
-warn() { WARN_COUNT=$((WARN_COUNT + 1)); printf '!! %s\n' "$*"; }
-hdr()  { printf '\n=== %s ===\n' "$*"; }
-
-# Step ledger. Every phase records its outcome here, and finish() renders it on
-# EVERY exit path, so a run that stopped at a gate still reports what the phases
-# before it did. Kept as a newline-delimited string rather than an associative
-# array, which bash 3.2 (the macOS system bash) does not have.
 PHASES="Preflight Crowdin-gui Crowdin-login-ui Workspace zcash chain-registry Release-dates Version-bump Merge Parity Verify Push"
-STEP_LOG=""
-step() { STEP_LOG="$STEP_LOG$1|$2|$3
-"; }
-render_steps() {
-  printf '\n=== Step report ===\n'
-  for ph in $PHASES; do
-    line="$(printf '%s' "$STEP_LOG" | grep "^$ph|" || true)"
-    if [ -z "$line" ]; then
-      printf '  %-16s %-11s %s\n' "$ph" "not-reached" "-"
-      continue
-    fi
-    st="$(printf '%s' "$line" | cut -d'|' -f2)"
-    detail="$(printf '%s' "$line" | cut -d'|' -f3-)"
-    printf '  %-16s %-11s %s\n' "$ph" "$st" "$detail"
-  done
-}
-RESULT_PRINTED=""
-finish() {
-  # The kept-workspace note prints HERE, not from the EXIT trap, so that
-  # `RESULT:` is always the last line a caller reads.
-  [ -n "${KEEP_WS:-}" ] && [ -n "${WT:-}" ] && [ -d "$WT" ] && say "workspace kept at $WT"
-  render_steps
-  RESULT_PRINTED=1
-  printf '\nRESULT: %s\n' "$1"
-  exit "$2"
-}
-die()   { printf '!! %s\n' "$*" >&2; finish error 1; }
+# shellcheck source=../../release-merge-lib.sh
+. "$HOME/.cursor/skills/release-merge-lib.sh"
 
 CHANGELOG_RESOLVER="$HOME/.cursor/skills/pr-land/scripts/changelog-union-merge.sh"
 LINT_COMMIT="$HOME/.cursor/skills/lint-commit.sh"
@@ -140,7 +106,6 @@ git -C "$REPO" rev-parse --verify --quiet "$DEV_REF" >/dev/null || die "no such 
 git -C "$REPO" rev-parse --verify --quiet "$STG_REF" >/dev/null || die "no such ref: $STG_REF"
 say "$DEV_REF $(git -C "$REPO" rev-parse --short "$DEV_REF")  $STG_REF $(git -C "$REPO" rev-parse --short "$STG_REF")"
 
-read_json_field() { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const v=process.argv[1].split(".").reduce((o,k)=>(o||{})[k],JSON.parse(s));console.log(v==null?"":v)})' "$1"; }
 CUR_VERSION="$(git -C "$REPO" show "$DEV_REF:package.json" | read_json_field version)"
 [ -n "$CUR_VERSION" ] || die "could not read version from $DEV_REF:package.json"
 if [ -z "$VERSION" ]; then
@@ -273,42 +238,7 @@ say "worktree $WT on $TMP_DEV"
 
 # The repo's precommit chain runs on both the bump and the merge commit, and it
 # needs artifacts that are gitignored and so absent from a fresh worktree.
-# node_modules must be a REAL directory: react-native's jest asset transformer
-# builds snapshot image paths relative to its own location inside node_modules,
-# so a symlink resolves them against the caller's checkout and every image
-# snapshot fails. Clone it (APFS clone-on-write costs seconds and little disk).
-if [ ! -e "$WT/node_modules" ] && [ -d "$REPO/node_modules" ]; then
-  say "cloning node_modules (a symlink breaks image snapshots)"
-  cp -c -R "$REPO/node_modules" "$WT/node_modules" 2>/dev/null \
-    || cp -R "$REPO/node_modules" "$WT/node_modules" \
-    || die "could not stage node_modules"
-fi
-# COPIED, never symlinked: a symlink named `_` is a file, so husky's own
-# `_/.gitignore` (which lives INSIDE the real dir) cannot ignore it, and a
-# scoped commit can sweep the link into the repo as a dangling absolute path
-# that breaks husky on every other machine (shipped to develop+staging in the
-# 4.51.0 cut's zcash pin-bump, 2026-08-27; removed in 99297e718).
-if [ ! -e "$WT/.husky/_" ] && [ -d "$REPO/.husky/_" ]; then
-  mkdir -p "$WT/.husky"
-  cp -R "$REPO/.husky/_" "$WT/.husky/_"
-  say "copied .husky/_"
-fi
-# Copied, not symlinked: the prepare step regenerates this dir (typechain
-# mkdir), which fails with EEXIST when the path is a symlink into the caller's
-# checkout — and a symlink would let the regen write into that checkout.
-if [ ! -e "$WT/src/plugins/contracts" ] && [ -d "$REPO/src/plugins/contracts" ]; then
-  cp -R "$REPO/src/plugins/contracts" "$WT/src/plugins/contracts"
-  say "copied src/plugins/contracts"
-fi
-# Copied rather than linked so nothing the hooks do can write into the caller's
-# checkout. Without these, the precommit tsc fails on unresolvable modules.
-for p in env.json config.json keys.json src/controllers/edgeProvider/client/rolledUp.js src/controllers/edgeProvider/injectThisInWebView.js; do
-  [ -e "$WT/$p" ] && continue
-  [ -e "$REPO/$p" ] || { warn "missing $p in $REPO, the precommit hooks may fail"; continue; }
-  mkdir -p "$(dirname "$WT/$p")"
-  cp "$REPO/$p" "$WT/$p"
-  say "copied $p"
-done
+release_ws_prep "$REPO" "$WT"
 
 step Workspace ok "$WT on $TMP_DEV"
 
@@ -469,15 +399,8 @@ const fs = require("fs");
 const { execFileSync } = require("child_process");
 const [wt, version, prevDateArg] = process.argv.slice(2);
 
-const pj = `${wt}/package.json`;
-fs.writeFileSync(pj, fs.readFileSync(pj, "utf8").replace(/("version":\s*)"[^"]+"/, `$1"${version}"`));
-
-// The lockfile carries the version twice, at the root and under packages[""].
-const pl = `${wt}/package-lock.json`;
-if (fs.existsSync(pl)) {
-  let n = 0;
-  fs.writeFileSync(pl, fs.readFileSync(pl, "utf8").replace(/("version":\s*)"[^"]+"/g, (m, p) => (n++ < 2 ? `${p}"${version}"` : m)));
-}
+// package.json and both package-lock.json version fields, shared with /point-release.
+require(require("os").homedir() + "/.cursor/skills/release-lib.js").bumpAppVersion(wt, version);
 
 const cl = `${wt}/CHANGELOG.md`;
 const lines = fs.readFileSync(cl, "utf8").split("\n");
@@ -636,81 +559,7 @@ if [ $rc -ne 0 ]; then
     echo
     while IFS= read -r f; do
       [ -z "$f" ] && continue
-      verdict="$(node - "$WT/$f" <<'NODE'
-// Classify a conflicted file: does taking develop's side lose anything staging
-// has? A purely textual subset test is not enough. A dependency pin that moved
-// on BOTH branches (staging took a hotfix bump, develop went further) has no
-// line in common, yet develop supersedes staging and taking develop's side is
-// correct. Calling that "staging carries content develop lacks" tells the
-// operator to downgrade develop, which is never right, and it would fire on
-// package.json / package-lock.json / Podfile.lock at every single release.
-const fs = require("fs");
-const lines = fs.readFileSync(process.argv[2], "utf8").split("\n");
-
-const VER = /\d+(?:\.\d+)+(?:[-+][0-9A-Za-z.-]+)?/g;
-// Lockfiles and Podfile.lock distinguish the same entry by CHECKSUM rather than
-// by version, so blank those too or every lockfile hunk reads as missing
-// content. A line that differs only in a version or a checksum is the same
-// entry at a different revision, not something only staging has.
-const HASH = /\b(?:sha\d+-[A-Za-z0-9+/=]{20,}|[0-9a-f]{32,})\b/g;
-// Strip version and checksum tokens so the same entry matches across revisions.
-const shape = (l) => l.trim().replace(HASH, "\u0000H\u0000").replace(VER, "\u0000V\u0000");
-const versionsOf = (l) => (l.trim().replace(HASH, "").match(VER) || []);
-const cmpVer = (a, b) => {
-  const pa = a.split(/[.+-]/).map(Number);
-  const pb = b.split(/[.+-]/).map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const x = pa[i] || 0, y = pb[i] || 0;
-    if (Number.isNaN(x) || Number.isNaN(y)) return 0;
-    if (x !== y) return x < y ? -1 : 1;
-  }
-  return 0;
-};
-
-let i = 0, hunks = 0, superseded = 0;
-const missing = [];
-while (i < lines.length) {
-  if (!lines[i].startsWith("<<<<<<< ")) { i++; continue; }
-  i++; const ours = [];
-  while (i < lines.length && !lines[i].startsWith("=======")) ours.push(lines[i++]);
-  i++; const theirs = [];
-  while (i < lines.length && !lines[i].startsWith(">>>>>>> ")) theirs.push(lines[i++]);
-  i++; hunks++;
-
-  const devExact = new Set(theirs.map((l) => l.trim()).filter(Boolean));
-  const devByShape = new Map();
-  for (const l of theirs) {
-    if (!l.trim()) continue;
-    const k = shape(l);
-    if (!devByShape.has(k)) devByShape.set(k, []);
-    devByShape.get(k).push(l);
-  }
-
-  for (const raw of ours) {
-    const l = raw.trim();
-    if (!l || devExact.has(l)) continue;
-    // Same entry, different version: develop wins as long as it is not older.
-    const twins = devByShape.get(shape(raw)) || [];
-    const sv = versionsOf(raw);
-    const newerOnDevelop = twins.some((t) => {
-      const tv = versionsOf(t);
-      return tv.length === sv.length && sv.every((v, n) => cmpVer(v, tv[n]) <= 0);
-    });
-    if (newerOnDevelop) { superseded++; continue; }
-    if (missing.length < 3) missing.push(l);
-  }
-}
-
-if (missing.length) {
-  console.log(`${hunks} hunk(s): staging carries content develop lacks, back-port it to develop first`);
-  for (const m of missing) console.log(`         only on staging: ${m.slice(0, 110)}`);
-} else if (superseded) {
-  console.log(`${hunks} hunk(s): develop supersedes staging (${superseded} entr(y/ies) at a newer version), taking develop's side loses nothing`);
-} else {
-  console.log(`${hunks} hunk(s): develop is a superset of staging, taking develop's side loses nothing`);
-}
-NODE
-)"
+      verdict="$(release_classify_conflict "$WT/$f" "$STAGING" "$DEVELOP")"
       printf '  %s\n' "$f"
       printf '%s\n' "$verdict" | sed 's/^/      /'
       case "$verdict" in
@@ -752,23 +601,9 @@ NODE
     die "merge --continue failed (full log: $MERGE_LOG)"
   fi
 
-  # `merge --continue` fires the repo's pre-commit hook, whose
-  # update-eslint-warnings step deletes every STAGED file from the warning list
-  # in eslint.config.mjs. A release merge stages develop's whole delta, so the
-  # hook strips entries develop still carries, staging leaves the cut with a
-  # different list than develop, and later cherry-picks of lint fixes conflict
-  # on the neighbouring lines. The merge commit carries the file as it was
-  # staged: put that back and amend. --no-verify, because the hook would strip
-  # it again; its tsc, lint and jest steps already passed on the stricter list.
-  # Only the hook's own rewrite is undone, so a staged file that differs from
-  # develop still reaches the parity gate as the drift it is.
-  HOOK_REWRITTEN="eslint.config.mjs"
-  if ! git -C "$WT" diff --quiet "$STAGED_TREE" HEAD -- "$HOOK_REWRITTEN"; then
-    git -C "$WT" checkout "$STAGED_TREE" -- "$HOOK_REWRITTEN" \
-      && git -C "$WT" commit --quiet --amend --no-edit --no-verify >>"$MERGE_LOG" 2>&1 \
-      || die "could not restore the staged $HOOK_REWRITTEN into the merge commit (full log: $MERGE_LOG)"
-    say "restored $HOOK_REWRITTEN as staged (the pre-commit hook rewrote it in the merge commit)"
-  fi
+  # `merge --continue` fires the repo's pre-commit hook; undo its eslint
+  # warning-list rewrite so later cherry-picks of lint fixes apply cleanly.
+  release_restore_hook_rewrites "$WT" "$STAGED_TREE" "$MERGE_LOG"
 fi
 if [ -n "$HAD_CONFLICTS" ]; then
   step Merge ok "$(git -C "$WT" rev-parse --short HEAD); CHANGELOG union-resolved, ${#RESOLVE_THEIRS[@]} file(s) cleared to develop"
@@ -828,23 +663,14 @@ if [ -n "$DRY_RUN" ]; then
 else
   hdr "Verify"
   VERIFY_LOG="$TMPROOT/staging-release-merge.$$.verify.log"
-  verify_once() { ( cd "$WT" && "$HOME/.cursor/skills/pm.sh" run verify ) >"$VERIFY_LOG" 2>&1; }
-  verify_ok=""
-  if verify_once; then
-    verify_ok=1
-  elif grep -qa "was terminated by another process: signal=SIGSEGV" "$VERIFY_LOG"; then
-    # A jest worker segfault is an infra flake, not a merge defect (the same
-    # suite passes in the commit chains). One retry before failing.
-    say "verify hit a jest-worker SIGSEGV; retrying once"
-    verify_once && verify_ok=2
-  fi
-  if [ "$verify_ok" = "2" ]; then
+  rc=0; release_verify "$WT" "$VERIFY_LOG" || rc=$?
+  if [ $rc -eq 3 ]; then
     step Verify ok "repo verify passed on the merge result (after one jest-worker SIGSEGV retry)"
-  elif [ -n "$verify_ok" ]; then
+  elif [ $rc -eq 0 ]; then
     step Verify ok "repo verify passed on the merge result"
   else
-    tail -30 "$TMPROOT/staging-release-merge.$$.verify.log" >&2
-    step Verify failed "repo verify failed, log $TMPROOT/staging-release-merge.$$.verify.log"
+    tail -30 "$VERIFY_LOG" >&2
+    step Verify failed "repo verify failed, log $VERIFY_LOG"
     die "verify failed on the merge result; nothing pushed"
   fi
 fi

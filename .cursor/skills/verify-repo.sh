@@ -179,12 +179,8 @@ function verifyChangelog() {
   }
   let sectionCount = 0;
 
-  const TYPE_ORDER = ["added", "changed", "deprecated", "fixed", "removed", "security"];
-
-  function entryType(line) {
-    const m = line.match(/^- (\w+):/i);
-    return m ? m[1].toLowerCase() : null;
-  }
+  // The entry type order is shared with changelog-union-merge.sh and the release scripts.
+  const { ENTRY_RE, orderErrors } = require(path.join(os.homedir(), ".cursor", "skills", "release-lib.js"));
 
   let currentSection = null;
   let sectionEntries = [];
@@ -212,18 +208,7 @@ function verifyChangelog() {
       seen.add(normalized);
     }
 
-    let lastTypeIdx = -1;
-    for (const { text, lineNum } of sectionEntries) {
-      const type = entryType(text);
-      if (type == null) continue;
-      const idx = TYPE_ORDER.indexOf(type);
-      if (idx === -1) continue;
-      if (idx < lastTypeIdx) {
-        const expected = TYPE_ORDER[lastTypeIdx];
-        errors.push(`Line ${lineNum}: "${type}" entry after "${expected}" in ${sectionLabel} — expected order: ${TYPE_ORDER.join(", ")}`);
-      }
-      lastTypeIdx = idx;
-    }
+    errors.push(...orderErrors(sectionEntries, sectionLabel));
   }
 
   for (let i = 0; i < lines.length; i++) {
@@ -264,7 +249,7 @@ function verifyChangelog() {
         currentSection === "unreleased" ||
         currentSection === "staging" ||
         currentSection === "legacy-top";
-      if (isActive && !line.match(/^- (added|changed|fixed|deprecated|removed|security):/i)) {
+      if (isActive && !ENTRY_RE.test(line)) {
         warnings.push(`Line ${lineNum}: Entry may not follow "- type: description" format`);
       }
     }
