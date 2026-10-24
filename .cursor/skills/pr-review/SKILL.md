@@ -17,15 +17,15 @@ metadata:
 <rule id="posting-gate">Posting is configured, never assumed. Default (no flag): present the formatted draft comments in chat and submit only after the user approves. `--comment`: submit without the ask. `--no-comment`: never submit; findings go to chat (and the run report in orch) only. In an orchestrated hands-off session the interactive ask is unavailable, so the default degrades to `--no-comment` with drafts delivered in the run report — post only when the task text explicitly directs posting.</rule>
 <rule id="review-event-mapping">A submitted review carries a real verdict, and AUTHORSHIP decides which events are legal. Step 1 resolves it (`gh api user --jq .login` vs `author`).
 
-ON A PR WE DO NOT AUTHOR: `REQUEST_CHANGES` when the review found something that must change before merge (a Critical or High finding: a real defect, a dropped guard, a broken caller). `APPROVE` when it found nothing, or nothing beyond nits, style preferences, and optional suggestions. Deliver the nits as inline comments on the approving review rather than withholding the verdict over them.
+ON A PR WE DO NOT AUTHOR: `REQUEST_CHANGES` when the review found something that must change before merge (a Critical or High finding: a real defect, a dropped guard, a broken caller). `APPROVE` when it found nothing, or nothing beyond nits, style preferences, and optional suggestions. Deliver the nits as inline comments on the approving review rather than withholding the verdict over them. A round where nothing survived curation still submits that `APPROVE` (step 6 gives its body).
 
 ON OUR OWN PR: `COMMENT` only. GitHub rejects a self-review verdict, so `APPROVE` or `REQUEST_CHANGES` there fails the API call instead of posting.
 
 YOUR STANDING VERDICT (`myStanding` in the context output) carries over between rounds, since GitHub keeps your latest verdict. When it is `CHANGES_REQUESTED`, check every `myStanding.blockingThreads` entry at the head: a confirmed fix gets a reply with `resolve: true`; one still present gets a "still present" reply and the round stays `REQUEST_CHANGES`. `submit` refuses an APPROVE that leaves any of those threads open. When every blocking thread is confirmed fixed, submit `APPROVE` with those replies even if the round found nothing new.
 
 `APPROVE` asserts that the review RAN and found no blocking defect. It is never a way to say "I did not look": a review that could not examine the diff, or whose workflow failed, submits nothing and says so. The mapping applies to every submission, whether `--comment` posted it directly or the user approved the draft first.</rule>
-<rule id="curation-owns-truth">Workflow findings are candidates, not conclusions. Before delivery, judge each against your own read of the diff: reject false positives (state the evidence), downgrade findings whose failure mode pre-exists the PR (say so in the comment), and drop findings that only restate a documented intent of the PR. Rejected findings reach the PR only per `rejected-on-own-prs`; everywhere else they go to chat/report. Parent-review findings (step 4b) get no independent verifier, so hold them to the same bar: each carries a concrete `failure_scenario` grounded in code you read, and curation re-judges them as strictly as workflow candidates.</rule>
-<rule id="rejected-on-own-prs">On a PR we author (`author == me`), every review this skill submits carries the findings curation rejected, as the curation-record block (step 5) in the review BODY, never as inline comments: an inline thread is an unresolved conversation that pr-address and one-shot's followup routing treat as work owed. A round whose findings were ALL rejected still submits, as a `COMMENT` review carrying only that block. Before listing a rejected finding, check your own earlier review bodies in `reviews[]`; one already listed there (same location, same claim) is not listed again, and a round left with nothing new submits nothing. On a PR we do not author, rejected findings stay in chat and the run report. `posting-gate` still decides whether any review submits at all.</rule>
+<rule id="curation-owns-truth">Workflow findings are candidates, not conclusions. Before delivery, judge each against your own read of the diff: reject false positives (state the evidence), downgrade findings whose failure mode pre-exists the PR (say so in the comment), and drop findings that only restate a documented intent of the PR. Rejected findings reach the PR only per `self-review-rejections`; everywhere else they go to chat/report. Parent-review findings (step 4b) get no independent verifier, so hold them to the same bar: each carries a concrete `failure_scenario` grounded in code you read, and curation re-judges them as strictly as workflow candidates.</rule>
+<rule id="self-review-rejections">Findings curation rejected reach the PR only as the curation-record block (step 5) in the review BODY, never as inline comments: an inline thread is an unresolved conversation that pr-address and one-shot's followup routing treat as work owed. The block goes on every review this skill submits on a PR we author (`author == me`), and on every `APPROVE` on a PR we do not author. On our own PR, a round whose findings were ALL rejected still submits, as a `COMMENT` review carrying only that block, and a round left with nothing new submits nothing. Before listing a rejected finding, check your own earlier review bodies in `reviews[]`; one already listed there (same location, same claim) is not listed again. A `REQUEST_CHANGES` on a PR we do not author leaves rejected findings in chat and the run report. `posting-gate` still decides whether any review submits at all.</rule>
 <rule id="independent-parent-review">The parent review (step 4b) runs WHILE the workflow runs and is finished before you read the workflow's result. Reading the workflow's candidates first anchors your pass on them and forfeits the independent second look that is the reason the pass exists.</rule>
 <rule id="batch-reads">When reviewing changed files, batch independent Read/Grep calls in a single message.</rule>
 <rule id="script-timeouts">The companion script may take up to 30s. Set `block_until_ms: 60000` when invoking it.</rule>
@@ -99,7 +99,7 @@ This sub-step is the extension point for Edge-specific review machinery (for exa
 <sub-step id="4c" name="Curate">
 Merge 4a + 4b into one findings set (a finding both passes raised counts once, and independent agreement raises confidence in it), then per `curation-owns-truth` and `no-duplicate-feedback`:
 1. Drop duplicates of feedback already on the PR (`reviews[]`, `inlineComments[]`).
-2. Reject false positives with cited evidence; keep the rejection list for the summary and, on our own PR, for the curation-record block (`rejected-on-own-prs`).
+2. Reject false positives with cited evidence; keep the rejection list for the summary and for the curation-record block wherever `self-review-rejections` puts it.
 3. Categorize survivors: **Critical** (must fix before merge), **Warning** (should address), **Suggestion** (consider).
 </sub-step>
 </step>
@@ -111,10 +111,10 @@ Merge 4a + 4b into one findings set (a finding both passes raised counts once, a
 - Keep comments concise, use backtick formatting for code, bold, or italics
 - Ordering/race findings: one mermaid block carries the mechanism (`diagram-escalation`)
 - Convention nits cite the published ruleset (the edge-dev-agents copy), never `~/.cursor/...` paths
-- 1 inline comment: leave `body` empty (`""`); 2+ inline comments: only add `body` if it provides necessary linking context. On our own PR the curation-record block below is the exception and always goes in `body`
+- 1 inline comment: leave `body` empty (`""`); 2+ inline comments: only add `body` if it provides necessary linking context. The curation-record block below is the exception and goes in `body` wherever `self-review-rejections` puts it
 </sub-step>
-<sub-step name="Curation record (our own PR only)">
-Appended to `body` per `rejected-on-own-prs`. One line per finding, `path:line` as of the reviewed head:
+<sub-step name="Curation record">
+Appended to `body` per `self-review-rejections`. One line per finding, `path:line` as of the reviewed head:
 
 ```markdown
 <details><summary>Rejected in curation (2)</summary>
@@ -158,7 +158,13 @@ Review JSON format:
 
 `replies` answer existing threads inside the same review; omit the key when there are none.
 
-0 findings after curation: no review is submitted (never an empty APPROVE), except the confirmed-fix APPROVE under `review-event-mapping` and the rejected-only `COMMENT` on our own PR under `rejected-on-own-prs`.
+0 findings after curation:
+1. On a PR we do not author → submit `APPROVE`. Its body is the coverage line, then the curation-record block when curation rejected anything:
+   ```markdown
+   Reviewed at `<short-sha>` (<level or quick>): nothing blocking.
+   ```
+   Pass the confirmed-fix `replies` (`review-event-mapping`) in the same payload. `submit` refuses a review with no body, comments, or replies, so this body is never left empty.
+2. On our own PR → the rejected-only `COMMENT` under `self-review-rejections`, or nothing.
 
 Drafts that wait for approval, or go into a run report for later posting, are pre-checked with the same payload plus `submit --check-only`: it runs every submit check (structure, anchors, prose lint) and posts nothing, so the approved draft is the one that posts.
 </step>
@@ -166,7 +172,7 @@ Drafts that wait for approval, or go into a run report for later posting, are pr
 <step id="7" name="Summarize">
 Provide a summary in the chat response:
 - Number of files reviewed, depth used (level or quick)
-- Findings by category (critical, warning, suggestion), plus the rejected-false-positive list with one-line reasons (on our own PR, say they were posted in the review body)
+- Findings by category (critical, warning, suggestion), plus the rejected-false-positive list with one-line reasons (say whether they were posted in the review body)
 - What was posted (link to the submitted review) or that drafts await approval / posting was off
 - PR link as `[PR title](url)`
 </step>

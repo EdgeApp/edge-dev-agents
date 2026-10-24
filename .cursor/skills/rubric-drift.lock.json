@@ -739,13 +739,13 @@
       ]
     },
     "one-shot:post-record-to-own-pr": {
-      "hash": "bedda6881b63",
+      "hash": "75d312e6b345",
       "dims": [
         "A36"
       ]
     },
-    "pr-review:rejected-on-own-prs": {
-      "hash": "a1ccad3c5509",
+    "pr-review:self-review-rejections": {
+      "hash": "5e456735671b",
       "dims": [
         "A36"
       ]
@@ -1643,8 +1643,8 @@
       "hash": "1d516f2f48de"
     },
     "task-run:review-field-routes": {
-      "reason": "2026-10-06: 2026-10-06: graded at completion by completion-judge J1 (rubric.md Task-deliverable agent_review clause); findings-comment shape change (link the review, list rejections only on non-owned PRs) is report content, not a judged gate",
-      "hash": "5841fd13cd47"
+      "reason": "2026-10-20: findings-comment wording only; review posting is graded via pr-review rules",
+      "hash": "ac0cbc71a863"
     },
     "asana-task-update:qa-subtasks": {
       "reason": "2026-10-08: mechanically enforced by asana-task-update.sh (QA_SUBTASKS_REQUIRED gate; QA_NOT_PLAIN check); writing rules owned by pr-land references/qa-writeup.md",
