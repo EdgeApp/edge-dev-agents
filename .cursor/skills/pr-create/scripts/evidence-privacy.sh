@@ -3,7 +3,7 @@
 # and write hatched copies. Local only: macOS Vision OCR, no network calls.
 #
 # The classes are defined by the rule `redact-secrets-before-attach`
-# (build-and-test references/drive.md); evidence-privacy.js reads frames
+# (build-and-test references/evidence.md); evidence-privacy.js reads frames
 # against it and documents every subcommand and the record format.
 #
 # Usage:

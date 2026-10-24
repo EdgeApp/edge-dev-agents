@@ -971,8 +971,8 @@
       "hash": "ae8c4248ab5a"
     },
     "build-and-test:maestro-flows-are-shortcuts": {
-      "reason": "2026-10-08: two topics split out verbatim into explore-on-interpreter-prove-on-flow and playbook-and-flow-proposals; guidance only, the drive outcome is graded by testing-depth",
-      "hash": "5fd4676ebc17"
+      "reason": "2026-10-24: 2026-10-24: dropped the bullet that only pointed at explore-on-interpreter-prove-on-flow and playbook-and-flow-proposals; guidance only, the drive outcome is graded by testing-depth",
+      "hash": "f06f48e1d7c5"
     },
     "build-and-test:proof-screenshots-for-pr": {
       "reason": "2026-10-10: capture bullet aligned to drive explore-on-interpreter-prove-on-flow (proof from a CLI flow run, never an MCP screenshot), which already graded it; no separate dimension",
@@ -1663,8 +1663,8 @@
       "hash": "b187b1601553"
     },
     "build-and-test:ios-flows-run-on-xcuitest": {
-      "reason": "2026-10-08: one citation repointed to explore-on-interpreter-prove-on-flow; driver choice is not graded, the drive outcome is",
-      "hash": "2de4b066b018"
+      "reason": "2026-10-24: 2026-10-24: dropped a sentence that only pointed at explore-on-interpreter-prove-on-flow; driver choice is not graded, the drive outcome is",
+      "hash": "d6c3ed95de34"
     },
     "build-and-test:app-config-files": {
       "reason": "2026-10-06: reference map of where gui config lives per branch; the copy it describes is graded under O8 workspace-status-contract",

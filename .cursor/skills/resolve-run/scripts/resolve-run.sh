@@ -75,19 +75,21 @@ discover() {
 }
 
 # ---- per-gid resolution ----
-asana_fetch() { # $1=gid → JSON {name,status,blocked} (or status=__MISSING__ / __NO_AUTH__)
+asana_fetch() { # $1=gid → JSON {name,status,blocked,deliverable} (or status=__MISSING__ / __NO_AUTH__)
   local gid="$1" token
   token="${ASANA_TOKEN:-$(jq -r '.asana_token // empty' "$CRED" 2>/dev/null)}"
   [ -n "$token" ] || { echo '{"name":null,"status":"__NO_AUTH__","blocked":null}'; return 0; }
   local resp; resp=$(curl -sf --max-time 20 "https://app.asana.com/api/1.0/tasks/$gid?opt_fields=name,custom_fields.name,custom_fields.gid,custom_fields.display_value" \
     -H "Authorization: Bearer $token" 2>/dev/null) || { echo '{"name":null,"status":"__MISSING__","blocked":null}'; return 0; }
-  local ag_gid bl_gid
+  local ag_gid bl_gid dl_gid
+  dl_gid=$(jq -r '.custom_fields.agent_deliverable.gid // empty' "$CONFIG" 2>/dev/null)
   ag_gid=$(jq -r '.custom_fields.agent_status.field_gid // .custom_fields.agent_status.gid // empty' "$CONFIG" 2>/dev/null)
   bl_gid=$(jq -r '.custom_fields.blocked.field_gid // .custom_fields.blocked.gid // empty' "$CONFIG" 2>/dev/null)
-  echo "$resp" | jq -c --arg ag "$ag_gid" --arg bl "$bl_gid" '{
+  echo "$resp" | jq -c --arg ag "$ag_gid" --arg bl "$bl_gid" --arg dl "$dl_gid" '{
     name: .data.name,
     status: (first(.data.custom_fields[]? | select((.gid == $ag) or ((.name // "") | ascii_downcase | test("agent.?status"))) | .display_value) // null),
-    blocked: (first(.data.custom_fields[]? | select((.gid == $bl) or ((.name // "") | ascii_downcase == "blocked")) | .display_value) // null)
+    blocked: (first(.data.custom_fields[]? | select((.gid == $bl) or ((.name // "") | ascii_downcase == "blocked")) | .display_value) // null),
+    deliverable: (first(.data.custom_fields[]? | select((.gid == $dl) or ((.name // "") == "agent_deliverable")) | .display_value) // null)
   }'
 }
 
@@ -446,8 +448,20 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
   local jlog; jlog=$(. "$HOME/.config/agent-watcher/lib/judge-log.sh" && judge_log_path "$gid")
   [ -r "$jlog" ] && judge_log=$(jq -cs . "$jlog" 2>/dev/null || echo "[]")
 
+  # Run shape: /one-shot (PR) or /task-run (Task). The transcript head records
+  # what actually ran (same JSON-string anchoring as lib/run-signature.sh, so a
+  # quoted skill body never matches); the live agent_deliverable field covers a
+  # run with no transcript and may have been flipped after the run. PR default,
+  # as in asana-watcher.js getDeliverable.
+  local deliverable="PR"
+  if [ -n "$transcript" ] && head -50 "$transcript" 2>/dev/null | grep -E '"/task-run --yolo|<command-name>/task-run</command-name>' >/dev/null; then
+    deliverable="Task"
+  elif [ -z "$transcript" ] && [ "$(echo "$asana" | jq -r '.deliverable // ""' | cut -c1-4)" = "Task" ]; then
+    deliverable="Task"
+  fi
+
   jq -cn \
-    --arg gid "$gid" --arg name_hint "$name_hint" --arg spawned "$spawned" \
+    --arg gid "$gid" --arg deliverable "$deliverable" --arg name_hint "$name_hint" --arg spawned "$spawned" \
     --arg session_state "$session_state" --arg tmux_session "$tmux_session" \
     --arg transcript "$transcript" --arg ws "$win_start" --arg we "$win_end" \
     --arg worktree "$worktree" --arg repo "$repo" --arg branch "$branch" \
@@ -473,6 +487,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       worktree: (if $worktree == "" then null else $worktree end),
       repo: (if $repo == "" then null else $repo end),
       branch: (if $branch == "" then null else $branch end),
+      deliverable: $deliverable,
       prs: $prs,
       slot: $slot,
       pool_entry: $pool,
@@ -487,6 +502,7 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
       friction: ($probe_index.friction // {}),
       probe_index: ($probe_index | del(.friction)),
       auto_na: ( {}
+        + (if $deliverable == "Task" then {A10: "Task deliverable: no PR to attach", A12: "Task deliverable: no commits", A13: "Task deliverable: no PR", A14: "Task deliverable: no PR review threads", A21: "Task deliverable: no shipped change to exercise (findings comment is graded instead)", A24: "Task deliverable: no PR threads to address", A25: "Task deliverable: no PR diff", A34: "Task deliverable: no CHANGELOG"} else {} end)
         + (if ($prs | length) == 0 then {A13: "no PR created this run", A14: "no PR, so no review threads to address"} else {} end)
         + (if (($probe_index.pr_land.count // 0) == 0) then {A15: "pr-land never invoked"} else {} end)
         + (if $followup.last_report_attached_at == null

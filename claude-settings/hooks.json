@@ -11,6 +11,11 @@
           "command": "~/.config/agent-watcher/hooks/refresh-report-judge-section.sh",
           "timeout": 120,
           "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/cap-skill-slice-size.sh",
+          "timeout": 10,
+          "type": "command"
         }
       ],
       "matcher": "Bash"
@@ -261,6 +266,11 @@
         {
           "command": "~/.config/agent-watcher/hooks/lint-md-on-write.sh",
           "timeout": 30,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/cap-skill-slice-size.sh",
+          "timeout": 10,
           "type": "command"
         }
       ],

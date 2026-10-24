@@ -40,6 +40,9 @@ const cohortInstructions = (input && input.cohortInstructions) || null
 // mode 'transcript': the full pass (agent-eval process dimensions + orch-eval).
 const mode = (input && input.mode) === 'transcript' ? 'transcript' : 'report'
 const profile = mode === 'report' ? 'report' : ((input && input.profile) || null)
+// a Task deliverable (/task-run, manifest `deliverable`) grades against agent-eval's
+// task-report profile: the findings comment is the deliverable, there is no PR.
+const profileFor = m => (mode === 'report' && m.deliverable === 'Task') ? 'task-report' : profile
 
 // Per-stage model defaults (operator policy 2026-07-29), each beaten by args.model:
 //   report-eval agents  -> sonnet (report-vs-API comparison; opus is wasted, haiku
@@ -52,7 +55,7 @@ const VERIFY_OPT = { ...(MODEL ? MOPT : { model: 'sonnet' }), effort: 'low' }
 const SYNTH_OPT = MOPT
 
 const needsTranscript = mode === 'transcript'
-// Thin references (__fetch_full) can't be pre-filtered here — the agent resolves
+// Thin references (__fetch_full) carry `deliverable` (profileFor reads it) but can't be pre-filtered here — the agent resolves
 // the manifest itself and honors skip-in-flight / reports no-report as escalation.
 const evaluable = manifests.filter(m => m.__fetch_full || (!m.in_flight && (needsTranscript ? m.transcript : m.run_report)))
 const skipped = manifests.filter(m => !m.__fetch_full && (m.in_flight || (needsTranscript ? !m.transcript : !m.run_report)))
@@ -126,7 +129,7 @@ const COHORT_SCHEMA = {
 
 const GATES = { 'A3': 'completion-honesty', 'A16': 'halt-discipline', 'O2': 'no-fork-storm', 'O3': 'no-memory-critical' }
 
-const evalPrompt = (skill, m) =>
+const evalPrompt = (skill, m, profile = profileFor(m)) =>
   `You are running the /${skill} evaluation for ONE orchestrated agent run.\n` +
   `Read ~/.cursor/skills/${skill}/SKILL.md FIRST, then the rubric: ` +
   (profile && skill === 'agent-eval'
@@ -152,7 +155,7 @@ const evalPrompt = (skill, m) =>
     ? `TARGETED PROFILE "${profile}": grade ONLY the dimensions that profile names in your skill's <profiles> block. ` +
       `Every other dimension is OUT OF SCOPE for this run — do not emit it (not even as NA), do not gather its evidence. ` +
       `Return each in-profile dimension exactly once, with BOTH its id and its rubric name.` +
-      (profile === 'report'
+      (mode === 'report'
         ? ` REPORT-EVAL HARD CONSTRAINT: the transcript is NEVER opened — not one grep. Evidence is the run-report ` +
           `attachment + live GitHub/Asana APIs + the manifest's zero-LLM fields (friction, versions) only; anything ` +
           `needing the transcript is NOT_CAPTURED. ALWAYS return the escalate object per the profile's heuristics ` +

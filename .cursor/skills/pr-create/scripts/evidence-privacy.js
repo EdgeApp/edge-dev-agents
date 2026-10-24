@@ -3,7 +3,7 @@
 // Run it through evidence-privacy.sh, which builds the Vision reader this needs.
 //
 // The definition of private content belongs to the rule
-// `redact-secrets-before-attach` (build-and-test references/drive.md). This
+// `redact-secrets-before-attach` (build-and-test references/evidence.md). This
 // file is its mechanical reading, with two classes:
 //   SECRET    a wallet seed or mnemonic, a private key, a cleartext password,
 //             an OTP or 2FA code. The frame may not be published.

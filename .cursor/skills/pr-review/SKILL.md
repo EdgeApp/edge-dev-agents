@@ -27,11 +27,12 @@ YOUR STANDING VERDICT (`myStanding` in the context output) carries over between 
 <rule id="curation-owns-truth">Workflow findings are candidates, not conclusions. Before delivery, judge each against your own read of the diff: reject false positives (state the evidence), downgrade findings whose failure mode pre-exists the PR (say so in the comment), and drop findings that only restate a documented intent of the PR. Rejected findings reach the PR only per `self-review-rejections`; everywhere else they go to chat/report. Parent-review findings (step 4b) get no independent verifier, so hold them to the same bar: each carries a concrete `failure_scenario` grounded in code you read, and curation re-judges them as strictly as workflow candidates.</rule>
 <rule id="self-review-rejections">Findings curation rejected reach the PR only as the curation-record block (step 5) in the review BODY, never as inline comments: an inline thread is an unresolved conversation that pr-address and one-shot's followup routing treat as work owed. The block goes on every review this skill submits on a PR we author (`author == me`), and on every `APPROVE` on a PR we do not author. On our own PR, a round whose findings were ALL rejected still submits, as a `COMMENT` review carrying only that block, and a round left with nothing new submits nothing. Before listing a rejected finding, check your own earlier review bodies in `reviews[]`; one already listed there (same location, same claim) is not listed again. A `REQUEST_CHANGES` on a PR we do not author leaves rejected findings in chat and the run report. `posting-gate` still decides whether any review submits at all.</rule>
 <rule id="finding-tags">Every inline finding names what produced it, so acceptance can be counted per rule. Each comment in the Review JSON carries `tag`; `submit` appends it to the comment body as a hidden last line, `<!-- pr-review:tag=<tag> -->` (an HTML comment, which GitHub does not render), and `render` prints the same payload without posting. Pick the tag in this order:
-1. `rule:<id>` when the finding is a violation of review-standards.mdc or typescript-standards.mdc: the `id` of its `<rule>`, `<standard>` or `<pattern>` element. A workflow finding that turns out to be a standards violation takes the rule, not its lens.
-2. `lens:<name>` for a workflow finding that cites no rule: the finding's `lens` from 4a. Correctness lenses are `line-by-line`, `removed-behavior`, `cross-file`, `language-pitfall`, `wrapper-proxy` and `gap-sweep`; cleanup lenses are `reuse`, `simplification`, `efficiency`, `altitude` and `conventions`.
+1. `rule:<id>` when the finding is a violation of review-standards.mdc or typescript-standards.mdc (the `id` of its `<rule>`, `<standard>` or `<pattern>` element) or of a feature rule in step 3's manifest (its `rules[].id`). A workflow or lens finding that turns out to be a rule violation takes the rule, not its lens.
+2. `lens:<name>` for a finding that cites no rule: the finding's `lens` from 4a, or the feature lens whose 4b agent raised it. Workflow correctness lenses are `line-by-line`, `removed-behavior`, `cross-file`, `language-pitfall`, `wrapper-proxy` and `gap-sweep`; cleanup lenses are `reuse`, `simplification`, `efficiency`, `altitude` and `conventions`; feature lenses are the manifest's `lenses[]` names other than `correctness`.
 3. `general` for everything else: parent-review general code review findings, and a workflow finding with no `lens`.
-A finding both passes raised takes the more specific tag. Never write the marker into a body yourself. `submit` and `render` refuse a comment whose tag is missing, malformed, or names an unknown rule id or lens. Replies and the review body carry no tag.</rule>
+A finding both passes raised takes the more specific tag. Never write the marker into a body yourself. `submit` and `render` refuse a comment whose tag is missing, malformed, or names an unknown rule id or lens; feature rule ids and feature lenses are known only through `--features <manifest>` (step 6). Replies and the review body carry no tag.</rule>
 <rule id="independent-parent-review">The parent review (step 4b) runs WHILE the workflow runs and is finished before you read the workflow's result. Reading the workflow's candidates first anchors your pass on them and forfeits the independent second look that is the reason the pass exists.</rule>
+<rule id="features-from-base">Feature rules and lenses come only from step 3's manifest, which the companion script builds from the PR's changed files and the features tree at the base branch. Never route by reading feature files from the PR checkout or `~/.cursor`, and never add or drop a feature, rule or lens by judgment: the manifest is the whole feature scope of the review.</rule>
 <rule id="batch-reads">When reviewing changed files, batch independent Read/Grep calls in a single message.</rule>
 <rule id="script-timeouts">The companion script may take up to 30s. Set `block_until_ms: 60000` when invoking it.</rule>
 <rule id="diagram-escalation">Comments stay concise per the formatting sub-step. EXCEPTION: when a finding explains ordering, a race, or state-machine behavior — anything where the reader would otherwise simulate event interleavings — carry the mechanism in ONE ```mermaid block inside the comment (GitHub renders mermaid natively) and keep the surrounding prose concise. Sequence diagram for cross-component ordering, flowchart for gates. Participant IDs must not be mermaid keywords; tdd's `diagrams-and-signatures` rule owns the pitfall list. Never more than one diagram per comment; a finding that does not involve ordering stays prose-only.</rule>
@@ -45,6 +46,7 @@ A finding both passes raised takes the more specific tag. Never write the marker
 - `effort=low|medium|high|xhigh|max|inherit` — the workflow's fan-out reasoning effort (default: the level's own); passed through verbatim.
 - Convention: dashed flags (`--quick`, `--level`, `--comment`) are this skill's; `key=value` tokens are the workflow's and reach it unchanged in step 4a's `args`.
 - `--comment` / `--no-comment` — posting config per `posting-gate`.
+- `--candidates` — also load `candidate` features (step 3 passes it to `features`), to trial a feature before it goes `active`. Forces `--no-comment`.
 </flags>
 
 <step id="1" name="Gather PR context">
@@ -71,11 +73,17 @@ git fetch origin <headRef> && git checkout <headRef>
 If checkout fails due to uncommitted changes, prompt the user to stash or commit before proceeding. (The deep workflow's scope agent fetches its own refs; this checkout serves steps 4b and 5.)
 </step>
 
-<step id="3" name="Load review standards">
-Read these files in parallel (skip any already present in context):
+<step id="3" name="Load review standards and features">
+In ONE message, run the feature router and read the standards (skip a standards file already in context):
+
+```bash
+~/.cursor/skills/pr-review/scripts/github-pr-review.sh features --pr <number> --owner <owner> --repo <repo> [--candidates] > /tmp/pr-review-features-<repo>-<number>.json
+```
 
 - `~/.cursor/rules/review-standards.mdc`
 - `~/.cursor/rules/typescript-standards.mdc`
+
+The manifest file is the review's feature scope (`features-from-base`; the routing semantics live in `features/README.md`). Its `rules[]` are judgment rules on top of the standards, each applying to the changed files its `scope` matches. Its `lenses[]` always starts with `correctness` (4a plus the parent review); every other entry is a feature lens that 4b spawns. A manifest with `configFound: false`, or with no matched features, is the correctness-only review: no feature rules, no lens agents. Note `features[].name` and `shadow[]` for the step 7 summary.
 </step>
 
 <step id="4" name="Analyze">
@@ -98,11 +106,13 @@ Your own review of the diff, on the session model, independent of the workflow. 
 
 Record each finding with file, line, summary, a concrete `failure_scenario`, and its tag (`rule:<id>` for an Edge-conventions finding, `general` otherwise, per `finding-tags`) before moving to 4c. Overlap with the workflow is expected and resolved in curation, so do not narrow this pass to avoid it.
 
-This sub-step is the extension point for Edge-specific review machinery (for example a catalog of known review dimensions fanned out to cheaper checkers): add such lenses here, feeding the same findings shape.
+Apply the manifest's `rules[]` in the Edge conventions lens too: a violation is tagged `rule:<feature-rule-id>`.
+
+Feature lenses: for each manifest `lenses[]` entry other than `correctness`, spawn one Agent with `model: "sonnet"`, all in one message, before your own pass so they run alongside it. Each prompt carries the PR URL and head sha, the lens `name` and `focus`, the `matchedFiles` of the features in its `features` list, and those features' `rules[]` (id, rule, severity, scope); it asks for findings with file, line, summary, `failure_scenario`, and the rule id when one applies, citing code the agent read. Their findings are part of this pass: tag each `rule:<id>` when it cites a manifest rule, otherwise `lens:<name>`, and have them all written down before reading the workflow result (`independent-parent-review`). No feature lens in the manifest means no agents.
 </sub-step>
 
 <sub-step id="4c" name="Curate">
-Merge 4a + 4b into one findings set (a finding both passes raised counts once, and independent agreement raises confidence in it), then per `curation-owns-truth` and `no-duplicate-feedback`:
+Merge 4a + 4b (feature lens findings included) into one findings set (a finding both passes raised counts once, and independent agreement raises confidence in it), then per `curation-owns-truth` and `no-duplicate-feedback`:
 1. Drop duplicates of feedback already on the PR (`reviews[]`, `inlineComments[]`).
 2. Reject false positives with cited evidence; keep the rejection list for the summary and for the curation-record block wherever `self-review-rejections` puts it.
 3. Categorize survivors: **Critical** (must fix before merge), **Warning** (should address), **Suggestion** (consider).
@@ -139,7 +149,7 @@ Resolve the posting decision per `posting-gate`:
 
 1. `--no-comment` (or orch default) → do not submit. Build the same Review JSON a submit would send and print it through `render`, which shows every draft comment ending in its tag marker; that output goes to chat / the run report. Done, go to step 7.
    ```bash
-   echo '<review-json>' | ~/.cursor/skills/pr-review/scripts/github-pr-review.sh render
+   echo '<review-json>' | ~/.cursor/skills/pr-review/scripts/github-pr-review.sh render --features /tmp/pr-review-features-<repo>-<number>.json
    ```
 2. Default interactive → show the drafts (grouped per PR file/line, with category), ask for approval, then submit the approved subset.
 3. `--comment` → submit directly.
@@ -148,8 +158,11 @@ Submit via the companion script with the event per the event-mapping rule (`revi
 
 ```bash
 echo '<review-json>' | ~/.cursor/skills/pr-review/scripts/github-pr-review.sh submit \
-  --pr <number> --owner <owner> --repo <repo> --sha <headSha>
+  --pr <number> --owner <owner> --repo <repo> --sha <headSha> \
+  --features /tmp/pr-review-features-<repo>-<number>.json
 ```
+
+`render`, `submit` and `submit --check-only` always take the step 3 manifest as `--features`, so the feature rule ids and lenses it loaded are valid tags.
 
 Review JSON format:
 ```json
@@ -181,6 +194,7 @@ Drafts that wait for approval, or go into a run report for later posting, are pr
 <step id="7" name="Summarize">
 Provide a summary in the chat response:
 - Number of files reviewed, depth used (level or quick)
+- Features matched (names, with the feature lenses spawned), or "no feature matched: correctness only"; shadow matches when `shadow[]` is non-empty
 - Findings by category (critical, warning, suggestion), plus the rejected-false-positive list with one-line reasons (say whether they were posted in the review body)
 - What was posted (link to the submitted review) or that drafts await approval / posting was off
 - PR link as `[PR title](url)`
@@ -193,12 +207,15 @@ Provide a summary in the chat response:
 <case name="Server repo">If the repository name ends in `-server` or context indicates a server project, also review against the Server Conventions section in review-standards.mdc.</case>
 <case name="Workflow unavailable or fails">If the Workflow tool is unavailable or the run errors, report it and continue with the parent review alone and say in the summary that depth was degraded. Do not silently claim deep coverage.</case>
 <case name="Your pending draft on the PR" id="pending-draft-adopted">`myPendingReview` set means the operator left an unsubmitted draft. Do not copy its comments into the payload and do not delete it: `submit` takes it over, publishing it with this review (or ahead of it when it is pinned to an older commit), and prints the draft action, which `--check-only` also shows. Dedupe findings against the draft's comments, and name the draft action in the summary and run report.</case>
+<case name="Features step fails">A non-zero `features` exit (gh failure, or a schema error in the base branch's features files) falls under `no-script-bypass`: report the error and stop. A missing features.yaml is not a failure; it routes to correctness only.</case>
 <case name="Multiple PRs named">Run steps 1-4 per PR (workflows may run in parallel); curate and deliver per PR. One approval ask covers all drafts.</case>
 </edge-cases>
 
 <reference>
 The path diagram (also synced to edge-dev-agents): `~/.cursor/skills/pr-review/review-path.md`.
+Feature routing: `features/README.md` (features.yaml and rule-file schema, glob semantics, statuses, base-branch read), `features/lenses.yaml` (lens catalog), loader `scripts/feature-routing.rb` (`validate --repo <repo> --root <dir>` checks a features tree before it ships).
 Review-comment mining (not part of the review path): `scripts/mine-review-comments.py` exports every review thread on an org's PRs merged in a date window as JSONL (one row per thread, root plus replies, each comment tagged human, operator or bot) with a counts summary, for rule-gap and acceptance-rate analysis. Read-only GraphQL through `gh`; per-PR responses cache under `<out>/cache/`. Author logins come from `~/.config/pr-review/mining/accounts.json` (machine-local, never synced); `scripts/mining-accounts.example.json` is the template. Defaults: EdgeApp, 2025-10-23 to 2026-10-23, output `~/.config/pr-review/mining/`.
 Replay comparator (not part of the review path): `scripts/replay-compare.js --findings <file|dir>` scores replayed findings against the human comments in that export (inline threads, review-summary points, conversation comments) with a Sonnet judge through `claude -p`, and writes recall, precision, signal-to-noise and per-tag counts per PR and per label to `~/.config/pr-review/replay-compare/runs/<ts>/`. No GitHub calls; held-out PRs (number mod 3 == 2) need `--allow-held-out`. Usage and input shapes are in the script header.
+
 Replay runner (not part of the review path): `scripts/replay-snapshot.py --repo <name> --pr <N>` builds `~/.config/pr-review/replay/snapshots/<repo>-<N>/` from the mining clones: a git repo holding only the base commit and the PR's commits up to the first-reviewed one, plus `meta.json`. `scripts/replay-pr-review.sh --snapshot <repo-N> --eda <sha> [--level <level>]` runs this skill at a pinned edge-dev-agents commit against that snapshot, offline, and writes `findings.json` (the comparator's input shape) under `~/.config/pr-review/replay/runs/`. `scripts/test-replay-offline.sh [--canary]` proves the replay environment makes no GitHub call. Held-out PRs need `--allow-held-out` (snapshot) and `REPLAY_ALLOW_HELD_OUT=1` (runner).
 </reference>

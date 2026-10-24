@@ -11,7 +11,9 @@ Synthesize always have.
 
 The workflow is one of two review passes. /pr-review's step 4b runs a parent
 review on the session model in parallel (general code review plus Edge
-conventions, at every level), and step 4c curates both sets together.
+conventions, at every level), plus one Sonnet agent per feature lens that step
+3's feature manifest spawns (none when no feature matches), and step 4c curates
+both sets together.
 
 ```mermaid
 flowchart LR

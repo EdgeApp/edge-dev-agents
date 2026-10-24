@@ -1,0 +1,26 @@
+# Test fixture for pr-review-feature-routing.test.py. One feature per status,
+# plus globs that exercise dir/**, ! exclusion, {a,b} and single-directory *.
+features:
+  - name: Swap
+    paths:
+      - src/swap/**
+      - '!src/**/__tests__/**'
+    owners: [swap-owner]
+    lenses: [amount-precision]
+    rules: swap.rules.yaml
+    status: active
+  - name: Stealth
+    paths:
+      - src/components/scenes/Stealth*.tsx
+      - src/{util,hooks}/stealth/*.ts
+    lenses: [keys-security, amount-precision]
+    rules: stealth.rules.yaml
+    status: active
+  - name: Docs
+    paths: [docs/**/*.md]
+    lenses: [keys-security]
+    status: candidate
+  - name: Legacy
+    paths: [src/**]
+    lenses: [keys-security]
+    status: retired

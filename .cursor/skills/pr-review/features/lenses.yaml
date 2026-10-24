@@ -1,0 +1,34 @@
+# Review lenses a feature can list in features.yaml. /pr-review step 4b spawns one
+# checker per lens the matched features name. correctness is not listed here: it
+# always runs (the deep workflow plus the parent review, removed-behavior included).
+# A lens joins this catalog only after a cluster of human-caught misses that the
+# existing lenses did not flag, backed by 3+ real replay cases.
+lenses:
+  - name: keys-security
+    focus: >-
+      Key material, seeds, signing and secrets. Look for private data that reaches
+      logs, analytics, error reports or disk unencrypted; signing or broadcast paths
+      that skip a confirmation or validation; auth tokens or API keys committed or
+      sent to the wrong host.
+  - name: amount-precision
+    focus: >-
+      Crypto and fiat amount math. Look for floating-point arithmetic on amounts,
+      denomination or decimal-place mixups (native vs display units), rounding in the
+      user's disfavor, lost precision through Number or parseFloat, and fee or
+      exchange-rate math that can go negative or divide by zero.
+  - name: i18n
+    focus: >-
+      User-facing strings and locale formats. Look for hard-coded English in UI code,
+      strings concatenated instead of templated, locale keys added in code but not to
+      the string files (or the reverse), and dates, numbers or currency formatted
+      without the locale helpers.
+  - name: test-coverage
+    focus: >-
+      Tests for the behavior the diff adds or changes. Look for new guards, branches
+      and error paths no test exercises, tests that assert on mocks instead of
+      behavior, and snapshot updates that hide a behavior change.
+  - name: docs-changelog
+    focus: >-
+      Documentation that must move with the code. Look for a missing or misplaced
+      CHANGELOG entry for a user-visible change, docs or architecture notes the diff
+      makes stale, and comments that now describe the old behavior.

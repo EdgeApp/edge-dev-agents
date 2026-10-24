@@ -15,6 +15,14 @@
 #   render   Review JSON on stdin -> the payload as it would post (tag markers appended to
 #            the comment bodies) on stdout, plus a per-tag count on stderr. Same payload and
 #            tag checks as submit; no GitHub call, so a --no-comment dry run can print it.
+#   features --pr <n> --owner <o> --repo <r> [--candidates]   Route the PR's changed files
+#            (gh pr diff --name-only) to the repo's review features and print the manifest
+#            on stdout (feature-routing.rb route; its header owns the manifest shape). The
+#            features tree is read from FEATURES_SLUG at FEATURES_REF, or at the PR's base
+#            branch when the PR is on FEATURES_SLUG itself: never from the PR head.
+#
+# submit and render take --features <manifest>: the rule ids and lenses that manifest loaded
+# are valid tags for that review, on top of the standards ids and TAG_LENSES.
 #
 # Review JSON: { event, body, comments: [{path, line, body, tag, start_line?, side?, start_side?}],
 #                replies: [{thread_id, body, resolve?}] }
@@ -24,7 +32,8 @@
 # Finding tags (pr-review `finding-tags`): every inline comment carries a `tag` naming what
 # produced the finding, and submit/render append it to the comment body as a hidden marker
 # on its own last line, `<!-- pr-review:tag=<tag> -->`, which GitHub does not render. A tag is
-# `rule:<id>` (an id from STANDARDS_FILES), `lens:<name>` (one of TAG_LENSES), or `general`.
+# `rule:<id>` (an id from STANDARDS_FILES or the --features manifest), `lens:<name>` (one of
+# TAG_LENSES or a lens the manifest spawned), or `general`.
 # A body that already ends with that same marker is left alone; a body holding a different
 # marker is refused. Replies and the review body carry no tag.
 #
@@ -48,7 +57,7 @@ set -euo pipefail
 CMD="${1:-}"
 shift || true
 
-OWNER="" REPO="" PR="" SHA="" CHECK_ONLY=""
+OWNER="" REPO="" PR="" SHA="" CHECK_ONLY="" FEATURES="" CANDIDATES=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --owner) OWNER="$2"; shift 2 ;;
@@ -56,6 +65,8 @@ while [[ $# -gt 0 ]]; do
     --pr) PR="$2"; shift 2 ;;
     --sha) SHA="$2"; shift 2 ;;
     --check-only) CHECK_ONLY=1; shift ;;
+    --features) FEATURES="$2"; shift 2 ;;
+    --candidates) CANDIDATES=1; shift ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -105,8 +116,8 @@ fetch_threads() { # owner repo number -> JSON array of raw thread nodes on stdou
 
 STANDARDS_FILES=("$HOME/.cursor/rules/review-standards.mdc" "$HOME/.cursor/rules/typescript-standards.mdc")
 # Lens names: code-review-sonnet's (ANGLE_LENS, CLEANUP_LENSES, SWEEP_LENS in
-# ~/.claude/workflows/code-review-sonnet.js). A lens added there or in pr-review
-# step 4b is added here too.
+# ~/.claude/workflows/code-review-sonnet.js). A lens added there is added here too;
+# feature lenses (features/lenses.yaml) are valid tags through --features instead.
 TAG_LENSES='["line-by-line","removed-behavior","cross-file","language-pitfall","wrapper-proxy","gap-sweep","reuse","simplification","efficiency","altitude","conventions"]'
 
 rule_ids_json() { # -> JSON array of the rule/standard/pattern ids in STANDARDS_FILES
@@ -114,14 +125,28 @@ rule_ids_json() { # -> JSON array of the rule/standard/pattern ids in STANDARDS_
     | sed -E 's/.*id="//; s/"$//' | jq -R . | jq -s .
 }
 
+# Feature routing: the features tree lives in FEATURES_SLUG (the edge-dev-agents
+# copy of ~/.cursor/skills/pr-review/features) and is read at FEATURES_REF. The
+# env overrides exist for tests.
+FEATURES_SLUG="${PR_REVIEW_FEATURES_SLUG:-EdgeApp/edge-dev-agents}"
+FEATURES_REF="${PR_REVIEW_FEATURES_REF:-main}"
+FEATURE_ROUTER="$(dirname "$0")/feature-routing.rb"
+
+feature_tags_json() { # --features manifest -> {ids, lenses} it loaded (empty lists without --features); nonzero when unreadable
+  [[ -z "$FEATURES" ]] && { echo '{"ids":[],"lenses":[]}'; return; }
+  jq -ce '{ids: [.rules[].id], lenses: [.lenses[].name | select(. != "correctness")]}' "$FEATURES" 2>/dev/null
+}
+
 # Review JSON on stdin -> "OK" or the reason to refuse it. Shape checks, then
-# tag checks. With no standards file readable the rule-id lookup is skipped
-# (warned), so a missing checkout cannot block every review.
+# tag checks. With no standards file readable the standards-id lookup is skipped
+# (warned), so a missing checkout cannot block every review; manifest ids still
+# count as known.
 validate_review() {
-  local ids
+  local ids ftags
   ids=$(rule_ids_json)
   [[ "$ids" == "[]" ]] && echo "WARN: no rule ids read from ${STANDARDS_FILES[*]}; rule: tags are checked for shape only" >&2
-  jq -rs --argjson ids "$ids" --argjson lenses "$TAG_LENSES" '
+  ftags=$(feature_tags_json) || { echo "--features $FEATURES is not a readable feature manifest (github-pr-review.sh features output)"; return; }
+  jq -rs --argjson ids "$ids" --argjson lenses "$TAG_LENSES" --argjson ftags "$ftags" '
     if length == 0 then "stdin is empty (was the draft file missing?)"
     elif length > 1 then "stdin holds \(length) JSON values; expected exactly one review object"
     else .[0] |
@@ -137,9 +162,9 @@ validate_review() {
         [(.comments // [])[] | . as $c | "\($c.path):\($c.line)" as $at | ($c.tag // null) as $t
           | if ($t | type) != "string" then "\($at): missing tag"
             elif ($t | test("^rule:[A-Za-z0-9][A-Za-z0-9-]*$")) then
-              (if ($ids | length) > 0 and ($ids | any(. == $t[5:]) | not) then "\($at): \($t) is not an id in review-standards.mdc or typescript-standards.mdc" else empty end)
+              (if ($ids | length) > 0 and (($ids + $ftags.ids) | any(. == $t[5:]) | not) then "\($at): \($t) is not an id in review-standards.mdc, typescript-standards.mdc or the --features manifest" else empty end)
             elif ($t | test("^lens:")) then
-              (if ($lenses | any(. == $t[5:]) | not) then "\($at): \($t) is not a known lens (\($lenses | join(", ")))" else empty end)
+              (($lenses + $ftags.lenses) as $known | if ($known | any(. == $t[5:]) | not) then "\($at): \($t) is not a known lens (\($known | join(", "))); feature lenses need --features" else empty end)
             elif $t == "general" then empty
             else "\($at): malformed tag \($t | tojson)" end,
           ([$c.body | scan("<!-- pr-review:tag=(\\S*) -->") | .[0] | select(. != $t)] | if length > 0 then "\($at): body already holds a different tag marker (\(.[0]))" else empty end)
@@ -517,8 +542,22 @@ case "$CMD" in
     echo "tags: $(printf '%s' "$REVIEW_JSON" | tag_counts)" >&2
     ;;
 
+  features)
+    require_gh
+    if [[ -z "$PR" || -z "$OWNER" || -z "$REPO" ]]; then
+      echo "Error: features needs --pr, --owner and --repo" >&2
+      exit 1
+    fi
+    REF="$FEATURES_REF"
+    if [[ "$(printf '%s' "$OWNER/$REPO" | tr '[:upper:]' '[:lower:]')" == "$(printf '%s' "$FEATURES_SLUG" | tr '[:upper:]' '[:lower:]')" ]]; then
+      REF=$(gh pr view "$PR" --repo "$OWNER/$REPO" --json baseRefName --jq .baseRefName)
+    fi
+    CHANGED=$(gh pr diff "$PR" --repo "$OWNER/$REPO" --name-only)
+    printf '%s\n' "$CHANGED" | "$FEATURE_ROUTER" route --repo "$REPO" --gh "$FEATURES_SLUG" --ref "$REF" ${CANDIDATES:+--candidates}
+    ;;
+
   *)
-    echo "Usage: github-pr-review.sh {context|submit|render} [args]" >&2
+    echo "Usage: github-pr-review.sh {context|submit|render|features} [args]" >&2
     exit 1
     ;;
 esac

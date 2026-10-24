@@ -1,0 +1,6 @@
+rules:
+  - id: stealth-confirm-before-send
+    rule: Stealth sends show the confirmation scene before broadcast.
+    severity: critical
+    sources:
+      - https://github.com/example/repo/pull/1#discussion_r1

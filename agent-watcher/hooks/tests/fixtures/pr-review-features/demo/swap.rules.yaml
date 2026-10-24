@@ -1,0 +1,12 @@
+rules:
+  - id: swap-quote-refresh
+    rule: Re-fetch the quote after the user confirms.
+    severity: warning
+  - id: swap-native-amounts
+    rule: Swap math stays in native units until display.
+    severity: critical
+    scope: [src/swap/math/**]
+  - id: swap-disabled
+    rule: A rule switched off.
+    severity: suggestion
+    enabled: false

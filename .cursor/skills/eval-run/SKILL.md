@@ -42,7 +42,7 @@ Workflow({
 ~/.cursor/skills/eval-run/scripts/actions-ledger.sh snapshot   # open remediation classes, script-computed recurrence
 ```
 
-Omitted mode = `report` (the workflow forces agent-eval's `report` profile, one light agent per run, no orch-eval, no transcript reads). `mode: "transcript"` = the full pass; only use it for the named/escalated one-offs per `two-eval-types`.
+Omitted mode = `report` (the workflow forces agent-eval's `report` profile, or `task-report` for a manifest with `deliverable: Task`, one light agent per run, no orch-eval, no transcript reads). A thin reference (`{gid, task_name, __fetch_full: true}`, which keeps a large cohort's payload small) MUST also carry the manifest's `deliverable`, because the workflow picks the profile before the agent fetches the full manifest. `mode: "transcript"` = the full pass; only use it for the named/escalated one-offs per `two-eval-types`.
 
 Model + verify defaults live in the workflow (args.model overrides all stages uniformly): report-eval agents and all verifiers default to sonnet (verifiers at low effort); transcript-eval agents and cohort synthesis inherit the session model. Adversarial verification covers every BAD in transcript mode (measured 2026-07-29: 8/106 cohort BADs refuted, all transcript-read errors) but only GATE findings in report mode, where evidence is freshly-fetched API output and the refutation rate is zero to date — non-gate report-mode BADs confirm directly.
 

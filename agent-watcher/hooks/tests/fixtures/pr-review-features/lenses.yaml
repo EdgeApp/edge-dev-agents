@@ -1,0 +1,6 @@
+# Test fixture for pr-review-feature-routing.test.py: a two-lens catalog.
+lenses:
+  - name: keys-security
+    focus: Key material and secrets.
+  - name: amount-precision
+    focus: Amount math and denominations.
