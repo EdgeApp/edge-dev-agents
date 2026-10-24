@@ -1,0 +1,9 @@
+# Features mined from human review comments (A2 leftover report, 2026-10-24).
+features:
+  - name: Currency engines
+    paths:
+      - "src/**"
+      - "src/**/*Info.ts"
+    owners: [swansontec, peachbits, samholmes]
+    rules: currency-engines.rules.yaml
+    status: active

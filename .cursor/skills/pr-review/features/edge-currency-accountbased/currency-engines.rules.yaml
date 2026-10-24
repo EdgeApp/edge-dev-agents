@@ -1,0 +1,36 @@
+rules:
+  - id: include-native-tokenid
+    rule: "Loops and maps over token ids include the native asset (null) unless the code is token-only, maps and balance results are keyed by the real tokenId (never a hard-coded null), balance and insufficient-funds checks use the selected tokenId and its amount, getTokenId rejects the native denom so a custom token cannot duplicate the native balance, and partner asset data becomes a tokenId through createTokenId."
+    severity: warning
+    scope:
+      - "src/**"
+    enabled: true
+    sources:
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/1117#discussion_r4210976455
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/1002#discussion_r2566116457
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/1002#discussion_r2566282730
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/1044#discussion_r3048265248
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/1002#discussion_r2566511090
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/1002#discussion_r2566511718
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/877#discussion_r1907965234
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/877#discussion_r1913921554
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/1002#discussion_r2562172129
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/1002#discussion_r2566022752
+      - https://github.com/EdgeApp/edge-info-server/pull/166#pullrequestreview-5524438800
+      - https://github.com/EdgeApp/edge-rates-server/pull/111#discussion_r2190874042
+      - https://github.com/EdgeApp/edge-rates-server/pull/111#discussion_r2201817078
+      - https://github.com/EdgeApp/edge-react-gui/pull/4594#pullrequestreview-1746925576
+      - https://github.com/EdgeApp/edge-react-gui/pull/4789#discussion_r1472147569
+      - https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1434619172
+  - id: info-files-plain-data
+    rule: "Currency info files (src/<chain>/<chain>Info.ts) hold plain data and import no currency library at runtime, directly or transitively: SDK types come in with import type, SDK-dependent logic lives in the chain Tools/Engine, and data the info server can deliver (endpoint discovery) comes from the info payload. Check the bundle size before and after when an info file changes imports."
+    severity: warning
+    scope:
+      - "src/**/*Info.ts"
+    enabled: true
+    sources:
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/645#pullrequestreview-1686325435
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/766#pullrequestreview-2021100754
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/645#discussion_r1364649258
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/654#discussion_r1378228764
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/847#discussion_r1819511498

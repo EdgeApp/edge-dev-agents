@@ -1,0 +1,15 @@
+rules:
+  - id: scene-insets-and-rotation
+    rule: "Scenes read screen size with useWindowDimensions (never Dimensions.get at module level, which goes stale on rotation), take left and right insets from safeAreaInsets so a rotated iPad avoids the notch, and let scroll views and lists stretch to the physical screen edge and scroll under the tab bar like the other scenes."
+    severity: suggestion
+    scope:
+      - "src/components/scenes/**"
+      - "src/components/common/SceneWrapper.tsx"
+    enabled: true
+    sources:
+      - https://github.com/EdgeApp/edge-react-gui/pull/4683#pullrequestreview-1810173668
+      - https://github.com/EdgeApp/edge-react-gui/pull/4648#discussion_r1438753114
+      - https://github.com/EdgeApp/edge-react-gui/pull/4648#discussion_r1439065098
+      - https://github.com/EdgeApp/edge-react-gui/pull/4648#discussion_r1439065179
+      - https://github.com/EdgeApp/edge-react-gui/pull/4683#discussion_r1445455855
+      - https://github.com/EdgeApp/edge-react-gui/pull/4683#discussion_r1445458764

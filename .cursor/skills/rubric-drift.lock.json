@@ -1351,8 +1351,8 @@
       "hash": "83505b090011"
     },
     "review-standards:clean-all-external-data": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "8b830977a05f"
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "dd33606bc54f"
     },
     "review-standards:derive-types-from-cleaners": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1371,16 +1371,16 @@
       "hash": "ac2d4b9e665c"
     },
     "review-standards:delete-unnecessary-code": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "f4b373883468"
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "640d13214f0f"
     },
     "review-standards:put-parameters-inline": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "f3023e485d5a"
     },
     "review-standards:use-existing-helpers": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "fe2f81246c2a"
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "e7438dfa09f9"
     },
     "review-standards:avoid-duplicated-mocks": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1435,8 +1435,8 @@
       "hash": "d8ca34f82fe2"
     },
     "review-standards:add-non-obvious-constraints": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "aa0705d5bcd8"
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "f0d60eb3cea1"
     },
     "review-standards:remove-stale-comments": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1737,6 +1737,178 @@
     "build-and-test:app-log-capture-and-read": {
       "reason": "2026-10-17: drive-time guidance on where to read the slot app log; no orch-graded outcome beyond existing evidence dimensions",
       "hash": "e48c0c5d9826"
+    },
+    "review-standards:changelog-section-and-verb": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "2eb54bd6ca57"
+    },
+    "review-standards:doc-links-resolve": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "6b4c80fffc55"
+    },
+    "review-standards:rn-render-cost": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "0cb2f1e47573"
+    },
+    "review-standards:units-explicit": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "781659d16fe2"
+    },
+    "review-standards:jsdoc-for-api-and-deprecations": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "b4c2f7811c0f"
+    },
+    "review-standards:no-debug-scaffolding": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "93d79a413c1a"
+    },
+    "review-standards:tokenid-not-currencycode": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "5a8fbc2af800"
+    },
+    "review-standards:narrow-try-scope": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "9c6f3b6d0b9c"
+    },
+    "review-standards:existing-user-paths": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "ff91424b3f14"
+    },
+    "review-standards:check-response-ok": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "19641412b3b2"
+    },
+    "review-standards:no-silent-success": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "784a457c6114"
+    },
+    "review-standards:structured-logging": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "58ab46fe7fdd"
+    },
+    "review-standards:log-only-real-work": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "67888768ddb6"
+    },
+    "review-standards:surface-errors-not-console": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "72228d804f74"
+    },
+    "review-standards:file-placement-conventions": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "f48436ccaa07"
+    },
+    "review-standards:normalize-at-the-boundary": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "de38e6f85745"
+    },
+    "review-standards:logic-belongs-in-owning-layer": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "02e3fbf9a5b2"
+    },
+    "review-standards:no-module-level-mutable-state": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "608607115555"
+    },
+    "review-standards:name-magic-values": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "2c27d5f5bdcc"
+    },
+    "review-standards:no-hardcoded-config": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "144a966e1a22"
+    },
+    "review-standards:test-each-guard": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "4ed88f928bd2"
+    },
+    "review-standards:order-state-around-awaits": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "a6180c2d3c0c"
+    },
+    "review-standards:stale-async-generation-check": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "80f748c3f94a"
+    },
+    "review-standards:bound-pagination-and-timeouts": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "0fef69d07796"
+    },
+    "review-standards:avoid-repeated-work": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "0e4f7658aa95"
+    },
+    "review-standards:no-secrets-in-dumps-or-logs": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "f5d05cf34cdd"
+    },
+    "review-standards:alphabetical-registration": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "2bc8d5ab9f40"
+    },
+    "review-standards:deprecated-fields-last": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "79665deaa9e5"
+    },
+    "review-standards:follow-repo-naming-conventions": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "5e39059849ac"
+    },
+    "review-standards:match-sibling-behavior": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "1bdbbfc5a045"
+    },
+    "review-standards:plain-functions-over-iife": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "6c1de35688d8"
+    },
+    "review-standards:tokenid-typed-and-required": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "2fa52bd5e0a7"
+    },
+    "review-standards:no-sentinel-empty-values": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "20a8f9252924"
+    },
+    "review-standards:map-set-for-dictionaries": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "feb6bcfffd4e"
+    },
+    "review-standards:discriminate-over-flags": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "a76d6f2a0a02"
+    },
+    "review-standards:narrowest-accurate-types": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "adacce115bde"
+    },
+    "review-standards:changelog-entry-with-change": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "18b159bf48fd"
+    },
+    "review-standards:clean-commit-history": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "fba5930e24a2"
+    },
+    "review-standards:split-unrelated-fixes": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "ca1ec11b7b85"
+    },
+    "review-standards:commit-message-matches-diff": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "997e17ae0e38"
+    },
+    "review-standards:no-unrelated-lockfile-churn": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "4b534c4a6a52"
+    },
+    "review-standards:declare-direct-dependencies": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "97bb5b5ad883"
+    },
+    "review-standards:white-label-neutral": {
+      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
+      "hash": "62cedf803aa9"
     }
   },
   "excluded_skills": {

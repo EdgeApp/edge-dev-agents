@@ -1,0 +1,10 @@
+# Features mined from human review comments (A2 leftover report, 2026-10-24).
+features:
+  - name: Swap providers
+    paths:
+      - "src/swap/**"
+      - "src/mappings/**"
+      - "docs/**"
+    owners: [paullinator, peachbits, samholmes]
+    rules: swap-providers.rules.yaml
+    status: active

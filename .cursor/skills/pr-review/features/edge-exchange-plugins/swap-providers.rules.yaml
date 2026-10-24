@@ -1,0 +1,83 @@
+rules:
+  - id: swap-map-by-chain-id
+    rule: "Provider chain and asset mapping identifies EVM chains by evmChainId and tokens by chain plus contract address (decimals read from the quote), never by ticker or network-name strings; quotes and orders pass those ids directly instead of pre-fetching an asset list before every quote; every chain the provider and Edge both support is mapped to the right Edge pluginId (BSC is binancesmartchain, not binance); a chain stays null until a swap on it has been verified; an empty-string mapping throws SwapCurrencyError; and the plugin requests the address type the provider can pay (transparent for ZEC)."
+    severity: warning
+    scope:
+      - "src/swap/**"
+      - "src/mappings/**"
+      - "docs/**"
+    enabled: true
+    sources:
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/405#pullrequestreview-3695251712
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/405#pullrequestreview-3802041438
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292102802
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292105937
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2807653672
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/480#discussion_r3708110245
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3799158311
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3799158577
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3799158887
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/495#discussion_r4189883104
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3799158230
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2422063724
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2422065315
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2719185493
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2719185683
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2719185880
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2719186015
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/441#discussion_r2886644499
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/495#discussion_r4189883098
+  - id: swap-error-mapping
+    rule: "Provider failures map to the matching Swap error by the provider's published code (not message keywords): limits to SwapAboveLimitError/SwapBelowLimitError even when the bound is absent, geo blocks to SwapPermissionError geoRestriction, a same-wallet requirement to SwapAddressError, an unmapped network to SwapCurrencyError, and a 5xx, failed or empty asset-list fetch to a provider error rather than an unsupported pair. When the API returns several errors, the plugin surfaces them in Edge's priority order; a limit payload is parsed with a cleaner loose enough to read it."
+    severity: warning
+    scope:
+      - "src/swap/**"
+      - "src/mappings/**"
+      - "docs/**"
+    enabled: true
+    sources:
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2302393626
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292096059
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292105363
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/433#discussion_r3054931999
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/480#discussion_r4066871866
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/480#discussion_r4066871870
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/444#discussion_r2898925181
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3799158504
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3799158710
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2422085991
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623050635
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623050847
+  - id: swap-limits-from-spec
+    rule: "Quotes take min and max from the API response in the field order the provider spec gives (never hard-coded constants), check bounds before any create or action call, probe max with a quote-only path (never a real order), support exact-receive (reverse) quotes when the provider does or document why not, mark DEX and floating quotes as estimates, pass every accepted parameter (refundAddress) into the order body, and check that the echoed deposit amount equals the amount sent."
+    severity: warning
+    scope:
+      - "src/swap/**"
+      - "src/mappings/**"
+      - "docs/**"
+    enabled: true
+    sources:
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292095228
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292104292
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/429#discussion_r2737726085
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/429#discussion_r2737730179
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/433#discussion_r3054985387
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/480#discussion_r4066871875
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/480#discussion_r3708197144
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3669516995
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3669556257
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3799158358
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623052652
+  - id: swap-plugin-follow-siblings
+    rule: "A new or changed swap plugin follows the pattern every sibling central plugin uses: call checkWhitelistedMainnetCodes, keep network code mapping in src/mappings/ built with mapToRecord, import denomination helpers from util/utils, and request the same address types (Zcash transparent) the siblings request."
+    severity: suggestion
+    scope:
+      - "src/swap/**"
+      - "src/mappings/**"
+    enabled: true
+    sources:
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/426#pullrequestreview-3754084394
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/426#discussion_r2766708057
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/426#discussion_r2766708120
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3799158419
+      - https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2807653759

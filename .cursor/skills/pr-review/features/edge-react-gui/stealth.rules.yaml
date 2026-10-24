@@ -1,0 +1,25 @@
+rules:
+  - id: stealth-parity
+    rule: "Stealth (Houdini private) send and swap behave the same in the Send scene and the Swap scene and match the design doc identity table: the same bans (Houdini-only asset bans, source and destination bans) dim or disable the toggle in both scenes and are checked before getQuote; the toggle re-seeds when a blocked reason clears, not only on wallet or recipient change; memos and destination tags carry across mode flips and wallet switches; every asset pick (including Myself) goes through the same handler; and privacy display keys on the swapSend action privacy, not the Houdini pluginId."
+    severity: warning
+    scope:
+      - "src/components/scenes/SendScene2.tsx"
+      - "src/components/scenes/SwapCreateScene.tsx"
+      - "src/components/scenes/SwapConfirmationScene.tsx"
+      - "src/components/scenes/TransactionDetailsScene.tsx"
+      - "src/components/tiles/AddressTile2.tsx"
+      - "src/util/houdiniChains.ts"
+      - "src/util/stealthSwap.ts"
+      - "docs/stealth-send-swap.md"
+    enabled: true
+    sources:
+      - https://github.com/EdgeApp/edge-react-gui/pull/6066#pullrequestreview-5344894013
+      - https://github.com/EdgeApp/edge-react-gui/pull/6253#pullrequestreview-5589630059
+      - https://github.com/EdgeApp/edge-react-gui/pull/6250#discussion_r4251697747
+      - https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4276082027
+      - https://github.com/EdgeApp/edge-react-gui/pull/6279#discussion_r4340424134
+      - https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4265158439
+      - https://github.com/EdgeApp/edge-react-gui/pull/6279#discussion_r4340424156
+      - https://github.com/EdgeApp/edge-react-gui/pull/6066#discussion_r4127223649
+      - https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4265158448
+      - https://github.com/EdgeApp/edge-react-gui/pull/6279#discussion_r4340424143

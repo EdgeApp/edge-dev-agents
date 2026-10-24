@@ -1,0 +1,22 @@
+# Features mined from human review comments (A2 leftover report, 2026-10-24).
+features:
+  - name: Stealth send/swap
+    paths:
+      - "src/components/scenes/SendScene2.tsx"
+      - "src/components/scenes/SwapCreateScene.tsx"
+      - "src/components/scenes/SwapConfirmationScene.tsx"
+      - "src/components/scenes/TransactionDetailsScene.tsx"
+      - "src/components/tiles/AddressTile2.tsx"
+      - "src/util/houdiniChains.ts"
+      - "src/util/stealthSwap.ts"
+      - "docs/stealth-send-swap.md"
+    owners: [peachbits]
+    rules: stealth.rules.yaml
+    status: active
+  - name: Scene layout
+    paths:
+      - "src/components/scenes/**"
+      - "src/components/common/SceneWrapper.tsx"
+    owners: [swansontec]
+    rules: scene-layout.rules.yaml
+    status: active
