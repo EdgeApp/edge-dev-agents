@@ -1058,7 +1058,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`pr-land-discover.sh`](.cursor/skills/pr-land/scripts/pr-land-discover.sh) | Find relevant PRs and approval state; drops merged and closed PRs (`notOpen`); `--no-bugbot-wait` lets auto-merge arm without waiting on running reviewer bots |
 | [`repo-land-lock.sh`](.cursor/skills/pr-land/scripts/repo-land-lock.sh) | Per-repo land lease; `--hold` keeps it for the whole run so main-checkout and master-build refreshes skip the repo |
 | [`pr-land-comments.sh`](.cursor/skills/pr-land/scripts/pr-land-comments.sh) | Detect unresolved inline, review-body, and top-level comments |
-| [`pr-land-prepare.sh`](.cursor/skills/pr-land/scripts/pr-land-prepare.sh) | Autosquash, rebase, detect conflicts, verify; refuses (exit 3) a base branch the master-build memo marks unbuildable unless `--allow-broken-develop` |
+| [`pr-land-prepare.sh`](.cursor/skills/pr-land/scripts/pr-land-prepare.sh) | Autosquash, rebase, detect conflicts, verify; refuses (exit 3) a base branch the master-build memo marks unbuildable unless `--allow-broken-develop`; deletes leaked `.watchman-cookie-*` files and the stalled watch that left them, so they never count as unsaved work |
 | [`pr-land-merge.sh`](.cursor/skills/pr-land/scripts/pr-land-merge.sh) | Rebase again, verify, merge sequentially |
 | [`pr-land-publish.sh`](.cursor/skills/pr-land/scripts/pr-land-publish.sh) | Version bump, changelog, commit, tag |
 | [`upgrade-dep.sh`](.cursor/skills/pr-land/scripts/upgrade-dep.sh) | Bump one package on the current branch and commit lockfile updates |

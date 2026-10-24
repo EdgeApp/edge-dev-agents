@@ -30,7 +30,7 @@
 // Output: JSON with results for each branch
 
 const { execSync, spawnSync } = require("child_process");
-const { existsSync, readFileSync } = require("fs");
+const { existsSync, readFileSync, rmSync } = require("fs");
 const path = require("path");
 const {
   getRepoDir,
@@ -222,8 +222,22 @@ async function prepareBranch(repo, branch, buildField) {
     console.error(`Branch ${branch} is held by worktree: ${wtDir}`);
     let wtDirty = true;
     try {
-      wtDirty =
-        execSync(`git -C "${wtDir}" status --porcelain`, { encoding: "utf8" }).trim() !== "";
+      // Untracked .watchman-cookie-* files are watchman scratch, not work. A
+      // worktree's .git is a file, so watchman writes its sync cookies into the
+      // root, and every cookie left behind is a sync that timed out on a stalled
+      // watch. Delete them and drop the watch (Metro re-creates it on demand);
+      // same exclusion as ~/.config/agent-watcher/lib/worktree-unsaved.sh.
+      const lines = execSync(`git -C "${wtDir}" status --porcelain`, { encoding: "utf8" })
+        .split("\n")
+        .filter(Boolean);
+      const cookieRe = /^\?\? (\.watchman-cookie-[^/]+)$/;
+      const cookies = lines.map((l) => cookieRe.exec(l)).filter(Boolean);
+      if (cookies.length > 0) {
+        for (const m of cookies) rmSync(path.join(wtDir, m[1]), { force: true });
+        spawnSync("watchman", ["watch-del", wtDir], { stdio: "ignore" });
+        console.error(`Removed ${cookies.length} leaked .watchman-cookie-* file(s) and dropped the stalled watchman watch on ${wtDir}`);
+      }
+      wtDirty = lines.length > cookies.length;
     } catch (e) {
       // status failure → treat as dirty and refuse below.
     }

@@ -96,6 +96,8 @@ Everything below this line is for Claude, not you.
 >    Set `git config --global user.name` and `user.email` to the operator's commit identity:
 >    read both from the source machine (`git config --global user.name`, `git config --global
 >    user.email`) or ask me. Neither value is kept in the repo.
+>    Add `.watchman-cookie-*` to the global git ignore (`~/.config/git/ignore`): a worktree's
+>    `.git` is a file, so watchman writes its sync cookies into the worktree root.
 >    Verify `jq gh tmux watchman`, `node -v` (== v24.15.0), `maestro -v`.
 > 3. **iOS sims.** Install the iOS 18 runtime (`xcodebuild -downloadPlatform iOS`; if it
 >    needs Apple ID, tell me). Create the master sim matching
