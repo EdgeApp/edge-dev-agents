@@ -9,7 +9,9 @@
 #   pr-merge-watch.sh     reports ALL_MERGED only when GitHub says MERGED; an
 #                         armed, still-open PR is never a success. A red check,
 #                         a branch that needs a rebase and a missing review
-#                         each end with their own verdict and exit code.
+#                         each end with their own verdict and exit code. A
+#                         reviewer-bot thread that opens while the PR is armed
+#                         disarms it and ends with BOT_THREADS.
 #
 # Runs the real scripts with a stand-in for the GitHub command on the PATH and
 # a stand-in for the review-comment check in a private HOME, so nothing reaches
@@ -37,7 +39,7 @@ SK="$FH/.cursor/skills/pr-land/scripts"
 FAKE="$TMP/fake"
 mkdir -p "$SK" "$FH/.config/agent-watcher/lib" "$TMP/bin" "$TMP/state" "$FAKE"
 cp "$REAL/pr-land/scripts/pr-land-automerge.sh" "$REAL/pr-land/scripts/pr-merge-watch.sh" \
-   "$REAL/pr-land/scripts/repo-land-lock.sh" "$SK/"
+   "$REAL/pr-land/scripts/repo-land-lock.sh" "$REAL/pr-land/scripts/bot-thread-count.sh" "$SK/"
 cp "$REAL_LIB" "$FH/.config/agent-watcher/lib/"
 
 # Stand-in for the review-comment check: FAKE/<num>/threads holds the number of
@@ -302,6 +304,44 @@ OUT=$(HOME="$FH" XDG_STATE_HOME="$TMP/state" FAKE="$FAKE" PATH="$TMP/bin:$PATH" 
   "$SK/pr-merge-watch.sh" "$TAG#20" "$TAG#21" --interval 0 --timeout 0 --result-file "$TMP/watch.result" 2>/dev/null | tail -1)
 rm -f /tmp/pr-merge-watch-deadline-*"$TAG"*
 check "one merged and one open is not ALL_MERGED" "$OUT" "TIMEOUT"
+
+# a reviewer bot posts a thread after arming: disarm, BOT_THREADS
+pr 30 "$(view OPEN BLOCKED APPROVED "$RUNNING")" '' 1
+: > "$FAKE/gh.log"
+watch 30; watch_rc 30
+check "a bot thread on an armed PR: exit code" "$RC" 8
+check "a bot thread on an armed PR: verdict" "$OUT" "BOT_THREADS $TAG#30"
+has "a bot thread on an armed PR disarms it" "$(cat "$FAKE/gh.log")" "pr merge 30 --repo EdgeApp/$TAG --disable-auto"
+
+# the thread arrives on the second poll, before GitHub merges
+pr 31 "$(view OPEN BLOCKED APPROVED "$RUNNING")"
+view MERGED UNKNOWN APPROVED "$GREEN" '{"oid":"bbb222"}' > "$FAKE/31/view.json.3"
+cat > "$SK/pr-land-comments.sh" <<'SH'
+#!/usr/bin/env bash
+NUM=$(jq -r '.[0].prNumber')
+C="$FAKE/$NUM/comments.count"; N=$(( $(cat "$C" 2>/dev/null || echo 0) + 1 )); echo "$N" > "$C"
+T=0; [[ "$NUM" == 31 && "$N" -ge 2 ]] && T=1
+T=$(cat "$FAKE/$NUM/threads" 2>/dev/null || echo "$T")
+[[ "$T" == fail ]] && exit 1
+jq -nc --argjson n "$T" '[{botThreads: [range(0; $n)]}]'
+SH
+chmod +x "$SK/pr-land-comments.sh"
+watch 31
+check "a thread on the second poll stops the watch before the merge" "$OUT" "BOT_THREADS $TAG#31"
+
+# an unreadable thread check never blocks or disarms
+pr 32 "$(view OPEN BLOCKED APPROVED "$RUNNING")" '' fail
+view MERGED UNKNOWN APPROVED "$GREEN" '{"oid":"ccc333"}' > "$FAKE/32/view.json.2"
+: > "$FAKE/gh.log"
+watch 32
+check "an unreadable thread check keeps polling to the merge" "$OUT" "ALL_MERGED $TAG#32=ccc333"
+has "an unreadable thread check is logged" "$(cat "$TMP/watch.err")" "bot-thread check failed"
+[[ "$(cat "$FAKE/gh.log")" == *--disable-auto* ]] && fail "an unreadable thread check does not disarm" || ok "an unreadable thread check does not disarm"
+
+# a merged PR with an open thread is the post-merge sweep's (step 9b), not a watch verdict
+pr 33 "$(view MERGED UNKNOWN APPROVED "$GREEN" '{"oid":"ddd444"}')" '' 2
+watch 33
+check "a merged PR with open threads is still ALL_MERGED" "$OUT" "ALL_MERGED $TAG#33=ddd444"
 
 HOME="$FH" PATH="$TMP/bin:$PATH" "$SK/pr-merge-watch.sh" >/dev/null 2>&1
 check "no PR argument is a usage error" "$?" 1

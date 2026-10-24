@@ -70,6 +70,21 @@
 #                      tdd complements tdd_doc so "no TDD owed" (none) is
 #                      distinguishable from "owed but missing" (tdd + tdd_doc
 #                      none).
+# and OVERWRITES (whatever the agent wrote, since hand-copied values were wrong):
+#   generated / ended  attach time, UTC (a re-attach after more work moves both;
+#                      the visible stamp line follows). `started` is the
+#                      segment's version-stamp ts.
+#   repo / branch      the task worktree's checkouts, comma-joined in order;
+#                      blank when the task has no worktree (Task deliverables).
+#   slot_index         the slot record (lib/slots.js get); metro_port / sim_udid
+#                      from the spawn env ($AGENT_METRO_PORT, $AGENT_SIM_UDID),
+#                      the slot record when the env is unset.
+#   friction line      first line of Orchestration Issues: this session's hook
+#                      blocks (top three hooks), tool errors and compactions,
+#                      counted by lib/transcript-friction.js over the hook's
+#                      transcript_path. Replaced on every attach, absent when
+#                      the session had none, so a "None observed" written over
+#                      dozens of gate blocks still carries the counts.
 #
 # FORMATTER-READY: these checks define the form contract a future form-only
 # formatter subagent would enforce (draft in, facts immutable, form normalized).
@@ -219,7 +234,6 @@ set_frontmatter() { # $1=key $2=value  (no-op on an already-populated key)
 }
 
 set_frontmatter claude_session_id "$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)"
-set_frontmatter generated "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 set_frontmatter agent_session_uuid "${AGENT_SESSION_UUID:-}"
 
 # TDD permalink, PINNED at the current branch commit (see header). Only when the
@@ -244,6 +258,77 @@ if [ -n "$STAMP" ]; then
   set_frontmatter effort "$(printf '%s' "$STAMP" | jq -r '.effort // empty' 2>/dev/null || true)"
 fi
 set_frontmatter agent_lane "$("$HOME/.cursor/skills/asana-field-value.sh" "$AGENT_TASK_GID" "agent_lane" 2>/dev/null || echo "none")"
+
+# Run facts the agent would otherwise hand-copy (and did, wrongly): OVERWRITTEN
+# on every attach from machine state, whatever the report says. See header.
+force_frontmatter() { # $1=key $2=value $3=1 for an unquoted (numeric) value
+  local key="$1" val="$2" line
+  [ -n "$val" ] || return 0
+  if [ "${3:-}" = 1 ]; then line="$key: $val"; else line="$key: \"$val\""; fi
+  awk -v k="$key" -v l="$line" '
+    NR == 1 && $0 == "---" { fm = 1; print; next }
+    fm && $0 == "---" { if (!done) print l; fm = 0; done = 1; print; next }
+    fm && !done && index($0, k ":") == 1 { print l; done = 1; next }
+    { print }
+  ' "$REPORT" > "$REPORT.tmp" && mv "$REPORT.tmp" "$REPORT"
+}
+NOW="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+force_frontmatter generated "$NOW"
+force_frontmatter ended "$NOW"
+[ -n "$STAMP" ] && force_frontmatter started "$(printf '%s' "$STAMP" | jq -r '.ts // empty' 2>/dev/null || true)"
+# repo/branch from the task's worktree checkouts (a Task deliverable has none,
+# so its fields stay blank); several repos join with commas, in the same order.
+WT_REPOS="" WT_BRANCHES=""
+for d in "$(task_worktree "$AGENT_TASK_GID")"/*/; do
+  [ -e "$d/.git" ] || continue
+  b=$(git -C "$d" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+  [ -n "$b" ] && [ "$b" != "HEAD" ] || continue
+  WT_REPOS="${WT_REPOS:+$WT_REPOS,}$(basename "$d")"
+  WT_BRANCHES="${WT_BRANCHES:+$WT_BRANCHES,}$b"
+done
+force_frontmatter repo "$WT_REPOS"
+force_frontmatter branch "$WT_BRANCHES"
+# Resources: the spawn env names what this session was given; the slot record
+# fills the index (and the rest when the env is gone).
+SLOT_JSON=$(node "$HOME/.config/agent-watcher/lib/slots.js" get --task-gid "$AGENT_TASK_GID" 2>/dev/null || true)
+slotv() { printf '%s' "$SLOT_JSON" | jq -r ".$1 // empty" 2>/dev/null || true; }
+force_frontmatter slot_index "$(slotv slot_index)" 1
+force_frontmatter metro_port "${AGENT_METRO_PORT:-$(slotv metro_port)}" 1
+force_frontmatter sim_udid "${AGENT_SIM_UDID:-$(slotv sim_udid)}"
+
+# Friction counts for THIS session (lib/transcript-friction.js, the same
+# patterns resolve-run's friction block uses), stamped as the first line of
+# Orchestration Issues and replaced on every attach. The agent still writes the
+# judgment below it; the counts keep a "None observed" honest.
+TRANSCRIPT_PATH=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null || true)
+FRICTION=$(node "$HOME/.config/agent-watcher/lib/transcript-friction.js" "$TRANSCRIPT_PATH" 2>/dev/null || echo '{}')
+FRICTION_LINE=$(printf '%s' "$FRICTION" | jq -r '
+  select((.hook_blocks.total // 0) > 0 or (.tool_errors // 0) > 0)
+  | "- Machine count, this session: \(.hook_blocks.total) hook blocks"
+    + (if .hook_blocks.total > 0 then " (" + ([.hook_blocks.by_hook | to_entries | sort_by(-.value) | .[:3][] | "\(.key) \(.value)"] | join(", ")) + ")" else "" end)
+    + ", \(.tool_errors) tool errors, \(.compact_boundaries) compactions. <!-- friction-stamp -->"' 2>/dev/null || true)
+python3 - "$REPORT" "$FRICTION_LINE" <<'PY'
+import re, sys
+path, stamp = sys.argv[1], sys.argv[2]
+lines = open(path).read().split("\n")
+lines = [l for l in lines if "<!-- friction-stamp -->" not in l]
+if stamp:
+    try:
+        i = next(n for n, l in enumerate(lines) if l.startswith("## Orchestration Issues"))
+    except StopIteration:
+        i = None
+    if i is not None:
+        j, in_comment = i + 1, False
+        while j < len(lines):
+            l = lines[j]
+            if in_comment or l.lstrip().startswith("<!--"):
+                in_comment = "-->" not in l
+                j += 1
+                continue
+            break
+        lines.insert(j, stamp)
+open(path, "w").write("\n".join(lines))
+PY
 
 # Iteration ordinal + normalized attach name + H1 title.
 # RE-ATTACH STABILITY: a report already stamped with `iteration: N` KEEPS N —
@@ -314,6 +399,7 @@ if [ -n "$ITER" ]; then
       !done && /^# Run report / { print ""; print s; done=1 }
     ' "$REPORT" > "$REPORT.tmp" && mv "$REPORT.tmp" "$REPORT"
   fi
+  sed -i '' -E "/^_iteration /s/generated [0-9TZ:-]+/generated $NOW/" "$REPORT"
 fi
 
 # 0. Conflict narration policy (operator, 2026-07-29). Two tiers:

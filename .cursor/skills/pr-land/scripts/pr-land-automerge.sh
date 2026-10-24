@@ -66,7 +66,6 @@ done
 # shellcheck source=/dev/null
 source "$HOME/.config/agent-watcher/lib/reviewer-bots.sh" \
   || { echo "ERROR: missing ~/.config/agent-watcher/lib/reviewer-bots.sh" >&2; exit 2; }
-COMMENTS_SH="$HOME/.cursor/skills/pr-land/scripts/pr-land-comments.sh"
 
 INPUT="$(cat)"
 [ -n "$INPUT" ] || { echo "ERROR: no PR JSON on stdin" >&2; exit 2; }
@@ -94,14 +93,12 @@ pending_reviewers() {
      | join(", ")' <<<"$json" 2>/dev/null || true
 }
 
-# Count of unresolved reviewer-bot threads (bot-thread-gate). Fails CLOSED: an
-# unreadable comment check returns "?" so the caller reports rather than arms blind.
-bot_thread_count() {
-  local pr_json="$1" out
-  out=$(jq -c '[{repo:.repo, prNumber:.prNumber, branch:(.branch // "")}]' <<<"$pr_json" \
-        | "$COMMENTS_SH" 2>/dev/null) || { echo "?"; return; }
-  jq -r '[ .[] | (.botThreads // []) | length ] | add // 0' <<<"${out:-[]}" 2>/dev/null || echo "?"
-}
+# bot_thread_count (bot-thread-gate) from the shared counter pr-merge-watch.sh
+# also reads. Fails CLOSED here: "?" (an unreadable comment check) reports
+# rather than arms blind.
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/bot-thread-count.sh" \
+  || { echo "ERROR: missing bot-thread-count.sh next to $0" >&2; exit 2; }
 
 while read -r pr; do
   REPO=$(echo "$pr" | jq -r '.repo')

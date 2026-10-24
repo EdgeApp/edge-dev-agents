@@ -3,10 +3,9 @@ task_gid: ""
 task_name: ""
 agent_session_uuid: ""   # $AGENT_SESSION_UUID — the orchestration session that produced this run
 orch_version: ""         # $AGENT_ORCH_VERSION — digest of the orch (skills/rules/watcher/hooks) governing this segment
-# Fields below through agent_lane are auto-filled at attach by
-# require-clean-run-report.sh (which also numbers the attach name
-# agent-run-report-NN-<slug>.md and inserts the "# Run report NN: <slug>" H1).
-# Leave them blank.
+# Fields below through sim_udid are stamped at attach by
+# require-clean-run-report.sh (which also numbers the attach name and inserts
+# the "# Run report NN: <slug>" H1). Leave them as they are.
 claude_session_id: ""
 generated: ""
 tdd_doc: ""
@@ -17,17 +16,18 @@ effort: ""
 agent_lane: ""
 repo: ""
 branch: ""
+started: ""
+ended: ""
+slot_index: null
+metro_port: null
+sim_udid: ""
+# Fields below are yours.
 base: origin/develop
 pr: none                 # PR URL, or "none"
 outcome: complete        # complete | partial | blocked
 verified: not-run        # pass | partial | not-run | fail | n/a (no runtime surface; Task deliverables only)
 verify_blockers: []      # any of: precondition | harness | code | task-drafting
-started: ""              # ISO 8601
-ended: ""                # ISO 8601
 skills_used: []          # e.g. [asana-plan, im, pr-create, build-and-test, debugger]
-slot_index: null         # from `node ~/.config/agent-watcher/lib/slots.js get --task-gid <gid>`
-metro_port: null         # $AGENT_METRO_PORT
-sim_udid: ""             # $AGENT_SIM_UDID
 ---
 
 ## Summary
@@ -153,7 +153,9 @@ _None observed._
 <!-- cat: orchestration -->
 <!-- Friction with the autonomous harness itself (NOT the task code): worktree /
      config.json / sim / metro / ports / resume / tmux / wakeup / resource limits /
-     auth in the spawned env. Enough detail to reproduce or fix. -->
+     auth in the spawned env. Enough detail to reproduce or fix. The attach gate
+     stamps this session's hook-block and tool-error counts as the first line;
+     name the blocks that cost the run time. -->
 _None observed._
 
 ## Skill Gaps

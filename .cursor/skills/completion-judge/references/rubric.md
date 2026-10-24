@@ -185,10 +185,11 @@ The task's `tested` value matches the evidence: each credited option needs the
 artifact its definition names in the "`tested` options" block attached below
 (verbatim from set-tested.sh, the one definition), and `Untested` is never combined
 with a real method. A credited value with no artifact is a `fail`. Exception: a
-followup segment that changed no shipped code and owed no new verification leaves
-the field as an earlier segment set it (one-shot `set-tested-field`); that value is
-`pass` here without this segment's artifacts, and the same segment overwriting a
-real credit with `Untested` is a `fail`.
+method an earlier segment credited is carried forward by set-tested.sh, and it is
+`pass` here without this segment's artifacts when this segment changed no shipped
+code after that evidence; when this segment changed the code that evidence
+exercised and the method is still credited without being re-earned, that is a
+`fail` (the run owed a `--drop` per one-shot `set-tested-field`).
 
 ### J5 deferral-validity (C, P, B)
 A deferral is a fail ONLY when it defers something one of THIS SEGMENT'S asks

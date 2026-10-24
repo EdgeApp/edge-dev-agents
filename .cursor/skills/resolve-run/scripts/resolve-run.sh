@@ -7,6 +7,10 @@
 #   --list               with --since: print gid + name + spawned_at only (no deep resolution)
 #   --transcript-only    with --gid: print just the resolved transcript path (one
 #                        line, empty when none) and exit; no Asana/GitHub calls
+#   --save               with --gid: write the manifest to /tmp/eval-<gid>/manifest.json
+#                        (temp file + rename, so concurrent evals never read a half-written
+#                        or another gid's file), assert its gid matches, print the path.
+#                        Exit 1 on a gid mismatch. Use this from parallel evaluators.
 #
 # Output: JSON array of manifests on stdout (the ONLY stdout). Diagnostics on stderr.
 # Exit: 0 = ok (possibly empty array), 1 = error, 2 = usage.
@@ -36,19 +40,21 @@ HEADS_JS="$HOME/.config/agent-watcher/lib/transcript-heads.js"
 CONFIG="$HOME/.config/agent-watcher/asana-config.json"
 CRED="$HOME/.config/agent-watcher/credentials.json"
 
-GID="" SINCE="" LIST=0 TRANSCRIPT_ONLY=0
+GID="" SINCE="" LIST=0 TRANSCRIPT_ONLY=0 SAVE=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --gid) GID="$2"; shift 2 ;;
     --since) SINCE="$2"; shift 2 ;;
     --list) LIST=1; shift ;;
     --transcript-only) TRANSCRIPT_ONLY=1; shift ;;
+    --save) SAVE=1; shift ;;
     -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//' >&2; exit 0 ;;
-    *) echo "usage: resolve-run.sh (--gid <gid> | --since <ISO-date>) [--list] [--transcript-only]" >&2; exit 2 ;;
+    *) echo "usage: resolve-run.sh (--gid <gid> | --since <ISO-date>) [--list] [--transcript-only] [--save]" >&2; exit 2 ;;
   esac
 done
-[ -n "$GID" ] || [ -n "$SINCE" ] || { echo "usage: resolve-run.sh (--gid <gid> | --since <ISO-date>) [--list] [--transcript-only]" >&2; exit 2; }
+[ -n "$GID" ] || [ -n "$SINCE" ] || { echo "usage: resolve-run.sh (--gid <gid> | --since <ISO-date>) [--list] [--transcript-only] [--save]" >&2; exit 2; }
 [ "$TRANSCRIPT_ONLY" -eq 0 ] || [ -n "$GID" ] || { echo "usage: --transcript-only needs --gid <gid>" >&2; exit 2; }
+[ "$SAVE" -eq 0 ] || [ -n "$GID" ] || { echo "usage: --save needs --gid <gid>" >&2; exit 2; }
 
 command -v jq >/dev/null || { echo "ERROR: jq not found" >&2; exit 1; }
 
@@ -378,7 +384,10 @@ resolve_one() { # $1=gid $2=name-hint $3=spawned-hint → one manifest JSON on s
   fi
 
   local run_report=""
-  run_report=$(find "$WORKTREES_ROOT/$gid" /tmp -maxdepth 3 \( -iname "*run-report*" -o -iname "*report*$gid*" \) -type f 2>/dev/null | head -1 || true)
+  # Only a report inside the task's own worktree root counts as local. A /tmp copy
+  # may be another task's or older than the attached one, so the newest Asana
+  # attachment is the report otherwise.
+  run_report=$(find "$WORKTREES_ROOT/$gid" -maxdepth 3 -iname "*run-report*" -type f 2>/dev/null | head -1 || true)
   [ -z "$run_report" ] && run_report="asana-attachment"
 
   # durable release receipt written by the watchdog at retirement (O1/O6 evidence).
@@ -527,6 +536,16 @@ if [ "$TRANSCRIPT_ONLY" -eq 1 ]; then
   exit 0
 fi
 if [ -n "$GID" ]; then
+  if [ "$SAVE" -eq 1 ]; then
+    dir="/tmp/eval-$GID"; mkdir -p "$dir"
+    tmp=$(mktemp "$dir/manifest.XXXXXX")
+    resolve_one "$GID" "" "" | jq -cs . > "$tmp"
+    got=$(jq -r '.[0].gid // empty' "$tmp")
+    [ "$got" = "$GID" ] || { rm -f "$tmp"; echo "resolve-run: manifest gid '$got' != requested '$GID'" >&2; exit 1; }
+    mv -f "$tmp" "$dir/manifest.json"
+    echo "$dir/manifest.json"
+    exit 0
+  fi
   resolve_one "$GID" "" "" | jq -cs .
   exit 0
 fi

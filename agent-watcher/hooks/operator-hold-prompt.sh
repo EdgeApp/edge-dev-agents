@@ -34,7 +34,8 @@
 # no waiver: the blocked write it orders passes the judge gate on the active hold.
 #
 # Not steering: harness envelopes and notices (background-task completions,
-# file-changed notes, command echoes) are stripped before the text is read, and
+# file-changed notes, command echoes, cross-session messages from other Claude
+# sessions) are stripped before the text is read, and
 # a prompt that is nothing else stamps nothing. Headless `claude -p` children
 # spawned by scripts inside the run inherit AGENT_TASK_GID and fire this hook on
 # their own payload; hooks/lib/headless-child.sh exits them early. The watchdog's
@@ -57,14 +58,17 @@ case "$PROMPT" in
 esac
 
 # Strip harness envelopes and machine notices; what survives is human text.
+# A cross-session-message is another Claude session's text, never the operator's,
+# so it cannot set or release a hold.
 HUMAN=$(printf '%s' "$PROMPT" | node -e '
 const tags = ["system-reminder", "task-notification", "local-command-stdout", "local-command-stderr",
-  "command-name", "command-message", "command-args", "user-prompt-submit-hook", "session-start-hook", "function_results"]
+  "command-name", "command-message", "command-args", "user-prompt-submit-hook", "session-start-hook", "function_results",
+  "cross-session-message"]
 let t = require("fs").readFileSync(0, "utf8")
 for (const tag of tags) {
   t = t.replace(new RegExp(`<${tag}\\b[^]*?</${tag}>`, "g"), "").replace(new RegExp(`</?${tag}\\b[^>]*>`, "g"), "")
 }
-const notice = /^\s*(\[SYSTEM NOTIFICATION|This is an automated|Do NOT interpret this|No human input has been received|Note: .*changed on disk|Background command .* completed|<task-id>|<tool-use-id>|<output-file>|<status>|<summary>)/
+const notice = /^\s*(\[SYSTEM NOTIFICATION|This is an automated|Do NOT interpret this|No human input has been received|Note: .*changed on disk|Background command .* completed|<task-id>|<tool-use-id>|<output-file>|<status>|<summary>|Another Claude session sent a message|This came from another Claude session)/
 process.stdout.write(t.split("\n").filter(l => !notice.test(l)).join("\n"))
 ' 2>/dev/null || printf '%s' "$PROMPT")
 printf '%s' "$HUMAN" | tr -d '[:space:]' | grep -q . || exit 0

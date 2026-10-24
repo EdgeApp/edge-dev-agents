@@ -27,6 +27,12 @@ set -uo pipefail
 #                 a human review, or — ONLY with Force Land authority — admin-merge
 #                 past exactly that review requirement (never past checks; see
 #                 pr-land `force-land-review-bypass`)
+#   BOT_THREADS <repo#num...> (exit 8) — an unresolved reviewer-bot thread is
+#                 open on a PR that is still armed (a bot posted after arming).
+#                 The watcher has already disarmed auto-merge on it (a failed
+#                 disarm is named on stderr). Address the threads per pr-land
+#                 `bot-thread-gate`, then re-arm through pr-land-automerge.sh.
+#                 An unreadable thread check is logged and polling continues.
 #
 # BACKGROUNDED CALLERS: read the VERDICT, never the exit code. A backgrounded
 # wrapper reports ITS OWN exit 0 and can mask exit 3 (the 2026-07-14 Banxa
@@ -82,6 +88,14 @@ prev_state() { printf '%s\n' "$PREV_STATES" | grep -F "|$1=" | head -1 | cut -d=
 # renew: 0 renewed, 3 no lease held, 1 held by someone else or expired).
 LAND_LOCK="$HOME/.cursor/skills/pr-land/scripts/repo-land-lock.sh"
 LAND_LOCK_OWNER="${AGENT_SESSION_UUID:-op-${USER:-shell}}"
+# Bot threads are re-read every poll (bot-thread-gate): arming checked them once,
+# and a reviewer bot can post a thread on the head before auto-merge fires. A
+# missing counter (an isolated install) skips the check with a warning.
+# shellcheck source=/dev/null
+if ! source "$(dirname "${BASH_SOURCE[0]}")/bot-thread-count.sh" 2>/dev/null; then
+  echo "WARNING: bot-thread-count.sh missing next to $0; bot threads are not re-checked" >&2
+  bot_thread_count() { echo "?"; }
+fi
 renew_land_leases() {
   [ -x "$LAND_LOCK" ] || return 0
   local r rc
@@ -99,6 +113,7 @@ while :; do
   red_pr=""
   rebase_prs=()
   review_prs=()
+  thread_prs=()
   line=""
   next_states=""
   merged_shas=""
@@ -123,6 +138,19 @@ while :; do
       continue
     fi
     open=$((open + 1))
+    nthreads=$(bot_thread_count "{\"repo\":\"$slug\",\"prNumber\":$num}")
+    if [ "$nthreads" = "?" ]; then
+      echo "$(date +%H:%M:%S) WARNING: bot-thread check failed for $spec; polling continues" >&2
+    elif [ "$nthreads" -gt 0 ] 2>/dev/null; then
+      # Same end state as pr-land-automerge.sh --disarm: "not enabled" is success.
+      if ! derr=$(gh pr merge "$num" --repo "$slug" --disable-auto 2>&1) \
+         && ! echo "$derr" | grep -qiE "not enabled|no auto.?merge|auto.?merge is not"; then
+        echo "$(date +%H:%M:%S) WARNING: disarm failed for $spec ($(echo "$derr" | head -1)); disarm it before it merges" >&2
+      fi
+      line="$line $spec=BOT_THREADS($nthreads)"
+      thread_prs+=("$spec")
+      continue
+    fi
     ms=$(echo "$js" | jq -r '.mergeStateStatus')
     bad=$(echo "$js" | jq -r '[.statusCheckRollup[]? | select((.conclusion // .state // "") | test("FAILURE|CANCELLED|TIMED_OUT|ERROR"))] | length')
     line="$line $spec=$ms(red=$bad)"
@@ -160,6 +188,7 @@ while :; do
   echo "$(date +%H:%M:%S) open=$open |$line"
 
   if [ "$open" -eq 0 ]; then finish "ALL_MERGED$merged_shas" 0; fi
+  if [ ${#thread_prs[@]} -gt 0 ]; then finish "BOT_THREADS ${thread_prs[*]}" 8; fi
   if [ -n "$red_pr" ]; then finish "CHECK_FAILED $red_pr" 4; fi
   if [ ${#rebase_prs[@]} -gt 0 ]; then finish "NEEDS_REBASE ${rebase_prs[*]}" 3; fi
   if [ ${#review_prs[@]} -gt 0 ]; then finish "BLOCKED_ON_REVIEW ${review_prs[*]}" 6; fi

@@ -140,8 +140,8 @@ const evalPrompt = (skill, m, profile = profileFor(m)) =>
   `Do NOT write any report file — return findings via StructuredOutput only (the orchestrator writes reports).\n` +
   (m.__fetch_full
     ? `This run was passed to you as a THIN reference (gid + cohort context only) to keep orchestration payload small. ` +
-      `Your FIRST step: run \`~/.cursor/skills/resolve-run/scripts/resolve-run.sh --gid ${m.gid}\` (timeout 90000ms+) to get the FULL manifest ` +
-      `JSON (transcript path, window, friction block, probe_index, auto_na, followup, blocking, etc.) for this gid. Use that as ` +
+      `Your FIRST step: run \`~/.cursor/skills/resolve-run/scripts/resolve-run.sh --gid ${m.gid} --save\` (timeout 90000ms+); it prints the path of the FULL manifest JSON (\`/tmp/eval-${m.gid}/manifest.json\`, gid-asserted; never write a manifest or report to any other path, other evaluators run concurrently): ` +
+      `transcript path, window, friction block, probe_index, auto_na, followup, blocking, etc. for this gid. Use that as ` +
       `"the manifest" for the rest of this evaluation. Thin reference passed by the orchestrator: ${JSON.stringify(m)}\n`
     : `Run manifest (from /resolve-run):\n${JSON.stringify(m)}\n`) +
   `The manifest carries probe_index (pre-computed transcript probe hits: counts + sample line numbers, plus the update-status ladder) ` +
@@ -156,7 +156,8 @@ const evalPrompt = (skill, m, profile = profileFor(m)) =>
       `Every other dimension is OUT OF SCOPE for this run — do not emit it (not even as NA), do not gather its evidence. ` +
       `Return each in-profile dimension exactly once, with BOTH its id and its rubric name.` +
       (mode === 'report'
-        ? ` REPORT-EVAL HARD CONSTRAINT: the transcript is NEVER opened — not one grep. Evidence is the run-report ` +
+        ? ` REPORT-EVAL HARD CONSTRAINT: the transcript is NEVER opened — not one grep. Fetch the report ONLY with ` +
+          `\`~/.cursor/skills/resolve-run/scripts/fetch-run-report.sh ${m.gid}\` (add \`--nth 2\` for the previous one; it asserts the attachment belongs to this task). Evidence is the run-report ` +
           `attachment + live GitHub/Asana APIs + the manifest's zero-LLM fields (friction, versions) only; anything ` +
           `needing the transcript is NOT_CAPTURED. ALWAYS return the escalate object per the profile's heuristics ` +
           `(reasons name the specific trigger, e.g. "hook_blocks=16" or "verified:partial with empty verify_blockers").`
@@ -189,7 +190,7 @@ const results = await pipeline(
         `Re-open the citation yourself and try to REFUTE it. Default to refuted=true if the evidence does not hold up ` +
         `or the citation cannot be opened.\nDimension: ${b.id}\nClaim: ${b.evidence}\nCitation: ${b.citation || 'none given'}\n` +
         (m.__fetch_full
-          ? `Manifest was passed thin; if the citation alone is insufficient, run \`~/.cursor/skills/resolve-run/scripts/resolve-run.sh --gid ${m.gid}\` ` +
+          ? `Manifest was passed thin; if the citation alone is insufficient, run \`~/.cursor/skills/resolve-run/scripts/resolve-run.sh --gid ${m.gid} --save\` ` +
             `(timeout 90000ms+) for the full manifest. Thin reference: ${JSON.stringify(m)}`
           : `Manifest: ${JSON.stringify(m)}`),
         { label: `verify:${m.gid}:${b.id}`, phase: 'Verify', schema: VERDICT_SCHEMA, ...VERIFY_OPT }

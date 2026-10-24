@@ -20,7 +20,11 @@ One of (with a 60000ms+ timeout):
 ~/.cursor/skills/resolve-run/scripts/resolve-run.sh --since <ISO-date>
 ~/.cursor/skills/resolve-run/scripts/resolve-run.sh --since <ISO-date> --list   # discovery only, no deep resolution
 ~/.cursor/skills/resolve-run/scripts/resolve-run.sh --gid <task-gid> --transcript-only   # just the transcript path
+~/.cursor/skills/resolve-run/scripts/resolve-run.sh --gid <task-gid> --save   # writes /tmp/eval-<gid>/manifest.json, gid-asserted, prints the path
+~/.cursor/skills/resolve-run/scripts/fetch-run-report.sh <task-gid> [--nth N]   # newest (or Nth) run report to /tmp/eval-<gid>/, owner-asserted
 ```
+
+When several evaluators run at once, use `--save` and `fetch-run-report.sh` and read the paths they print; never redirect either output to a path of your own.
 
 Output is a JSON array of manifests (stdout only; diagnostics on stderr). Exit 0 = ok, 1 = error, 2 = usage.
 </step>

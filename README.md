@@ -776,7 +776,10 @@ finding carrying a citation an auditor can open.
 
 - **`/resolve-run`** builds the evidence manifest per run: transcript path,
   PRs, Asana state, attempt log, friction block (hook blocks, tool errors,
-  compactions), version stamps, release receipt.
+  compactions), version stamps, release receipt, and run shape (`deliverable`:
+  PR or Task). `--save` writes it to `/tmp/eval-<gid>/` and checks the gid, so
+  parallel evals never read each other's manifest; `scripts/fetch-run-report.sh`
+  downloads a report attachment and checks it belongs to the task.
 - **`/agent-eval`** grades process compliance and outcome honesty against the
   agent-behavior rubric (dimensions A1-A37: status hygiene, completion
   honesty, report discipline, testing depth, tested-field accuracy, deferral
@@ -1097,6 +1100,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`upgrade-dep.sh`](.cursor/skills/pr-land/scripts/upgrade-dep.sh) | Bump one package on the current branch and commit lockfile updates |
 | [`npm-auth-wait.sh`](.cursor/skills/pr-land/scripts/npm-auth-wait.sh) | Foreground wait on `npm-publish-web.sh` logs; returns within one poll of each new auth link or tap so the relay goes out while the link is live |
 | [`pr-bot-findings-sweep.sh`](.cursor/skills/pr-land/scripts/pr-bot-findings-sweep.sh) | After merge, lists reviewer-bot findings that landed late on the merged PRs, so each becomes a follow-up task |
+| [`bot-thread-count.sh`](.cursor/skills/pr-land/scripts/bot-thread-count.sh) | Counts unresolved reviewer-bot threads on a PR head; shared by `pr-land-automerge.sh` (refuses to arm) and `pr-merge-watch.sh` (re-checks every poll, disarms and exits 8 `BOT_THREADS`) |
 | [`staging-cherry-pick.sh`](.cursor/skills/staging-cherry-pick/scripts/staging-cherry-pick.sh) | Cherry-pick staging-qualified commits; a conflict confined to TDD `tdd-code-fingerprint` stamp lines resolves to the incoming stamp |
 | [`staging-release-merge.sh`](.cursor/skills/develop-staging/scripts/staging-release-merge.sh) | Bump, merge develop into staging in a throwaway worktree, gate parity, push |
 | [`master-release-merge.sh`](.cursor/skills/staging-master/scripts/master-release-merge.sh) | Merge staging into master in a throwaway worktree, date the release heading, gate tree parity with staging, push master and the `vX.Y.0` tag; a dry run publishes a `dryrun/<version>-master` inspection tag |

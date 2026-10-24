@@ -58,13 +58,13 @@
       ]
     },
     "one-shot:report-as-attachment": {
-      "hash": "990c914c91e4",
+      "hash": "f038429fbaab",
       "dims": [
         "A9"
       ]
     },
     "file:agent-run-report.md": {
-      "hash": "ed2ce36f63c2",
+      "hash": "fb05e3cea031",
       "dims": [
         "A18",
         "A20",
@@ -222,7 +222,7 @@
       ]
     },
     "file:set-tested.sh": {
-      "hash": "c3a49ef3aed5",
+      "hash": "75e625df86ef",
       "dims": [
         "A22"
       ]
@@ -417,7 +417,7 @@
       ]
     },
     "file:require-clean-run-report.sh": {
-      "hash": "58f140a348cc",
+      "hash": "b5cdc8388248",
       "dims": [
         "A9"
       ]
@@ -441,7 +441,7 @@
       ]
     },
     "pr-land:bot-thread-gate": {
-      "hash": "7cb11182fd0f",
+      "hash": "32abd4a70b55",
       "dims": [
         "A15"
       ]
@@ -679,7 +679,7 @@
       ]
     },
     "one-shot:set-tested-field": {
-      "hash": "7bc33466d512",
+      "hash": "f685147c0653",
       "dims": [
         "A22"
       ]
@@ -1635,8 +1635,8 @@
       "hash": "a4e21645bdac"
     },
     "task-run:report-shape": {
-      "reason": "2026-09-24: operator declined a rubric dimension for task-run 2026-09-24",
-      "hash": "3f62fe4aee13"
+      "reason": "2026-10-24: frontmatter/Finalize Gate shape for Task runs; graded via agent-eval task-report profile A20, not a separate dimension",
+      "hash": "8abd5543c65e"
     },
     "one-shot:usage-pause": {
       "reason": "2026-09-25: graded by orch-eval O4 (usage-pause followed by turn end is expected; continuing work after it is BAD)",
