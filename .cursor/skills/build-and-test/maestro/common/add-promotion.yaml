@@ -1,0 +1,38 @@
+# common/add-promotion.yaml: Settings -> Promotion Settings -> add PROMO_CODE.
+# THROWAWAY ACCOUNTS ONLY: an added promotion is account-synced state
+# (activePromotions) that every session on the account then sees.
+# PARAMS:
+#   PROMO_CODE  the installer/promotion id to add.
+#   SHOT        frame path taken after the add. Unset takes none. The add does
+#               nothing visible when no info-server promotion matches the code,
+#               so the frame is how the caller confirms it landed.
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  PROMO_CODE: ${PROMO_CODE || ""}
+  SHOT: ${SHOT || ""}
+---
+- runFlow: open-settings.yaml
+- scrollUntilVisible:
+    element: "Promotion Settings"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Promotion Settings"
+- extendedWaitUntil:
+    visible: "Add promotion code"
+    timeout: 10000
+- tapOn: "Add promotion code"
+# The modal's title repeats the button label; its input takes the code.
+- extendedWaitUntil:
+    visible: "Submit"
+    timeout: 5000
+- inputText: ${PROMO_CODE}
+- tapOn: "Submit"
+- extendedWaitUntil:
+    notVisible: "Submit"
+    timeout: 15000
+- runFlow:
+    when:
+      true: ${SHOT != ''}
+    commands:
+      - takeScreenshot: ${SHOT}

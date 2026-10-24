@@ -1,0 +1,47 @@
+# swap-drive.yaml: a whole swap drive in ONE invocation: relaunch -> login ->
+# startup modals -> pair and amount -> quote -> proof frame -> (opt-in) confirm.
+# One runner start instead of one per stage.
+# PARAMS (every select-swap-pair param passes straight through: SRC_ASSET,
+# DST_ASSET, SRC_WALLET, DST_WALLET, SRC_ROW_ID, DST_ROW_ID, FIAT_AMOUNT,
+# PROVIDER, MANUAL_PATH):
+#   PIN_DIGIT, EXPECT_USERNAME  see common/login-if-needed.yaml. On iOS pass
+#                     `xcuitest-run.sh --login-role <role>` and neither param.
+#   RELAUNCH          "false" skips the relaunch and drives the app as it is
+#                     (already logged in). Default "true".
+#   QUOTE_SCREENSHOT  path for a frame of the quote scene. Unset takes none.
+#   CONFIRM           "true" slides the confirm slider. THE SLIDE MOVES FUNDS.
+#                     Default "false": the flow ends on the live quote.
+#   SUCCESS_TEXT / SUCCESS_TIMEOUT  passed to common/confirm-slider.yaml
+# A missed slide fails the flow 3s after the gesture and is never repeated.
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  # `${KEY || default}` so a caller's runFlow env wins over the default.
+  PIN_DIGIT: ${PIN_DIGIT || "0"}
+  EXPECT_USERNAME: ${EXPECT_USERNAME || ""}
+  RELAUNCH: ${RELAUNCH || "true"}
+  QUOTE_SCREENSHOT: ${QUOTE_SCREENSHOT || ""}
+  CONFIRM: ${CONFIRM || "false"}
+---
+- runFlow:
+    when:
+      true: ${RELAUNCH == 'true'}
+    file: common/relaunch-and-login.yaml
+    env:
+      PIN_DIGIT: ${PIN_DIGIT}
+      EXPECT_USERNAME: ${EXPECT_USERNAME}
+- runFlow:
+    when:
+      true: ${RELAUNCH != 'true'}
+    file: common/dismiss-startup-modals.yaml
+- runFlow:
+    file: common/select-swap-pair.yaml
+- runFlow:
+    when:
+      true: ${QUOTE_SCREENSHOT != ''}
+    commands:
+      - takeScreenshot: ${QUOTE_SCREENSHOT}
+- runFlow:
+    when:
+      true: ${CONFIRM == 'true'}
+    file: common/confirm-slider.yaml

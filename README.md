@@ -738,9 +738,13 @@ the app.
 - **Flow library** (`build-and-test/maestro/common/`): parameterized,
   reusable maestro flows (login, `relaunch-and-login.yaml`, wallet find,
   send-to-address, swap pair selection, ramp region/fiat, throwaway-account
-  lifecycle, slider confirm, `dismiss-logbox-banner.yaml` for the debug-build
+  lifecycle, slider confirm, `settings-unlock.yaml`, `add-promotion.yaml` for
+  throwaway accounts, `dismiss-logbox-banner.yaml` for the debug-build
   toast that swallows taps at the bottom of a scene; it returns at once on an
-  agent test build, which shows no toast). Every wait names each
+  agent test build, which shows no toast). Top-level composites run a whole
+  drive in one runner start: `swap-drive.yaml` (login through quote, opt-in
+  confirm) and `buy-select-provider.yaml` (buy quote through the payment-method
+  list, opt-in provider pick). Every wait names each
   ending it can reach, and a long wait never directly follows a tap.
   Task-specific flows an agent writes mid-run stay local and are excluded from
   sync; recurring sequences get promoted into the library through eval

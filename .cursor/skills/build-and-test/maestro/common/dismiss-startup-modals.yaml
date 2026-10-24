@@ -15,6 +15,13 @@ env:
 ---
 # A debug build's LogBox toast covers the tab bar and swallows taps there.
 - runFlow: dismiss-logbox-banner.yaml
+# The app's own review prompt ("Enjoying Edge?") also shows on an agent test
+# build, so it is probed outside the AGENT_TEST_MODE gate.
+- runFlow:
+    when:
+      visible: "Enjoying .*\\?"
+    commands:
+      - tapOn: "No Thanks"
 - runFlow:
     when:
       true: ${AGENT_TEST_MODE != 'true'}

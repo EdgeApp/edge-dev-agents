@@ -24,7 +24,8 @@ env:
     timeout: 15000
 - tapOn: "Settings"
 # Scene-advanced check: the Settings list opens on its "Account: <username>"
-# header, which the side menu does not show.
+# header, which the side menu does not show. The first open after a relaunch
+# takes over 10s to show it.
 - extendedWaitUntil:
     visible: "Account: .*"
-    timeout: 10000
+    timeout: 20000

@@ -1,0 +1,50 @@
+# buy-select-provider.yaml: buy-quote-input.yaml (login -> Buy -> amount), then
+# Next to the "Select Payment Method" list, and (opt-in) a provider pick.
+# PARAMS (every buy-quote-input param passes straight through: PIN_DIGIT,
+# EXPECT_USERNAME, BUY_AMOUNT, BUY_ASSET, MANUAL_PATH, FIAT_CODE):
+#   PAYMENT_TYPE  the payment-type card to change provider on, by its pill's
+#                 testID `providerPill_<paymentType>` (e.g. `applepay`,
+#                 `credit`). The pill text is the provider name and changes
+#                 with ranking, so it is not a selector. Unset ends on the
+#                 option list, where provider ordering is visible.
+#   PROVIDER      provider name to pick in "Choose Provider". Read with
+#                 PAYMENT_TYPE.
+#   SHOT          frame path taken at the end. Unset takes none.
+# A region-less account stops in buy-quote-input on "Select your region"; run
+# common/ramp-set-region-fiat.yaml once first.
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  PAYMENT_TYPE: ${PAYMENT_TYPE || ""}
+  PROVIDER: ${PROVIDER || ""}
+  SHOT: ${SHOT || ""}
+---
+- runFlow: buy-quote-input.yaml
+- tapOn: "Next"
+- extendedWaitUntil:
+    visible: "Select Payment Method"
+    timeout: 30000
+- runFlow:
+    when:
+      true: ${PAYMENT_TYPE != ''}
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: ${"providerPill_" + PAYMENT_TYPE}
+          direction: DOWN
+          timeout: 15000
+      - tapOn:
+          id: ${"providerPill_" + PAYMENT_TYPE}
+      - extendedWaitUntil:
+          visible: "Choose Provider"
+          timeout: 10000
+      - tapOn: ${PROVIDER}
+      # Scene-advanced check: a pick that landed closes the sheet.
+      - extendedWaitUntil:
+          notVisible: "Choose Provider"
+          timeout: 5000
+- runFlow:
+    when:
+      true: ${SHOT != ''}
+    commands:
+      - takeScreenshot: ${SHOT}

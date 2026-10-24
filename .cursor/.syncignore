@@ -6,12 +6,11 @@
 # needs — capture-buy-quote.sh defaults to skills/build-and-test/maestro/
 # buy-quote-input.yaml — so buy-quote*.yaml MUST keep syncing.
 #
-# Task/feature-specific flows an agent authors mid-run (e.g. the Maya swap-*
-# flows) are GUI dev artifacts, NOT agent conventions. Keep them LOCALLY for
-# reuse, but never push them to the agent repo. Until the orchestration
-# "where do per-task yamls live" strategy is finalized, list those task-flow
-# families here so the leak can't recur.
-skills/build-and-test/maestro/swap-*.yaml
+# Task/feature-specific flows an agent authors mid-run are GUI dev artifacts,
+# NOT agent conventions. Keep them LOCALLY for reuse, but never push them to
+# the agent repo. Until the orchestration "where do per-task yamls live"
+# strategy is finalized, list those task-flow families here so the leak can't
+# recur. swap-drive.yaml is a library flow and syncs.
 
 # Third-party skills need no entry here: skills/ is authored-only (the sync
 # excludes and REPORTS anything the repo does not carry and whose SKILL.md

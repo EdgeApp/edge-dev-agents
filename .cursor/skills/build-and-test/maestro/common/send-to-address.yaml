@@ -22,9 +22,17 @@
 #                  needs the broadcast waits for "Transaction Success|Slide to
 #                  Confirm", then asserts "Transaction Success" (the modal a
 #                  sent transaction raises).
+#   ROW_ID         manual path only: the wallet row's testID
+#                  (`walletListRow.<wallet name>.<code>`), for an account where
+#                  WALLET_SEARCH matches several wallets. Unset picks the first
+#                  match, as before.
+#   AMOUNT         "MAX" (manual path only) taps the amount modal's MAX button
+#                  instead of typing a number.
 #   MANUAL_PATH    "true" forces Assets -> wallet -> Send -> address -> amount,
 #                  for a task whose change is on the wallet scene, the address
 #                  modal or the amount entry.
+# A zero-balance wallet raises "Wallet Empty" over the Send scene after the Send
+# tap; the manual path declines it ("Not at this time") and carries on.
 # Promoted 2026-08-06 (run 1217135300337949); proof-frame tail steps
 # intentionally dropped for reuse.
 appId: co.edgesecure.app
@@ -32,6 +40,7 @@ env:
   CURRENCY_CODE: ${CURRENCY_CODE || ""}
   MANUAL_PATH: ${MANUAL_PATH || ""}
   WALLET_SEARCH: ${WALLET_SEARCH || ""}
+  ROW_ID: ${ROW_ID || ""}
   SLIDE: ${SLIDE || "true"}
 ---
 - runFlow:
@@ -68,21 +77,19 @@ env:
       - extendedWaitUntil: {visible: "Assets", timeout: 1000}
       - runFlow: {when: {visible: "Not Now"}, commands: [{tapOn: "Not Now"}]}
       - runFlow: {when: {visible: {id: "modal-close-button"}}, commands: [{tapOn: {id: "modal-close-button"}}]}
-      # Home is still mounting cards in the first seconds after a login and a
-      # tab tap in that window is swallowed with no error, so settle first.
-      - waitForAnimationToEnd: {timeout: 5000}
-      - tapOn: "Assets"
-      # Scene-advanced check: the wallet list's search footer.
-      - extendedWaitUntil: {visible: "Search Wallets", timeout: 5000}
-      - tapOn: "Search Wallets"
-      # The search text survives navigation; clear it or inputText appends.
-      - eraseText: 40
-      - inputText: ${WALLET_SEARCH}
-      - extendedWaitUntil: {visible: ".*${WALLET_SEARCH}.*", timeout: 15000}
-      - tapOn: {text: ".*${WALLET_SEARCH}.*", index: 0}
+      - runFlow:
+          file: find-wallet.yaml
+          env:
+            SEARCH_TERM: ${WALLET_SEARCH}
+            ROW_ID: ${ROW_ID}
       - extendedWaitUntil: {visible: "Send", timeout: 15000}
       - tapOn: "Send"
-      - extendedWaitUntil: {visible: ".*Enter.*", timeout: 15000}
+      - extendedWaitUntil: {visible: ".*Enter.*|Wallet Empty", timeout: 15000}
+      - runFlow:
+          when: {visible: "Wallet Empty"}
+          commands:
+            - tapOn: "Not at this time"
+            - extendedWaitUntil: {notVisible: "Wallet Empty", timeout: 5000}
       - tapOn: {text: ".*Enter.*"}
       - tapOn: "Address"
       - inputText: ${ADDRESS}
@@ -96,15 +103,26 @@ env:
       # swaps, so AMOUNT is in units of the currency here as on the link.
       - runFlow:
           when:
-            true: ${CURRENCY_CODE != ''}
+            true: ${CURRENCY_CODE != '' && AMOUNT != 'MAX'}
           commands:
             - runFlow:
                 when: {visible: "0 ${CURRENCY_CODE.toUpperCase()}"}
                 commands:
                   - tapOn: "0 ${CURRENCY_CODE.toUpperCase()}"
                   - extendedWaitUntil: {notVisible: "0 ${CURRENCY_CODE.toUpperCase()}", timeout: 3000}
-      - inputText: ${AMOUNT}
-      - tapOn: "Done"
+      - runFlow:
+          when:
+            true: ${AMOUNT == 'MAX'}
+          commands:
+            - tapOn: "MAX"
+            # Scene-advanced check: MAX fills the amount and closes the modal.
+            - extendedWaitUntil: {notVisible: "MAX", timeout: 5000}
+      - runFlow:
+          when:
+            true: ${AMOUNT != 'MAX'}
+          commands:
+            - inputText: ${AMOUNT}
+            - tapOn: "Done"
 - extendedWaitUntil: {visible: "Slide to Confirm", timeout: 15000}
 # A LogBox toast over the slider swallows the swipe (debug builds).
 - runFlow: dismiss-logbox-banner.yaml

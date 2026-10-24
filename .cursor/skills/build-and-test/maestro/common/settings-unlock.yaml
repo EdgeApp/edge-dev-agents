@@ -1,0 +1,30 @@
+# common/settings-unlock.yaml: from any signed-in scene, open Settings and
+# unlock Account Settings through the Confirm Password modal.
+# PARAMS:
+#   PASSWORD  the signed-in account's password. No default: pass it with
+#             `-e PASSWORD=...` and mask it in any step log you attach.
+# Ends on "Tap to Lock Account Settings" (the row an unlocked account shows).
+appId: ${APP_ID}
+env:
+  APP_ID: co.edgesecure.app
+  PASSWORD: ${PASSWORD || ""}
+---
+- runFlow: open-settings.yaml
+- extendedWaitUntil:
+    visible: "Tap to Unlock Account Settings|Tap to Lock Account Settings"
+    timeout: 20000
+# Already unlocked this session: nothing to do.
+- runFlow:
+    when:
+      visible: "Tap to Unlock Account Settings"
+    commands:
+      - tapOn: "Tap to Unlock Account Settings"
+      - extendedWaitUntil:
+          visible: "Confirm Password"
+          timeout: 15000
+      - inputText: ${PASSWORD}
+      - tapOn: "Submit"
+      # Password checks run scrypt; a slow device takes most of a minute.
+      - extendedWaitUntil:
+          visible: "Tap to Lock Account Settings"
+          timeout: 60000
