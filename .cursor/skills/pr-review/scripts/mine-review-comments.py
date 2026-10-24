@@ -9,6 +9,11 @@ each PR with all of its comments (paginated past 100). Raw per-PR responses are
 cached under <out>/cache/ so a rerun or an interrupted run only fetches what is
 missing; --refresh ignores the cache.
 
+The export shares the gh token's hourly GraphQL budget with everything else that
+uses it. Every query reads its own rateLimit; when the remaining points drop
+below --rate-floor, all workers pause until the reset. The run's points and REST
+points land in summary.json under apiUsage (the export makes no REST requests).
+
 Outputs in --out:
   review-threads-<since>_<until>.jsonl  one row per thread (root comment + replies)
   summary.json, summary.md              counts by repo, author and author class
@@ -24,7 +29,7 @@ it. diffHunkFull keeps the hunk as GitHub returned it.
 Usage:
   mine-review-comments.py [--org EdgeApp] [--since 2025-10-23] [--until 2026-10-23]
                           [--out ~/.config/pr-review/mining] [--accounts <file>]
-                          [--jobs 4] [--refresh]
+                          [--jobs 4] [--rate-floor 1000] [--refresh]
 """
 
 import argparse
@@ -35,6 +40,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 
 DEFAULT_ACCOUNTS = os.path.expanduser('~/.config/pr-review/mining/accounts.json')
@@ -46,6 +52,12 @@ EXAMPLE_ACCOUNTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'min
 HUMANS = set()
 OPERATOR = None
 KNOWN_BOTS = set()
+
+# GraphQL budget shared by the worker threads. graphql() records each response's
+# rateLimit; wait_for_budget() sleeps through the reset while remaining < floor.
+RATE = {'floor': 1000, 'used': 0, 'remaining': None, 'resetAt': None}
+RATE_LOCK = threading.Lock()
+RATE_LIMIT_FIELDS = 'rateLimit { cost remaining resetAt }'
 
 
 def load_accounts(path):
@@ -61,6 +73,7 @@ def load_accounts(path):
 
 SEARCH_QUERY = '''
 query($q: String!, $after: String) {
+  %s
   search(query: $q, type: ISSUE, first: 100, after: $after) {
     issueCount
     pageInfo { hasNextPage endCursor }
@@ -73,7 +86,7 @@ query($q: String!, $after: String) {
     }
   }
 }
-'''
+''' % RATE_LIMIT_FIELDS
 
 COMMENT_FIELDS = '''
   id databaseId url createdAt body authorAssociation diffHunk
@@ -86,9 +99,10 @@ COMMENT_FIELDS = '''
 
 THREADS_QUERY = '''
 query($owner: String!, $repo: String!, $number: Int!, $after: String) {
+  %s
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
-      reviewThreads(first: 50, after: $after) {
+      reviewThreads(first: 100, after: $after) {
         pageInfo { hasNextPage endCursor }
         nodes {
           id isResolved isOutdated path line originalLine startLine originalStartLine
@@ -103,10 +117,11 @@ query($owner: String!, $repo: String!, $number: Int!, $after: String) {
     }
   }
 }
-''' % COMMENT_FIELDS
+''' % (RATE_LIMIT_FIELDS, COMMENT_FIELDS)
 
 MORE_COMMENTS_QUERY = '''
 query($id: ID!, $after: String) {
+  %s
   node(id: $id) {
     ... on PullRequestReviewThread {
       comments(first: 100, after: $after) {
@@ -116,16 +131,52 @@ query($id: ID!, $after: String) {
     }
   }
 }
-''' % COMMENT_FIELDS
+''' % (RATE_LIMIT_FIELDS, COMMENT_FIELDS)
+
+
+def parse_time(s):
+  return datetime.datetime.fromisoformat(s.replace('Z', '+00:00'))
+
+
+def seed_rate_limit():
+  # REST rate_limit reads do not count against either budget.
+  proc = subprocess.run(['gh', 'api', 'rate_limit'], capture_output=True, text=True, check=True)
+  res = json.loads(proc.stdout)['resources']
+  gql = res['graphql']
+  reset = datetime.datetime.fromtimestamp(gql['reset'], datetime.timezone.utc)
+  with RATE_LOCK:
+    RATE['remaining'] = gql['remaining']
+    RATE['resetAt'] = reset.isoformat()
+  print('rate limit: graphql %d/%d remaining, resets %s' % (
+    gql['remaining'], gql['limit'], RATE['resetAt']), file=sys.stderr)
+
+
+def wait_for_budget():
+  # Holding the lock while sleeping parks every other worker here too.
+  with RATE_LOCK:
+    if RATE['remaining'] is None or RATE['remaining'] >= RATE['floor']:
+      return
+    wait = (parse_time(RATE['resetAt']) - datetime.datetime.now(datetime.timezone.utc)).total_seconds() + 5
+    print('graphql remaining %d < %d: pausing %ds until %s' % (
+      RATE['remaining'], RATE['floor'], max(wait, 0), RATE['resetAt']), file=sys.stderr)
+    time.sleep(max(wait, 0))
+    RATE['remaining'] = None
 
 
 def graphql(query, variables, attempts=5):
   body = json.dumps({'query': query, 'variables': variables})
   for attempt in range(attempts):
+    wait_for_budget()
     proc = subprocess.run(['gh', 'api', 'graphql', '--input', '-'], input=body,
                           capture_output=True, text=True)
     if proc.returncode == 0:
       data = json.loads(proc.stdout)
+      rl = (data.get('data') or {}).pop('rateLimit', None)
+      if rl:
+        with RATE_LOCK:
+          RATE['used'] += rl['cost']
+          RATE['remaining'] = rl['remaining']
+          RATE['resetAt'] = rl['resetAt']
       if not data.get('errors'):
         return data['data']
       err = json.dumps(data['errors'])[:500]
@@ -372,9 +423,13 @@ def main():
   ap.add_argument('--accounts', default=DEFAULT_ACCOUNTS)
   ap.add_argument('--jobs', type=int, default=4)
   ap.add_argument('--hunk-lines', type=int, default=10)
+  ap.add_argument('--rate-floor', type=int, default=1000,
+                  help='pause until the reset when GraphQL points remaining drop below this')
   ap.add_argument('--refresh', action='store_true', help='refetch PRs already in the cache')
   args = ap.parse_args()
   load_accounts(args.accounts)
+  RATE['floor'] = args.rate_floor
+  seed_rate_limit()
 
   cache_dir = os.path.join(args.out, 'cache')
   os.makedirs(cache_dir, exist_ok=True)
@@ -411,6 +466,7 @@ def main():
     for r in rows:
       f.write(json.dumps(r, ensure_ascii=False) + '\n')
   s = summarize(rows, prs, args)
+  s['apiUsage'] = {'graphqlPoints': RATE['used'], 'restRequests': 0}
   with open(os.path.join(args.out, 'summary.json'), 'w') as f:
     json.dump(s, f, indent=2)
   with open(os.path.join(args.out, 'summary.md'), 'w') as f:
@@ -420,6 +476,7 @@ def main():
   print('threads %d, human roots %d in %d repos, %s roots %d, bot roots %d' % (
     t.get('threads', 0), t.get('root_human', 0), s['reposWithHumanRoots'],
     OPERATOR, t.get('root_' + OPERATOR, 0), t.get('root_bot', 0)))
+  print('graphql points used %d, REST requests 0' % RATE['used'])
   print('wrote %s, summary.json, summary.md in %s' % (name, args.out))
 
 
