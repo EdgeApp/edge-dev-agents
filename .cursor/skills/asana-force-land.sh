@@ -4,8 +4,9 @@
 # The field (gid 1216270424525434) is the operator's opt-in to land WITHOUT a
 # human PR approval — for trivial changes (copy tweaks) where review adds
 # nothing. All other landing legitimacy comes from an actual human approval on
-# the PR (one-shot `land-on-approval`); this field overrides only the approval
-# requirement, never CI or the finalize gate.
+# the PR (one-shot `land-on-approval`); this field overrides the approval
+# requirement and, in pr-land-prepare.sh, the CHANGELOG entry requirement;
+# never CI or the finalize gate.
 #
 # --since <iso8601>: print land-approved only when the field's most recent
 # change to "Land Approved" (from the task's stories) happened AFTER that time.

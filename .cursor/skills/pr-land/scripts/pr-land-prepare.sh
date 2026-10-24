@@ -7,6 +7,12 @@
 //   Optional per-branch "buildField": the linked task's Build field value from
 //   asana-build-field.sh (resolved at discovery). "staging" arms the
 //   staging-task-under-unreleased CHANGELOG placement check.
+//   Optional per-branch "taskGid": the linked Asana task. When the task's Force
+//   Land field is Land Approved (asana-force-land.sh, read live here so the
+//   caller cannot grant it), verification drops --require-changelog for that
+//   branch: the operator's opt-in covers landing with no CHANGELOG entry. An
+//   entry the branch does add still gets the placement check. The result
+//   carries changelogRequired: false when the exemption applied.
 //
 // For each branch:
 //   1. Checkout + fetch; stop with status "diverged" when the local branch
@@ -184,7 +190,21 @@ function describeBranchState(repoDir, branch) {
   return parts.join("\n");
 }
 
-async function prepareBranch(repo, branch, buildField) {
+// Force Land authority for a task, resolved by asana-force-land.sh. No gid, or
+// any resolver error, keeps the CHANGELOG requirement.
+function hasForceLand(taskGid) {
+  if (!taskGid) return false;
+  const r = spawnSync(path.join(process.env.HOME, ".cursor/skills/asana-force-land.sh"), [String(taskGid)], {
+    encoding: "utf8",
+  });
+  if (r.status !== 0) {
+    console.error(`asana-force-land.sh failed for task ${taskGid}; CHANGELOG entry stays required`);
+    return false;
+  }
+  return r.stdout.trim() === "land-approved";
+}
+
+async function prepareBranch(repo, branch, buildField, taskGid) {
   const canonicalDir = getRepoDir(repo);
   let repoDir = canonicalDir;
   const result = {
@@ -381,13 +401,16 @@ async function prepareBranch(repo, branch, buildField) {
   }
 
   // Step 6: Run verification (lint scoped to files changed vs upstream).
-  // requireChangelog: every landed PR must have updated CHANGELOG.md — the
-  // diff-based existence check is format-agnostic (works for Unreleased-style
-  // AND legacy versions-only CHANGELOGs).
+  // requireChangelog: every landed PR must have updated CHANGELOG.md (the
+  // diff-based existence check is format-agnostic: Unreleased-style AND legacy
+  // versions-only CHANGELOGs), except a task with Force Land authority.
+  const requireChangelog = !hasForceLand(taskGid);
+  result.changelogRequired = requireChangelog;
+  if (!requireChangelog) console.error(`Force Land on task ${taskGid}: CHANGELOG entry not required`);
   console.error("\nRunning verification...");
   const verifyResult = runVerification(repoDir, upstream, {
     skipInstall: true,
-    requireChangelog: true,
+    requireChangelog,
   });
 
   if (!verifyResult.success) {
@@ -516,8 +539,8 @@ async function main() {
 
   let exitCode = 0;
 
-  for (const { repo, branch, buildField } of branches) {
-    const result = await prepareBranch(repo, branch, buildField);
+  for (const { repo, branch, buildField, taskGid } of branches) {
+    const result = await prepareBranch(repo, branch, buildField, taskGid);
 
     switch (result.status) {
       case "ready":

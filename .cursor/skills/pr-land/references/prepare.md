@@ -14,7 +14,7 @@ Governs steps 3-4 of `/pr-land` (prepare and push), and every CHANGELOG or code 
 |--------|---------|
 | `pr-land-prepare.sh` | Rebase + conflict detection + verification |
 | `~/.cursor/skills/dep-publish-sanction.sh` | `check`: is this PR waiting on an unpublished dependency. `clear`: remove the `awaiting-dep-publish` label and body line (`dep-sanction-at-land`) |
-| `verify-repo.sh` | Verification (CHANGELOG + code; lint scoped to changed files when `--base` given; accommodates both Unreleased-style and legacy versions-only CHANGELOG formats; prepare invokes it with `--require-changelog`, so every landed PR must include a CHANGELOG entry) |
+| `verify-repo.sh` | Verification (CHANGELOG + code; lint scoped to changed files when `--base` given; accommodates both Unreleased-style and legacy versions-only CHANGELOG formats; prepare invokes it with `--require-changelog` unless the PR's task has Force Land authority) |
 | `changelog-union-merge.sh` | Mechanically resolve a CHANGELOG rebase/cherry-pick conflict (union, dedupe, type-order). Shared with /develop-staging, which adds whole-section merging behind `--release-merge`; pr-land never passes that flag |
 | `wait-for-quiet-load.sh` | Blocks (bounded) until the 1-min load average, minus this session's own process tree, is at or below 2 x CPUs; called by every verification path, exits 0 always |
 
@@ -32,7 +32,7 @@ Governs steps 3-4 of `/pr-land` (prepare and push), and every CHANGELOG or code 
 | `ready` | Prepared + verified | Proceed to push (step 4). Check `placementWarnings` first. |
 | `changelog_conflict` | CHANGELOG-only rebase conflict, left in progress | Run `changelog-union-merge.sh <repoDir> --continue` (mechanical union: dedupe + type-order), re-run prepare. Resolve by hand only if the script exits non-zero. |
 | `code_conflict` | Code-file rebase conflict, rebase LEFT IN PROGRESS | Resolve semantically in place when confidently determinable (dep/version bumps, lockfile regen, accept upstream deletion, non-overlapping edits): keep both sides' intent, regenerate lockfiles if deps changed, `git add` + `GIT_EDITOR=true git rebase --continue`, re-run prepare. `git rebase --abort` + skip ONLY if not confidently resolvable. See `code-conflicts`. |
-| `verification_failed` | verify-repo.sh failed | Read `failedStep` + `logPath` from the JSON; inspect the log tail (`tail -40 <logPath>`); fix only if trivially in-scope, else report. Special case `failedStep: "CHANGELOG entry existence check"` — prepare REQUIRES every landed PR to have updated CHANGELOG.md: add a correctly-formatted entry for the PR's change (under `## Unreleased`, or the topmost version section in legacy versions-only repos), amend it onto the branch, and re-run prepare. Only if an entry is genuinely unwarranted (e.g. CI-only change), ask the user whether to land without one. |
+| `verification_failed` | verify-repo.sh failed | Read `failedStep` + `logPath` from the JSON; inspect the log tail (`tail -40 <logPath>`); fix only if trivially in-scope, else report. Special case `failedStep: "CHANGELOG entry existence check"` — prepare REQUIRES the PR to have updated CHANGELOG.md (a task with Force Land authority never reaches this, see `taskGid` above): add a correctly-formatted entry for the PR's change (under `## Unreleased`, or the topmost version section in legacy versions-only repos), amend it onto the branch, and re-run prepare. Only if an entry is genuinely unwarranted (e.g. CI-only change), ask the user whether to land without one. |
 | `install_failed` | Dependency install failed | Read the error: a Socket Firewall HTML page ("Please connect to Socket Firewall") is a transient proxy outage — retry the prepare ONCE, then report. Runtime-setup steps in `scripts.prepare` are already stripped during verification installs (see `verification-prepare-cmd.sh`), so a persistent failure is a real install problem: report, do not retry further. |
 | `diverged` | Local branch lacks commits `origin/<branch>` has; nothing was rewritten | Read `message`. Leftover of an earlier attempt: `git checkout -B <branch> origin/<branch>`, re-run prepare. Local work the PR lacks: rebase it onto `origin/<branch>` and push it first. Never force-push to clear this status. |
 | `autosquash_failed` | Fixup autosquash rebase failed (aborted) | Report; branch likely needs manual history repair. |
@@ -51,10 +51,10 @@ First run the `dep-sanction-at-land` check on each PR about to be prepared and l
 ONE tool call per batch:
 
 ```bash
-echo '[{"repo":"...","branch":"<prefix>/feature","buildField":"staging"}]' | ~/.cursor/skills/pr-land/scripts/pr-land-prepare.sh
+echo '[{"repo":"...","branch":"<prefix>/feature","buildField":"staging","taskGid":"<task-gid>"}]' | ~/.cursor/skills/pr-land/scripts/pr-land-prepare.sh
 ```
 
-Include `buildField` per branch with the task's Build field value already resolved during discovery (`build-field-routing`) — `"staging"` arms the deterministic CHANGELOG placement check below; omit it for tasks with no Build field.
+Include `buildField` per branch with the task's Build field value already resolved during discovery (`build-field-routing`) — `"staging"` arms the deterministic CHANGELOG placement check below; omit it for tasks with no Build field. Include `taskGid` per branch: the Asana task (or per-PR subtask) the PR is linked from. The script reads that task's Force Land field itself; on `Land Approved` it lands the PR without a CHANGELOG entry and reports `changelogRequired: false`. Omit it for PRs discovered with no task.
 
 The prepare script handles: clone/checkout, autosquash fixups, rebase onto upstream (the repo's actual default branch via origin/HEAD; `origin/develop` for the GUI), conflict detection, and verification. It operates on the PRIMARY checkout at `~/git/<repo>` — not a scratch clone — so in-progress local work there is auto-stashed per `dirty-tree-policy`. Per-PR outcomes are the `status` values in `<prepare-statuses>`; act on each as prescribed there.
 
