@@ -26,6 +26,11 @@ YOUR STANDING VERDICT (`myStanding` in the context output) carries over between 
 `APPROVE` asserts that the review RAN and found no blocking defect. It is never a way to say "I did not look": a review that could not examine the diff, or whose workflow failed, submits nothing and says so. The mapping applies to every submission, whether `--comment` posted it directly or the user approved the draft first.</rule>
 <rule id="curation-owns-truth">Workflow findings are candidates, not conclusions. Before delivery, judge each against your own read of the diff: reject false positives (state the evidence), downgrade findings whose failure mode pre-exists the PR (say so in the comment), and drop findings that only restate a documented intent of the PR. Rejected findings reach the PR only per `self-review-rejections`; everywhere else they go to chat/report. Parent-review findings (step 4b) get no independent verifier, so hold them to the same bar: each carries a concrete `failure_scenario` grounded in code you read, and curation re-judges them as strictly as workflow candidates.</rule>
 <rule id="self-review-rejections">Findings curation rejected reach the PR only as the curation-record block (step 5) in the review BODY, never as inline comments: an inline thread is an unresolved conversation that pr-address and one-shot's followup routing treat as work owed. The block goes on every review this skill submits on a PR we author (`author == me`), and on every `APPROVE` on a PR we do not author. On our own PR, a round whose findings were ALL rejected still submits, as a `COMMENT` review carrying only that block, and a round left with nothing new submits nothing. Before listing a rejected finding, check your own earlier review bodies in `reviews[]`; one already listed there (same location, same claim) is not listed again. A `REQUEST_CHANGES` on a PR we do not author leaves rejected findings in chat and the run report. `posting-gate` still decides whether any review submits at all.</rule>
+<rule id="finding-tags">Every inline finding names what produced it, so acceptance can be counted per rule. Each comment in the Review JSON carries `tag`; `submit` appends it to the comment body as a hidden last line, `<!-- pr-review:tag=<tag> -->` (an HTML comment, which GitHub does not render), and `render` prints the same payload without posting. Pick the tag in this order:
+1. `rule:<id>` when the finding is a violation of review-standards.mdc or typescript-standards.mdc: the `id` of its `<rule>`, `<standard>` or `<pattern>` element. A workflow finding that turns out to be a standards violation takes the rule, not its lens.
+2. `lens:<name>` for a workflow finding that cites no rule: the finding's `lens` from 4a. Correctness lenses are `line-by-line`, `removed-behavior`, `cross-file`, `language-pitfall`, `wrapper-proxy` and `gap-sweep`; cleanup lenses are `reuse`, `simplification`, `efficiency`, `altitude` and `conventions`.
+3. `general` for everything else: parent-review general code review findings, and a workflow finding with no `lens`.
+A finding both passes raised takes the more specific tag. Never write the marker into a body yourself. `submit` and `render` refuse a comment whose tag is missing, malformed, or names an unknown rule id or lens. Replies and the review body carry no tag.</rule>
 <rule id="independent-parent-review">The parent review (step 4b) runs WHILE the workflow runs and is finished before you read the workflow's result. Reading the workflow's candidates first anchors your pass on them and forfeits the independent second look that is the reason the pass exists.</rule>
 <rule id="batch-reads">When reviewing changed files, batch independent Read/Grep calls in a single message.</rule>
 <rule id="script-timeouts">The companion script may take up to 30s. Set `block_until_ms: 60000` when invoking it.</rule>
@@ -81,7 +86,7 @@ Invoke the workflow with the level and target:
 Workflow({ name: "code-review-sonnet", args: "<level> [angles=N] [model=X] [effort=X] <pr-url>" })
 ```
 
-It runs in the background. Do NOT wait on it yet: go straight to 4b, and read its result (TaskOutput, blocking) only once 4b's findings are written down, per `independent-parent-review`. Its result carries `findings[]` (each with file/line/summary/failure_scenario/category/verdict) and `refuted[]`.
+It runs in the background. Do NOT wait on it yet: go straight to 4b, and read its result (TaskOutput, blocking) only once 4b's findings are written down, per `independent-parent-review`. Its result carries `findings[]` (each with file/line/summary/failure_scenario/category/verdict/lens, where `lens` names the finder lens that raised it, per `finding-tags`) and `refuted[]`.
 
 Model allocation, for cost awareness: the workflow's Scope and Synthesize agents inherit the session model; its Find/Verify/Sweep fan-out defaults to Sonnet running at the level's effort (level IS effort, mirroring the official /code-review). Depth, model, and effort are separate dials: pass `model=sonnet|opus|haiku|inherit` and/or `effort=low|medium|high|xhigh|max|inherit` alongside the level, where `inherit` on either drops that key so the fan-out takes the session's own value. Everything else in this skill runs inline on the session model.
 </sub-step>
@@ -91,7 +96,7 @@ Your own review of the diff, on the session model, independent of the workflow. 
 - **General code review**: anything a strong reviewer would catch. Correctness on paths the diff touches, whether the change does what the PR title/body (and linked task) say, design and altitude (a special case bolted onto shared code, logic at the wrong layer), cross-cutting effects that span files, and missing handling for realistic states (error path, empty/cold state, concurrent calls).
 - **Edge conventions**: violations of review-standards.mdc and typescript-standards.mdc; efficient memoization where necessary (memo, useHandler, useCallback); unnecessary code, unnecessary JSX fragments, missed simplifications.
 
-Record each finding with file, line, summary, and a concrete `failure_scenario` before moving to 4c. Overlap with the workflow is expected and resolved in curation, so do not narrow this pass to avoid it.
+Record each finding with file, line, summary, a concrete `failure_scenario`, and its tag (`rule:<id>` for an Edge-conventions finding, `general` otherwise, per `finding-tags`) before moving to 4c. Overlap with the workflow is expected and resolved in curation, so do not narrow this pass to avoid it.
 
 This sub-step is the extension point for Edge-specific review machinery (for example a catalog of known review dimensions fanned out to cheaper checkers): add such lenses here, feeding the same findings shape.
 </sub-step>
@@ -101,6 +106,7 @@ Merge 4a + 4b into one findings set (a finding both passes raised counts once, a
 1. Drop duplicates of feedback already on the PR (`reviews[]`, `inlineComments[]`).
 2. Reject false positives with cited evidence; keep the rejection list for the summary and for the curation-record block wherever `self-review-rejections` puts it.
 3. Categorize survivors: **Critical** (must fix before merge), **Warning** (should address), **Suggestion** (consider).
+4. Give each survivor its final tag per `finding-tags`.
 </sub-step>
 </step>
 
@@ -131,7 +137,10 @@ A caller that also fixed findings before posting (one-shot's self-review) adds a
 <step id="6" name="Deliver">
 Resolve the posting decision per `posting-gate`:
 
-1. `--no-comment` (or orch default) → do not submit; findings and drafts go to chat / the run report. Done, go to step 7.
+1. `--no-comment` (or orch default) → do not submit. Build the same Review JSON a submit would send and print it through `render`, which shows every draft comment ending in its tag marker; that output goes to chat / the run report. Done, go to step 7.
+   ```bash
+   echo '<review-json>' | ~/.cursor/skills/pr-review/scripts/github-pr-review.sh render
+   ```
 2. Default interactive → show the drafts (grouped per PR file/line, with category), ask for approval, then submit the approved subset.
 3. `--comment` → submit directly.
 
@@ -148,7 +157,7 @@ Review JSON format:
   "event": "COMMENT",
   "body": "",
   "comments": [
-    { "path": "src/file.ts", "line": 42, "side": "RIGHT", "body": "Comment text" }
+    { "path": "src/file.ts", "line": 42, "side": "RIGHT", "body": "Comment text", "tag": "rule:<id>" }
   ],
   "replies": [
     { "thread_id": "<threads[].id>", "body": "Fixed at `abc1234`.", "resolve": true }
@@ -166,7 +175,7 @@ Review JSON format:
    Pass the confirmed-fix `replies` (`review-event-mapping`) in the same payload. `submit` refuses a review with no body, comments, or replies, so this body is never left empty.
 2. On our own PR → the rejected-only `COMMENT` under `self-review-rejections`, or nothing.
 
-Drafts that wait for approval, or go into a run report for later posting, are pre-checked with the same payload plus `submit --check-only`: it runs every submit check (structure, anchors, prose lint) and posts nothing, so the approved draft is the one that posts.
+Drafts that wait for approval, or go into a run report for later posting, are pre-checked with the same payload plus `submit --check-only`: it runs every submit check (structure, tags, anchors, prose lint) and posts nothing, so the approved draft is the one that posts.
 </step>
 
 <step id="7" name="Summarize">

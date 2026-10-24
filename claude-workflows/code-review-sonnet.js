@@ -2,7 +2,7 @@ export const meta = {
   name: "code-review-sonnet",
   description: "Workflow-backed code review with Sonnet fan-out — one finder per correctness angle plus one finder covering all cleanup angles, an independent verifier for every distinct (file, line) location across the pooled candidates, then a ranked, capped findings report.",
   whenToUse: "Model-invocable clone of the built-in /code-review workflow, re-pinned for level parity with Claude Code 2.1.232, with Find/Verify/Sweep forced onto Sonnet while Scope and Synthesize inherit the session model. Callable from a skill step or an orch task without the disable-model-invocation gate on /code-review. Pass args as \"<level> [angles=N] [model=X] [effort=X] [target]\" — level is low, medium, high, xhigh, or max and picks the pipeline shape plus, by default, the fan-out agents' reasoning effort (level IS effort, as in the official build); angles=N overrides the correctness-angle count (1-5) independently of level; model=sonnet|opus|haiku|inherit overrides the fan-out model (default sonnet, inherit = the caller\u0027s session model); effort=low|medium|high|xhigh|max|inherit overrides the fan-out reasoning effort (default: the level's own effort; inherit = the caller's session effort, leaving level to control shape only); target is an optional PR number or URL, branch, ref range, path, or free-form review instructions.",
-  phases: [{"title":"Scope","detail":"Pin the diff command, changed files, applicable CLAUDE.md files, and conventions"},{"title":"Find","detail":"One finder per correctness angle plus one finder covering all cleanup angles, pooled before verify"},{"title":"Verify","detail":"One independent verifier per distinct (file, line) location — CONFIRMED / PLAUSIBLE / REFUTED per candidate"},{"title":"Sweep","detail":"Fresh finder hunting only for gaps (xhigh/max)"},{"title":"Synthesize","detail":"Merge duplicates, rank, cap the report"}],
+  phases: [{"title":"Scope","detail":"Pin the diff command, changed files, applicable CLAUDE.md and AGENTS.md files, and conventions"},{"title":"Find","detail":"One finder per correctness angle plus one finder covering all cleanup angles, pooled before verify"},{"title":"Verify","detail":"One independent verifier per distinct (file, line) location — CONFIRMED / PLAUSIBLE / REFUTED per candidate"},{"title":"Sweep","detail":"Fresh finder hunting only for gaps (xhigh/max)"},{"title":"Synthesize","detail":"Merge duplicates, rank, cap the report"}],
 }
 
 // code-review: Scope → Find (barrier) → group-by-location → Verify → Sweep (xhigh/max) → Synthesize
@@ -94,11 +94,21 @@ const FANOUT = {
 
 // Prompt fragments shared with the inline /code-review cells (one source of truth).
 const CORRECTNESS_ANGLES = [{"label":"angle-A","text":"### Angle A — line-by-line diff scan\n\nRead every hunk in the diff, line by line. Then Read the enclosing function for\neach hunk — bugs in unchanged lines of a touched function are in scope (the PR\nre-exposes or fails to fix them). For every line ask: what input, state, timing,\nor platform makes this line wrong? Look for inverted/wrong conditions,\noff-by-one, null/undefined deref, missing `await`, falsy-zero checks,\nwrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.\n"},{"label":"angle-B","text":"### Angle B — removed-behavior auditor\n\nFor every line the diff DELETES or replaces, name the invariant or behavior it\nenforced, then search the new code for where that invariant is re-established.\nIf you can't find it, that's a candidate: a removed guard, a dropped error\npath, a narrowed validation, a deleted test that was covering a real case.\n"},{"label":"angle-C","text":"### Angle C — cross-file tracer\n\nFor each function the diff changes, find its callers (Grep for the symbol) and\ncheck whether the change breaks any call site: a new precondition, a changed\nreturn shape, a new exception, a timing/ordering dependency. Also check callees:\ndoes a parallel change in the same PR make a call unsafe?\n"},{"label":"angle-D","text":"### Angle D — language-pitfall specialist\n\nScan for the classic pitfalls of the diff's language/framework — for example:\nJS falsy-zero, `==` coercion, closure-captured loop var; Python mutable default\nargs, late-binding closures; Go nil-map write, range-var capture; SQL injection;\ntimezone/DST drift; float equality. Flag any instance the diff introduces.\n"},{"label":"angle-E","text":"### Angle E — wrapper/proxy correctness\n\nWhen the PR adds or modifies a type that wraps another (cache, proxy, decorator,\nadapter): check that every method routes to the wrapped instance and not back\nthrough a registry/session/global — e.g. a caching provider holding a\n`delegate` field that resolves IDs via `session.get(...)` instead of\n`delegate.get(...)` will re-enter the cache or recurse. Also check that the\nwrapper forwards all the methods the callers actually use.\n"}]
-const CLEANUP_TEXT = "### Reuse\n\nFlag new code that re-implements something the codebase\nalready has — Grep shared/utility modules and files adjacent to the change,\nand name the existing helper to call instead.\n\n\n### Simplification\n\nFlag unnecessary complexity the diff adds: redundant or derivable state,\ncopy-paste with slight variation, deep nesting, dead code left behind. Name\nthe simpler form that does the same job.\n\n\n### Efficiency\n\nFlag wasted work the diff introduces: redundant computation or repeated I/O,\nindependent operations run sequentially, blocking work added to startup or\nhot paths. Also flag long-lived objects built from closures or captured\nenvironments — they keep the entire enclosing scope alive for the object's\nlifetime (a memory leak when that scope holds large values); prefer a\nclass/struct that copies only the fields it needs. Name the cheaper\nalternative.\n\n\n### Altitude\n\nCheck that each change is implemented at the right depth, not as a fragile\nbandaid. Special cases layered on shared infrastructure are a sign the fix\nisn't deep enough — prefer generalizing the underlying mechanism over adding\nspecial cases.\n\n\n### Conventions (CLAUDE.md)\n\nFind the CLAUDE.md files that govern the changed code: the user-level\n~/.claude/CLAUDE.md, the repo-root CLAUDE.md, plus any CLAUDE.md or\nCLAUDE.local.md in a directory that is an ancestor of a changed file (a\ndirectory's CLAUDE.md only applies to files at or below it). Read each one\nthat exists, then check the diff for clear violations of the rules they state.\n\nOnly flag a violation when you can quote the exact rule and the exact line\nthat breaks it — no style preferences, no vague \"spirit of the doc\"\ninferences. In the finding, name the CLAUDE.md path and quote the rule so the\nreport can cite it. If no CLAUDE.md applies, return nothing for this angle.\n"
+const CLEANUP_TEXT = "### Reuse\n\nFlag new code that re-implements something the codebase\nalready has — Grep shared/utility modules and files adjacent to the change,\nand name the existing helper to call instead.\n\n\n### Simplification\n\nFlag unnecessary complexity the diff adds: redundant or derivable state,\ncopy-paste with slight variation, deep nesting, dead code left behind. Name\nthe simpler form that does the same job.\n\n\n### Efficiency\n\nFlag wasted work the diff introduces: redundant computation or repeated I/O,\nindependent operations run sequentially, blocking work added to startup or\nhot paths. Also flag long-lived objects built from closures or captured\nenvironments — they keep the entire enclosing scope alive for the object's\nlifetime (a memory leak when that scope holds large values); prefer a\nclass/struct that copies only the fields it needs. Name the cheaper\nalternative.\n\n\n### Altitude\n\nCheck that each change is implemented at the right depth, not as a fragile\nbandaid. Special cases layered on shared infrastructure are a sign the fix\nisn't deep enough — prefer generalizing the underlying mechanism over adding\nspecial cases.\n\n\n### Conventions (CLAUDE.md, AGENTS.md)\n\nFind the CLAUDE.md and AGENTS.md files that govern the changed code: the\nuser-level ~/.claude/CLAUDE.md, the repo-root CLAUDE.md and AGENTS.md, plus any\nCLAUDE.md, CLAUDE.local.md, or AGENTS.md in a directory that is an ancestor of a\nchanged file (a directory's file only applies to files at or below it). Read each one\nthat exists, then check the diff for clear violations of the rules they state.\n\nOnly flag a violation when you can quote the exact rule and the exact line\nthat breaks it — no style preferences, no vague \"spirit of the doc\"\ninferences. In the finding, name the CLAUDE.md or AGENTS.md path and quote the rule so\nthe report can cite it. If no such file applies, return nothing for this angle.\n"
 const VERDICT_LADDER = "- **CONFIRMED** — can name the inputs/state that trigger it and the wrong\n  output or crash. Quote the line.\n- **PLAUSIBLE** — mechanism is real, trigger is uncertain (timing, env,\n  config). State what would confirm it.\n- **REFUTED** — factually wrong (code doesn't say that) or guarded elsewhere.\n  Quote the line that proves it."
 const VERDICT_LADDER_RECALL = "**PLAUSIBLE by default** — do not refute a candidate for being \"speculative\" or\n\"depends on runtime state\" when the state is realistic: concurrency races,\nnil/undefined on a rare-but-reachable path (error handler, cold cache, missing\noptional field), falsy-zero treated as missing, off-by-one on a boundary the\ncode does not exclude, retry storms / partial failures, regex/allowlist that\nlost an anchor. These are PLAUSIBLE.\n\n**REFUTED** only when constructible from the code: factually wrong (quote the\nactual line); provably impossible (type/constant/invariant — show it); already\nhandled in this diff (cite the guard); or pure style with no observable effect."
-const CLEANUP_PRECEDENCE = "Cleanup, altitude, and conventions candidates use the same\n`file`/`line`/`summary` shape; in `failure_scenario`, state the concrete\ncost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule\nis broken) instead of a crash. Correctness bugs always outrank cleanup,\naltitude, and conventions findings when the output cap forces a cut.\n"
+const CLEANUP_PRECEDENCE = "Cleanup, altitude, and conventions candidates use the same\n`file`/`line`/`summary` shape; in `failure_scenario`, state the concrete\ncost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md or\nAGENTS.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup,\naltitude, and conventions findings when the output cap forces a cut.\n"
 const SWEEP_GAP_FOCUS = "moved/extracted code that dropped a guard\nor anchor; second-tier footguns (dataclass default evaluated once, `hash()`\nnon-determinism, lock-scope shrink, predicate methods with side effects);\nsetup/teardown asymmetry in tests; config defaults flipped."
+
+// Lens names (pr-review `finding-tags`): every candidate carries the lens that
+// produced it, so /pr-review can tag each posted comment and acceptance can be
+// counted per lens. A one-angle finder's lens is stamped from its angle; the
+// cleanup and single-pass finders name it per candidate from a fixed list; the
+// sweep is its own lens.
+const ANGLE_LENS = { "angle-A": "line-by-line", "angle-B": "removed-behavior", "angle-C": "cross-file", "angle-D": "language-pitfall", "angle-E": "wrapper-proxy" }
+const CLEANUP_LENSES = ["reuse", "simplification", "efficiency", "altitude", "conventions"]
+const ALL_LENSES = Object.values(ANGLE_LENS).concat(CLEANUP_LENSES)
+const SWEEP_LENS = "gap-sweep"
 
 // ─── Schemas ───
 const SCOPE_SCHEMA = {
@@ -111,20 +121,23 @@ const SCOPE_SCHEMA = {
     conventions: { type: "string" },
   },
 }
-const CANDIDATES_SCHEMA = {
+// `lenses` set: the finder covers several lenses and must name one per candidate.
+const candidatesSchema = lenses => ({
   type: "object", required: ["candidates"],
   properties: {
     candidates: { type: "array", items: {
-      type: "object", required: ["file", "summary", "failure_scenario"],
+      type: "object", required: ["file", "summary", "failure_scenario"].concat(lenses ? ["lens"] : []),
       properties: {
         file: { type: "string", description: "repo-relative path exactly as listed under Changed files in the review scope" },
         line: { type: "number" },
         summary: { type: "string" },
         failure_scenario: { type: "string" },
+        ...(lenses ? { lens: { enum: lenses, description: "the lens this candidate was found under" } } : {}),
       },
     }},
   },
-}
+})
+const CANDIDATES_SCHEMA = candidatesSchema()
 // One verifier per distinct (file, line) location, returning a verdict per
 // candidate at that location — instead of one verifier per candidate. Cuts
 // verifier-agent count by the cross-finder location-collision rate (~40% at
@@ -166,7 +179,7 @@ const scope = await agent(
   "\n1. Determine the exact diff command(s) for the review and run them to confirm they produce a non-empty diff.\n" +
   "2. List the changed files.\n" +
   "3. Summarize what changed in one paragraph.\n" +
-  "4. List the CLAUDE.md files that apply to the changed files (the user-level ~/.claude/CLAUDE.md, the repo-root CLAUDE.md, plus any CLAUDE.md or CLAUDE.local.md in a directory that is an ancestor of a changed file). Read each one that exists and note conventions a reviewer should know.\n\n" +
+  "4. List the CLAUDE.md and AGENTS.md files that apply to the changed files (the user-level ~/.claude/CLAUDE.md, the repo-root CLAUDE.md and AGENTS.md, plus any CLAUDE.md, CLAUDE.local.md, or AGENTS.md in a directory that is an ancestor of a changed file). Return them all in claudeMdFiles. Read each one that exists and note conventions a reviewer should know.\n\n" +
   "Return diffCommand exactly as a reviewer should run it. Structured output only.",
   { label: "scope", schema: SCOPE_SCHEMA }
 )
@@ -184,7 +197,7 @@ const SCOPE_BLOCK =
   "Diff command: " + scope.diffCommand + "\n" +
   "Changed files (" + scope.files.length + "):\n" +
   scope.files.map(f => "  - " + f).join("\n") + "\n" +
-  "Applicable CLAUDE.md files (" + claudeMdFiles.length + "):\n" +
+  "Applicable CLAUDE.md / AGENTS.md files (" + claudeMdFiles.length + "):\n" +
   (claudeMdFiles.length > 0 ? claudeMdFiles.map(f => "  - " + f).join("\n") : "  (none)") + "\n\n" +
   "## What changed\n" + scope.summary + "\n\n" +
   "## Conventions\n" + (scope.conventions || "(none noted)") + "\n" +
@@ -213,7 +226,8 @@ const FINDER_PROMPT = f => {
     (isCleanup ? CLEANUP_PRECEDENCE + "\n" : "") +
     "Surface up to " + f.cap + " candidate findings, each with file, line, a one-line summary, and a concrete failure_scenario — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows). " +
     (isCleanup
-      ? "Cover whichever lenses apply — you do not need findings from every lens; prioritize the highest-cost issues across all of them, and list candidates highest-cost first: only the first " + f.keep + " are verified. "
+      ? "Cover whichever lenses apply — you do not need findings from every lens; prioritize the highest-cost issues across all of them, and list candidates highest-cost first: only the first " + f.keep + " are verified. " +
+        "Set each candidate's lens to the lens it was found under (" + f.lenses.join(", ") + "). "
       : "") +
     "Pass every candidate with a nameable failure scenario through — do not silently drop half-believed candidates; an independent verifier judges them next. " +
     "If nothing qualifies, return an empty list.\n\nStructured output only."
@@ -230,6 +244,7 @@ const LOW_PASS_PROMPT =
   CLEANUP_PRECEDENCE + "\n" +
   "No verifier follows this pass, so surface only findings you would stake the review on: " +
   "each with file, line, a one-line summary, and a concrete failure_scenario. " +
+  "Set each candidate's lens to the lens it was found under: Angles A-E are " + Object.values(ANGLE_LENS).join(", ") + "; the cleanup lenses are " + CLEANUP_LENSES.join(", ") + ". " +
   "Surface up to 8 candidates; if nothing qualifies, return an empty list.\n\nStructured output only."
 
 // Finders may return absolute, repo-relative, or backslash-separated paths
@@ -248,7 +263,10 @@ const canonFile = raw => {
   }
   return best || p
 }
-const ingest = (cs, cap, kind) => cs.slice(0, cap).map(c => ({ ...c, file: canonFile(c.file), kind }))
+// A finder's fixed `lens` wins; otherwise keep the candidate's own lens only
+// when it is one the finder was given.
+const lensFor = (f, c) => f.lens || (f.lenses && f.lenses.includes(c.lens) ? c.lens : undefined)
+const ingest = (cs, cap, f) => cs.slice(0, cap).map(c => ({ ...c, file: canonFile(c.file), kind: f.kind, lens: lensFor(f, c) }))
 const loc = c => c.file + (c.line != null ? ":" + c.line : "")
 const inBounds = (i, n) => Number.isInteger(i) && i >= 0 && i < n
 
@@ -304,13 +322,14 @@ async function verifyGroups(candidates) {
 // Low replaces the fan-out with the official single-pass cell: one finder,
 // every lens, no verify.
 const FINDERS = P.singlePass
-  ? [{ label: "single-pass", kind: "correctness", cap: 8, text: null }]
+  ? [{ label: "single-pass", kind: "correctness", cap: 8, text: null, lenses: ALL_LENSES }]
   : CORRECTNESS_ANGLES.slice(0, CORRECTNESS_COUNT)
-      .map(a => ({ ...a, kind: "correctness", cap: P.perAngle }))
+      .map(a => ({ ...a, kind: "correctness", cap: P.perAngle, lens: ANGLE_LENS[a.label] }))
       .concat([{
         label: "cleanup",
         kind: "cleanup",
         cap: 5 * P.perAngle,
+        lenses: CLEANUP_LENSES,
         // Plain pre-verify cap: cleanup ranks below every correctness finding,
         // so at most maxFindings cleanup candidates can reach the report.
         // Verifying more is spend with no reportable outcome.
@@ -320,10 +339,10 @@ const FINDERS = P.singlePass
 
 let cleanupCapped = 0
 const finderOuts = await parallel(FINDERS.map(f => () =>
-  agent(P.singlePass ? LOW_PASS_PROMPT : FINDER_PROMPT(f), { label: f.label, phase: "Find", schema: CANDIDATES_SCHEMA, ...FANOUT }).then(r => {
+  agent(P.singlePass ? LOW_PASS_PROMPT : FINDER_PROMPT(f), { label: f.label, phase: "Find", schema: f.lenses ? candidatesSchema(f.lenses) : CANDIDATES_SCHEMA, ...FANOUT }).then(r => {
     if (!r) return []
     log(f.label + ": " + r.candidates.length + " candidates")
-    const kept = ingest(r.candidates, f.cap, f.kind)
+    const kept = ingest(r.candidates, f.cap, f)
     if (f.keep == null || kept.length <= f.keep) return kept
     cleanupCapped = kept.length - f.keep
     log(f.label + ": capped to " + f.keep + " before verify (" + cleanupCapped + " dropped)")
@@ -354,7 +373,7 @@ if (P.sweep) {
     { label: "sweep", phase: "Sweep", schema: CANDIDATES_SCHEMA, ...FANOUT }
   )
   if (sweep && sweep.candidates.length > 0) {
-    const sliced = ingest(sweep.candidates, SWEEP_MAX, "correctness")
+    const sliced = ingest(sweep.candidates, SWEEP_MAX, { kind: "correctness", lens: SWEEP_LENS })
     candidatesSeen += sliced.length
     log("sweep: " + sliced.length + " candidates")
     const sweepVerified = await verifyGroups(sliced)
@@ -437,14 +456,14 @@ for (const d of decisions) {
   const merged = (Array.isArray(d.merge) ? d.merge : []).filter(claim).map(i => ranked[i])
   const verdict = merged.some(m => m.verdict === "CONFIRMED") ? "CONFIRMED" : c.verdict
   const also = merged.length > 0 ? " [same root cause also at: " + merged.map(loc).join(", ") + "]" : ""
-  findings.push({ file: c.file, line: c.line, summary: c.summary + also, failure_scenario: c.failure_scenario, category: c.kind, verdict })
+  findings.push({ file: c.file, line: c.line, summary: c.summary + also, failure_scenario: c.failure_scenario, category: c.kind, lens: c.lens, verdict })
 }
 const usedDecisions = findings.length > 0
 let backfilled = 0
 for (let i = 0; i < ranked.length && findings.length < P.maxFindings; i++) {
   if (seen.has(i)) continue
   const c = ranked[i]
-  findings.push({ file: c.file, line: c.line, summary: c.summary, failure_scenario: c.failure_scenario, category: c.kind, verdict: c.verdict })
+  findings.push({ file: c.file, line: c.line, summary: c.summary, failure_scenario: c.failure_scenario, category: c.kind, lens: c.lens, verdict: c.verdict })
   backfilled++
 }
 const summary = usedDecisions && report
@@ -458,6 +477,6 @@ return {
   target: TARGET || undefined,
   summary,
   findings,
-  refuted: refuted.map(c => ({ file: c.file, line: c.line, summary: c.summary })),
+  refuted: refuted.map(c => ({ file: c.file, line: c.line, summary: c.summary, lens: c.lens })),
   stats: { ...stats, reported: findings.length },
 }

@@ -7,15 +7,26 @@
 #   submit   --pr <n> --owner <o> --repo <r> --sha <sha>  Post review (JSON on stdin; exits 1
 #            without calling GitHub if stdin is empty, not one JSON object, has an event
 #            other than COMMENT/REQUEST_CHANGES/APPROVE, has malformed comments or replies,
-#            anchors an inline comment outside the PR diff, sends a verdict on your own PR, or
-#            APPROVEs over your own open REQUEST_CHANGES threads). --check-only runs every
-#            check, prose lint included, prints what would happen to a pending draft, and exits
-#            0 without posting.
+#            anchors an inline comment outside the PR diff, gives an inline comment a missing
+#            or unknown tag, sends a verdict on your own PR, or APPROVEs over your own open
+#            REQUEST_CHANGES threads). --check-only runs every check, prose lint included,
+#            prints the per-tag count and what would happen to a pending draft, and exits 0
+#            without posting.
+#   render   Review JSON on stdin -> the payload as it would post (tag markers appended to
+#            the comment bodies) on stdout, plus a per-tag count on stderr. Same payload and
+#            tag checks as submit; no GitHub call, so a --no-comment dry run can print it.
 #
-# Review JSON: { event, body, comments: [{path, line, body, start_line?, side?, start_side?}],
+# Review JSON: { event, body, comments: [{path, line, body, tag, start_line?, side?, start_side?}],
 #                replies: [{thread_id, body, resolve?}] }
 # `replies` answer existing review threads (thread node ids from context `threads[]`) inside
 # the same review; `resolve: true` resolves the thread after the review posts.
+#
+# Finding tags (pr-review `finding-tags`): every inline comment carries a `tag` naming what
+# produced the finding, and submit/render append it to the comment body as a hidden marker
+# on its own last line, `<!-- pr-review:tag=<tag> -->`, which GitHub does not render. A tag is
+# `rule:<id>` (an id from STANDARDS_FILES), `lens:<name>` (one of TAG_LENSES), or `general`.
+# A body that already ends with that same marker is left alone; a body holding a different
+# marker is refused. Replies and the review body carry no tag.
 #
 # Pending drafts: GitHub allows one PENDING review per user per PR and answers a second review
 # with a bare HTTP 422. Submit never deletes a draft that holds content. A draft pinned to the
@@ -90,6 +101,63 @@ fetch_threads() { # owner repo number -> JSON array of raw thread nodes on stdou
           nodes { id isResolved isOutdated path line originalLine
             comments(first: 1) { totalCount nodes { author { login } body pullRequestReview { databaseId } } } }
         } } } }' --jq '.data.repository.pullRequest.reviewThreads.nodes[]' | jq -s '.'
+}
+
+STANDARDS_FILES=("$HOME/.cursor/rules/review-standards.mdc" "$HOME/.cursor/rules/typescript-standards.mdc")
+# Lens names: code-review-sonnet's (ANGLE_LENS, CLEANUP_LENSES, SWEEP_LENS in
+# ~/.claude/workflows/code-review-sonnet.js). A lens added there or in pr-review
+# step 4b is added here too.
+TAG_LENSES='["line-by-line","removed-behavior","cross-file","language-pitfall","wrapper-proxy","gap-sweep","reuse","simplification","efficiency","altitude","conventions"]'
+
+rule_ids_json() { # -> JSON array of the rule/standard/pattern ids in STANDARDS_FILES
+  { cat "${STANDARDS_FILES[@]}" 2>/dev/null || true; } | { grep -oE '<(rule|standard|pattern) id="[^"]*"' || true; } \
+    | sed -E 's/.*id="//; s/"$//' | jq -R . | jq -s .
+}
+
+# Review JSON on stdin -> "OK" or the reason to refuse it. Shape checks, then
+# tag checks. With no standards file readable the rule-id lookup is skipped
+# (warned), so a missing checkout cannot block every review.
+validate_review() {
+  local ids
+  ids=$(rule_ids_json)
+  [[ "$ids" == "[]" ]] && echo "WARN: no rule ids read from ${STANDARDS_FILES[*]}; rule: tags are checked for shape only" >&2
+  jq -rs --argjson ids "$ids" --argjson lenses "$TAG_LENSES" '
+    if length == 0 then "stdin is empty (was the draft file missing?)"
+    elif length > 1 then "stdin holds \(length) JSON values; expected exactly one review object"
+    else .[0] |
+      if type != "object" then "review must be a JSON object, got \(type)"
+      elif (has("event") | not) then "review is missing \"event\""
+      elif (.event != "COMMENT" and .event != "REQUEST_CHANGES" and .event != "APPROVE") then "event must be COMMENT, REQUEST_CHANGES or APPROVE, got \(.event | tojson)"
+      elif has("comments") and (.comments | type) != "array" then "\"comments\" must be an array"
+      elif any((.comments // [])[]; type != "object" or ((.path // "") == "") or ((.line | type) != "number") or ((.body // "") == "")) then "every comment needs a non-empty path, a numeric line, and a non-empty body"
+      elif has("replies") and (.replies | type) != "array" then "\"replies\" must be an array"
+      elif any((.replies // [])[]; type != "object" or ((.thread_id // "") == "") or ((.body // "") == "") or (has("resolve") and (.resolve | type) != "boolean")) then "every reply needs a non-empty thread_id and body; resolve must be a boolean"
+      elif ((.body // "") == "") and ((.comments // []) | length) == 0 and ((.replies // []) | length) == 0 then "review has no body, comments, or replies"
+      else
+        [(.comments // [])[] | . as $c | "\($c.path):\($c.line)" as $at | ($c.tag // null) as $t
+          | if ($t | type) != "string" then "\($at): missing tag"
+            elif ($t | test("^rule:[A-Za-z0-9][A-Za-z0-9-]*$")) then
+              (if ($ids | length) > 0 and ($ids | any(. == $t[5:]) | not) then "\($at): \($t) is not an id in review-standards.mdc or typescript-standards.mdc" else empty end)
+            elif ($t | test("^lens:")) then
+              (if ($lenses | any(. == $t[5:]) | not) then "\($at): \($t) is not a known lens (\($lenses | join(", ")))" else empty end)
+            elif $t == "general" then empty
+            else "\($at): malformed tag \($t | tojson)" end,
+          ([$c.body | scan("<!-- pr-review:tag=(\\S*) -->") | .[0] | select(. != $t)] | if length > 0 then "\($at): body already holds a different tag marker (\(.[0]))" else empty end)
+        ] as $bad
+        | if ($bad | length) > 0 then "bad finding tags (each inline comment needs tag: rule:<id>, lens:<name> or general, per pr-review finding-tags): " + ($bad | join("; ")) else "OK" end
+      end
+    end' 2>/dev/null || echo "stdin is not valid JSON"
+}
+
+# Validated review JSON on stdin -> the payload as GitHub receives it: each
+# comment body ends with its tag marker and the `tag` key is dropped.
+TAG_JQ='if has("comments") then .comments |= map(
+    ("<!-- pr-review:tag=" + .tag + " -->") as $m
+    | .body = (if (.body | rtrimstr("\n") | endswith($m)) then .body else .body + "\n\n" + $m end)
+    | del(.tag)) else . end'
+
+tag_counts() { # validated review JSON on stdin -> "rule:x=2 general=1" (or "none")
+  jq -r '[(.comments // [])[] | .tag] | group_by(.) | map("\(.[0])=\(length)") | join(" ") | if . == "" then "none" else . end'
 }
 
 graphql_input() { # request JSON {query, variables} on stdin -> response on stdout, exit 1 on errors
@@ -210,25 +278,15 @@ case "$CMD" in
     # author, a review that found nothing blocking submits APPROVE, and one that
     # found a must-fix submits REQUEST_CHANGES. The skill decides which; this
     # script only refuses events GitHub has no verb for.
-    VALIDATION=$(printf '%s' "$REVIEW_JSON" | jq -rs '
-      if length == 0 then "stdin is empty (was the draft file missing?)"
-      elif length > 1 then "stdin holds \(length) JSON values; expected exactly one review object"
-      else .[0] |
-        if type != "object" then "review must be a JSON object, got \(type)"
-        elif (has("event") | not) then "review is missing \"event\""
-        elif (.event != "COMMENT" and .event != "REQUEST_CHANGES" and .event != "APPROVE") then "event must be COMMENT, REQUEST_CHANGES or APPROVE, got \(.event | tojson)"
-        elif has("comments") and (.comments | type) != "array" then "\"comments\" must be an array"
-        elif any((.comments // [])[]; type != "object" or ((.path // "") == "") or ((.line | type) != "number") or ((.body // "") == "")) then "every comment needs a non-empty path, a numeric line, and a non-empty body"
-        elif has("replies") and (.replies | type) != "array" then "\"replies\" must be an array"
-        elif any((.replies // [])[]; type != "object" or ((.thread_id // "") == "") or ((.body // "") == "") or (has("resolve") and (.resolve | type) != "boolean")) then "every reply needs a non-empty thread_id and body; resolve must be a boolean"
-        elif ((.body // "") == "") and ((.comments // []) | length) == 0 and ((.replies // []) | length) == 0 then "review has no body, comments, or replies"
-        else "OK" end
-      end' 2>/dev/null) || VALIDATION="stdin is not valid JSON"
+    VALIDATION=$(printf '%s' "$REVIEW_JSON" | validate_review)
     if [[ "$VALIDATION" != "OK" ]]; then
       echo "Error: refusing to submit: $VALIDATION" >&2
       exit 1
     fi
     EVENT=$(printf '%s' "$REVIEW_JSON" | jq -r '.event')
+    # What GitHub receives: REVIEW_JSON with each comment's tag marker appended.
+    # The checks and the prose lint read REVIEW_JSON, so the marker is never linted.
+    POST_JSON=$(printf '%s' "$REVIEW_JSON" | jq "$TAG_JQ")
 
     PR_JSON=$(gh api "repos/$OWNER/$REPO/pulls/$PR" --jq '{head: .head.sha, author: .user.login}') || {
       echo "Error: failed to read PR $OWNER/$REPO#$PR" >&2; exit 1
@@ -379,7 +437,7 @@ case "$CMD" in
     fi
 
     if [[ "$CHECK_ONLY" == "1" ]]; then
-      echo "check-only: payload, anchors, verdict guard and prose lint OK; draft action: $DRAFT_ACTION; nothing posted"
+      echo "check-only: payload, tags, anchors, verdict guard and prose lint OK; tags: $(printf '%s' "$REVIEW_JSON" | tag_counts); draft action: $DRAFT_ACTION; nothing posted"
       exit 0
     fi
 
@@ -397,7 +455,7 @@ case "$CMD" in
 
     # Plain path: no draft to adopt and no thread replies, one REST call.
     if [[ "$DRAFT_ACTION" != "adopt" && "$REPLY_COUNT" -eq 0 ]]; then
-      printf '%s' "$REVIEW_JSON" | jq --arg sha "$SHA" 'del(.replies) + {commit_id: $sha}' | \
+      printf '%s' "$POST_JSON" | jq --arg sha "$SHA" 'del(.replies) + {commit_id: $sha}' | \
         gh api "repos/$OWNER/$REPO/pulls/$PR/reviews" -X POST --input - | \
         jq '{id: .id, state: .state, url: .html_url}'
       exit 0
@@ -419,9 +477,9 @@ case "$CMD" in
           exit 1
         }
         ADDED=$((ADDED + 1))
-      done < <(printf '%s' "$REVIEW_JSON" | jq -c '(.comments // [])[]')
+      done < <(printf '%s' "$POST_JSON" | jq -c '(.comments // [])[]')
     else
-      CREATED=$(printf '%s' "$REVIEW_JSON" | jq --arg sha "$SHA" '{commit_id: $sha, comments: (.comments // [])}' | \
+      CREATED=$(printf '%s' "$POST_JSON" | jq --arg sha "$SHA" '{commit_id: $sha, comments: (.comments // [])}' | \
         gh api "repos/$OWNER/$REPO/pulls/$PR/reviews" -X POST --input -)
       RID=$(printf '%s' "$CREATED" | jq -r '.id'); RNODE=$(printf '%s' "$CREATED" | jq -r '.node_id')
     fi
@@ -448,8 +506,19 @@ case "$CMD" in
     done < <(printf '%s' "$REVIEW_JSON" | jq -r '(.replies // [])[] | select(.resolve == true) | .thread_id')
     ;;
 
+  render)
+    REVIEW_JSON=$(cat)
+    VALIDATION=$(printf '%s' "$REVIEW_JSON" | validate_review)
+    if [[ "$VALIDATION" != "OK" ]]; then
+      echo "Error: refusing to render: $VALIDATION" >&2
+      exit 1
+    fi
+    printf '%s' "$REVIEW_JSON" | jq "$TAG_JQ"
+    echo "tags: $(printf '%s' "$REVIEW_JSON" | tag_counts)" >&2
+    ;;
+
   *)
-    echo "Usage: github-pr-review.sh {context|submit} [args]" >&2
+    echo "Usage: github-pr-review.sh {context|submit|render} [args]" >&2
     exit 1
     ;;
 esac

@@ -88,5 +88,10 @@ Reading notes:
   exist for the case the compensation was never meant to cover: once the fan-out is
   NOT sonnet, low-at-medium-effort has no premise left, and `effort=inherit` is how
   such a call runs as its caller runs. No default path passes either token.
+- Every finding carries `lens`: the angle's lens for a correctness angle
+  (`line-by-line`, `removed-behavior`, `cross-file`, `language-pitfall`,
+  `wrapper-proxy`), `gap-sweep` for the sweep, and for the single-pass and cleanup
+  finders the lens each candidate names (schema-enforced to that finder's list).
+  /pr-review turns it into the comment's `lens:<name>` tag (`finding-tags`).
 - Not cloned: ultra (cloud, user-triggered), the diff-size finder-budget hint,
   non-sonnet per-model prompt cells.

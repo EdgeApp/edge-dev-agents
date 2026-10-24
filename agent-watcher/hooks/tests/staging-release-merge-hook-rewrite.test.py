@@ -13,8 +13,8 @@ commit carrying the file as it was staged:
   real-drift   staging holds its own list    -> the staged (drifted) file is kept,
                so the parity gate still sees the difference
 
-The block under test is cut out of the script itself, so the test follows the
-script. Each case builds a throwaway repo whose pre-commit hook behaves like
+The block under test is cut out of the script itself, and the restore function
+it calls out of release-merge-lib.sh, so the test follows both. Each case builds a throwaway repo whose pre-commit hook behaves like
 update-eslint-warnings.
 """
 import os
@@ -36,15 +36,21 @@ LIST = "export default [\n  'src/a.ts',\n  'src/b.ts',\n  'src/c.ts',\n  'src/d.
 DRIFTED = "export default [\n  'src/a.ts',\n  'src/b.ts',\n  'src/c.ts'\n]\n"
 
 
+LIB = os.path.expanduser('~/.cursor/skills/release-merge-lib.sh')
+
+
 def block():
-    """The lines from the staged-tree snapshot through the end of the restore."""
+    """The lines from the staged-tree snapshot through the restore call, after
+    the lib's restore function."""
     lines = open(SCRIPT).read().split('\n')
     start = next((i for i, l in enumerate(lines) if 'STAGED_TREE="$(git' in l), None)
-    said = next((i for i, l in enumerate(lines) if 'say "restored $HOOK_REWRITTEN' in l), None)
-    if start is None or said is None or said < start:
+    call = next((i for i, l in enumerate(lines) if l.strip().startswith('release_restore_hook_rewrites ')), None)
+    lib = open(LIB).read().split('\n')
+    fn = next((i for i, l in enumerate(lib) if l.startswith('release_restore_hook_rewrites()')), None)
+    if start is None or call is None or call < start or fn is None:
         return None
-    end = next(i for i in range(said, len(lines)) if lines[i] == '  fi')
-    return '\n'.join(lines[start:end + 1]) + '\n'
+    fn_end = next(i for i in range(fn, len(lib)) if lib[i] == '}')
+    return '\n'.join(lib[fn:fn_end + 1] + lines[start:call + 1]) + '\n'
 
 
 def git(repo, *args, check=True):

@@ -884,7 +884,10 @@ reproducible from a single clone + `./bootstrap.sh`:
   attribution, permissions) are added to the canonical file per machine.
 - **`claude-workflows/`**: multi-agent Workflow scripts installed to
   `~/.claude/workflows` (currently `code-review-sonnet.js`, the deep
-  multi-agent PR review harness `/pr-review` launches). The cleanup finder
+  multi-agent PR review harness `/pr-review` launches). Every finding it
+  returns names the finder lens that raised it (`lens`), which `/pr-review`
+  turns into the comment's tag. Its Scope and Conventions prompts read
+  AGENTS.md next to CLAUDE.md, since Edge repos ship AGENTS.md. The cleanup finder
   may surface up to 5x the per-angle budget, but only the first
   `maxFindings` cleanup candidates (8, 10 or 15 by level) go to verify, since
   cleanup ranks below every correctness finding and no more than that can
@@ -1002,7 +1005,7 @@ scripts, not be re-described independently across skills.
 | [`/pr-create`](.cursor/skills/pr-create/SKILL.md) | Create a PR with repo-aligned title/body, evidence, and Asana attach |
 | [`/bugbot`](.cursor/skills/bugbot/SKILL.md) | Address Cursor Bugbot findings until the PR is actually clean |
 | [`/pr-address`](.cursor/skills/pr-address/SKILL.md) | Address PR feedback: fixups, reply-then-resolve, mark-addressed |
-| [`/pr-review`](.cursor/skills/pr-review/SKILL.md) | Review a PR: deep multi-agent pass by default, plus an independent parent review (general code review and the Edge-specific checklist) on the session model at every level. A round with nothing blocking on someone else's PR submits an `APPROVE` whose body carries the rejected findings |
+| [`/pr-review`](.cursor/skills/pr-review/SKILL.md) | Review a PR: deep multi-agent pass by default, plus an independent parent review (general code review and the Edge-specific checklist) on the session model at every level. A round with nothing blocking on someone else's PR submits an `APPROVE` whose body carries the rejected findings. Every inline finding carries a hidden tag naming the rule (`rule:<id>`), workflow lens (`lens:<name>`) or `general` that produced it, so acceptance can be counted per rule |
 | [`/pr-land`](.cursor/skills/pr-land/SKILL.md) | Land approved PRs: prepare, merge, publish, GUI dep bumps, staging cherry-picks, a late reviewer-bot findings sweep, Asana updates; before the QA Verification handoff it writes one `QA: <item>` subtask per manual verification item. Holds each landing repo's land lease for the whole run, so checkout refreshes yield to it. Split like /one-shot: a core SKILL.md plus one `references/<phase>.md` per phase (comments, prepare, merge, publish, post-merge) |
 | [`/develop-staging`](.cursor/skills/develop-staging/SKILL.md) | Cut a staging release: bump the version, merge develop into staging, gate on develop/staging parity |
 | [`/staging-master`](.cursor/skills/staging-master/SKILL.md) | Ship an X.Y.0 release: merge staging into master, date the CHANGELOG heading, prove master carries staging's tree, push master and the `vX.Y.0` tag |
@@ -1069,7 +1072,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 |------|-------------|
 | [`pr-create.sh`](.cursor/skills/pr-create/scripts/pr-create.sh) | Create the PR: verify, template body, prose lint (with judge), evidence, Asana attach |
 | [`pr-address.sh`](.cursor/skills/pr-address/scripts/pr-address.sh) | Fetch unresolved feedback (with an obligation trailer so filtered JSON cannot hide review bodies), reply, resolve, mark addressed; outbound bodies linted |
-| [`github-pr-review.sh`](.cursor/skills/pr-review/scripts/github-pr-review.sh) | Fetch PR context and submit reviews; review bodies linted and inline anchors checked against the diff at submit (`--check-only` runs the checks without posting) |
+| [`github-pr-review.sh`](.cursor/skills/pr-review/scripts/github-pr-review.sh) | Fetch PR context and submit reviews; review bodies linted, inline anchors checked against the diff, and each inline comment's `tag` validated and appended as a hidden `<!-- pr-review:tag=... -->` marker at submit (`--check-only` runs the checks without posting; `render` prints the tagged payload for a `--no-comment` dry run) |
 | [`pr-finalize-fixups.sh`](.cursor/skills/pr-finalize-fixups.sh) | Finalize fixup commits before the ready flip |
 | [`git-branch-ops.sh`](.cursor/skills/git-branch-ops.sh) | Shared deterministic history ops: `fold-one` (one fixup into its target), whole-branch `autosquash`, condense, push, and the `fold-mode` oracle that reads the operator rewrite-approval note's `Targets:` scope |
 
@@ -1160,6 +1163,7 @@ scripts live at `skills/` top level. The ones most worth knowing:
 | [`no-format-lint.mdc`](.cursor/rules/no-format-lint.mdc) | No manual formatting; the commit script owns it |
 | [`typescript-standards.mdc`](.cursor/rules/typescript-standards.mdc) | TypeScript and React editing standards |
 | [`review-standards.mdc`](.cursor/rules/review-standards.mdc) | Review-specific bug patterns and conventions |
+| [`review-standards/generate-bugbot.js`](.cursor/rules/review-standards/generate-bugbot.js) | Renders edge-react-gui's `.cursor/BUGBOT.md` from review-standards.mdc plus [`bugbot-overlay.md`](.cursor/rules/review-standards/bugbot-overlay.md) (per-rule titles and code examples); `--check` fails when the committed file has drifted |
 | [`eslint-warnings.mdc`](.cursor/rules/eslint-warnings.mdc) | Documented fixes for recurring ESLint warnings |
 
 ## Design principles
