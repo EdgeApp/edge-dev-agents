@@ -749,6 +749,14 @@ the app.
   Task-specific flows an agent writes mid-run stay local and are excluded from
   sync; recurring sequences get promoted into the library through eval
   curation.
+- **Stealth Send / Swap & Send suite** (`build-and-test/maestro/stealth/`):
+  one flow per user-visible branch of the Houdini private send and swap UI
+  (toggle, private and standard quotes, below-minimum refusal, myself picker,
+  QR payment URI, transaction details), built from the
+  `common/stealth-*.yaml` subflows so a run can drive one state without
+  walking the whole feature. The two flows tagged `stealth-spend` move funds
+  in opposite directions; running and account notes are in
+  [`skills/build-and-test/maestro/stealth/README.md`](.cursor/skills/build-and-test/maestro/stealth/README.md).
 - **Attempt log.** Every value-moving action and drive logs through
   `log-attempt.sh` with a truthful result; the log is the ground truth evals
   and the concession gate read. Proof screenshots are pixel-verified, and
