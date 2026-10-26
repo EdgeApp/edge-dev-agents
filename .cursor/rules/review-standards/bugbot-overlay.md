@@ -173,6 +173,18 @@ if (mode === 'a') doA(id)
 else doB(id)
 ```
 
+### Narrow Try Scope (`narrow-try-scope`)
+
+### Check Response Status (`check-response-ok`)
+
+### No Silent Success (`no-silent-success`)
+
+### Structured Logging (`structured-logging`)
+
+### Log Only Real Work (`log-only-real-work`)
+
+### Surface Errors, Not Console (`surface-errors-not-console`)
+
 ### Prefer `useHandler` Over `useCallback` (`useHandler-over-useCallback`)
 
 ```ts
@@ -277,6 +289,10 @@ const onPress = useHandler(async () => {
 })
 ```
 
+### React Native Render Cost (`rn-render-cost`)
+
+### White-Label Neutral (`white-label-neutral`)
+
 ### No Duplicate Redux State in Local State (`no-duplicate-redux-local`)
 
 ```ts
@@ -335,6 +351,10 @@ settings.notifState = newNotifState
 // Good:
 settings.notifState = { ...settings.notifState, ...newNotifState }
 ```
+
+### No Module-Level Mutable State (`no-module-level-mutable-state`)
+
+### Combine Related Dispatches (`combine-dispatches`)
 
 ### Use `makePeriodicTask` (`makePeriodicTask`)
 
@@ -415,6 +435,16 @@ async function runSerialized(repoId: string, fn: () => Promise<void>) {
 }
 ```
 
+### Order State Around Awaits (`order-state-around-awaits`)
+
+### Stale Async Generation Check (`stale-async-generation-check`)
+
+### Bound Pagination and Timeouts (`bound-pagination-and-timeouts`)
+
+### Recover From Network Failures (`recover-from-network-failures`)
+
+### Release Resources on Error (`release-resources-on-error`)
+
 ### Clean All External Data (`clean-all-external-data`)
 
 ```ts
@@ -450,6 +480,10 @@ const asSettings = asObject({
 ```ts
 // Good: delete unused field, or comment why it remains
 ```
+
+### Normalize at the Boundary (`normalize-at-the-boundary`)
+
+### Explicit Units (`units-explicit`)
 
 ### Delete Unnecessary Code (`delete-unnecessary-code`)
 
@@ -548,6 +582,42 @@ export const POLL_MS = 30_000
 // Good: remove styles.unused if nothing references it
 ```
 
+### Existing User Paths (`existing-user-paths`)
+
+### No Debug Scaffolding (`no-debug-scaffolding`)
+
+### File Placement Conventions (`file-placement-conventions`)
+
+### Logic Belongs in the Owning Layer (`logic-belongs-in-owning-layer`)
+
+### Name Magic Values (`name-magic-values`)
+
+### No Hardcoded Config (`no-hardcoded-config`)
+
+### Avoid Repeated Work (`avoid-repeated-work`)
+
+### Follow Repo Naming Conventions (`follow-repo-naming-conventions`)
+
+### Match Sibling Behavior (`match-sibling-behavior`)
+
+### Plain Functions Over IIFEs (`plain-functions-over-iife`)
+
+### Declare Direct Dependencies (`declare-direct-dependencies`)
+
+### Guard Parsed Numbers and Divisors (`guard-numeric-inputs`)
+
+### Refactors Keep Every Case (`refactor-preserves-behavior`)
+
+### Fix the Root Cause (`fix-root-cause`)
+
+### Names Match What They Hold (`names-match-role`)
+
+### Match the Local Form (`match-local-form`)
+
+### Methods Without this Become Functions (`methods-without-this`)
+
+### Const and Ternary Over Reassigned Let (`const-over-reassigned-let`)
+
 ### Reuse Existing Strings (`reuse-existing-strings`)
 
 ```ts
@@ -601,9 +671,45 @@ showError(lstrings.connection_failed)
 // Only active items can be edited; archived items are read-only
 ```
 
+### Doc Links Resolve (`doc-links-resolve`)
+
+### JSDoc for APIs and Deprecations (`jsdoc-for-api-and-deprecations`)
+
 ### Commit Subjects Fit in 50 Characters (`commit-subject-50`)
 
 ### No Attribution Trailers (`no-attribution-trailers`)
+
+### CHANGELOG Section and Verb (`changelog-section-and-verb`)
+
+### CHANGELOG Entry for User-Visible Changes (`changelog-entry-with-change`)
+
+### Clean Commit History (`clean-commit-history`)
+
+### Split Unrelated Fixes (`split-unrelated-fixes`)
+
+### Commit Message Matches Diff (`commit-message-matches-diff`)
+
+### No Unrelated Lockfile Churn (`no-unrelated-lockfile-churn`)
+
+### tokenId, Not currencyCode (`tokenid-not-currencycode`)
+
+### tokenId Typed and Required (`tokenid-typed-and-required`)
+
+### No Sentinel Empty Values (`no-sentinel-empty-values`)
+
+### Map and Set for Dictionaries (`map-set-for-dictionaries`)
+
+### Discriminated Unions Over Flags (`discriminate-over-flags`)
+
+### Narrowest Accurate Types (`narrowest-accurate-types`)
+
+### Deprecated Fields Last (`deprecated-fields-last`)
+
+### No Secrets in Dumps or Logs (`no-secrets-in-dumps-or-logs`)
+
+### Test Each Guard (`test-each-guard`)
+
+### No Redundant Tests (`no-redundant-tests`)
 
 ### Server devDependencies (`server-devdependencies`)
 

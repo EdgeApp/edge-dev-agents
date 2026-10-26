@@ -7,6 +7,12 @@
 # Usage:
 #   completion-judge.sh --gid <gid> --event complete|pr-create|block [--reason "<text>"]
 #                       [--offline] [--force] [--quiet]
+#   completion-judge.sh --gid <gid> --event qa-plan|qa-passed|qa-blocked|qa-failed [--force] [--quiet]
+# QA events (the qa-run skill's plan gate and verdict gate) run the same judge with the
+# QA rubric (~/.cursor/skills/qa-run/references/rubric.md: P dims for qa-plan, V dims
+# for the verdicts), the QA bundle (qa-run/scripts/qa-evidence.sh), and their own
+# verdict file /tmp/agent-qa-verdict-<gid>-<event>.json. Operator comment overrides,
+# the true-blocker list and the tested options belong to the completion events only.
 # Exit: 0 allow | 1 deny (failed items on stdout) | 3 judge unavailable (no verdict
 #       written; reason on stderr: a timeout, a judge error, an unparseable verdict,
 #       or an allow that leaves a rubric dimension unanswered) | 2 usage
@@ -46,6 +52,19 @@ done
 H="$HOME/.config/agent-watcher"
 SK="$HOME/.cursor/skills/completion-judge/references"
 VERDICT="/tmp/agent-completion-verdict-$GID.json"
+EVIDENCE_SH="$H/completion-evidence.sh"
+DIM_RE='^### J[0-9]+'
+WORK="/tmp/agent-judge-$GID"
+QA_EVENT=0
+case "$EVENT" in
+  qa-plan|qa-passed|qa-blocked|qa-failed)
+    QA_EVENT=1
+    SK="$HOME/.cursor/skills/qa-run/references"
+    VERDICT="/tmp/agent-qa-verdict-$GID-$EVENT.json"
+    EVIDENCE_SH="$HOME/.cursor/skills/qa-run/scripts/qa-evidence.sh"
+    WORK="/tmp/agent-judge-qa-$GID"
+    if [ "$EVENT" = qa-plan ]; then DIM_RE='^### P[0-9]+'; else DIM_RE='^### V[0-9]+'; fi ;;
+esac
 . "$H/lib/judge-log.sh"
 LOG_DIR="$(judge_log_dir)"
 MODEL="${COMPLETION_JUDGE_MODEL:-opus}"
@@ -88,7 +107,7 @@ EV_ARGS=(--gid "$GID" --event "$EVENT")
 [ -n "$BASE_ARG" ] && EV_ARGS+=(--base "$BASE_ARG")
 [ "$OFFLINE" = 1 ] && EV_ARGS+=(--offline)
 EV_OUT=$(mktemp "${TMPDIR:-/tmp}/judge-evidence.XXXXXX")
-run_bounded "$DEADLINE" "$H/completion-evidence.sh" "${EV_ARGS[@]}" > "$EV_OUT"
+run_bounded "$DEADLINE" "$EVIDENCE_SH" "${EV_ARGS[@]}" > "$EV_OUT"
 EV_RC=$?; EV=$(cat "$EV_OUT"); rm -f "$EV_OUT"
 EV_S=$(( $(date +%s) - T0 ))
 [ "$EV_RC" = 124 ] && fail_unavailable "evidence gathering timed out at the ${DEADLINE}s deadline, before the judge was called"
@@ -101,7 +120,7 @@ BUNDLE=${EV#path=}; BUNDLE=${BUNDLE%% hash=*}; HASH=${EV##*hash=}
 # and each one writes its own provenance line: no waiver file is dropped, so nothing
 # skips an event the comment was never read against.
 MARKER="/tmp/agent-followup-scope-$GID.json"
-if [ -s "$MARKER" ] && . "$H/hooks/lib/operator-directives.sh" 2>/dev/null; then
+if [ "$QA_EVENT" = 0 ] && [ -s "$MARKER" ] && . "$H/hooks/lib/operator-directives.sh" 2>/dev/null; then
   while IFS=$'\t' read -r c_ts c_text; do
     [ -n "$c_text" ] || continue
     kinds=$(printf '%s' "$c_text" | directive_kinds)
@@ -138,13 +157,23 @@ fi
 # 3. Fresh judgment in a clean headless context
 command -v claude >/dev/null 2>&1 || { echo "completion-judge: claude binary not on PATH" >&2; exit 3; }
 [ -s "$SK/rubric.md" ] || { echo "completion-judge: rubric missing at $SK/rubric.md" >&2; exit 3; }
+if [ "$QA_EVENT" = 0 ]; then
 TRUE_BLOCKERS=$(grep -o '<rule id="yolo-true-blockers">.*</rule>' "$HOME/.cursor/skills/one-shot/references/blocking.md" 2>/dev/null | head -1)
 [ -n "$TRUE_BLOCKERS" ] || { echo "completion-judge: yolo-true-blockers rule not found in one-shot references/blocking.md" >&2; exit 3; }
 TESTED_OPTIONS=$(sed -n '/^# Options (multi-select/,/^# Exit:/p' "$H/set-tested.sh" | sed -e '$d' -e 's/^# \{0,1\}//')
 [ -n "$TESTED_OPTIONS" ] || { echo "completion-judge: tested option block not found in set-tested.sh" >&2; exit 3; }
+fi
 NONCE=$(head -c 8 /dev/urandom | xxd -p 2>/dev/null || date +%s%N)
-WORK="/tmp/agent-judge-$GID"; mkdir -p "$WORK"
+mkdir -p "$WORK"
 PROMPT="$WORK/prompt.md"
+if [ "$QA_EVENT" = 1 ]; then
+{
+  cat "$SK/rubric.md"
+  printf '\n\n---\n\n# EVIDENCE BUNDLE (the only facts you have)\n\n'
+  cat "$BUNDLE"
+  printf '\n\n---\nJudge the `%s` event for task %s now. Answer only the %s dimensions. Return only the JSON object in a ```json fence.\n' "$EVENT" "$GID" "$( [ "$EVENT" = qa-plan ] && echo P || echo V )"
+} > "$PROMPT"
+else
 {
   cat "$SK/rubric.md"
   printf '\n\n---\n\n'
@@ -158,6 +187,7 @@ PROMPT="$WORK/prompt.md"
   cat "$BUNDLE"
   printf '\n\n---\nJudge the `%s` event for task %s now. Return only the JSON object in a ```json fence.\n' "$EVENT" "$GID"
 } > "$PROMPT"
+fi
 
 REMAIN=$(( DEADLINE - ($(date +%s) - T0) ))
 [ "$REMAIN" -ge 1 ] || fail_unavailable "evidence gathering took ${EV_S}s of the ${DEADLINE}s deadline, no time left for the judge"
@@ -179,8 +209,8 @@ RC=$?
 [ "$RC" = 0 ] || fail_unavailable "claude -p exited $RC: $(head -c 300 "$ERR" | tr '\n' ' ')"
 
 # 4. Parse and validate. An allow must answer every rubric dimension (pass or na).
-DIM_IDS=$(grep -oE '^### J[0-9]+' "$SK/rubric.md" | awk '{print $2}' | tr '\n' ' ')
-[ -n "${DIM_IDS// /}" ] || fail_unavailable "no J dimension headings found in $SK/rubric.md"
+DIM_IDS=$(grep -oE "$DIM_RE" "$SK/rubric.md" | awk '{print $2}' | tr '\n' ' ')
+[ -n "${DIM_IDS// /}" ] || fail_unavailable "no dimension headings matching $DIM_RE found in $SK/rubric.md"
 PARSED=$(node -e '
 const fs=require("fs");
 const [rawPath,gid,event,hash,nonce,model,,dimIds]=process.argv.slice(1);

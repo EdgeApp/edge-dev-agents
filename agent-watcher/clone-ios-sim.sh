@@ -138,5 +138,11 @@ if $MASTER_WAS_BOOTED; then
   echo ">> clone-ios-sim: re-booted master to restore prior state" >&2
 fi
 
+# The cloned LaunchServices store keeps the master's ABSOLUTE app container paths,
+# so the clone's app (and `simctl get_app_container`) would read and write the
+# master's data folder. Deleting it before the first boot makes the clone rebuild
+# the store against its own data volume; the app's data container is untouched.
+rm -f "${HOME:?}/Library/Developer/CoreSimulator/Devices/${CLONE_UDID:?}/data/var/db/lsd/"com.apple.LaunchServices-*.csstore
+
 echo ">> clone-ios-sim: created $NAME → $CLONE_UDID" >&2
 echo "$CLONE_UDID"

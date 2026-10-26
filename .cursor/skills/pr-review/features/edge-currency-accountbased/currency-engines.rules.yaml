@@ -34,3 +34,14 @@ rules:
       - https://github.com/EdgeApp/edge-currency-accountbased/pull/645#discussion_r1364649258
       - https://github.com/EdgeApp/edge-currency-accountbased/pull/654#discussion_r1378228764
       - https://github.com/EdgeApp/edge-currency-accountbased/pull/847#discussion_r1819511498
+  - id: lowercase-token-ids
+    rule: "Token ids built from a hex contract address or a case-insensitive denom are lowercased (as Ethereum's are), so case variants of one asset map to the same token and do not create duplicates. Keep the original case only where the chain treats it as significant, and say so in a comment."
+    severity: warning
+    scope:
+      - "src/**"
+    enabled: true
+    sources:
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/698#discussion_r1430551660
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/717#discussion_r1485465886
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/923#pullrequestreview-2795558048
+      - https://github.com/EdgeApp/edge-currency-accountbased/pull/923#discussion_r2061073287

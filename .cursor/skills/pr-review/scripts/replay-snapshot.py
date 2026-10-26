@@ -2,7 +2,7 @@
 """Build an offline replay snapshot of a past PR as it looked when it was first reviewed.
 
 Usage:
-  replay-snapshot.py --repo <name> --pr <N> [--allow-held-out] [--force] [--no-gh] [--base <sha>]
+  replay-snapshot.py --repo <name> --pr <N> [--force] [--no-gh] [--base <sha>]
 
 Output (one directory per PR, nothing else is written outside it except the clone and the gh cache):
   ~/.config/pr-review/replay/snapshots/<repo>-<N>/repo/       self-contained git repo, no remote, no alternates
@@ -21,7 +21,8 @@ writes to a remote. The only GitHub API use is one read-only GraphQL query per P
 title, description (as of the first review) and creation data, cached under
 ~/.config/pr-review/replay/cache/; --no-gh skips it.
 
-Held-out PRs (number mod 3 == 2) are refused unless --allow-held-out is passed.
+The review rules are mined from every PR in the 2023-10-23 to 2026-10-23 export, so a
+replay that measures them scores PRs opened after 2026-10-23.
 """
 
 import argparse
@@ -241,14 +242,10 @@ def main():
   ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
   ap.add_argument('--repo', required=True)
   ap.add_argument('--pr', required=True, type=int)
-  ap.add_argument('--allow-held-out', action='store_true')
   ap.add_argument('--force', action='store_true', help='rebuild an existing snapshot')
   ap.add_argument('--no-gh', action='store_true', help='skip the GraphQL metadata query')
   ap.add_argument('--base', help='override the base commit')
   a = ap.parse_args()
-
-  if a.pr % 3 == 2 and not a.allow_held_out:
-    die('%s#%d is held out (number mod 3 == 2); pass --allow-held-out only for the replay run' % (a.repo, a.pr))
 
   dest = os.path.join(REPLAY, 'snapshots', '%s-%d' % (a.repo, a.pr))
   if os.path.exists(dest):

@@ -89,7 +89,7 @@ if [[ "${SKIP_MASTER_REFRESH:-}" != "1" && -x "$DIR/refresh-master-build.sh" ]];
   "$DIR/refresh-master-build.sh" || log "master-build refresh exited $? (non-fatal; continuing on current master)"
 fi
 
-# Returns the task GID of a LIVE active session (claude-asana-<digits>) currently
+# Returns the task GID of a LIVE active session (claude-asana-<digits> or QA qa-asana-<digits>) currently
 # running on this sim UDID (its claude process exports AGENT_SIM_UDID), or empty.
 # Used to RECLAIM (not recycle) a sim that got marked dirty but is still in active
 # use — e.g. a resumed followup session. Retired (done-asana-*) sessions are
@@ -97,7 +97,7 @@ fi
 sim_live_owner() {
   local want="$1" sess gid ppid cpid envudid
   while IFS= read -r sess; do
-    gid="${sess#claude-asana-}"
+    gid="${sess#claude-asana-}"; gid="${gid#qa-asana-}"
     [[ "$gid" =~ ^[0-9]+$ ]] || continue
     ppid="$(tmux list-panes -t "=$sess:" -F '#{pane_pid}' 2>/dev/null | head -1)"
     [[ -n "$ppid" ]] || continue
@@ -105,7 +105,7 @@ sim_live_owner() {
     [[ -n "$cpid" ]] || continue
     envudid="$(ps eww -p "$cpid" 2>/dev/null | tr ' ' '\n' | sed -n 's/^AGENT_SIM_UDID=//p' | head -1)"
     if [[ "$envudid" == "$want" ]]; then echo "$gid"; return 0; fi
-  done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^claude-asana-')
+  done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -E '^(claude|qa)-asana-')
   return 0
 }
 

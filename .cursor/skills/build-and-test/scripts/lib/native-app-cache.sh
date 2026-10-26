@@ -83,14 +83,27 @@ native_app_cache_put() {
   native_app_cache_trim "$bundle_id"
 }
 
+# native_app_cache_pinned: prints every key pinned by a task awaiting QA. A pin is
+# $NATIVE_APP_CACHE_DIR/.pins/<gid> holding one key per line, written by
+# qa-run/scripts/qa-on-complete.sh at the dev run's first Complete and removed by
+# the watcher once the task's agent_qa is terminal. A pin older than 7 days is
+# ignored, so a lost removal cannot pin an entry forever.
+native_app_cache_pinned() {
+  [[ -d "$NATIVE_APP_CACHE_DIR/.pins" ]] || return 0
+  find "$NATIVE_APP_CACHE_DIR/.pins" -type f -mtime -7 -exec cat {} + 2>/dev/null | sort -u
+}
+
 # native_app_cache_trim <bundle-id>: keep the NATIVE_APP_CACHE_KEEP most recently
-# used entries; also clears temp folders a killed put left behind (over an hour old).
+# used unpinned entries (pinned entries are never trimmed and do not count); also
+# clears temp folders a killed put left behind (over an hour old).
 native_app_cache_trim() {
-  local base="$NATIVE_APP_CACHE_DIR/$1" n=0 d
+  local base="$NATIVE_APP_CACHE_DIR/$1" n=0 d pinned
   [[ -d "$base" ]] || return 0
   find "$base" -maxdepth 1 -name '.tmp-*' -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+  pinned="$(native_app_cache_pinned)"
   while IFS= read -r d; do
     [[ -n "$d" ]] || continue
+    [[ -n "$pinned" ]] && grep -qxF "$d" <<<"$pinned" && continue
     n=$((n + 1))
     [[ "$n" -le "$NATIVE_APP_CACHE_KEEP" ]] || rm -rf "$base/$d"
   done < <(cd "$base" && ls -t 2>/dev/null)

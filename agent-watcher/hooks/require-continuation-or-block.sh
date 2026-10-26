@@ -48,6 +48,31 @@ if [ -f "${AGENT_USAGE_PAUSE_STAMP:-/tmp/agent-usage-pause.json}" ]; then
   exit 0
 fi
 
+# ---- QA session (AGENT_MODE=qa, qa-run skill) ----
+# agent_status stays Complete for the whole QA pass, so the dev test below would allow
+# every stop. A QA session's legit ends are local markers its own scripts write:
+# qa-verdict.sh writes verdict.json after posting any verdict (one session runs the whole
+# pass, so an approved plan is not an end: the drive follows). Anything else is a premature stop,
+# bounded like the dev path; the escalation file is /tmp/agent-qa-stuck-<gid>.md, which
+# the watcher reads as a dead QA session (respawn, then Blocked).
+if [ "${AGENT_MODE:-}" = qa ]; then
+  QA_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/qa/$GID"
+  QA_COUNT="/tmp/agent-qa-stop-block-count-$GID"
+  if [ -f "$QA_DIR/verdict.json" ]; then
+    rm -f "$QA_COUNT"; exit 0
+  fi
+  N=$(cat "$QA_COUNT" 2>/dev/null || echo 0); case "$N" in ''|*[!0-9]*) N=0 ;; esac; N=$((N + 1))
+  if [ "$N" -gt "$STOP_BLOCK_MAX" ]; then
+    printf '# QA session stuck on task %s\nEnded its turn %s times without a posted verdict.\n' "$GID" "$N" > "/tmp/agent-qa-stuck-$GID.md" 2>/dev/null || true
+    rm -f "$QA_COUNT"; exit 0
+  fi
+  printf '%s' "$N" > "$QA_COUNT"
+  cat <<JSON
+{"decision":"block","reason":"You ended your turn in a QA session (qa-run, task $GID) without posting a verdict. No human is watching. CONTINUE per the qa-run skill: in the Planning phase, finish the plan and run qa-gate.sh, then rerun qa-start.sh once it allows; in the Running phase, drive the approved cases and post the verdict with qa-verdict.sh. A wall you cannot pass after the documented attempts is a Blocked verdict, posted with qa-verdict.sh, never a stop. This is premature-stop ${N}/${STOP_BLOCK_MAX}."}
+JSON
+  exit 0
+fi
+
 # ---- Fast path: a FRESH final marker = a legit end the agent JUST set ----
 # update-status.sh drops /tmp/agent-final-<gid> right after a successful PUT of
 # Complete/Archived/blocked=Yes (and removes it on a non-terminal reopen). Trusting a

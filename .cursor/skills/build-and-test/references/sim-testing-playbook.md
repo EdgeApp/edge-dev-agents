@@ -194,9 +194,9 @@ promotes it into `common/`. Same contract as `[playbook]` bullets.
   value-moving action per claim being proven: do not repeat a successful
   swap/send for extra screenshots or "to be sure". The goal is the fewest and
   smallest balance changes that still prove the path end-to-end.
-- **Fee/slippage budget: $15 equivalent per run.** Network fees, swap fees, and
+- **Fee/slippage budget: $20 equivalent per run.** Network fees, swap fees, and
   slippage incurred while testing are budgeted operating costs, NOT losses. Spend
-  up to ~$15 equivalent per task run on them without hesitation; pick swap
+  up to ~$20 equivalent per task run on them without hesitation; pick swap
   amounts so the whole test fits the budget. A TRUE LOSS is different and is the
   ONLY funds-related blocker: an attempted swap/send that FAILED and the
   principal did not arrive and is not recoverable. Fees and slippage never count

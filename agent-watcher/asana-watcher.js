@@ -20,6 +20,9 @@
 //   6. per picked task: set Planning, allocate a pool sim (sim lane only) + slot, spawn
 //                           /one-shot (agent_deliverable PR) or /task-run (Task).
 //   7. slot allocations persisted to slots.json (via lib/slots.js).
+//   QA queue (lib/qa-queue.js, header there): its reconcile runs before step 2 every
+//   tick (dev re-arm kills, Failed → Fixing re-arm, terminal cleanup, qa-holds.json);
+//   its spawns run after step 6 under watcher.max_concurrent_qa.
 //
 // SLOT ACCOUNTING IS BY LIVE TMUX SESSIONS, NOT BY ASANA STATE. A task that is
 // blocked or in-flight in Asana but whose tmux session has died does NOT hold a
@@ -42,6 +45,7 @@ const path = require('node:path')
 const { execSync, spawnSync } = require('node:child_process')
 const api = require('./asana-api.js')
 const slots = require('./lib/slots.js')
+const qaQueue = require('./lib/qa-queue.js')
 
 const HOME = process.env.HOME || ''
 const DIR = path.join(HOME, '.config/agent-watcher')
@@ -119,7 +123,10 @@ function countActiveSessions() {
   const gids = out.split('\n').filter((s) => s.startsWith(SESSION_PREFIX) && /^\d+$/.test(s.slice(SESSION_PREFIX.length))).map((s) => s.slice(SESSION_PREFIX.length))
   const withSim = new Set(slots.list().filter((s) => s.sim_udid).map((s) => s.task_gid))
   const sim = gids.filter((g) => withSim.has(g)).length
-  return { sim, nosim: gids.length - sim }
+  // A live QA session holds a pool sim for its whole pass, so it counts against
+  // max_concurrent too (and against max_concurrent_qa in qa-queue.js).
+  const qaSim = [...qaQueue.liveQaSessions({ sh })].filter((g) => withSim.has(g) && !gids.includes(g)).length
+  return { sim: sim + qaSim, nosim: gids.length - sim }
 }
 
 function getLoadAvg() {
@@ -200,6 +207,7 @@ function shCapture(cmd) {
 }
 
 function waitRcReadyAndSendPrompt(sessionName, prompt) {
+  const cmd = prompt.split(' ')[0] // the skill token: /one-shot, /task-run or /qa-run
   const deadline = Date.now() + RC_READY_TIMEOUT_MS
   let ready = false
   let acceptedBypass = false
@@ -245,8 +253,8 @@ function waitRcReadyAndSendPrompt(sessionName, prompt) {
     //      prompts"). The `/one-shot` token only appears at the prompt START, so a
     //      wrapped URL tail on a non-`❯` continuation line never false-matches (b).
     const inputLine = paneLines.filter((l) => l.trimStart().startsWith('❯')).pop() || ''
-    const submittedAbove = paneLines.some((l) => !l.trimStart().startsWith('❯') && l.includes('/one-shot'))
-    if (!inputLine.includes('/one-shot') || submittedAbove) {
+    const submittedAbove = paneLines.some((l) => !l.trimStart().startsWith('❯') && l.includes(cmd))
+    if (!inputLine.includes(cmd) || submittedAbove) {
       log(`  prompt sent (attempt ${attempt}): ${prompt}`)
       return
     }
@@ -382,8 +390,24 @@ function usageHold() {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
+// One tick: QA reconcile (kills/resets/re-arms, before any dev spawn), dev spawns, then
+// QA spawns under max_concurrent_qa. ctx carries the dev tick's hold reason and whether
+// a sim is free for QA (no dev sim task waiting, sim cap has room, load ok).
 function main() {
   const cfg = loadConfig()
+  const simulating = argInt('--simulate-pending') != null
+  const ctx = { cfg, log, sh, DRY_RUN, waitRcReadyAndSendPrompt, holdReason: null, simRoom: false }
+  let tasks = null
+  if (!simulating) {
+    tasks = listAgentTasks(cfg)
+    log(`Fetched ${tasks.length} task(s) from project`)
+    qaQueue.reconcile(tasks, ctx)
+  }
+  devTick(cfg, tasks, ctx)
+  if (tasks) qaQueue.spawn(tasks, ctx)
+}
+
+function devTick(cfg, tasks, ctx) {
   const MAX = maxConcurrent(cfg)
   const MAX_NOSIM = maxConcurrentNosim(cfg)
   log(`Watcher tick — project: ${cfg.project_name} (${cfg.project_gid}), max_concurrent=${MAX}, max_concurrent_nosim=${MAX_NOSIM}`)
@@ -407,6 +431,7 @@ function main() {
   // Step 3: both caps full.
   if (active.sim >= MAX && active.nosim >= MAX_NOSIM) {
     log(`at cap (sim=${active.sim}/${MAX}, nosim=${active.nosim}/${MAX_NOSIM}) — nothing to spawn this tick`)
+    ctx.holdReason = 'dev at cap'
     return
   }
 
@@ -417,6 +442,7 @@ function main() {
   const freeGb = getFreeRamGb()
   if (freeGb < minFree) {
     log(`skipped this tick: guardrail (free=${freeGb.toFixed(1)}GB min=${minFree}GB)`)
+    ctx.holdReason = 'RAM guardrail'
     return
   }
   const loadOk = load <= maxLoad
@@ -424,6 +450,7 @@ function main() {
 
   if (usage?.spawn_hold) {
     log(`skipped this tick: usage hold (${usage.reason}); Pending tasks wait`)
+    ctx.holdReason = 'usage hold'
     return
   }
 
@@ -439,14 +466,13 @@ function main() {
       created_at: new Date(Date.now() + i * 1000).toISOString(),
     }))
   } else {
-    const tasks = listAgentTasks(cfg)
-    log(`Fetched ${tasks.length} task(s) from project`)
     pending = tasks.filter((t) => getAgentStatus(t, cfg) === 'Pending')
   }
   pending.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''))
 
   if (pending.length === 0) {
     log('No Pending tasks. Nothing to do.')
+    ctx.simRoom = availableSim > 0
     return
   }
 
@@ -455,6 +481,7 @@ function main() {
   const toSpawnSim = pendingSim.slice(0, availableSim)
   const toSpawn = [...toSpawnSim, ...pendingNosim.slice(0, availableNosim)]
   const deferred = [...pendingSim.slice(availableSim), ...pendingNosim.slice(availableNosim)]
+  ctx.simRoom = pendingSim.length < availableSim
   const simHeld = loadOk ? '' : ` (held: load ${load.toFixed(1)} > max_load_avg ${maxLoad})`
   log(`Pending=${pending.length} (sim ${pendingSim.length}, nosim ${pendingNosim.length}), open sim=${availableSim}${simHeld} nosim=${availableNosim} → spawning ${toSpawn.length}, deferring ${deferred.length}`)
 

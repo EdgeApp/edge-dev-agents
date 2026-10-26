@@ -54,41 +54,43 @@ alwaysApply: false
 
 <rule id="narrow-try-scope">A try block covers only the call whose failure it handles: one malformed entry, one bad transfer or one failed query must not abort the whole pass; a throwing lookup sits inside the branch that needs it; a best-effort write (pruning) logs instead of rejecting the request; and steps that run after funds moved (broadcast, saveTxAction, success modal) sit outside a catch that cancels, retries or re-opens the flow.
 Don't flag: A catch whose only job is logging and rethrowing at a top-level boundary; try blocks around a single call.
-Sources: [edge-currency-accountbased#1044](https://github.com/EdgeApp/edge-currency-accountbased/pull/1044#discussion_r3048266066); all 7 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 6, samholmes 1.
+Sources: [edge-autobot-server#2](https://github.com/EdgeApp/edge-autobot-server/pull/2#discussion_r2356790665); all 11 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 5, peachbits 5, samholmes 1.
 </rule>
 
 <rule id="check-response-ok">Every fetch checks response.ok before parsing or treating the call as success, and a failure throws with the response text (and the id being processed) so the log shows what the server said.
 Don't flag: Wrappers (fetchCors, a typed client) that already throw on non-2xx.
-Sources: [edge-currency-accountbased#811](https://github.com/EdgeApp/edge-currency-accountbased/pull/811#discussion_r1707483550); all 6 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 4, peachbits 2.
+Sources: [edge-currency-accountbased#811](https://github.com/EdgeApp/edge-currency-accountbased/pull/811#discussion_r1707483550); all 7 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 4, peachbits 2, samholmes 1.
 </rule>
 
 <rule id="no-silent-success">An unconfigured, empty, unknown or failed path surfaces as a failure instead of a guessed value: no defaulting a missing amount, txid, status or card type (applepay) to a plausible value; no silent fallback to another provider or a "1" multiplier for an unknown currency; whitespace or empty strings fail the same check as null; an unknown status is mapped or logged; a privacy request that cannot be met shows an error rather than silently downgrading.
 Don't flag: Best-effort UI hints where the fallback is explicitly cosmetic; fallbacks the PR description defends with a reason.
-Sources: [biggystring#22](https://github.com/EdgeApp/biggystring/pull/22#issuecomment-2231982035); all 11 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 6, paullinator 3, peachbits 2.
+Sources: [biggystring#21](https://github.com/EdgeApp/biggystring/pull/21#discussion_r1678293882); all 47 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 21, samholmes 15, peachbits 8, swansontec 3.
 </rule>
 
 <rule id="structured-logging">Log calls use the logger's (object, message) form with errors as { err } (never String(error), a stack pasted into the message, or a msg field), errors go through log.error and routine backend events through info (not warn), messages name the subsystem or plugin, carry the id a reader needs to trace the item (txHash, txId, pluginId), and a path that drops or skips data logs why.
 Don't flag: GUI code that logs through logActivity or showError; console.* (guard-debug-logging owns it); hot loops where a per-item log would flood.
-Sources: [edge-autobot-server#3](https://github.com/EdgeApp/edge-autobot-server/pull/3#pullrequestreview-3720598688); all 8 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 6, paullinator 2.
+Sources: [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r2011111342); all 19 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 13, samholmes 3, paullinator 3.
 </rule>
 
 <rule id="log-only-real-work">Breadcrumbs and logs fire inside the branch that does the work, not before the check that decides whether there is work, and a repeated refusal logs once per window: Sentry keeps only the last 25 breadcrumbs, and a per-call breadcrumb pushes out the ones that explain a crash.
 Don't flag: One-shot startup logs; error logs.
-Sources: [edge-core-js#613](https://github.com/EdgeApp/edge-core-js/pull/613#discussion_r1739433632); all 3 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 2, peachbits 1.
+Sources: [edge-core-js#613](https://github.com/EdgeApp/edge-core-js/pull/613#discussion_r1739433632); all 6 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 5, peachbits 1.
 </rule>
 
 <rule id="surface-errors-not-console">In the GUI, a caught error reaches the user or the developer through showError or showDevError, not console.log/console.error; console.error raises a red box. Expected failures (offline autocomplete) are swallowed at the plugin level instead of logged on every keystroke.
 ❌ `} catch (err) { console.error(err) }`
 ✅ `} catch (err) { showError(err) }`
 Don't flag: Server and plugin repos without showError; debug-only logging behind a flag.
-Sources: [edge-react-gui#5118](https://github.com/EdgeApp/edge-react-gui/pull/5118#discussion_r1663259327); all 4 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 3, samholmes 1.
+Sources: [edge-currency-accountbased#854](https://github.com/EdgeApp/edge-currency-accountbased/pull/854#discussion_r1844323897); all 9 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 6, samholmes 3.
 </rule>
 
 </section>
 
 <section name="React & UI">
 
-<rule id="useHandler-over-useCallback">Prefer `useHandler` (from `hooks/useHandler`) over `useCallback` for event handlers and async functions. Provides better TypeScript inference and handles async more gracefully.</rule>
+<rule id="useHandler-over-useCallback">Prefer `useHandler` (from `hooks/useHandler`) over `useCallback` for event handlers and async functions that are passed as props or into effects. It gives better TypeScript inference and handles async more gracefully. A render function or a handler only called inside the component needs no wrapper.
+Don't flag: Handlers a child memoizes on, where identity matters.
+Sources: [edge-react-gui#4652](https://github.com/EdgeApp/edge-react-gui/pull/4652#discussion_r1440889424); all 10 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 5, swansontec 5.</rule>
 
 <rule id="combine-related-effects">If two `useEffect` hooks update related state from related dependencies, combine them into one effect to avoid redundant renders.</rule>
 
@@ -108,14 +110,14 @@ Sources: [edge-react-gui#5118](https://github.com/EdgeApp/edge-react-gui/pull/51
 
 <rule id="rn-render-cost">React Native UI avoids render cost a reviewer can see in the diff: no wrapper View or animated JS wrapper where padding or the native component (Text, TextInput with allowFontScaling) does the job; no useMemo or useCallback around cheap lookups and plain render functions; several dispatches in a row become one action; animation prop objects and default state are hoisted out of render; a no-op dispatch is skipped.
 Don't flag: Memoization a profiler result in the PR justifies; list items passed to FlatList renderItem.
-Sources: [edge-login-ui-rn#148](https://github.com/EdgeApp/edge-login-ui-rn/pull/148#discussion_r1444114612); all 17 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 9, paullinator 5, samholmes 2, peachbits 1.
+Sources: [edge-login-ui-rn#148](https://github.com/EdgeApp/edge-login-ui-rn/pull/148#discussion_r1444114612); all 16 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 10, paullinator 5, samholmes 1.
 </rule>
 
 <rule id="white-label-neutral">Shared app code stays brand-neutral for white-label builds: strings do not promise Edge-only services (live agents), links go to themed in-app scenes or config-provided URLs, and brand-specific support (Airbitz) lives in the white-label config.
 ❌ `supportUrl: 'https://support.edge.app/chat'   // white-label apps have no live agents`
 ✅ `navigation.navigate('support')   // themed in-app scene`
 Don't flag: Code paths only the Edge-branded build runs.
-Sources: [edge-apps-stress#1](https://github.com/EdgeApp/edge-apps-stress/pull/1#discussion_r1575151415); all 3 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 2, swansontec 1.
+Sources: [edge-apps-stress#1](https://github.com/EdgeApp/edge-apps-stress/pull/1#discussion_r1575151415); all 5 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 2, peachbits 2, swansontec 1.
 </rule>
 
 </section>
@@ -141,8 +143,14 @@ Sources: [edge-apps-stress#1](https://github.com/EdgeApp/edge-apps-stress/pull/1
 ❌ `let l1RollupParams: RollupParams | undefined   // module level, shared by every wallet`
 ✅ `class TarotPoolAdaptor { private l1RollupParams?: RollupParams }`
 Don't flag: Immutable module constants; caches keyed by an id that are safe to share and documented as such.
-Sources: [edge-currency-accountbased#729](https://github.com/EdgeApp/edge-currency-accountbased/pull/729#discussion_r1501054439); all 3 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 2, samholmes 1.
+Sources: [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#discussion_r2825511670); all 7 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 4, swansontec 2, samholmes 1.
 </rule>
+
+<rule id="combine-dispatches">Several Redux updates that always happen together go out as one action, not a run of separate dispatches.
+❌ `dispatch({ type: 'STAKING/SET_POLICIES' }); dispatch({ type: 'STAKING/SET_POSITIONS' }); dispatch({ type: 'STAKING/SET_LOADED' })`
+✅ `dispatch({ type: 'STAKING/SETUP', data: { policies, positions } })`
+Don't flag: Dispatches separated by awaits whose intermediate state the UI shows.
+Sources: [edge-react-gui#5397](https://github.com/EdgeApp/edge-react-gui/pull/5397#discussion_r1884609628); all 3 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 3.</rule>
 
 </section>
 
@@ -164,27 +172,39 @@ Sources: [edge-currency-accountbased#729](https://github.com/EdgeApp/edge-curren
 
 <rule id="order-state-around-awaits">Set guards, cooldowns and in-flight flags before awaiting a call that can hang or throw (fire cleanup unawaited when nothing depends on it); start dependents (engines, network sync, refetches) only after their prerequisites (account files, plugin settings, startEngine) have finished; update a shared watermark (lastCheckTime, latestIsoDate) only after every query that depends on it completes; subscribe to an event before triggering it.
 Don't flag: Sequential code with no await between the steps; races the PR description already names and accepts; ordering an existing queue or makePeriodicTask enforces.
-Sources: [edge-core-js#733](https://github.com/EdgeApp/edge-core-js/pull/733#pullrequestreview-5158964850); all 9 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 5, swansontec 2, peachbits 2.
+Sources: [edge-core-js#643](https://github.com/EdgeApp/edge-core-js/pull/643#discussion_r2036197687); all 17 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 7, swansontec 6, paullinator 4.
 </rule>
 
 <rule id="stale-async-generation-check">Async work that can outlive a reset, resync or killEngine checks a generation counter or engineOn flag before it writes state or publishes balances, and promises that stop() waits on (keysPromise) can reject or time out so shutdown cannot deadlock; a failed adopt path closes the native wallet it opened.
 Don't flag: Synchronous handlers; work a lifecycle-managed task already cancels.
-Sources: [edge-currency-accountbased#1090](https://github.com/EdgeApp/edge-currency-accountbased/pull/1090#pullrequestreview-4978796037); all 4 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 8.
+Sources: [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#discussion_r2807031497); all 7 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 6, peachbits 1.
 </rule>
 
 <rule id="bound-pagination-and-timeouts">Loops over remote pages have an upper bound and stop when the cursor does not advance or the known item never appears, and fetches that feed a refresh carry a timeout on both the request and the body read.
 ❌ `while (!found) { page = await getPage(cursor); cursor = page.next }`
 ✅ `for (let i = 0; i < MAX_PAGES && cursor != null && cursor !== prev; i++) { ... }`
 Don't flag: Streams with their own server-side termination; one-off scripts.
-Sources: [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371553); all 3 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 2, samholmes 1.
+Sources: [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371553); all 10 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 4, peachbits 4, samholmes 2.
 </rule>
+
+<rule id="recover-from-network-failures">Long-lived network code recovers from failure: a dropped WebSocket reconnects with a new socket after a delay, retries back off exponentially instead of a tight fixed loop, a check that depends on propagation waits and retries, and a failed load is not cached as a rejected promise that disables the feature for the session.
+❌ `const toolsPromise = loadTools()   // one rejection lasts until restart`
+✅ `let tools: Tools | undefined; const getTools = async () => (tools ??= await loadTools())`
+Don't flag: One-off scripts; retries a library already performs.
+Sources: [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1992177560); all 8 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 3, peachbits 3, paullinator 2.</rule>
+
+<rule id="release-resources-on-error">A resource opened in a function (a client connection, a native wallet, an AMQP channel) is released on every path, including a throw: close it in a finally block or a shared cleanup helper, not only at the end of the happy path.
+❌ `await client.connect(); const quote = await getQuote(client); await client.disconnect()`
+✅ `await client.connect(); try { return await getQuote(client) } finally { await client.disconnect() }`
+Don't flag: Process-lifetime connections closed in shutdown.
+Sources: [edge-currency-accountbased#1090](https://github.com/EdgeApp/edge-currency-accountbased/pull/1090#pullrequestreview-4978796037); all 3 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 1, swansontec 1, samholmes 1.</rule>
 
 </section>
 
 <section name="Data Validation (Cleaners)">
 
 <rule id="clean-all-external-data">All network responses, disk reads and native-bridge results must be cleaned with the cleaners library before use; access cleaned values, not raw data, and never a type assertion. Clean per entry with asMaybe where one malformed entry must not drop the whole list or document, use asOptional where corrupt data should be reported rather than silently dropped, use the typed cleaner (asEdgeTokenId) for typed fields, and check Number() and parseInt results for NaN before they flow into signing or comparisons.
-Sources: [edge-currency-accountbased#925](https://github.com/EdgeApp/edge-currency-accountbased/pull/925#discussion_r2076024621); all 9 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 4, paullinator 3, samholmes 1, peachbits 1.
+Sources: [edge-autobot-server#3](https://github.com/EdgeApp/edge-autobot-server/pull/3#discussion_r2739871662); all 45 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 21, paullinator 13, samholmes 7, peachbits 4.
 </rule>
 
 <rule id="derive-types-from-cleaners">Derive types from cleaners with `ReturnType<typeof asCleaner>`. Don't duplicate type definitions alongside cleaner definitions.</rule>
@@ -197,12 +217,12 @@ Sources: [edge-currency-accountbased#925](https://github.com/EdgeApp/edge-curren
 
 <rule id="normalize-at-the-boundary">Partner data is translated into Edge identifiers (pluginId, tokenId) once, at the server or plugin that talks to the partner; downstream code (the app) looks assets up by pluginId and tokenId and never reads plugin-specific fields such as networkLocation or matches contracts locally. Edge-owned data (evmChainId, URI schemes) comes from the server or a small local table.
 Don't flag: Code inside the plugin or server that owns the partner mapping.
-Sources: [edge-info-server#166](https://github.com/EdgeApp/edge-info-server/pull/166#pullrequestreview-5511277435); all 4 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 5.
+Sources: [edge-info-server#166](https://github.com/EdgeApp/edge-info-server/pull/166#discussion_r4265158097); all 6 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 6.
 </rule>
 
 <rule id="units-explicit">Values that carry a unit are converted at the boundary and named or commented with the unit: seconds vs milliseconds for dates and expiries, hex vs decimal for RPC quantities (convert at every call site, not one of two), native vs display units for amounts. A timestamp is not a currency amount: use integer math on it, not biggystring, and keep the precision the store needs.
 Don't flag: Values whose type already encodes the unit; internal helpers with the unit in the name.
-Sources: [edge-currency-accountbased#919](https://github.com/EdgeApp/edge-currency-accountbased/pull/919#discussion_r2025626117); all 7 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 3, samholmes 2, peachbits 1, swansontec 1.
+Sources: [edge-currency-accountbased#735](https://github.com/EdgeApp/edge-currency-accountbased/pull/735#discussion_r1508214842); all 16 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 7, peachbits 6, samholmes 2, swansontec 1.
 </rule>
 
 </section>
@@ -210,13 +230,13 @@ Sources: [edge-currency-accountbased#919](https://github.com/EdgeApp/edge-curren
 <section name="Code Quality">
 
 <rule id="delete-unnecessary-code">Don't leave dead or unused code "just in case." Git history preserves it. This includes unused variables and parameters, unreachable branches, commented-out blocks, and redundant guards: optional chaining or ?? fallbacks on values that are never null, a != null check next to optional chaining that already covers it, '| undefined' on an optional prop, a cleaner on a value whose type is already static, the same check in two places, a guard before a no-op call, single-use helpers, aliases and constants that only rename another.
-Sources: [edge-currency-accountbased#952](https://github.com/EdgeApp/edge-currency-accountbased/pull/952#discussion_r2180886489); all 27 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 11, swansontec 9, paullinator 4, peachbits 3.
+Sources: [airbitz-whitelabel#2](https://github.com/EdgeApp/airbitz-whitelabel/pull/2#discussion_r1585620583); all 164 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 82, paullinator 31, samholmes 30, peachbits 21.
 </rule>
 
 <rule id="put-parameters-inline">Don't declare variables just to pass them to a function; inline the parameters. Exception: typed constants for functions with untyped/`any` parameters, where the constant provides compile-time checking.</rule>
 
 <rule id="use-existing-helpers">Before creating a new utility, value or copy, check for an existing source and use it: helpers (`getTokenId`/`getTokenIdForced` instead of `getWalletTokenId`, `getExchangeDenom` instead of custom multiplier lookups), hooks and selectors already in the codebase, values already in scope or state (walletState, contextAppId, a cleaned variable), named constants and setup objects instead of repeated literals, a provider SDK or API instead of hand-copied constants, and one shared copy of a file instead of an out-of-sync duplicate.
-Sources: [edge-apps-stress#4](https://github.com/EdgeApp/edge-apps-stress/pull/4#discussion_r1610656237); all 24 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 13, peachbits 5, paullinator 4, samholmes 2.
+Sources: [edge-apps-stress#4](https://github.com/EdgeApp/edge-apps-stress/pull/4#discussion_r1610656237); all 83 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 35, paullinator 26, peachbits 15, samholmes 6, j0ntz 1.
 </rule>
 
 <rule id="avoid-duplicated-mocks">Use existing mock data from `src/util/fake/` or consolidate new mocks there. Duplicated half-baked mock data breaks on core changes.</rule>
@@ -239,69 +259,104 @@ Sources: [edge-apps-stress#4](https://github.com/EdgeApp/edge-apps-stress/pull/4
 
 <rule id="existing-user-paths">A change keeps working for existing users, wallets and stored data: derived values (key derivation, addresses) never depend on a network fetch and persist for wallets created earlier; a new optional key does not turn off a feature users already had; a removed flag or option stays as @deprecated with its old default; legacy undefined fields and old DB rows are typed optional and handled; servers that still send the old shape keep working; and an old scene still in use stays until its callers move.
 Don't flag: Format changes with migration code (data-format-migrations owns that); features behind a new flag nobody has yet.
-Sources: [edge-core-js#579](https://github.com/EdgeApp/edge-core-js/pull/579#discussion_r1441266626); all 15 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 8, samholmes 5, paullinator 2.
+Sources: [edge-core-js#661](https://github.com/EdgeApp/edge-core-js/pull/661#discussion_r2101215753); all 25 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 19, peachbits 3, paullinator 2, samholmes 1.
 </rule>
 
 <rule id="no-debug-scaffolding">Debug-time code does not ship: hack lines added to get a case working (a Math.random mode pick, a temporary header to dodge rate limits), commented-out config or cleaners kept "for later", exports that exist only so tests can reset module state, debug-only scans that run in production before the flag check, and console output from WebView code where nobody can read it.
 Don't flag: Debug code behind __DEV__ or an env flag checked first; test files.
-Sources: [edge-currency-accountbased#799](https://github.com/EdgeApp/edge-currency-accountbased/pull/799#discussion_r1680136775); all 5 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 2, samholmes 2, peachbits 1.
+Sources: [biggystring#18](https://github.com/EdgeApp/biggystring/pull/18#discussion_r1391835175); all 54 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 30, samholmes 17, peachbits 5, paullinator 2.
 </rule>
 
 <rule id="file-placement-conventions">New files and declarations go where the repo keeps that kind of thing: utilities in src/util, reducers in src/reducers, scenes in src/components/scenes, non-scene components in their component folder, types next to the actions or on-disk format that own them (not in a reducer file).
 Don't flag: Moves the PR defers to a named follow-up; repos with no established layout.
-Sources: [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1430512921); all 7 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 6, samholmes 1.
+Sources: [edge-core-js#599](https://github.com/EdgeApp/edge-core-js/pull/599#discussion_r1651718432); all 23 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 14, samholmes 5, peachbits 2, j0ntz 1, paullinator 1.
 </rule>
 
 <rule id="logic-belongs-in-owning-layer">New logic, constants and data live in the layer that owns the concept: chain facts and per-chain behavior in the chain's engine or networkInfo (not core, not a base engine, not the GUI), provider mapping in the plugin or server that talks to the provider, a precondition inside the function that needs it rather than at each caller, public config in config files rather than the secrets file. Flag code that adds a concept to a layer that only consumes it.
 Don't flag: Moves the PR description defers to a named follow-up; test fixtures; a constant used by one function in the same file.
-Sources: [edge-core-js#618](https://github.com/EdgeApp/edge-core-js/pull/618#pullrequestreview-2298142883); all 7 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 5, peachbits 2.
+Sources: [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1996137086); all 40 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 19, peachbits 13, paullinator 4, samholmes 4.
 </rule>
 
 <rule id="name-magic-values">Numbers and literals with meaning (poll intervals, tx direction or priority codes, an epoch date, a currency code) become named constants, a library enum, or come from currencyInfo or config. Partly lintable: eslint no-magic-numbers with an allow-list of 0, 1, -1 catches the numeric half.
 Don't flag: 0, 1 and -1; array indices; values used once with an explanatory comment.
-Sources: [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371542); all 5 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 4, samholmes 1.
+Sources: [biggystring#19](https://github.com/EdgeApp/biggystring/pull/19#discussion_r1505071262); all 14 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 5, paullinator 5, swansontec 2, peachbits 2.
 </rule>
 
 <rule id="no-hardcoded-config">Values that differ between deployments or people (branch names, project ids, server URIs, env variables, a person's name, an endpoint a test server must replace) come from config, networkInfo or infoOptions, not literals in the code.
 Don't flag: Protocol constants that never change; defaults that config overrides.
-Sources: [edge-autobot-server#3](https://github.com/EdgeApp/edge-autobot-server/pull/3#pullrequestreview-3720598688); all 8 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 4, samholmes 2, paullinator 1, swansontec 1.
+Sources: [edge-autobot-server#4](https://github.com/EdgeApp/edge-autobot-server/pull/4#discussion_r2943202103); all 17 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 7, samholmes 4, peachbits 3, swansontec 3.
 </rule>
 
 <rule id="avoid-repeated-work">Do expensive or networked work once and reuse the result: create clients once, cache network calls and parsed files, load a currency cache before a batch instead of making each per-item processor async, read settings once into a local, reuse a value already in scope or passed by the previous scene, run cheap validation before the network call, skip a write when nothing changed, and initialize plugins lazily where they are used rather than in Redux or a background manager.
 Don't flag: Cold paths that run once per app launch; micro-optimizations with no measured cost.
-Sources: [edge-react-gui#5691](https://github.com/EdgeApp/edge-react-gui/pull/5691#discussion_r2283794439); all 19 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 7, swansontec 5, samholmes 4, peachbits 3.
-</rule>
-
-<rule id="alphabetical-registration">Plugin registrations, interface fields, object keys and JSX props stay in the alphabetical order the surrounding block uses; a new entry goes in its sorted position, not at the end.
-❌ `export const plugins = { changenow, sideshift, xgram, exolix }`
-✅ `export const plugins = { changenow, exolix, sideshift, xgram }`
-Don't flag: Blocks that are not sorted yet; order that carries meaning (priority lists).
-Sources: [edge-core-js#615](https://github.com/EdgeApp/edge-core-js/pull/615#discussion_r1747674696); all 6 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 2, swansontec 2, paullinator 2.
+Sources: [biggystring#18](https://github.com/EdgeApp/biggystring/pull/18#discussion_r1396556236); all 47 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 17, swansontec 15, peachbits 10, samholmes 5.
 </rule>
 
 <rule id="follow-repo-naming-conventions">Names follow the repo's convention: withX for Serverlet middleware, camelCase file names, UPPER_SNAKE for module constants (BUY_ONLY_PLUGIN_IDS, SYNC_INTERVAL) and camelCase for locals, capitalized interface names, asX cleaners without a Request suffix and matching edge-server-tools names, kebab-case command names, `error` for a caught exception, lower-case shell locals.
 Don't flag: Names a public API already exports; generated code.
-Sources: [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1715981387); all 17 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 11, samholmes 5, paullinator 1.
+Sources: [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r2036137147); all 57 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 35, samholmes 15, paullinator 5, peachbits 2.
 </rule>
 
 <rule id="match-sibling-behavior">When a sibling feature or another implementation of the same interface already handles a case (the wallet method's token post-processing, core's onError path, another provider format, SimpleTextInput's behavior, the iOS copy and icons, an empty state, the other partner plugins' sync shape, the withWallet hook), the new code does the same or says why it differs.
 ❌ `// config.parseUri skips the token post-processing wallet.parseUri does`
 ✅ `const parsed = await postProcessTokens(await plugin.parseUri(uri))   // shared with wallet.parseUri`
 Don't flag: Intentional divergence stated in the PR or a comment; siblings that are themselves under review in the same PR.
-Sources: [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#discussion_r4160149915); all 12 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 5, samholmes 5, peachbits 1, paullinator 1.
+Sources: [drupe#1](https://github.com/EdgeApp/drupe/pull/1#discussion_r2520369254); all 39 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 16, peachbits 11, paullinator 6, samholmes 6.
 </rule>
 
 <rule id="plain-functions-over-iife">Prefer a named function, async/await or a promise chain over an IIFE, a new Promise wrapper or a hand-extracted resolve deferred.
 Don't flag: Wrapping a callback-only API in a Promise.
-Sources: [edge-core-js#697](https://github.com/EdgeApp/edge-core-js/pull/697#discussion_r2731473206); all 5 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 4, samholmes 1.
+Sources: [edge-core-js#697](https://github.com/EdgeApp/edge-core-js/pull/697#discussion_r2731473206); all 6 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 5, samholmes 1.
 </rule>
 
 <rule id="declare-direct-dependencies">A package imported directly is declared in package.json (not relied on through a transitive dependency), and build-only tools and bundled packages go in devDependencies.
 ❌ `import { b58cencode } from '@taquito/utils'   // not in package.json`
 ✅ `package.json dependencies: { "@taquito/utils": "^20.0.0" }`
 Don't flag: Node built-ins; monorepo workspace packages the root declares.
-Sources: [drupe#1](https://github.com/EdgeApp/drupe/pull/1#discussion_r2520376341); all 3 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 2, samholmes 1.
+Sources: [drupe#1](https://github.com/EdgeApp/drupe/pull/1#discussion_r2520376341); all 6 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 3, peachbits 2, samholmes 1.
 </rule>
+
+<rule id="guard-numeric-inputs">A number parsed from a string (parseInt, parseFloat, Number) or from external data is checked for NaN, or parsed by a cleaner that rejects non-numbers, before it is stored, compared, saved as a checkpoint or used in math, and a divisor that can reach zero (leverage - 1, an item width, a total) is guarded first.
+❌ `checkpoint = parseInt(block.number, 16).toString()   // saves "NaN"`
+✅ `const height = parseInt(block.number, 16); if (isNaN(height)) throw new Error('bad block ' + block.number)`
+Don't flag: Values a cleaner already typed as numbers; divisors that are constants.
+Sources: [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#discussion_r2807032547); all 10 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 4, paullinator 3, swansontec 3.</rule>
+
+<rule id="refactor-preserves-behavior">A rewrite, refactor or condition change keeps every case the old code handled: no inverted test (`== null` that was `!= null`, `=== 0` that was `!== 0`), no dropped clause from a compound condition, no dropped loop, route param or prop. When the PR means to change the behavior, it says so.
+❌ `if (token == null)   // the old code ran this branch for tokens`
+✅ `if (token != null)   // same case as the old currencyCode comparison`
+Don't flag: Behavior changes the PR description or a commit message names.
+Sources: [edge-currency-accountbased#749](https://github.com/EdgeApp/edge-currency-accountbased/pull/749#discussion_r1532915232); all 14 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 8, samholmes 2, paullinator 2, peachbits 2.</rule>
+
+<rule id="fix-root-cause">A fix addresses why the bug happens, not where it shows: no padding offset for a layout bug nobody explained, no optional chaining for a call that runs after logout, no blind retry for a load that fails, no workaround for bad upstream data. When the root cause is out of reach, the patch says what is known and what was ruled out.
+❌ `paddingBottom: theme.rem(4)   // without it the list is cut off`
+✅ `// The scene was mounted after logout; unmount it with the account instead`
+Don't flag: Stopgaps the PR labels as temporary and links to a follow-up.
+Sources: [edge-core-js#685](https://github.com/EdgeApp/edge-core-js/pull/685#pullrequestreview-3390167854); all 9 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 4, peachbits 3, swansontec 2.</rule>
+
+<rule id="names-match-role">A name says what the thing is and holds, and changes when that changes: a url that is not a base is url, a value that holds url and headers is connectionInfo, a hook named for what it returns, a validator renamed when it checks more than its name says, an identifier renamed with its siblings.
+❌ `const midgardUrl = { url, headers }`
+✅ `const midgardConnectionInfo = { url, headers }`
+Don't flag: Names a public API already exports; names follow-repo-naming-conventions owns (case and prefix conventions).
+Sources: [edge-core-js#608](https://github.com/EdgeApp/edge-core-js/pull/608#discussion_r1704482801); all 12 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 6, swansontec 3, paullinator 2, peachbits 1.</rule>
+
+<rule id="match-local-form">New code takes the form its neighbors use in the same file or module: options in one opts object placed last, the same parameter order as sibling functions, for...of loops, `== null` checks, the `? null :` JSX form, `catch (error)`, the same comment style and the same units as the sibling themes or helpers.
+❌ `const fetchFee = (url: string, timeout: number, tokenId: EdgeTokenId) => ...`
+✅ `const fetchFee = (url: string, tokenId: EdgeTokenId, opts: { timeout?: number } = {}) => ...`
+Don't flag: Code the formatter or linter owns; a file with no settled form.
+Sources: [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1996078879); all 20 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 13, samholmes 5, paullinator 2.</rule>
+
+<rule id="methods-without-this">A class or object method that never reads `this` becomes a standalone function at module level, called with what it needs.
+❌ `getRequiredConfirmations(chainId: string): number { return CONFIRMATIONS[chainId] }`
+✅ `function getRequiredConfirmations(chainId: string): number { return CONFIRMATIONS[chainId] }`
+Don't flag: Methods that implement an interface; methods a subclass overrides.
+Sources: [edge-autobot-server#2](https://github.com/EdgeApp/edge-autobot-server/pull/2#discussion_r2356784917); all 3 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 2, paullinator 1.</rule>
+
+<rule id="const-over-reassigned-let">A value picked by a condition is a `const` assigned with a ternary, not a `let` declared first and set in an if/else.
+❌ `let url = DEFAULT_URL; if (isSell) url = SELL_URL`
+✅ `const url = isSell ? SELL_URL : DEFAULT_URL`
+Don't flag: Three or more branches, where an if/else or lookup reads better; values built up in a loop.
+Sources: [edge-react-gui#5206](https://github.com/EdgeApp/edge-react-gui/pull/5206#discussion_r1720445709); all 3 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 3.</rule>
 
 </section>
 
@@ -325,8 +380,9 @@ Sources: [drupe#1](https://github.com/EdgeApp/drupe/pull/1#discussion_r252037634
 
 <section name="Comments & Documentation">
 
-<rule id="add-non-obvious-constraints">Document constraints and choices that are not obvious from the code: what an unusual name or suffix means, a hard-coded value (an IP, a 2px Android offset), a platform-specific branch, what a boolean parameter does, when a polyfill can be removed, where copied code came from (link it), and why a type is exported (tests). Replace a vague comment ("because reasons") with the real reason. Example: `// EVM-only: assumes EVM contract address format`.
-Sources: [edge-core-js#600](https://github.com/EdgeApp/edge-core-js/pull/600#discussion_r1669317697); all 17 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 13, swansontec 4.
+<rule id="add-non-obvious-constraints">Ask for a comment only where a reader without it would get the code wrong, and name that mistake in the finding: a reader would assume a function handles non-EVM chains, treat a hard-coded value (an IP, a 2px Android offset) as arbitrary and change it, take a platform-specific branch for dead code, misread what a boolean parameter does, or delete a polyfill or exported type that something still needs. Replace a vague comment ("because reasons") with the real reason. Example: `// EVM-only: assumes EVM contract address format`.
+Don't flag: Code a reader would use and change correctly without the comment; a missing comment whose only cost is that the reader has to look something up.
+Sources: [biggystring#19](https://github.com/EdgeApp/biggystring/pull/19#discussion_r1505070945); all 36 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 17, swansontec 13, peachbits 4, paullinator 2.
 </rule>
 
 <rule id="remove-stale-comments">Remove comments when the context they describe has changed. Stale comments mislead more than missing comments.</rule>
@@ -338,12 +394,12 @@ Sources: [edge-core-js#600](https://github.com/EdgeApp/edge-core-js/pull/600#dis
 
 <rule id="doc-links-resolve">Code links in committed docs resolve after merge: a permalink pins a sha that is in the final branch history (not an orphaned pre-squash commit or a deleted branch), points at the repo that owns the code (edge-core-js types, not the GUI copy), and shows the code the prose describes; prefer repo-relative links or the default branch when the sha would go stale.
 Don't flag: External links to third-party sites; links in CHANGELOG entries.
-Sources: [edge-currency-accountbased#1098](https://github.com/EdgeApp/edge-currency-accountbased/pull/1098#discussion_r3993267174); all 11 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 11.
+Sources: [edge-currency-accountbased#1098](https://github.com/EdgeApp/edge-currency-accountbased/pull/1098#discussion_r3993267174); all 14 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 11, paullinator 2, samholmes 1.
 </rule>
 
 <rule id="jsdoc-for-api-and-deprecations">Exported API members, config fields and deprecations are documented with a JSDoc block above the declaration (so editors show it), every parameter has a description, the text is complete, and a deprecated field carries @deprecated naming its replacement.
 Don't flag: Private helpers; members whose name says everything.
-Sources: [edge-core-js#589](https://github.com/EdgeApp/edge-core-js/pull/589#discussion_r1536641836); all 6 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 3, swansontec 2, paullinator 1.
+Sources: [edge-core-js#589](https://github.com/EdgeApp/edge-core-js/pull/589#discussion_r1536641836); all 14 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 9, samholmes 4, paullinator 1.
 </rule>
 
 </section>
@@ -356,36 +412,36 @@ Sources: [edge-core-js#589](https://github.com/EdgeApp/edge-core-js/pull/589#dis
 
 <rule id="changelog-section-and-verb">A CHANGELOG entry sits in the section for the branch it lands on (Unreleased for develop-only work, the staging release section only for a fix cherry-picked to staging; after a rebase it moves to the end of the current unreleased group), uses the verb that matches the change (added, changed, fixed, removed), names only the chains or features that were affected with a prefix such as (ADA) where the repo uses one, and is not written for a fix to a bug no shipped release had.
 Don't flag: A dependency-bump entry the release scripts write; wording nits that do not change meaning; repos that keep no Unreleased section.
-Sources: [edge-core-js#583](https://github.com/EdgeApp/edge-core-js/pull/583#discussion_r1458036518); all 12 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 6, samholmes 4, swansontec 1, paullinator 1.
+Sources: [edge-core-js#583](https://github.com/EdgeApp/edge-core-js/pull/583#discussion_r1458036518); all 24 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 9, peachbits 9, swansontec 3, paullinator 2, j0ntz 1.
 </rule>
 
-<rule id="changelog-entry-with-change">A user-visible change carries a CHANGELOG entry, and the entry, string changes, snapshot updates and .gitignore lines go in the same commit as the change they belong to, not a trailing commit.
-Don't flag: Repos without a CHANGELOG; internal refactors with no user-visible effect.
-Sources: [edge-currency-plugins#424](https://github.com/EdgeApp/edge-currency-plugins/pull/424#issuecomment-2859493713); all 13 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 9, peachbits 2, paullinator 1, swansontec 1.
+<rule id="changelog-entry-with-change">A user-visible change carries a CHANGELOG entry. Flag only a user-visible change that has no entry anywhere in the PR; never comment on which commit carries the entry.
+Don't flag: Repos without a CHANGELOG; internal refactors with no user-visible effect; an entry that exists in a different commit from the change.
+Sources: [edge-core-js#694](https://github.com/EdgeApp/edge-core-js/pull/694#discussion_r2674452965); all 11 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 7, peachbits 2, paullinator 2.
 </rule>
 
 <rule id="clean-commit-history">History is linear and reviewable: rebase onto the base instead of merging it, use fixup! commits for review changes so reviewed commits stay put, squash wip and fix-the-fix commits before landing, drop a commit instead of adding a revert, and avoid a line that one commit adds and the next removes.
 Don't flag: Merge commits the repo workflow creates at land.
-Sources: [edge-currency-accountbased#645](https://github.com/EdgeApp/edge-currency-accountbased/pull/645#pullrequestreview-1690640672); all 15 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 7, samholmes 4, paullinator 4.
+Sources: [edge-change-server#5](https://github.com/EdgeApp/edge-change-server/pull/5#discussion_r2098939428); all 41 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 22, samholmes 10, paullinator 4, j0ntz 3, peachbits 2.
 </rule>
 
 <rule id="split-unrelated-fixes">Each commit does one thing its message names: renames, deletions, signature changes, editor config, docs and unrelated fixes go in their own commits (refactor, fix and new behavior separately, each with its tests), and cleanups unrelated to the PR go to a separate PR.
 ❌ `commit "Add couchUris config" also fixes the promiseTimeout hang`
 ✅ `commit 1 "Clear promiseTimeout timer"; commit 2 "Add couchUris config"`
 Don't flag: Fixups that will be autosquashed; one-line typo fixes in a touched line.
-Sources: [biggystring#19](https://github.com/EdgeApp/biggystring/pull/19#discussion_r1505032654); all 12 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 6, peachbits 3, samholmes 2, paullinator 1.
+Sources: [biggystring#19](https://github.com/EdgeApp/biggystring/pull/19#discussion_r1505032654); all 31 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 10, samholmes 9, peachbits 7, paullinator 5.
 </rule>
 
 <rule id="commit-message-matches-diff">Commit messages and PR titles describe what the final diff does: after fixups squash in, the body is rewritten to match the shipped design (not a removed one), claims match files the commit touches, the body explains why (motivation, root cause, the command used for a generated change), and any patch or behavior change the commit carries is named.
 Don't flag: Fixup commits that will be squashed; trivial one-line changes.
-Sources: [edge-currency-accountbased#829](https://github.com/EdgeApp/edge-currency-accountbased/pull/829#pullrequestreview-2284005823); all 21 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 10, samholmes 6, swansontec 4, paullinator 1.
+Sources: [edge-core-js#583](https://github.com/EdgeApp/edge-core-js/pull/583#pullrequestreview-1830650317); all 33 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 11, peachbits 11, samholmes 10, paullinator 1.
 </rule>
 
 <rule id="no-unrelated-lockfile-churn">Lockfile changes match the dependency change the PR makes: discard unrelated Podfile.lock checksum flips and lockfile flip-flops, explain any new transitive dependency, dedupe duplicate versions, and check that resolutions still apply.
 ❌ `Podfile.lock: SPEC CHECKSUMS changed for 14 pods   (no pod change in the PR)`
 ✅ `yarn.lock: only the entries for the bumped package`
 Don't flag: Lockfile regeneration that is the purpose of the PR.
-Sources: [edge-currency-accountbased#957](https://github.com/EdgeApp/edge-currency-accountbased/pull/957#discussion_r2199606065); all 7 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 4, swansontec 3.
+Sources: [airbitz-whitelabel#2](https://github.com/EdgeApp/airbitz-whitelabel/pull/2#discussion_r1585623560); all 11 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 5, peachbits 5, samholmes 1.
 </rule>
 
 </section>
@@ -396,37 +452,37 @@ Sources: [edge-currency-accountbased#957](https://github.com/EdgeApp/edge-curren
 ❌ `if (request.fromCurrencyCode !== wallet.currencyInfo.currencyCode) isToken = true`
 ✅ `const isToken = request.fromTokenId != null`
 Don't flag: Display strings; legacy APIs that only accept a currency code (add a todo).
-Sources: [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292110225); all 10 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 8, swansontec 2.
+Sources: [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1412619219); all 21 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 10, paullinator 9, peachbits 2.
 </rule>
 
 <rule id="tokenid-typed-and-required">tokenId fields and parameters use the EdgeTokenId type (not string | null) and are required where a missing value would silently mean the native asset; undefined must not stand for both "parent currency" and "none specified" (use a union type), and null is reserved for tokenId, not general absence.
 Don't flag: Legacy public APIs that need a deprecation cycle.
-Sources: [edge-react-gui#5275](https://github.com/EdgeApp/edge-react-gui/pull/5275#discussion_r1778954857); all 11 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 10, peachbits 1.
+Sources: [edge-currency-accountbased#719](https://github.com/EdgeApp/edge-currency-accountbased/pull/719#discussion_r1484664313); all 8 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 8.
 </rule>
 
 <rule id="no-sentinel-empty-values">Missing optional values are undefined, not empty strings, empty arrays or null stand-ins; on-disk types do not persist null for absent fields (use a separate change type for deletions); and a fallback must not turn "unknown" into a value that defeats a downstream null check.
 Don't flag: Protocols that require an empty string; UI inputs whose value is a string by contract.
-Sources: [edge-core-js#693](https://github.com/EdgeApp/edge-core-js/pull/693#discussion_r2674364062); all 6 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 4, peachbits 1, paullinator 1.
+Sources: [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1430530646); all 13 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 10, paullinator 2, peachbits 1.
 </rule>
 
 <rule id="map-set-for-dictionaries">A dictionary keyed by data (ids, URIs, addresses) is a Map, a membership collection is a Set, and a Set never holds objects that should dedupe by value (use a Map keyed by id).
 Don't flag: Fixed-shape records; objects serialized to JSON as-is.
-Sources: [edge-currency-accountbased#765](https://github.com/EdgeApp/edge-currency-accountbased/pull/765#pullrequestreview-2023583681); all 5 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 5.
+Sources: [edge-currency-accountbased#644](https://github.com/EdgeApp/edge-currency-accountbased/pull/644#discussion_r1364585893); all 9 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 9.
 </rule>
 
 <rule id="discriminate-over-flags">A distinct mode gets its own type or action variant (a separate send-request type, a swapSend action) instead of optional fields or a flag on a shared shape; callers pass the request, a single config object or a whole asset, not a boolean, split fields or positional args that are easy to swap; a partial result is a success/failure union, not Partial<T>.
 Don't flag: Public API changes the PR cannot make without a breaking release; internal two-arg helpers with distinct types.
-Sources: [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#pullrequestreview-5344893732); all 13 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 7, swansontec 3, paullinator 3, samholmes 1.
+Sources: [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#discussion_r4127223350); all 7 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 5, swansontec 1, samholmes 1.
 </rule>
 
 <rule id="narrowest-accurate-types">Types say exactly what the code allows: required when every caller sets it, a literal or union instead of a wide type (true, a keyboard-type subset), JsonObject or lowercase object instead of Object, and no as cast where the type already flows.
 Don't flag: Types imported from third-party packages; public types widened on purpose for compatibility.
-Sources: [edge-change-server#3](https://github.com/EdgeApp/edge-change-server/pull/3#discussion_r2047947966); all 10 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 6, paullinator 2, peachbits 1, samholmes 1.
+Sources: [edge-change-server#3](https://github.com/EdgeApp/edge-change-server/pull/3#discussion_r2047947966); all 46 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 22, paullinator 12, samholmes 8, peachbits 4.
 </rule>
 
 <rule id="deprecated-fields-last">In interfaces and cleaners, deprecated members sit at the bottom under one "Deprecated" comment, and the fields that replace them (serviceKeys) group at the top.
 Don't flag: Public types where reordering would change a serialized order.
-Sources: [edge-core-js#633](https://github.com/EdgeApp/edge-core-js/pull/633#discussion_r1906080057); all 5 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 4, swansontec 1.
+Sources: [edge-core-js#633](https://github.com/EdgeApp/edge-core-js/pull/633#discussion_r1906080057); all 6 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: samholmes 4, swansontec 2.
 </rule>
 
 </section>
@@ -435,7 +491,7 @@ Sources: [edge-core-js#633](https://github.com/EdgeApp/edge-core-js/pull/633#dis
 
 <rule id="no-secrets-in-dumps-or-logs">API keys, plugin env and sensitive transaction or wallet event data never reach dumpData, logs, logged URLs or chat; signing endpoints allow-list the hosts they sign for and never fall back to Edge's own secret; services exposed beyond localhost require credentials; lookups keyed by attacker-controlled strings use a Map; a hashed identifier keeps enough entropy that the original is not recoverable. Severity: critical.
 Don't flag: Public keys and public addresses; test fixtures with fake keys.
-Sources: [edge-currency-accountbased#1036](https://github.com/EdgeApp/edge-currency-accountbased/pull/1036#discussion_r2886432340); all 8 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: paullinator 4, peachbits 2, samholmes 1, swansontec 1.
+Sources: [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371558); all 6 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 4, paullinator 1, samholmes 1.
 </rule>
 
 </section>
@@ -446,8 +502,14 @@ Sources: [edge-currency-accountbased#1036](https://github.com/EdgeApp/edge-curre
 ❌ `// SendScene2.tsx adds three token-payout guards; no test fails if any is removed`
 ✅ `it('refuses a destination-banned asset', () => { expect(pickPayout(banned)).toEqual({ refused: true }) })`
 Don't flag: Pure renames and moves; config-only changes; code paths an existing test already pins.
-Sources: [biggystring#18](https://github.com/EdgeApp/biggystring/pull/18#discussion_r1325312744); all 37 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 19, paullinator 8, samholmes 8, swansontec 2.
+Sources: [biggystring#18](https://github.com/EdgeApp/biggystring/pull/18#discussion_r1325312744); all 64 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 39, paullinator 13, samholmes 8, swansontec 4.
 </rule>
+
+<rule id="no-redundant-tests">Tests cover the change's risk once: no unit test that repeats a path an existing end-to-end or integration test already covers, no micro-test per line where a few behavior-level tests (success, limit reached, cancel, non-retriable error) say more, and no test that mocks the whole library and so checks nothing real.
+❌ `it('deletes file 1') ... it('deletes file 2') ...   // the wallet test already deletes them all`
+✅ `it('removes every transaction file, including new fields')`
+Don't flag: Regression tests that pin a reported bug.
+Sources: [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1996112622); all 6 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 5, paullinator 1.</rule>
 
 </section>
 

@@ -64,10 +64,6 @@ done
 
 REPO_NAME=$(jq -r .repo "$SNAP/meta.json")
 PR_NUM=$(jq -r .pr "$SNAP/meta.json")
-if (( PR_NUM % 3 == 2 )) && [[ "${REPLAY_ALLOW_HELD_OUT:-}" != "1" ]]; then
-  echo "Error: $REPO_NAME#$PR_NUM is held out (mod 3 == 2); set REPLAY_ALLOW_HELD_OUT=1 only for the replay run" >&2
-  exit 2
-fi
 
 SHA=$(git -C "$EDA_REPO" rev-parse --verify --quiet "$EDA^{commit}") || { echo "Error: $EDA is not a commit in $EDA_REPO" >&2; exit 2; }
 PIN="$REPLAY_ROOT/eda/$SHA"

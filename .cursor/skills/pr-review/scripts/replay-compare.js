@@ -26,7 +26,7 @@
 // Usage:
 //   replay-compare.js --findings <file|dir> [--findings ...] [--export <jsonl>]
 //     [--out <dir>] [--label <name>] [--repo-dir <clone>] [--sha <commit>]
-//     [--human-until <iso>] [--allow-held-out] [--model sonnet] [--parallel 3]
+//     [--human-until <iso>] [--model sonnet] [--parallel 3]
 //     [--sample <n>] [--dry-run]
 //
 // Judge verdicts are cached by prompt; --sample <n> (default 1) draws a fresh
@@ -50,8 +50,11 @@
 // conversation | pr. Human logins come from the machine-local accounts.json
 // (`humans`), never from this file.
 //
-// Held-out PRs (number mod 3 == 2) are refused unless --allow-held-out, which
-// only the replay run passes.
+// The review rules are mined from every PR in the 2023-10-23 to 2026-10-23
+// export, so a replay that measures them scores PRs opened after 2026-10-23.
+// j0ntz stays out of the human set (accounts.json lists it as the operator):
+// the mining filter that separates its hand-written comments from agent output
+// does not run here.
 const { spawn, spawnSync } = require('child_process')
 const crypto = require('crypto')
 const fs = require('fs')
@@ -83,7 +86,6 @@ function parseArgs(argv) {
     else if (a === '--model') opts.model = next()
     else if (a === '--parallel') opts.parallel = Number(next())
     else if (a === '--sample') opts.sample = Number(next())
-    else if (a === '--allow-held-out') opts.allowHeldOut = true
     else if (a === '--dry-run') opts.dryRun = true
     else if (a === '-h' || a === '--help') {
       process.stdout.write(fs.readFileSync(__filename, 'utf8').split('\nconst ')[0])
@@ -572,10 +574,6 @@ async function main() {
   const exportFile = opts.export ?? defaultExport()
   const humans = loadHumans(opts.accounts ?? `${MINING}/accounts.json`)
   const sets = findingFiles(opts.findings).map(f => loadFindings(f, opts))
-  const heldOut = sets.filter(s => s.pr.number % 3 === 2)
-  if (heldOut.length > 0 && opts.allowHeldOut !== true) {
-    die(`held-out PRs (number mod 3 == 2) need --allow-held-out: ${heldOut.map(s => prKey(s.pr.repo, s.pr.number)).join(', ')}`)
-  }
   const wanted = new Set(sets.map(s => prKey(s.pr.repo, s.pr.number)))
   const rowsByPr = loadExportRows(exportFile, wanted)
   for (const k of wanted) if (!rowsByPr.has(k)) process.stderr.write(`replay-compare: ${k} has no rows in ${exportFile}; scoring against an empty human set\n`)

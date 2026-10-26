@@ -9,7 +9,9 @@
 #
 # The test is BOTH of:
 #   1. AGENT_TASK_GID is set (exported only by orch spawns/resumes).
-#   2. The pane's CURRENT tmux session name is exactly claude-asana-$AGENT_TASK_GID.
+#   2. The pane's CURRENT tmux session name is exactly claude-asana-$AGENT_TASK_GID,
+#      or qa-asana-$AGENT_TASK_GID when AGENT_MODE=qa (a qa-run session: killed after
+#      its verdict, never retired, so the exact name is in flight for its whole life).
 #
 # Why the env var alone is not enough: the watchdog's completion sweep renames
 # claude-asana-<gid> -> done-asana-<gid> at completion but leaves claude alive
@@ -38,5 +40,6 @@ set -uo pipefail
 [ -n "${TMUX:-}" ] && [ -n "${TMUX_PANE:-}" ] || exit 1
 
 NAME=$(tmux display-message -p -t "$TMUX_PANE" '#{session_name}' 2>/dev/null || true)
-[ "$NAME" = "claude-asana-$AGENT_TASK_GID" ] || exit 1
-exit 0
+[ "$NAME" = "claude-asana-$AGENT_TASK_GID" ] && exit 0
+[ "${AGENT_MODE:-}" = qa ] && [ "$NAME" = "qa-asana-$AGENT_TASK_GID" ] && exit 0
+exit 1

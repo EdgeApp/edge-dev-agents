@@ -2,762 +2,1656 @@
 
 Every review comment each mined review-standards.mdc and typescript-standards.mdc rule came from.
 The rule bodies link the first one; feature rules list theirs in `features/<repo>/*.rules.yaml`.
-Sources are mined PRs only: no PR whose number mod 3 is 2 (the replay hold-out) appears here.
+Sources span every PR in the 2023-10-23 to 2026-10-23 review export.
 
-## changelog-section-and-verb
+## narrow-try-scope
 
-review-standards.mdc, new. Reviewers: peachbits 6, samholmes 4, swansontec 1, paullinator 1.
+review-standards.mdc, new. Reviewers: paullinator 5, peachbits 5, samholmes 1.
 
-- [edge-core-js#583](https://github.com/EdgeApp/edge-core-js/pull/583#discussion_r1458036518)
-- [edge-core-js#717](https://github.com/EdgeApp/edge-core-js/pull/717#discussion_r2949716335)
-- [edge-core-js#721](https://github.com/EdgeApp/edge-core-js/pull/721#discussion_r3040803133)
-- [edge-currency-accountbased#676](https://github.com/EdgeApp/edge-currency-accountbased/pull/676#discussion_r1403714854)
-- [edge-currency-accountbased#829](https://github.com/EdgeApp/edge-currency-accountbased/pull/829#discussion_r1746114771)
-- [edge-currency-accountbased#1084](https://github.com/EdgeApp/edge-currency-accountbased/pull/1084#discussion_r3847619317)
-- [edge-react-gui#5206](https://github.com/EdgeApp/edge-react-gui/pull/5206#discussion_r1720381457)
-- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#discussion_r3807687602)
-- [edge-react-gui#6240](https://github.com/EdgeApp/edge-react-gui/pull/6240#discussion_r4233126633)
-- [edge-react-gui#6256](https://github.com/EdgeApp/edge-react-gui/pull/6256#discussion_r4276118281)
-- [edge-react-gui#6267](https://github.com/EdgeApp/edge-react-gui/pull/6267#discussion_r4300149798)
-- [edge-react-gui#6211](https://github.com/EdgeApp/edge-react-gui/pull/6211#pullrequestreview-5359568343)
+- [edge-autobot-server#2](https://github.com/EdgeApp/edge-autobot-server/pull/2#discussion_r2356790665)
+- [edge-autobot-server#2](https://github.com/EdgeApp/edge-autobot-server/pull/2#discussion_r2356791276)
+- [edge-currency-accountbased#1044](https://github.com/EdgeApp/edge-currency-accountbased/pull/1044#discussion_r3048266066)
+- [edge-currency-accountbased#1096](https://github.com/EdgeApp/edge-currency-accountbased/pull/1096#discussion_r3917922101)
+- [edge-currency-accountbased#1098](https://github.com/EdgeApp/edge-currency-accountbased/pull/1098#discussion_r3983332843)
+- [edge-currency-plugins#454](https://github.com/EdgeApp/edge-currency-plugins/pull/454#discussion_r3723898208)
+- [edge-info-server#130](https://github.com/EdgeApp/edge-info-server/pull/130#discussion_r1741263862)
+- [edge-rates-server#99](https://github.com/EdgeApp/edge-rates-server/pull/99#discussion_r1513861209)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2258781004)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2264024206)
+- [edge-react-gui#6235](https://github.com/EdgeApp/edge-react-gui/pull/6235#discussion_r4200200259)
+
+## check-response-ok
+
+review-standards.mdc, new. Reviewers: paullinator 4, peachbits 2, samholmes 1.
+
+- [edge-currency-accountbased#811](https://github.com/EdgeApp/edge-currency-accountbased/pull/811#discussion_r1707483550)
+- [edge-exchange-plugins#330](https://github.com/EdgeApp/edge-exchange-plugins/pull/330#discussion_r1651473120)
+- [edge-exchange-plugins#403](https://github.com/EdgeApp/edge-exchange-plugins/pull/403#discussion_r2360440301)
+- [edge-exchange-plugins#429](https://github.com/EdgeApp/edge-exchange-plugins/pull/429#discussion_r2737716493)
+- [edge-exchange-plugins#480](https://github.com/EdgeApp/edge-exchange-plugins/pull/480#discussion_r4066871861)
+- [edge-rates-server#103](https://github.com/EdgeApp/edge-rates-server/pull/103#discussion_r1693435682)
+- [edge-reports-server#194](https://github.com/EdgeApp/edge-reports-server/pull/194#discussion_r1837285253)
+
+## no-silent-success
+
+review-standards.mdc, new. Reviewers: paullinator 21, samholmes 15, peachbits 8, swansontec 3.
+
+- [biggystring#21](https://github.com/EdgeApp/biggystring/pull/21#discussion_r1678293882)
+- [edge-change-server#3](https://github.com/EdgeApp/edge-change-server/pull/3#discussion_r2047950397)
+- [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#discussion_r2807031085)
+- [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#discussion_r2807031686)
+- [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#pullrequestreview-3800960702)
+- [edge-currency-accountbased#668](https://github.com/EdgeApp/edge-currency-accountbased/pull/668#discussion_r1391724834)
+- [edge-currency-accountbased#923](https://github.com/EdgeApp/edge-currency-accountbased/pull/923#discussion_r2061060259)
+- [edge-currency-accountbased#938](https://github.com/EdgeApp/edge-currency-accountbased/pull/938#discussion_r2107788446)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371548)
+- [edge-currency-accountbased#1044](https://github.com/EdgeApp/edge-currency-accountbased/pull/1044#discussion_r3048265592)
+- [edge-currency-accountbased#1045](https://github.com/EdgeApp/edge-currency-accountbased/pull/1045#discussion_r3040846357)
+- [edge-currency-accountbased#1045](https://github.com/EdgeApp/edge-currency-accountbased/pull/1045#discussion_r3040847076)
+- [edge-currency-accountbased#1090](https://github.com/EdgeApp/edge-currency-accountbased/pull/1090#pullrequestreview-4978796037)
+- [edge-currency-accountbased#1099](https://github.com/EdgeApp/edge-currency-accountbased/pull/1099#discussion_r3983689586)
+- [edge-currency-plugins#387](https://github.com/EdgeApp/edge-currency-plugins/pull/387#discussion_r1367585094)
+- [edge-currency-plugins#423](https://github.com/EdgeApp/edge-currency-plugins/pull/423#discussion_r1999547485)
+- [edge-currency-plugins#423](https://github.com/EdgeApp/edge-currency-plugins/pull/423#discussion_r1999678612)
+- [edge-currency-plugins#455](https://github.com/EdgeApp/edge-currency-plugins/pull/455#discussion_r3716971834)
+- [edge-devops#50](https://github.com/EdgeApp/edge-devops/pull/50#discussion_r1622847384)
+- [edge-devops#55](https://github.com/EdgeApp/edge-devops/pull/55#discussion_r1759533290)
+- [edge-devops#59](https://github.com/EdgeApp/edge-devops/pull/59#discussion_r1857553390)
+- [edge-exchange-plugins#403](https://github.com/EdgeApp/edge-exchange-plugins/pull/403#discussion_r2356803413)
+- [edge-exchange-plugins#429](https://github.com/EdgeApp/edge-exchange-plugins/pull/429#discussion_r2737716498)
+- [edge-exchange-plugins#429](https://github.com/EdgeApp/edge-exchange-plugins/pull/429#discussion_r2737726074)
+- [edge-exchange-plugins#475](https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3799158640)
+- [edge-exchange-plugins#485](https://github.com/EdgeApp/edge-exchange-plugins/pull/485#discussion_r3807451843)
+- [edge-exchange-plugins#485](https://github.com/EdgeApp/edge-exchange-plugins/pull/485#pullrequestreview-4965199783)
+- [edge-info-server#159](https://github.com/EdgeApp/edge-info-server/pull/159#discussion_r3762514613)
+- [edge-login-server#190](https://github.com/EdgeApp/edge-login-server/pull/190#pullrequestreview-3862909116)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2264041027)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2264066515)
+- [edge-react-gui#4832](https://github.com/EdgeApp/edge-react-gui/pull/4832#discussion_r1484710692)
+- [edge-react-gui#5413](https://github.com/EdgeApp/edge-react-gui/pull/5413#discussion_r1899341656)
+- [edge-react-gui#5414](https://github.com/EdgeApp/edge-react-gui/pull/5414#discussion_r1899346640)
+- [edge-react-gui#5594](https://github.com/EdgeApp/edge-react-gui/pull/5594#discussion_r2198963221)
+- [edge-react-gui#6005](https://github.com/EdgeApp/edge-react-gui/pull/6005#discussion_r3326097085)
+- [edge-react-gui#6005](https://github.com/EdgeApp/edge-react-gui/pull/6005#pullrequestreview-4391780152)
+- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#discussion_r4127223641)
+- [edge-reports-server#197](https://github.com/EdgeApp/edge-reports-server/pull/197#discussion_r1917589949)
+- [edge-reports-server#197](https://github.com/EdgeApp/edge-reports-server/pull/197#discussion_r1956850177)
+- [edge-reports-server#197](https://github.com/EdgeApp/edge-reports-server/pull/197#discussion_r1956853405)
+- [edge-reports-server#198](https://github.com/EdgeApp/edge-reports-server/pull/198#discussion_r2186020804)
+- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2666773499)
+- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2688412197)
+- [edge-reports-server#220](https://github.com/EdgeApp/edge-reports-server/pull/220#discussion_r3562371903)
+- [edge-reports-server#220](https://github.com/EdgeApp/edge-reports-server/pull/220#pullrequestreview-4675389718)
+- [react-native-zano#17](https://github.com/EdgeApp/react-native-zano/pull/17#pullrequestreview-4978795323)
+
+## structured-logging
+
+review-standards.mdc, new. Reviewers: swansontec 13, samholmes 3, paullinator 3.
+
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r2011111342)
+- [edge-change-server#7](https://github.com/EdgeApp/edge-change-server/pull/7#discussion_r2466807281)
+- [edge-change-server#12](https://github.com/EdgeApp/edge-change-server/pull/12#discussion_r2714842654)
+- [edge-change-server#12](https://github.com/EdgeApp/edge-change-server/pull/12#discussion_r2714845320)
+- [edge-change-server#12](https://github.com/EdgeApp/edge-change-server/pull/12#discussion_r2714879339)
+- [edge-change-server#12](https://github.com/EdgeApp/edge-change-server/pull/12#discussion_r2714899823)
+- [edge-change-server#12](https://github.com/EdgeApp/edge-change-server/pull/12#pullrequestreview-3690027358)
+- [edge-change-server#13](https://github.com/EdgeApp/edge-change-server/pull/13#discussion_r2733674173)
+- [edge-change-server#13](https://github.com/EdgeApp/edge-change-server/pull/13#discussion_r2733678754)
+- [edge-change-server#13](https://github.com/EdgeApp/edge-change-server/pull/13#pullrequestreview-3713277634)
+- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2143808731)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2855886855)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371569)
+- [edge-currency-plugins#401](https://github.com/EdgeApp/edge-currency-plugins/pull/401#discussion_r1598981684)
+- [edge-rates-server#116](https://github.com/EdgeApp/edge-rates-server/pull/116#discussion_r2364658481)
+- [edge-react-gui#5118](https://github.com/EdgeApp/edge-react-gui/pull/5118#discussion_r1663245945)
+- [edge-react-gui#5270](https://github.com/EdgeApp/edge-react-gui/pull/5270#discussion_r1773842262)
+- [edge-react-gui#5691](https://github.com/EdgeApp/edge-react-gui/pull/5691#discussion_r2334576837)
+- [edge-react-gui#5917](https://github.com/EdgeApp/edge-react-gui/pull/5917#discussion_r2723231017)
+
+## log-only-real-work
+
+review-standards.mdc, new. Reviewers: swansontec 5, peachbits 1.
+
+- [edge-core-js#613](https://github.com/EdgeApp/edge-core-js/pull/613#discussion_r1739433632)
+- [edge-core-js#613](https://github.com/EdgeApp/edge-core-js/pull/613#discussion_r1739434095)
+- [edge-core-js#645](https://github.com/EdgeApp/edge-core-js/pull/645#discussion_r2059304806)
+- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3860039279)
+- [edge-push-server#77](https://github.com/EdgeApp/edge-push-server/pull/77#discussion_r2331519072)
+- [edge-push-server#77](https://github.com/EdgeApp/edge-push-server/pull/77#discussion_r2331529955)
+
+## surface-errors-not-console
+
+review-standards.mdc, new. Reviewers: swansontec 6, samholmes 3.
+
+- [edge-currency-accountbased#854](https://github.com/EdgeApp/edge-currency-accountbased/pull/854#discussion_r1844323897)
+- [edge-react-gui#4664](https://github.com/EdgeApp/edge-react-gui/pull/4664#discussion_r1438440154)
+- [edge-react-gui#4771](https://github.com/EdgeApp/edge-react-gui/pull/4771#discussion_r1467250170)
+- [edge-react-gui#5118](https://github.com/EdgeApp/edge-react-gui/pull/5118#discussion_r1663247537)
+- [edge-react-gui#5118](https://github.com/EdgeApp/edge-react-gui/pull/5118#discussion_r1663258272)
+- [edge-react-gui#5118](https://github.com/EdgeApp/edge-react-gui/pull/5118#discussion_r1663259327)
+- [edge-react-gui#5145](https://github.com/EdgeApp/edge-react-gui/pull/5145#discussion_r1676510022)
+- [edge-react-gui#5330](https://github.com/EdgeApp/edge-react-gui/pull/5330#discussion_r1821664874)
+- [edge-react-gui#5397](https://github.com/EdgeApp/edge-react-gui/pull/5397#discussion_r1884617250)
+
+## useHandler-over-useCallback
+
+review-standards.mdc, new. Reviewers: samholmes 5, swansontec 5.
+
+- [edge-react-gui#4652](https://github.com/EdgeApp/edge-react-gui/pull/4652#discussion_r1440889424)
+- [edge-react-gui#4652](https://github.com/EdgeApp/edge-react-gui/pull/4652#discussion_r1440994564)
+- [edge-react-gui#4725](https://github.com/EdgeApp/edge-react-gui/pull/4725#discussion_r1458089715)
+- [edge-react-gui#4725](https://github.com/EdgeApp/edge-react-gui/pull/4725#discussion_r1458095644)
+- [edge-react-gui#4854](https://github.com/EdgeApp/edge-react-gui/pull/4854#discussion_r1503198751)
+- [edge-react-gui#4854](https://github.com/EdgeApp/edge-react-gui/pull/4854#discussion_r1503200439)
+- [edge-react-gui#4854](https://github.com/EdgeApp/edge-react-gui/pull/4854#pullrequestreview-1902330715)
+- [edge-react-gui#4898](https://github.com/EdgeApp/edge-react-gui/pull/4898#discussion_r1520496003)
+- [edge-react-gui#4898](https://github.com/EdgeApp/edge-react-gui/pull/4898#discussion_r1520518514)
+- [edge-react-gui#5145](https://github.com/EdgeApp/edge-react-gui/pull/5145#discussion_r1676261771)
+
+## rn-render-cost
+
+review-standards.mdc, new. Reviewers: swansontec 10, paullinator 5, samholmes 1.
+
+- [edge-login-ui-rn#148](https://github.com/EdgeApp/edge-login-ui-rn/pull/148#discussion_r1444114612)
+- [edge-login-ui-rn#148](https://github.com/EdgeApp/edge-login-ui-rn/pull/148#discussion_r1444114675)
+- [edge-react-gui#4604](https://github.com/EdgeApp/edge-react-gui/pull/4604#discussion_r1419544129)
+- [edge-react-gui#4611](https://github.com/EdgeApp/edge-react-gui/pull/4611#discussion_r1418151152)
+- [edge-react-gui#4648](https://github.com/EdgeApp/edge-react-gui/pull/4648#discussion_r1438750857)
+- [edge-react-gui#4708](https://github.com/EdgeApp/edge-react-gui/pull/4708#discussion_r1451036130)
+- [edge-react-gui#4716](https://github.com/EdgeApp/edge-react-gui/pull/4716#discussion_r1456867983)
+- [edge-react-gui#4721](https://github.com/EdgeApp/edge-react-gui/pull/4721#discussion_r1456551716)
+- [edge-react-gui#4753](https://github.com/EdgeApp/edge-react-gui/pull/4753#discussion_r1464357254)
+- [edge-react-gui#4772](https://github.com/EdgeApp/edge-react-gui/pull/4772#discussion_r1468244998)
+- [edge-react-gui#4898](https://github.com/EdgeApp/edge-react-gui/pull/4898#discussion_r1520525432)
+- [edge-react-gui#5107](https://github.com/EdgeApp/edge-react-gui/pull/5107#discussion_r1653437835)
+- [edge-react-gui#5691](https://github.com/EdgeApp/edge-react-gui/pull/5691#discussion_r2283807894)
+- [edge-react-gui#5724](https://github.com/EdgeApp/edge-react-gui/pull/5724#discussion_r2317374598)
+- [edge-react-gui#5724](https://github.com/EdgeApp/edge-react-gui/pull/5724#discussion_r2317382613)
+- [edge-react-gui#5724](https://github.com/EdgeApp/edge-react-gui/pull/5724#discussion_r2317390332)
+
+## white-label-neutral
+
+review-standards.mdc, new. Reviewers: samholmes 2, peachbits 2, swansontec 1.
+
+- [edge-apps-stress#1](https://github.com/EdgeApp/edge-apps-stress/pull/1#discussion_r1575151415)
+- [edge-react-gui#4685](https://github.com/EdgeApp/edge-react-gui/pull/4685#discussion_r1445286073)
+- [edge-react-gui#4685](https://github.com/EdgeApp/edge-react-gui/pull/4685#pullrequestreview-1809894847)
+- [edge-react-gui#6001](https://github.com/EdgeApp/edge-react-gui/pull/6001#discussion_r3170253264)
+- [edge-react-gui#6001](https://github.com/EdgeApp/edge-react-gui/pull/6001#discussion_r3170312100)
+
+## no-module-level-mutable-state
+
+review-standards.mdc, new. Reviewers: peachbits 4, swansontec 2, samholmes 1.
+
+- [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#discussion_r2825511670)
+- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3848172819)
+- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3855599305)
+- [edge-currency-accountbased#729](https://github.com/EdgeApp/edge-currency-accountbased/pull/729#discussion_r1501054439)
+- [edge-currency-accountbased#1121](https://github.com/EdgeApp/edge-currency-accountbased/pull/1121#discussion_r4233456685)
+- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446780187)
+- [edge-react-gui#6177](https://github.com/EdgeApp/edge-react-gui/pull/6177#discussion_r3909111043)
+
+## combine-dispatches
+
+review-standards.mdc, new. Reviewers: swansontec 3.
+
+- [edge-react-gui#5397](https://github.com/EdgeApp/edge-react-gui/pull/5397#discussion_r1884609628)
+- [edge-react-gui#5397](https://github.com/EdgeApp/edge-react-gui/pull/5397#discussion_r1884612593)
+- [edge-react-gui#5505](https://github.com/EdgeApp/edge-react-gui/pull/5505#discussion_r2002077008)
+
+## order-state-around-awaits
+
+review-standards.mdc, new. Reviewers: peachbits 7, swansontec 6, paullinator 4.
+
+- [edge-core-js#643](https://github.com/EdgeApp/edge-core-js/pull/643#discussion_r2036197687)
+- [edge-core-js#643](https://github.com/EdgeApp/edge-core-js/pull/643#pullrequestreview-2754897828)
+- [edge-core-js#733](https://github.com/EdgeApp/edge-core-js/pull/733#discussion_r3972249452)
+- [edge-core-js#733](https://github.com/EdgeApp/edge-core-js/pull/733#pullrequestreview-5158964850)
+- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3848172812)
+- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3855599272)
+- [edge-currency-accountbased#1055](https://github.com/EdgeApp/edge-currency-accountbased/pull/1055#discussion_r3992876608)
+- [edge-currency-accountbased#1055](https://github.com/EdgeApp/edge-currency-accountbased/pull/1055#discussion_r3992876621)
+- [edge-currency-accountbased#1110](https://github.com/EdgeApp/edge-currency-accountbased/pull/1110#discussion_r4128001741)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2258571523)
+- [edge-react-gui#4874](https://github.com/EdgeApp/edge-react-gui/pull/4874#discussion_r1503118291)
+- [edge-react-gui#5109](https://github.com/EdgeApp/edge-react-gui/pull/5109#discussion_r1649438613)
+- [edge-react-gui#5294](https://github.com/EdgeApp/edge-react-gui/pull/5294#discussion_r1792292148)
+- [edge-react-gui#5294](https://github.com/EdgeApp/edge-react-gui/pull/5294#discussion_r1792292255)
+- [edge-react-gui#6235](https://github.com/EdgeApp/edge-react-gui/pull/6235#discussion_r4200200249)
+- [edge-react-gui#6240](https://github.com/EdgeApp/edge-react-gui/pull/6240#discussion_r4233126640)
+- [react-native-zano#17](https://github.com/EdgeApp/react-native-zano/pull/17#discussion_r3818736321)
+
+## stale-async-generation-check
+
+review-standards.mdc, new. Reviewers: paullinator 6, peachbits 1.
+
+- [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#discussion_r2807031497)
+- [edge-core-js#733](https://github.com/EdgeApp/edge-core-js/pull/733#discussion_r3972249477)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371539)
+- [edge-currency-accountbased#1090](https://github.com/EdgeApp/edge-currency-accountbased/pull/1090#discussion_r3818736432)
+- [edge-currency-accountbased#1090](https://github.com/EdgeApp/edge-currency-accountbased/pull/1090#pullrequestreview-4978796037)
+- [edge-currency-accountbased#1090](https://github.com/EdgeApp/edge-currency-accountbased/pull/1090#pullrequestreview-4979167195)
+- [edge-react-gui#6199](https://github.com/EdgeApp/edge-react-gui/pull/6199#discussion_r4020532054)
+
+## bound-pagination-and-timeouts
+
+review-standards.mdc, new. Reviewers: paullinator 4, peachbits 4, samholmes 2.
+
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371553)
+- [edge-currency-accountbased#1118](https://github.com/EdgeApp/edge-currency-accountbased/pull/1118#discussion_r4189681661)
+- [edge-currency-plugins#455](https://github.com/EdgeApp/edge-currency-plugins/pull/455#discussion_r3716971820)
+- [edge-currency-plugins#455](https://github.com/EdgeApp/edge-currency-plugins/pull/455#pullrequestreview-4859876312)
+- [edge-devops#60](https://github.com/EdgeApp/edge-devops/pull/60#discussion_r1884598663)
+- [edge-info-server#160](https://github.com/EdgeApp/edge-info-server/pull/160#discussion_r3814319537)
+- [edge-info-server#166](https://github.com/EdgeApp/edge-info-server/pull/166#discussion_r4265158107)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2258587190)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2258608001)
+- [edge-reports-server#211](https://github.com/EdgeApp/edge-reports-server/pull/211#discussion_r3095175563)
+
+## recover-from-network-failures
+
+review-standards.mdc, new. Reviewers: swansontec 3, peachbits 3, paullinator 2.
+
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1992177560)
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1996126277)
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r2036170205)
+- [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#discussion_r2807031354)
+- [edge-currency-accountbased#992](https://github.com/EdgeApp/edge-currency-accountbased/pull/992#discussion_r2488063294)
+- [edge-currency-accountbased#1121](https://github.com/EdgeApp/edge-currency-accountbased/pull/1121#pullrequestreview-5476384804)
+- [edge-currency-plugins#455](https://github.com/EdgeApp/edge-currency-plugins/pull/455#discussion_r3716971829)
+- [edge-exchange-plugins#330](https://github.com/EdgeApp/edge-exchange-plugins/pull/330#discussion_r1651471999)
+
+## release-resources-on-error
+
+review-standards.mdc, new. Reviewers: paullinator 1, swansontec 1, samholmes 1.
+
+- [edge-currency-accountbased#1090](https://github.com/EdgeApp/edge-currency-accountbased/pull/1090#pullrequestreview-4978796037)
+- [edge-exchange-plugins#440](https://github.com/EdgeApp/edge-exchange-plugins/pull/440#discussion_r2843635851)
+- [edge-push-server#74](https://github.com/EdgeApp/edge-push-server/pull/74#discussion_r1901283392)
+
+## clean-all-external-data
+
+review-standards.mdc, reword. Reviewers: swansontec 21, paullinator 13, samholmes 7, peachbits 4.
+
+- [edge-autobot-server#3](https://github.com/EdgeApp/edge-autobot-server/pull/3#discussion_r2739871662)
+- [edge-change-server#5](https://github.com/EdgeApp/edge-change-server/pull/5#discussion_r2098905805)
+- [edge-change-server#5](https://github.com/EdgeApp/edge-change-server/pull/5#discussion_r2098942463)
+- [edge-change-server#5](https://github.com/EdgeApp/edge-change-server/pull/5#pullrequestreview-2855620738)
+- [edge-currency-accountbased#738](https://github.com/EdgeApp/edge-currency-accountbased/pull/738#discussion_r1513572876)
+- [edge-currency-accountbased#738](https://github.com/EdgeApp/edge-currency-accountbased/pull/738#pullrequestreview-1918247948)
+- [edge-currency-accountbased#785](https://github.com/EdgeApp/edge-currency-accountbased/pull/785#discussion_r1644762359)
+- [edge-currency-accountbased#785](https://github.com/EdgeApp/edge-currency-accountbased/pull/785#discussion_r1644764353)
+- [edge-currency-accountbased#785](https://github.com/EdgeApp/edge-currency-accountbased/pull/785#discussion_r1651401786)
+- [edge-currency-accountbased#785](https://github.com/EdgeApp/edge-currency-accountbased/pull/785#discussion_r1651403282)
+- [edge-currency-accountbased#785](https://github.com/EdgeApp/edge-currency-accountbased/pull/785#pullrequestreview-2126000464)
+- [edge-currency-accountbased#826](https://github.com/EdgeApp/edge-currency-accountbased/pull/826#discussion_r1741237287)
+- [edge-currency-accountbased#923](https://github.com/EdgeApp/edge-currency-accountbased/pull/923#pullrequestreview-2795558048)
+- [edge-currency-accountbased#925](https://github.com/EdgeApp/edge-currency-accountbased/pull/925#discussion_r2076024621)
+- [edge-currency-accountbased#925](https://github.com/EdgeApp/edge-currency-accountbased/pull/925#pullrequestreview-2819227178)
+- [edge-currency-accountbased#992](https://github.com/EdgeApp/edge-currency-accountbased/pull/992#discussion_r2488057759)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371571)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371580)
+- [edge-currency-accountbased#1055](https://github.com/EdgeApp/edge-currency-accountbased/pull/1055#discussion_r4019765686)
+- [edge-currency-accountbased#1098](https://github.com/EdgeApp/edge-currency-accountbased/pull/1098#discussion_r3993267172)
+- [edge-currency-plugins#400](https://github.com/EdgeApp/edge-currency-plugins/pull/400#discussion_r1591369066)
+- [edge-currency-plugins#420](https://github.com/EdgeApp/edge-currency-plugins/pull/420#discussion_r1907508500)
+- [edge-exchange-plugins#360](https://github.com/EdgeApp/edge-exchange-plugins/pull/360#discussion_r1905897592)
+- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2719199693)
+- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2719199924)
+- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2812980231)
+- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#pullrequestreview-3695265984)
+- [edge-exchange-plugins#495](https://github.com/EdgeApp/edge-exchange-plugins/pull/495#discussion_r4161212778)
+- [edge-info-server#160](https://github.com/EdgeApp/edge-info-server/pull/160#discussion_r3814319561)
+- [edge-login-server#141](https://github.com/EdgeApp/edge-login-server/pull/141#discussion_r1790740102)
+- [edge-login-server#145](https://github.com/EdgeApp/edge-login-server/pull/145#discussion_r1823558426)
+- [edge-login-server#163](https://github.com/EdgeApp/edge-login-server/pull/163#discussion_r1900262533)
+- [edge-push-server#77](https://github.com/EdgeApp/edge-push-server/pull/77#discussion_r2331539479)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2308717652)
+- [edge-react-gui#4975](https://github.com/EdgeApp/edge-react-gui/pull/4975#discussion_r1562993852)
+- [edge-react-gui#4975](https://github.com/EdgeApp/edge-react-gui/pull/4975#discussion_r1562995389)
+- [edge-react-gui#4975](https://github.com/EdgeApp/edge-react-gui/pull/4975#pullrequestreview-1998188447)
+- [edge-react-gui#5126](https://github.com/EdgeApp/edge-react-gui/pull/5126#discussion_r1664914689)
+- [edge-react-gui#5430](https://github.com/EdgeApp/edge-react-gui/pull/5430#discussion_r1929200980)
+- [edge-react-gui#6228](https://github.com/EdgeApp/edge-react-gui/pull/6228#discussion_r4189786769)
+- [edge-reports-server#190](https://github.com/EdgeApp/edge-reports-server/pull/190#discussion_r1608666513)
+- [edge-reports-server#194](https://github.com/EdgeApp/edge-reports-server/pull/194#discussion_r1837286377)
+- [edge-reports-server#194](https://github.com/EdgeApp/edge-reports-server/pull/194#pullrequestreview-2428291890)
+- [edge-reports-server#197](https://github.com/EdgeApp/edge-reports-server/pull/197#discussion_r1917549799)
+- [edge-reports-server#197](https://github.com/EdgeApp/edge-reports-server/pull/197#discussion_r1966856565)
+
+## normalize-at-the-boundary
+
+review-standards.mdc, new. Reviewers: peachbits 6.
+
+- [edge-info-server#166](https://github.com/EdgeApp/edge-info-server/pull/166#discussion_r4265158097)
+- [edge-info-server#166](https://github.com/EdgeApp/edge-info-server/pull/166#discussion_r4265158103)
+- [edge-info-server#166](https://github.com/EdgeApp/edge-info-server/pull/166#pullrequestreview-5511277435)
+- [edge-rates-server#111](https://github.com/EdgeApp/edge-rates-server/pull/111#discussion_r2201817078)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4265158422)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#pullrequestreview-5511277743)
+
+## units-explicit
+
+review-standards.mdc, new. Reviewers: paullinator 7, peachbits 6, samholmes 2, swansontec 1.
+
+- [edge-currency-accountbased#735](https://github.com/EdgeApp/edge-currency-accountbased/pull/735#discussion_r1508214842)
+- [edge-currency-accountbased#854](https://github.com/EdgeApp/edge-currency-accountbased/pull/854#discussion_r1843043033)
+- [edge-currency-accountbased#919](https://github.com/EdgeApp/edge-currency-accountbased/pull/919#discussion_r2025626117)
+- [edge-currency-accountbased#1070](https://github.com/EdgeApp/edge-currency-accountbased/pull/1070#discussion_r3573397413)
+- [edge-currency-monero#94](https://github.com/EdgeApp/edge-currency-monero/pull/94#discussion_r2051150739)
+- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623060856)
+- [edge-exchange-plugins#429](https://github.com/EdgeApp/edge-exchange-plugins/pull/429#discussion_r2737726084)
+- [edge-exchange-plugins#495](https://github.com/EdgeApp/edge-exchange-plugins/pull/495#pullrequestreview-5386439180)
+- [edge-rates-server#119](https://github.com/EdgeApp/edge-rates-server/pull/119#discussion_r2476749653)
+- [edge-rates-server#119](https://github.com/EdgeApp/edge-rates-server/pull/119#discussion_r2476752140)
+- [edge-rates-server#121](https://github.com/EdgeApp/edge-rates-server/pull/121#discussion_r2586489870)
+- [edge-react-gui#6193](https://github.com/EdgeApp/edge-react-gui/pull/6193#discussion_r4020453685)
+- [edge-reports-server#197](https://github.com/EdgeApp/edge-reports-server/pull/197#discussion_r1956725712)
+- [edge-reports-server#197](https://github.com/EdgeApp/edge-reports-server/pull/197#discussion_r1956728792)
+- [edge-reports-server#197](https://github.com/EdgeApp/edge-reports-server/pull/197#discussion_r1956733827)
+- [edge-reports-server#197](https://github.com/EdgeApp/edge-reports-server/pull/197#discussion_r1956748659)
+
+## delete-unnecessary-code
+
+review-standards.mdc, reword. Reviewers: swansontec 82, paullinator 31, samholmes 30, peachbits 21.
+
+- [airbitz-whitelabel#2](https://github.com/EdgeApp/airbitz-whitelabel/pull/2#discussion_r1585620583)
+- [edge-autobot-server#2](https://github.com/EdgeApp/edge-autobot-server/pull/2#discussion_r2356781460)
+- [edge-autobot-server#3](https://github.com/EdgeApp/edge-autobot-server/pull/3#discussion_r2739871765)
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1996138609)
+- [edge-conventions#28](https://github.com/EdgeApp/edge-conventions/pull/28#discussion_r2830796303)
+- [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1412615359)
+- [edge-core-js#587](https://github.com/EdgeApp/edge-core-js/pull/587#discussion_r1536384276)
+- [edge-core-js#599](https://github.com/EdgeApp/edge-core-js/pull/599#discussion_r1651757774)
+- [edge-core-js#599](https://github.com/EdgeApp/edge-core-js/pull/599#discussion_r1651758645)
+- [edge-core-js#628](https://github.com/EdgeApp/edge-core-js/pull/628#discussion_r1852657358)
+- [edge-core-js#650](https://github.com/EdgeApp/edge-core-js/pull/650#discussion_r2080280812)
+- [edge-core-js#658](https://github.com/EdgeApp/edge-core-js/pull/658#pullrequestreview-2852147494)
+- [edge-core-js#659](https://github.com/EdgeApp/edge-core-js/pull/659#discussion_r2101524150)
+- [edge-core-js#697](https://github.com/EdgeApp/edge-core-js/pull/697#discussion_r2731429805)
+- [edge-core-js#697](https://github.com/EdgeApp/edge-core-js/pull/697#discussion_r2731489220)
+- [edge-core-js#697](https://github.com/EdgeApp/edge-core-js/pull/697#discussion_r2731548597)
+- [edge-core-js#700](https://github.com/EdgeApp/edge-core-js/pull/700#discussion_r2766559042)
+- [edge-core-js#700](https://github.com/EdgeApp/edge-core-js/pull/700#discussion_r2775880610)
+- [edge-core-js#700](https://github.com/EdgeApp/edge-core-js/pull/700#discussion_r2777625747)
+- [edge-core-js#710](https://github.com/EdgeApp/edge-core-js/pull/710#discussion_r2862225054)
+- [edge-core-js#710](https://github.com/EdgeApp/edge-core-js/pull/710#discussion_r2862226801)
+- [edge-core-js#710](https://github.com/EdgeApp/edge-core-js/pull/710#discussion_r2862232467)
+- [edge-core-js#710](https://github.com/EdgeApp/edge-core-js/pull/710#discussion_r2862236054)
+- [edge-core-js#710](https://github.com/EdgeApp/edge-core-js/pull/710#discussion_r2862236464)
+- [edge-core-js#712](https://github.com/EdgeApp/edge-core-js/pull/712#discussion_r2875940257)
+- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3848172815)
+- [edge-currency-accountbased#662](https://github.com/EdgeApp/edge-currency-accountbased/pull/662#discussion_r1388630684)
+- [edge-currency-accountbased#662](https://github.com/EdgeApp/edge-currency-accountbased/pull/662#discussion_r1388638968)
+- [edge-currency-accountbased#662](https://github.com/EdgeApp/edge-currency-accountbased/pull/662#discussion_r1388639519)
+- [edge-currency-accountbased#671](https://github.com/EdgeApp/edge-currency-accountbased/pull/671#discussion_r1398032388)
+- [edge-currency-accountbased#671](https://github.com/EdgeApp/edge-currency-accountbased/pull/671#discussion_r1398032461)
+- [edge-currency-accountbased#671](https://github.com/EdgeApp/edge-currency-accountbased/pull/671#discussion_r1398038274)
+- [edge-currency-accountbased#745](https://github.com/EdgeApp/edge-currency-accountbased/pull/745#discussion_r1526958686)
+- [edge-currency-accountbased#766](https://github.com/EdgeApp/edge-currency-accountbased/pull/766#discussion_r1578616073)
+- [edge-currency-accountbased#844](https://github.com/EdgeApp/edge-currency-accountbased/pull/844#discussion_r1786832084)
+- [edge-currency-accountbased#888](https://github.com/EdgeApp/edge-currency-accountbased/pull/888#discussion_r1932692482)
+- [edge-currency-accountbased#888](https://github.com/EdgeApp/edge-currency-accountbased/pull/888#pullrequestreview-2579140654)
+- [edge-currency-accountbased#894](https://github.com/EdgeApp/edge-currency-accountbased/pull/894#discussion_r1960107954)
+- [edge-currency-accountbased#894](https://github.com/EdgeApp/edge-currency-accountbased/pull/894#pullrequestreview-2624223334)
+- [edge-currency-accountbased#908](https://github.com/EdgeApp/edge-currency-accountbased/pull/908#discussion_r2049417846)
+- [edge-currency-accountbased#912](https://github.com/EdgeApp/edge-currency-accountbased/pull/912#discussion_r2012872426)
+- [edge-currency-accountbased#923](https://github.com/EdgeApp/edge-currency-accountbased/pull/923#discussion_r2061067893)
+- [edge-currency-accountbased#923](https://github.com/EdgeApp/edge-currency-accountbased/pull/923#discussion_r2064855735)
+- [edge-currency-accountbased#923](https://github.com/EdgeApp/edge-currency-accountbased/pull/923#pullrequestreview-2801091215)
+- [edge-currency-accountbased#935](https://github.com/EdgeApp/edge-currency-accountbased/pull/935#discussion_r2124988734)
+- [edge-currency-accountbased#952](https://github.com/EdgeApp/edge-currency-accountbased/pull/952#discussion_r2180886489)
+- [edge-currency-accountbased#973](https://github.com/EdgeApp/edge-currency-accountbased/pull/973#discussion_r2317310112)
+- [edge-currency-accountbased#992](https://github.com/EdgeApp/edge-currency-accountbased/pull/992#discussion_r2488044200)
+- [edge-currency-accountbased#992](https://github.com/EdgeApp/edge-currency-accountbased/pull/992#discussion_r2488046043)
+- [edge-currency-accountbased#992](https://github.com/EdgeApp/edge-currency-accountbased/pull/992#discussion_r2488047632)
+- [edge-currency-accountbased#992](https://github.com/EdgeApp/edge-currency-accountbased/pull/992#discussion_r2488048316)
+- [edge-currency-accountbased#996](https://github.com/EdgeApp/edge-currency-accountbased/pull/996#discussion_r2519344999)
+- [edge-currency-accountbased#1002](https://github.com/EdgeApp/edge-currency-accountbased/pull/1002#discussion_r2562214280)
+- [edge-currency-accountbased#1002](https://github.com/EdgeApp/edge-currency-accountbased/pull/1002#discussion_r2565960750)
+- [edge-currency-accountbased#1036](https://github.com/EdgeApp/edge-currency-accountbased/pull/1036#discussion_r2886519546)
+- [edge-currency-monero#89](https://github.com/EdgeApp/edge-currency-monero/pull/89#discussion_r2006537902)
+- [edge-currency-monero#100](https://github.com/EdgeApp/edge-currency-monero/pull/100#discussion_r2728647515)
+- [edge-currency-plugins#292](https://github.com/EdgeApp/edge-currency-plugins/pull/292#discussion_r1376833956)
+- [edge-currency-plugins#402](https://github.com/EdgeApp/edge-currency-plugins/pull/402#discussion_r1598801401)
+- [edge-currency-plugins#447](https://github.com/EdgeApp/edge-currency-plugins/pull/447#discussion_r2886567059)
+- [edge-devops#61](https://github.com/EdgeApp/edge-devops/pull/61#discussion_r1927590639)
+- [edge-devops#65](https://github.com/EdgeApp/edge-devops/pull/65#discussion_r2056625588)
+- [edge-exchange-plugins#296](https://github.com/EdgeApp/edge-exchange-plugins/pull/296#pullrequestreview-1693548501)
+- [edge-exchange-plugins#306](https://github.com/EdgeApp/edge-exchange-plugins/pull/306#discussion_r1403689743)
+- [edge-exchange-plugins#350](https://github.com/EdgeApp/edge-exchange-plugins/pull/350#pullrequestreview-2428002950)
+- [edge-exchange-plugins#360](https://github.com/EdgeApp/edge-exchange-plugins/pull/360#discussion_r1904779197)
+- [edge-exchange-plugins#385](https://github.com/EdgeApp/edge-exchange-plugins/pull/385#discussion_r2112715742)
+- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2807653846)
+- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2807653876)
+- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2807653940)
+- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2807653994)
+- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2812980395)
+- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#pullrequestreview-3802041438)
+- [edge-exchange-plugins#425](https://github.com/EdgeApp/edge-exchange-plugins/pull/425#discussion_r2621016037)
+- [edge-exchange-plugins#426](https://github.com/EdgeApp/edge-exchange-plugins/pull/426#discussion_r2735061148)
+- [edge-exchange-plugins#426](https://github.com/EdgeApp/edge-exchange-plugins/pull/426#discussion_r2735063709)
+- [edge-exchange-plugins#429](https://github.com/EdgeApp/edge-exchange-plugins/pull/429#discussion_r2737720889)
+- [edge-exchange-plugins#475](https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3799158960)
+- [edge-exchange-plugins#496](https://github.com/EdgeApp/edge-exchange-plugins/pull/496#discussion_r4101887349)
+- [edge-info-server#106](https://github.com/EdgeApp/edge-info-server/pull/106#discussion_r1384162415)
+- [edge-info-server#129](https://github.com/EdgeApp/edge-info-server/pull/129#discussion_r1719087079)
+- [edge-info-server#130](https://github.com/EdgeApp/edge-info-server/pull/130#discussion_r1739565645)
+- [edge-info-server#130](https://github.com/EdgeApp/edge-info-server/pull/130#discussion_r1739565672)
+- [edge-login-server#145](https://github.com/EdgeApp/edge-login-server/pull/145#discussion_r1824946472)
+- [edge-login-server#146](https://github.com/EdgeApp/edge-login-server/pull/146#discussion_r1803904166)
+- [edge-login-server#146](https://github.com/EdgeApp/edge-login-server/pull/146#discussion_r1803911379)
+- [edge-login-server#146](https://github.com/EdgeApp/edge-login-server/pull/146#discussion_r1803916091)
+- [edge-login-server#170](https://github.com/EdgeApp/edge-login-server/pull/170#discussion_r2034046079)
+- [edge-login-server#170](https://github.com/EdgeApp/edge-login-server/pull/170#discussion_r2034051034)
+- [edge-login-ui-rn#142](https://github.com/EdgeApp/edge-login-ui-rn/pull/142#discussion_r1388437603)
+- [edge-login-ui-rn#142](https://github.com/EdgeApp/edge-login-ui-rn/pull/142#discussion_r1388439393)
+- [edge-monitor-server#2](https://github.com/EdgeApp/edge-monitor-server/pull/2#discussion_r1402585102)
+- [edge-rates-server#103](https://github.com/EdgeApp/edge-rates-server/pull/103#discussion_r1693600869)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2308791038)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2308791119)
+- [edge-rates-server#119](https://github.com/EdgeApp/edge-rates-server/pull/119#discussion_r2476697043)
+- [edge-react-gui#3597](https://github.com/EdgeApp/edge-react-gui/pull/3597#discussion_r1630747670)
+- [edge-react-gui#4585](https://github.com/EdgeApp/edge-react-gui/pull/4585#discussion_r1404609565)
+- [edge-react-gui#4627](https://github.com/EdgeApp/edge-react-gui/pull/4627#discussion_r1430429761)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1434393321)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435258602)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435267863)
+- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446710154)
+- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446754867)
+- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446763165)
+- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446765526)
+- [edge-react-gui#4685](https://github.com/EdgeApp/edge-react-gui/pull/4685#discussion_r1445268801)
+- [edge-react-gui#4704](https://github.com/EdgeApp/edge-react-gui/pull/4704#discussion_r1450930926)
+- [edge-react-gui#4704](https://github.com/EdgeApp/edge-react-gui/pull/4704#discussion_r1456455577)
+- [edge-react-gui#4737](https://github.com/EdgeApp/edge-react-gui/pull/4737#discussion_r1460102715)
+- [edge-react-gui#4739](https://github.com/EdgeApp/edge-react-gui/pull/4739#discussion_r1462528405)
+- [edge-react-gui#4762](https://github.com/EdgeApp/edge-react-gui/pull/4762#discussion_r1472034056)
+- [edge-react-gui#4771](https://github.com/EdgeApp/edge-react-gui/pull/4771#discussion_r1467248263)
+- [edge-react-gui#4853](https://github.com/EdgeApp/edge-react-gui/pull/4853#discussion_r1495217708)
+- [edge-react-gui#4863](https://github.com/EdgeApp/edge-react-gui/pull/4863#discussion_r1501287096)
+- [edge-react-gui#4898](https://github.com/EdgeApp/edge-react-gui/pull/4898#discussion_r1520463442)
+- [edge-react-gui#4898](https://github.com/EdgeApp/edge-react-gui/pull/4898#discussion_r1520464141)
+- [edge-react-gui#5098](https://github.com/EdgeApp/edge-react-gui/pull/5098#discussion_r1643126205)
+- [edge-react-gui#5107](https://github.com/EdgeApp/edge-react-gui/pull/5107#discussion_r1653312784)
+- [edge-react-gui#5124](https://github.com/EdgeApp/edge-react-gui/pull/5124#discussion_r1664583468)
+- [edge-react-gui#5145](https://github.com/EdgeApp/edge-react-gui/pull/5145#discussion_r1676510395)
+- [edge-react-gui#5206](https://github.com/EdgeApp/edge-react-gui/pull/5206#discussion_r1720428220)
+- [edge-react-gui#5223](https://github.com/EdgeApp/edge-react-gui/pull/5223#discussion_r1741259588)
+- [edge-react-gui#5225](https://github.com/EdgeApp/edge-react-gui/pull/5225#discussion_r1739435343)
+- [edge-react-gui#5231](https://github.com/EdgeApp/edge-react-gui/pull/5231#discussion_r1746302050)
+- [edge-react-gui#5231](https://github.com/EdgeApp/edge-react-gui/pull/5231#pullrequestreview-2284290863)
+- [edge-react-gui#5343](https://github.com/EdgeApp/edge-react-gui/pull/5343#discussion_r1829865306)
+- [edge-react-gui#5397](https://github.com/EdgeApp/edge-react-gui/pull/5397#discussion_r1887787085)
+- [edge-react-gui#5413](https://github.com/EdgeApp/edge-react-gui/pull/5413#discussion_r1899337886)
+- [edge-react-gui#5413](https://github.com/EdgeApp/edge-react-gui/pull/5413#discussion_r1899818104)
+- [edge-react-gui#5428](https://github.com/EdgeApp/edge-react-gui/pull/5428#discussion_r1920874023)
+- [edge-react-gui#5680](https://github.com/EdgeApp/edge-react-gui/pull/5680#discussion_r2252395713)
+- [edge-react-gui#5691](https://github.com/EdgeApp/edge-react-gui/pull/5691#discussion_r2283797150)
+- [edge-react-gui#5694](https://github.com/EdgeApp/edge-react-gui/pull/5694#discussion_r2278009448)
+- [edge-react-gui#5705](https://github.com/EdgeApp/edge-react-gui/pull/5705#discussion_r2288820861)
+- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2417965099)
+- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2417988157)
+- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2422170571)
+- [edge-react-gui#5858](https://github.com/EdgeApp/edge-react-gui/pull/5858#discussion_r2607742442)
+- [edge-react-gui#5984](https://github.com/EdgeApp/edge-react-gui/pull/5984#discussion_r2963442120)
+- [edge-react-gui#6018](https://github.com/EdgeApp/edge-react-gui/pull/6018#pullrequestreview-4385257153)
+- [edge-react-gui#6021](https://github.com/EdgeApp/edge-react-gui/pull/6021#discussion_r3993083628)
+- [edge-react-gui#6065](https://github.com/EdgeApp/edge-react-gui/pull/6065#discussion_r3723900866)
+- [edge-react-gui#6065](https://github.com/EdgeApp/edge-react-gui/pull/6065#pullrequestreview-4868601319)
+- [edge-react-gui#6238](https://github.com/EdgeApp/edge-react-gui/pull/6238#discussion_r4189740919)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4265158463)
+- [edge-referral-server#69](https://github.com/EdgeApp/edge-referral-server/pull/69#discussion_r1714404003)
+- [edge-referral-server#70](https://github.com/EdgeApp/edge-referral-server/pull/70#discussion_r1773834303)
+- [edge-reports-server#185](https://github.com/EdgeApp/edge-reports-server/pull/185#discussion_r1505026704)
+- [edge-reports-server#186](https://github.com/EdgeApp/edge-reports-server/pull/186#discussion_r1522108608)
+- [edge-reports-server#193](https://github.com/EdgeApp/edge-reports-server/pull/193#discussion_r1870185000)
+- [edge-reports-server#193](https://github.com/EdgeApp/edge-reports-server/pull/193#discussion_r1870201868)
+- [edge-reports-server#196](https://github.com/EdgeApp/edge-reports-server/pull/196#discussion_r1917297006)
+- [edge-reports-server#197](https://github.com/EdgeApp/edge-reports-server/pull/197#discussion_r1956798114)
+- [edge-reports-server#205](https://github.com/EdgeApp/edge-reports-server/pull/205#discussion_r2666676920)
+- [edge-reports-server#205](https://github.com/EdgeApp/edge-reports-server/pull/205#discussion_r2666700863)
+- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2688411939)
+- [edge-tester#6](https://github.com/EdgeApp/edge-tester/pull/6#discussion_r2561019422)
+- [edge-tester#6](https://github.com/EdgeApp/edge-tester/pull/6#discussion_r2561019992)
+- [edge-zignal#1](https://github.com/EdgeApp/edge-zignal/pull/1#discussion_r2159754482)
+- [edge-zignal#1](https://github.com/EdgeApp/edge-zignal/pull/1#discussion_r2159754571)
+- [react-native-fast-crypto#57](https://github.com/EdgeApp/react-native-fast-crypto/pull/57#pullrequestreview-3286889114)
+- [react-native-monero-lwsf#2](https://github.com/EdgeApp/react-native-monero-lwsf/pull/2#discussion_r2849005862)
+- [react-native-zano#2](https://github.com/EdgeApp/react-native-zano/pull/2#discussion_r2060810290)
+
+## use-existing-helpers
+
+review-standards.mdc, reword. Reviewers: swansontec 35, paullinator 26, peachbits 15, samholmes 6, j0ntz 1.
+
+- [edge-apps-stress#4](https://github.com/EdgeApp/edge-apps-stress/pull/4#discussion_r1610656237)
+- [edge-change-server#16](https://github.com/EdgeApp/edge-change-server/pull/16#pullrequestreview-3976928331)
+- [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1412604392)
+- [edge-core-js#609](https://github.com/EdgeApp/edge-core-js/pull/609#discussion_r1706277458)
+- [edge-core-js#623](https://github.com/EdgeApp/edge-core-js/pull/623#discussion_r1815806771)
+- [edge-core-js#650](https://github.com/EdgeApp/edge-core-js/pull/650#discussion_r2080292867)
+- [edge-core-js#650](https://github.com/EdgeApp/edge-core-js/pull/650#discussion_r2080298057)
+- [edge-core-js#687](https://github.com/EdgeApp/edge-core-js/pull/687#discussion_r2641601562)
+- [edge-core-js#693](https://github.com/EdgeApp/edge-core-js/pull/693#discussion_r2674357653)
+- [edge-core-js#733](https://github.com/EdgeApp/edge-core-js/pull/733#discussion_r3972249458)
+- [edge-currency-accountbased#433](https://github.com/EdgeApp/edge-currency-accountbased/pull/433#discussion_r1630742509)
+- [edge-currency-accountbased#658](https://github.com/EdgeApp/edge-currency-accountbased/pull/658#discussion_r1383938905)
+- [edge-currency-accountbased#658](https://github.com/EdgeApp/edge-currency-accountbased/pull/658#discussion_r1383942223)
+- [edge-currency-accountbased#682](https://github.com/EdgeApp/edge-currency-accountbased/pull/682#discussion_r1411502924)
+- [edge-currency-accountbased#749](https://github.com/EdgeApp/edge-currency-accountbased/pull/749#discussion_r1532904579)
+- [edge-currency-accountbased#758](https://github.com/EdgeApp/edge-currency-accountbased/pull/758#discussion_r1556459184)
+- [edge-currency-accountbased#877](https://github.com/EdgeApp/edge-currency-accountbased/pull/877#discussion_r1909280560)
+- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2143785363)
+- [edge-currency-accountbased#973](https://github.com/EdgeApp/edge-currency-accountbased/pull/973#discussion_r2317308825)
+- [edge-currency-accountbased#974](https://github.com/EdgeApp/edge-currency-accountbased/pull/974#discussion_r2331254527)
+- [edge-currency-accountbased#981](https://github.com/EdgeApp/edge-currency-accountbased/pull/981#discussion_r2380401493)
+- [edge-currency-accountbased#981](https://github.com/EdgeApp/edge-currency-accountbased/pull/981#pullrequestreview-3269564367)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371555)
+- [edge-currency-accountbased#1044](https://github.com/EdgeApp/edge-currency-accountbased/pull/1044#discussion_r3047716105)
+- [edge-currency-accountbased#1051](https://github.com/EdgeApp/edge-currency-accountbased/pull/1051#discussion_r3155972335)
+- [edge-currency-accountbased#1051](https://github.com/EdgeApp/edge-currency-accountbased/pull/1051#pullrequestreview-4190988664)
+- [edge-currency-accountbased#1055](https://github.com/EdgeApp/edge-currency-accountbased/pull/1055#discussion_r3992876631)
+- [edge-currency-monero#89](https://github.com/EdgeApp/edge-currency-monero/pull/89#discussion_r2006534807)
+- [edge-devops#47](https://github.com/EdgeApp/edge-devops/pull/47#discussion_r1605333137)
+- [edge-devops#47](https://github.com/EdgeApp/edge-devops/pull/47#discussion_r1605333451)
+- [edge-devops#62](https://github.com/EdgeApp/edge-devops/pull/62#discussion_r1931082346)
+- [edge-devops#62](https://github.com/EdgeApp/edge-devops/pull/62#discussion_r1931087650)
+- [edge-exchange-plugins#401](https://github.com/EdgeApp/edge-exchange-plugins/pull/401#discussion_r2331259689)
+- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2807654249)
+- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2807654619)
+- [edge-exchange-plugins#426](https://github.com/EdgeApp/edge-exchange-plugins/pull/426#discussion_r2766708302)
+- [edge-info-server#159](https://github.com/EdgeApp/edge-info-server/pull/159#discussion_r3762514629)
+- [edge-login-server#114](https://github.com/EdgeApp/edge-login-server/pull/114#discussion_r1374958654)
+- [edge-login-server#170](https://github.com/EdgeApp/edge-login-server/pull/170#discussion_r2034039895)
+- [edge-login-ui-rn#148](https://github.com/EdgeApp/edge-login-ui-rn/pull/148#discussion_r1447718132)
+- [edge-monitor-server#2](https://github.com/EdgeApp/edge-monitor-server/pull/2#discussion_r1402650535)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2258581716)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2258594152)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2258621817)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2258983737)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2258984582)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2259001396)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2261645147)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2261645496)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2264082270)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2277929227)
+- [edge-rates-server#119](https://github.com/EdgeApp/edge-rates-server/pull/119#discussion_r2476707107)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435267474)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435349550)
+- [edge-react-gui#4648](https://github.com/EdgeApp/edge-react-gui/pull/4648#discussion_r1439066025)
+- [edge-react-gui#4685](https://github.com/EdgeApp/edge-react-gui/pull/4685#discussion_r1445244124)
+- [edge-react-gui#4685](https://github.com/EdgeApp/edge-react-gui/pull/4685#discussion_r1445283023)
+- [edge-react-gui#4702](https://github.com/EdgeApp/edge-react-gui/pull/4702#discussion_r1450926913)
+- [edge-react-gui#4721](https://github.com/EdgeApp/edge-react-gui/pull/4721#discussion_r1456558215)
+- [edge-react-gui#4762](https://github.com/EdgeApp/edge-react-gui/pull/4762#discussion_r1468711747)
+- [edge-react-gui#4762](https://github.com/EdgeApp/edge-react-gui/pull/4762#discussion_r1470153850)
+- [edge-react-gui#5373](https://github.com/EdgeApp/edge-react-gui/pull/5373#discussion_r1861382227)
+- [edge-react-gui#5691](https://github.com/EdgeApp/edge-react-gui/pull/5691#discussion_r2289422770)
+- [edge-react-gui#5705](https://github.com/EdgeApp/edge-react-gui/pull/5705#discussion_r2288982201)
+- [edge-react-gui#5732](https://github.com/EdgeApp/edge-react-gui/pull/5732#discussion_r2323895978)
+- [edge-react-gui#5855](https://github.com/EdgeApp/edge-react-gui/pull/5855#discussion_r2578162071)
+- [edge-react-gui#5855](https://github.com/EdgeApp/edge-react-gui/pull/5855#discussion_r2578188471)
+- [edge-react-gui#5855](https://github.com/EdgeApp/edge-react-gui/pull/5855#discussion_r2578421490)
+- [edge-react-gui#5858](https://github.com/EdgeApp/edge-react-gui/pull/5858#discussion_r2586717533)
+- [edge-react-gui#5981](https://github.com/EdgeApp/edge-react-gui/pull/5981#discussion_r2955122634)
+- [edge-react-gui#6032](https://github.com/EdgeApp/edge-react-gui/pull/6032#pullrequestreview-4534985702)
+- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#discussion_r4127223612)
+- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#pullrequestreview-5344894013)
+- [edge-react-gui#6199](https://github.com/EdgeApp/edge-react-gui/pull/6199#discussion_r4020532077)
+- [edge-react-gui#6206](https://github.com/EdgeApp/edge-react-gui/pull/6206#discussion_r4041486414)
+- [edge-react-gui#6267](https://github.com/EdgeApp/edge-react-gui/pull/6267#discussion_r4300149788)
+- [edge-react-gui#6267](https://github.com/EdgeApp/edge-react-gui/pull/6267#pullrequestreview-5554616684)
+- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2688229269)
+- [edge-tester#6](https://github.com/EdgeApp/edge-tester/pull/6#discussion_r2561019817)
+- [git-refresher#1](https://github.com/EdgeApp/git-refresher/pull/1#discussion_r1790988716)
+- [monero-lws-balancer#1](https://github.com/EdgeApp/monero-lws-balancer/pull/1#discussion_r2395718229)
+- [monero-lws-balancer#1](https://github.com/EdgeApp/monero-lws-balancer/pull/1#discussion_r2395725109)
+- [monero-lws-balancer#7](https://github.com/EdgeApp/monero-lws-balancer/pull/7#discussion_r2530087433)
+
+## existing-user-paths
+
+review-standards.mdc, new. Reviewers: swansontec 19, peachbits 3, paullinator 2, samholmes 1.
+
+- [edge-core-js#661](https://github.com/EdgeApp/edge-core-js/pull/661#discussion_r2101215753)
+- [edge-core-js#710](https://github.com/EdgeApp/edge-core-js/pull/710#discussion_r2862164192)
+- [edge-currency-accountbased#673](https://github.com/EdgeApp/edge-currency-accountbased/pull/673#discussion_r1403674526)
+- [edge-currency-accountbased#745](https://github.com/EdgeApp/edge-currency-accountbased/pull/745#discussion_r1526957722)
+- [edge-currency-accountbased#764](https://github.com/EdgeApp/edge-currency-accountbased/pull/764#pullrequestreview-2013054168)
+- [edge-currency-accountbased#784](https://github.com/EdgeApp/edge-currency-accountbased/pull/784#discussion_r1637398707)
+- [edge-currency-accountbased#811](https://github.com/EdgeApp/edge-currency-accountbased/pull/811#discussion_r1708094886)
+- [edge-currency-accountbased#890](https://github.com/EdgeApp/edge-currency-accountbased/pull/890#discussion_r1951441161)
+- [edge-currency-accountbased#890](https://github.com/EdgeApp/edge-currency-accountbased/pull/890#pullrequestreview-2609764241)
+- [edge-currency-accountbased#912](https://github.com/EdgeApp/edge-currency-accountbased/pull/912#discussion_r2012881177)
+- [edge-currency-accountbased#923](https://github.com/EdgeApp/edge-currency-accountbased/pull/923#discussion_r2061056907)
+- [edge-currency-accountbased#923](https://github.com/EdgeApp/edge-currency-accountbased/pull/923#pullrequestreview-2795558048)
+- [edge-currency-accountbased#1008](https://github.com/EdgeApp/edge-currency-accountbased/pull/1008#pullrequestreview-3581274762)
+- [edge-currency-accountbased#1044](https://github.com/EdgeApp/edge-currency-accountbased/pull/1044#discussion_r3047043539)
+- [edge-currency-accountbased#1057](https://github.com/EdgeApp/edge-currency-accountbased/pull/1057#discussion_r3423612870)
+- [edge-currency-plugins#406](https://github.com/EdgeApp/edge-currency-plugins/pull/406#discussion_r1631780006)
+- [edge-currency-plugins#406](https://github.com/EdgeApp/edge-currency-plugins/pull/406#pullrequestreview-2105500927)
+- [edge-login-server#170](https://github.com/EdgeApp/edge-login-server/pull/170#discussion_r2034057655)
+- [edge-login-server#170](https://github.com/EdgeApp/edge-login-server/pull/170#discussion_r2034059021)
+- [edge-login-server#176](https://github.com/EdgeApp/edge-login-server/pull/176#discussion_r2232833829)
+- [edge-rates-server#125](https://github.com/EdgeApp/edge-rates-server/pull/125#discussion_r4189930172)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435346461)
+- [edge-react-gui#5705](https://github.com/EdgeApp/edge-react-gui/pull/5705#discussion_r2286623798)
+- [edge-react-gui#5855](https://github.com/EdgeApp/edge-react-gui/pull/5855#discussion_r2586545017)
+- [monero-lws-balancer#5](https://github.com/EdgeApp/monero-lws-balancer/pull/5#pullrequestreview-3326243990)
+
+## no-debug-scaffolding
+
+review-standards.mdc, new. Reviewers: swansontec 30, samholmes 17, peachbits 5, paullinator 2.
+
+- [biggystring#18](https://github.com/EdgeApp/biggystring/pull/18#discussion_r1391835175)
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1996090798)
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1996122082)
+- [edge-change-server#5](https://github.com/EdgeApp/edge-change-server/pull/5#discussion_r2098906236)
+- [edge-change-server#5](https://github.com/EdgeApp/edge-change-server/pull/5#discussion_r2098942248)
+- [edge-change-server#13](https://github.com/EdgeApp/edge-change-server/pull/13#discussion_r2718219628)
+- [edge-core-js#623](https://github.com/EdgeApp/edge-core-js/pull/623#discussion_r1815807081)
+- [edge-core-js#643](https://github.com/EdgeApp/edge-core-js/pull/643#discussion_r2036210162)
+- [edge-core-js#643](https://github.com/EdgeApp/edge-core-js/pull/643#pullrequestreview-2754897828)
+- [edge-core-js#650](https://github.com/EdgeApp/edge-core-js/pull/650#discussion_r2080127859)
+- [edge-core-js#668](https://github.com/EdgeApp/edge-core-js/pull/668#discussion_r2169587973)
+- [edge-core-js#682](https://github.com/EdgeApp/edge-core-js/pull/682#discussion_r2436972726)
+- [edge-currency-accountbased#654](https://github.com/EdgeApp/edge-currency-accountbased/pull/654#discussion_r1383923816)
+- [edge-currency-accountbased#662](https://github.com/EdgeApp/edge-currency-accountbased/pull/662#discussion_r1388628902)
+- [edge-currency-accountbased#662](https://github.com/EdgeApp/edge-currency-accountbased/pull/662#discussion_r1388636029)
+- [edge-currency-accountbased#668](https://github.com/EdgeApp/edge-currency-accountbased/pull/668#discussion_r1391720470)
+- [edge-currency-accountbased#679](https://github.com/EdgeApp/edge-currency-accountbased/pull/679#discussion_r1412457944)
+- [edge-currency-accountbased#799](https://github.com/EdgeApp/edge-currency-accountbased/pull/799#discussion_r1680136775)
+- [edge-currency-accountbased#936](https://github.com/EdgeApp/edge-currency-accountbased/pull/936#discussion_r2096592979)
+- [edge-currency-monero#97](https://github.com/EdgeApp/edge-currency-monero/pull/97#pullrequestreview-3297007748)
+- [edge-currency-plugins#400](https://github.com/EdgeApp/edge-currency-plugins/pull/400#discussion_r1591537581)
+- [edge-currency-plugins#423](https://github.com/EdgeApp/edge-currency-plugins/pull/423#discussion_r2008230595)
+- [edge-currency-plugins#423](https://github.com/EdgeApp/edge-currency-plugins/pull/423#discussion_r2008231135)
+- [edge-devops#68](https://github.com/EdgeApp/edge-devops/pull/68#discussion_r2198545827)
+- [edge-exchange-plugins#315](https://github.com/EdgeApp/edge-exchange-plugins/pull/315#discussion_r1504783021)
+- [edge-exchange-plugins#320](https://github.com/EdgeApp/edge-exchange-plugins/pull/320#discussion_r1547022811)
+- [edge-exchange-plugins#352](https://github.com/EdgeApp/edge-exchange-plugins/pull/352#discussion_r1847349512)
+- [edge-exchange-plugins#392](https://github.com/EdgeApp/edge-exchange-plugins/pull/392#discussion_r2198628300)
+- [edge-exchange-plugins#392](https://github.com/EdgeApp/edge-exchange-plugins/pull/392#pullrequestreview-3007196981)
+- [edge-login-ui-rn#194](https://github.com/EdgeApp/edge-login-ui-rn/pull/194#discussion_r1640355090)
+- [edge-rates-server#119](https://github.com/EdgeApp/edge-rates-server/pull/119#discussion_r2476696461)
+- [edge-react-gui#4592](https://github.com/EdgeApp/edge-react-gui/pull/4592#discussion_r1403695235)
+- [edge-react-gui#4855](https://github.com/EdgeApp/edge-react-gui/pull/4855#discussion_r1494905023)
+- [edge-react-gui#4863](https://github.com/EdgeApp/edge-react-gui/pull/4863#discussion_r1501290662)
+- [edge-react-gui#4863](https://github.com/EdgeApp/edge-react-gui/pull/4863#discussion_r1501292755)
+- [edge-react-gui#4896](https://github.com/EdgeApp/edge-react-gui/pull/4896#discussion_r1520537230)
+- [edge-react-gui#4912](https://github.com/EdgeApp/edge-react-gui/pull/4912#discussion_r1538590395)
+- [edge-react-gui#5073](https://github.com/EdgeApp/edge-react-gui/pull/5073#discussion_r1631782866)
+- [edge-react-gui#5225](https://github.com/EdgeApp/edge-react-gui/pull/5225#discussion_r1739438997)
+- [edge-react-gui#5240](https://github.com/EdgeApp/edge-react-gui/pull/5240#discussion_r1752742596)
+- [edge-react-gui#5270](https://github.com/EdgeApp/edge-react-gui/pull/5270#discussion_r1773841038)
+- [edge-react-gui#5397](https://github.com/EdgeApp/edge-react-gui/pull/5397#discussion_r1884582825)
+- [edge-react-gui#5469](https://github.com/EdgeApp/edge-react-gui/pull/5469#discussion_r1966331742)
+- [edge-react-gui#5594](https://github.com/EdgeApp/edge-react-gui/pull/5594#discussion_r2198915217)
+- [edge-react-gui#5705](https://github.com/EdgeApp/edge-react-gui/pull/5705#discussion_r2286607492)
+- [edge-react-gui#5705](https://github.com/EdgeApp/edge-react-gui/pull/5705#discussion_r2288958082)
+- [edge-reports-server#183](https://github.com/EdgeApp/edge-reports-server/pull/183#discussion_r1364610458)
+- [edge-reports-server#186](https://github.com/EdgeApp/edge-reports-server/pull/186#discussion_r1522105061)
+- [edge-reports-server#186](https://github.com/EdgeApp/edge-reports-server/pull/186#discussion_r1522105945)
+- [edge-reports-server#187](https://github.com/EdgeApp/edge-reports-server/pull/187#pullrequestreview-1972391751)
+- [edge-reports-server#199](https://github.com/EdgeApp/edge-reports-server/pull/199#discussion_r2110443458)
+- [edge-reports-server#202](https://github.com/EdgeApp/edge-reports-server/pull/202#discussion_r2208723083)
+- [edge-server-tools#34](https://github.com/EdgeApp/edge-server-tools/pull/34#pullrequestreview-3152544445)
+- [edge-tester#4](https://github.com/EdgeApp/edge-tester/pull/4#discussion_r1390017449)
+
+## file-placement-conventions
+
+review-standards.mdc, new. Reviewers: swansontec 14, samholmes 5, peachbits 2, j0ntz 1, paullinator 1.
+
+- [edge-core-js#599](https://github.com/EdgeApp/edge-core-js/pull/599#discussion_r1651718432)
+- [edge-core-js#599](https://github.com/EdgeApp/edge-core-js/pull/599#discussion_r1651735989)
+- [edge-currency-accountbased#795](https://github.com/EdgeApp/edge-currency-accountbased/pull/795#discussion_r1669382678)
+- [edge-currency-accountbased#826](https://github.com/EdgeApp/edge-currency-accountbased/pull/826#discussion_r1741241252)
+- [edge-currency-accountbased#826](https://github.com/EdgeApp/edge-currency-accountbased/pull/826#discussion_r1741241931)
+- [edge-currency-accountbased#826](https://github.com/EdgeApp/edge-currency-accountbased/pull/826#discussion_r1741246625)
+- [edge-currency-accountbased#848](https://github.com/EdgeApp/edge-currency-accountbased/pull/848#discussion_r1821333500)
+- [edge-currency-accountbased#947](https://github.com/EdgeApp/edge-currency-accountbased/pull/947#discussion_r2150655205)
+- [edge-devops#55](https://github.com/EdgeApp/edge-devops/pull/55#discussion_r1759538491)
+- [edge-exchange-plugins#473](https://github.com/EdgeApp/edge-exchange-plugins/pull/473#discussion_r3575012811)
+- [edge-info-server#152](https://github.com/EdgeApp/edge-info-server/pull/152#discussion_r2674478276)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2258788512)
+- [edge-react-gui#4631](https://github.com/EdgeApp/edge-react-gui/pull/4631#discussion_r1439086439)
+- [edge-react-gui#4631](https://github.com/EdgeApp/edge-react-gui/pull/4631#discussion_r1439087637)
+- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446719917)
+- [edge-react-gui#4887](https://github.com/EdgeApp/edge-react-gui/pull/4887#discussion_r1513032248)
+- [edge-react-gui#4887](https://github.com/EdgeApp/edge-react-gui/pull/4887#discussion_r1513037914)
+- [edge-react-gui#5107](https://github.com/EdgeApp/edge-react-gui/pull/5107#discussion_r1651917959)
+- [edge-react-gui#5397](https://github.com/EdgeApp/edge-react-gui/pull/5397#discussion_r1884598822)
+- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2417997468)
+- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#discussion_r4127223623)
+- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#pullrequestreview-5344894013)
+- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1716010647)
+
+## logic-belongs-in-owning-layer
+
+review-standards.mdc, new. Reviewers: swansontec 19, peachbits 13, paullinator 4, samholmes 4.
+
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1996137086)
+- [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1430512921)
+- [edge-core-js#599](https://github.com/EdgeApp/edge-core-js/pull/599#discussion_r1651762463)
+- [edge-core-js#635](https://github.com/EdgeApp/edge-core-js/pull/635#discussion_r1910854433)
+- [edge-core-js#635](https://github.com/EdgeApp/edge-core-js/pull/635#pullrequestreview-2543227614)
+- [edge-core-js#687](https://github.com/EdgeApp/edge-core-js/pull/687#discussion_r2624270645)
+- [edge-core-js#689](https://github.com/EdgeApp/edge-core-js/pull/689#discussion_r2696527331)
+- [edge-core-js#693](https://github.com/EdgeApp/edge-core-js/pull/693#discussion_r2674361223)
+- [edge-core-js#700](https://github.com/EdgeApp/edge-core-js/pull/700#discussion_r2766618411)
+- [edge-core-js#710](https://github.com/EdgeApp/edge-core-js/pull/710#discussion_r2862183373)
+- [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#pullrequestreview-5344893732)
+- [edge-currency-accountbased#847](https://github.com/EdgeApp/edge-currency-accountbased/pull/847#discussion_r1819511498)
+- [edge-currency-accountbased#974](https://github.com/EdgeApp/edge-currency-accountbased/pull/974#pullrequestreview-3166222632)
+- [edge-currency-accountbased#992](https://github.com/EdgeApp/edge-currency-accountbased/pull/992#pullrequestreview-3418483479)
+- [edge-currency-accountbased#1036](https://github.com/EdgeApp/edge-currency-accountbased/pull/1036#discussion_r2886506282)
+- [edge-currency-accountbased#1084](https://github.com/EdgeApp/edge-currency-accountbased/pull/1084#discussion_r3847619306)
+- [edge-currency-accountbased#1119](https://github.com/EdgeApp/edge-currency-accountbased/pull/1119#discussion_r4212412214)
+- [edge-devops#57](https://github.com/EdgeApp/edge-devops/pull/57#discussion_r1786939302)
+- [edge-devops#71](https://github.com/EdgeApp/edge-devops/pull/71#discussion_r2415167306)
+- [edge-exchange-plugins#341](https://github.com/EdgeApp/edge-exchange-plugins/pull/341#discussion_r1768922220)
+- [edge-exchange-plugins#465](https://github.com/EdgeApp/edge-exchange-plugins/pull/465#pullrequestreview-4555768022)
+- [edge-login-ui-rn#230](https://github.com/EdgeApp/edge-login-ui-rn/pull/230#discussion_r1919356900)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2224084429)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2224084525)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2224090722)
+- [edge-react-gui#4716](https://github.com/EdgeApp/edge-react-gui/pull/4716#discussion_r1456510628)
+- [edge-react-gui#4787](https://github.com/EdgeApp/edge-react-gui/pull/4787#discussion_r1471062466)
+- [edge-react-gui#5149](https://github.com/EdgeApp/edge-react-gui/pull/5149#discussion_r1678590770)
+- [edge-react-gui#5223](https://github.com/EdgeApp/edge-react-gui/pull/5223#discussion_r1741254586)
+- [edge-react-gui#5439](https://github.com/EdgeApp/edge-react-gui/pull/5439#discussion_r1943854260)
+- [edge-react-gui#5665](https://github.com/EdgeApp/edge-react-gui/pull/5665#discussion_r2216794553)
+- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2417904460)
+- [edge-react-gui#6065](https://github.com/EdgeApp/edge-react-gui/pull/6065#discussion_r3707867317)
+- [edge-react-gui#6065](https://github.com/EdgeApp/edge-react-gui/pull/6065#issuecomment-5172198955)
+- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#discussion_r4127223663)
+- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#pullrequestreview-5344894013)
+- [edge-react-gui#6197](https://github.com/EdgeApp/edge-react-gui/pull/6197#discussion_r4040424370)
+- [edge-react-gui#6197](https://github.com/EdgeApp/edge-react-gui/pull/6197#discussion_r4040424377)
+- [edge-reports-server#183](https://github.com/EdgeApp/edge-reports-server/pull/183#discussion_r1364568414)
+- [edge-sync-client#19](https://github.com/EdgeApp/edge-sync-client/pull/19#discussion_r2608550317)
+
+## name-magic-values
+
+review-standards.mdc, new. Reviewers: samholmes 5, paullinator 5, swansontec 2, peachbits 2.
+
+- [biggystring#19](https://github.com/EdgeApp/biggystring/pull/19#discussion_r1505071262)
+- [edge-core-js#700](https://github.com/EdgeApp/edge-core-js/pull/700#discussion_r2766598338)
+- [edge-core-js#700](https://github.com/EdgeApp/edge-core-js/pull/700#discussion_r2766712831)
+- [edge-currency-accountbased#992](https://github.com/EdgeApp/edge-currency-accountbased/pull/992#discussion_r2488023556)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371542)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371582)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371584)
+- [edge-login-server#182](https://github.com/EdgeApp/edge-login-server/pull/182#discussion_r2345633894)
+- [edge-react-gui#4716](https://github.com/EdgeApp/edge-react-gui/pull/4716#discussion_r1456507937)
+- [edge-react-gui#4716](https://github.com/EdgeApp/edge-react-gui/pull/4716#discussion_r1456508042)
+- [edge-react-gui#4883](https://github.com/EdgeApp/edge-react-gui/pull/4883#discussion_r1512043397)
+- [edge-react-gui#4883](https://github.com/EdgeApp/edge-react-gui/pull/4883#discussion_r1512043686)
+- [edge-reports-server#184](https://github.com/EdgeApp/edge-reports-server/pull/184#discussion_r1505107029)
+- [edge-reports-server#184](https://github.com/EdgeApp/edge-reports-server/pull/184#discussion_r1505121610)
+
+## no-hardcoded-config
+
+review-standards.mdc, new. Reviewers: paullinator 7, samholmes 4, peachbits 3, swansontec 3.
+
+- [edge-autobot-server#4](https://github.com/EdgeApp/edge-autobot-server/pull/4#discussion_r2943202103)
+- [edge-autobot-server#4](https://github.com/EdgeApp/edge-autobot-server/pull/4#discussion_r2943246371)
+- [edge-autobot-server#4](https://github.com/EdgeApp/edge-autobot-server/pull/4#discussion_r2943251231)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2855879786)
+- [edge-devops#47](https://github.com/EdgeApp/edge-devops/pull/47#discussion_r1575484862)
+- [edge-devops#62](https://github.com/EdgeApp/edge-devops/pull/62#discussion_r1931089586)
+- [edge-exchange-plugins#344](https://github.com/EdgeApp/edge-exchange-plugins/pull/344#discussion_r1786851086)
+- [edge-login-server#118](https://github.com/EdgeApp/edge-login-server/pull/118#discussion_r1449678869)
+- [edge-login-server#175](https://github.com/EdgeApp/edge-login-server/pull/175#discussion_r2198768510)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2224085286)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2224085840)
+- [edge-react-gui#4685](https://github.com/EdgeApp/edge-react-gui/pull/4685#discussion_r1446606697)
+- [edge-react-gui#4896](https://github.com/EdgeApp/edge-react-gui/pull/4896#discussion_r1520538248)
+- [edge-react-gui#5206](https://github.com/EdgeApp/edge-react-gui/pull/5206#discussion_r1720422870)
+- [edge-react-gui#5430](https://github.com/EdgeApp/edge-react-gui/pull/5430#pullrequestreview-2565650016)
+- [edge-react-gui#5697](https://github.com/EdgeApp/edge-react-gui/pull/5697#discussion_r2334598699)
+- [react-native-fast-crypto#57](https://github.com/EdgeApp/react-native-fast-crypto/pull/57#discussion_r2381159483)
+
+## avoid-repeated-work
+
+review-standards.mdc, new. Reviewers: paullinator 17, swansontec 15, peachbits 10, samholmes 5.
+
+- [biggystring#18](https://github.com/EdgeApp/biggystring/pull/18#discussion_r1396556236)
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r2011028974)
+- [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#discussion_r2807032028)
+- [edge-core-js#645](https://github.com/EdgeApp/edge-core-js/pull/645#discussion_r2064202512)
+- [edge-core-js#645](https://github.com/EdgeApp/edge-core-js/pull/645#pullrequestreview-2800192615)
+- [edge-core-js#686](https://github.com/EdgeApp/edge-core-js/pull/686#discussion_r2482665843)
+- [edge-core-js#733](https://github.com/EdgeApp/edge-core-js/pull/733#discussion_r3972249469)
+- [edge-currency-accountbased#654](https://github.com/EdgeApp/edge-currency-accountbased/pull/654#discussion_r1378198017)
+- [edge-currency-accountbased#679](https://github.com/EdgeApp/edge-currency-accountbased/pull/679#discussion_r1412441269)
+- [edge-currency-accountbased#693](https://github.com/EdgeApp/edge-currency-accountbased/pull/693#discussion_r1418166006)
+- [edge-currency-accountbased#1108](https://github.com/EdgeApp/edge-currency-accountbased/pull/1108#discussion_r4101764565)
+- [edge-currency-monero#89](https://github.com/EdgeApp/edge-currency-monero/pull/89#discussion_r2006541317)
+- [edge-exchange-plugins#366](https://github.com/EdgeApp/edge-exchange-plugins/pull/366#discussion_r1936245211)
+- [edge-exchange-plugins#496](https://github.com/EdgeApp/edge-exchange-plugins/pull/496#discussion_r4101887357)
+- [edge-info-server#159](https://github.com/EdgeApp/edge-info-server/pull/159#discussion_r3762514645)
+- [edge-login-server#176](https://github.com/EdgeApp/edge-login-server/pull/176#discussion_r2231722258)
+- [edge-push-server#77](https://github.com/EdgeApp/edge-push-server/pull/77#discussion_r2331550525)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2264029238)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2264065357)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2277916689)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2277943813)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2308760627)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2308807887)
+- [edge-rates-server#121](https://github.com/EdgeApp/edge-rates-server/pull/121#discussion_r2586516851)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435256348)
+- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446754512)
+- [edge-react-gui#4762](https://github.com/EdgeApp/edge-react-gui/pull/4762#discussion_r1472049521)
+- [edge-react-gui#5107](https://github.com/EdgeApp/edge-react-gui/pull/5107#discussion_r1653306811)
+- [edge-react-gui#5123](https://github.com/EdgeApp/edge-react-gui/pull/5123#discussion_r1663321952)
+- [edge-react-gui#5397](https://github.com/EdgeApp/edge-react-gui/pull/5397#discussion_r1884600473)
+- [edge-react-gui#5423](https://github.com/EdgeApp/edge-react-gui/pull/5423#discussion_r1911778259)
+- [edge-react-gui#5455](https://github.com/EdgeApp/edge-react-gui/pull/5455#discussion_r1955427619)
+- [edge-react-gui#5496](https://github.com/EdgeApp/edge-react-gui/pull/5496#discussion_r1995934812)
+- [edge-react-gui#5691](https://github.com/EdgeApp/edge-react-gui/pull/5691#discussion_r2283792870)
+- [edge-react-gui#5691](https://github.com/EdgeApp/edge-react-gui/pull/5691#discussion_r2289457132)
+- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2422166600)
+- [edge-react-gui#5858](https://github.com/EdgeApp/edge-react-gui/pull/5858#discussion_r2586674808)
+- [edge-react-gui#6141](https://github.com/EdgeApp/edge-react-gui/pull/6141#discussion_r3739384311)
+- [edge-react-gui#6141](https://github.com/EdgeApp/edge-react-gui/pull/6141#discussion_r3739397856)
+- [edge-react-gui#6141](https://github.com/EdgeApp/edge-react-gui/pull/6141#pullrequestreview-4887326507)
+- [edge-react-gui#6177](https://github.com/EdgeApp/edge-react-gui/pull/6177#discussion_r3909078413)
+- [edge-react-gui#6193](https://github.com/EdgeApp/edge-react-gui/pull/6193#discussion_r4020453691)
+- [edge-reports-server#197](https://github.com/EdgeApp/edge-reports-server/pull/197#discussion_r1972583833)
+- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2684351461)
+- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2684356163)
+- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2687739646)
+- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2688205006)
+
+## follow-repo-naming-conventions
+
+review-standards.mdc, new. Reviewers: swansontec 35, samholmes 15, paullinator 5, peachbits 2.
+
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r2036137147)
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r2036161371)
+- [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#discussion_r2825513859)
+- [edge-conventions#28](https://github.com/EdgeApp/edge-conventions/pull/28#discussion_r2830809046)
+- [edge-conventions#28](https://github.com/EdgeApp/edge-conventions/pull/28#discussion_r2830809092)
+- [edge-conventions#28](https://github.com/EdgeApp/edge-conventions/pull/28#discussion_r2830809159)
+- [edge-conventions#28](https://github.com/EdgeApp/edge-conventions/pull/28#discussion_r2830809236)
+- [edge-core-js#607](https://github.com/EdgeApp/edge-core-js/pull/607#discussion_r1693449150)
+- [edge-core-js#633](https://github.com/EdgeApp/edge-core-js/pull/633#discussion_r1905933635)
+- [edge-core-js#633](https://github.com/EdgeApp/edge-core-js/pull/633#pullrequestreview-2535146999)
+- [edge-core-js#658](https://github.com/EdgeApp/edge-core-js/pull/658#discussion_r2102939107)
+- [edge-currency-accountbased#662](https://github.com/EdgeApp/edge-currency-accountbased/pull/662#discussion_r1388713190)
+- [edge-currency-accountbased#673](https://github.com/EdgeApp/edge-currency-accountbased/pull/673#discussion_r1403673291)
+- [edge-currency-accountbased#673](https://github.com/EdgeApp/edge-currency-accountbased/pull/673#discussion_r1403686989)
+- [edge-currency-accountbased#679](https://github.com/EdgeApp/edge-currency-accountbased/pull/679#discussion_r1412436843)
+- [edge-currency-accountbased#716](https://github.com/EdgeApp/edge-currency-accountbased/pull/716#discussion_r1484609375)
+- [edge-currency-accountbased#799](https://github.com/EdgeApp/edge-currency-accountbased/pull/799#discussion_r1680112106)
+- [edge-currency-accountbased#942](https://github.com/EdgeApp/edge-currency-accountbased/pull/942#discussion_r2152907635)
+- [edge-currency-plugins#396](https://github.com/EdgeApp/edge-currency-plugins/pull/396#discussion_r1552586009)
+- [edge-currency-plugins#420](https://github.com/EdgeApp/edge-currency-plugins/pull/420#discussion_r1907513047)
+- [edge-devops#60](https://github.com/EdgeApp/edge-devops/pull/60#discussion_r1884615410)
+- [edge-devops#64](https://github.com/EdgeApp/edge-devops/pull/64#discussion_r1992207040)
+- [edge-devops#65](https://github.com/EdgeApp/edge-devops/pull/65#discussion_r2056623032)
+- [edge-exchange-plugins#328](https://github.com/EdgeApp/edge-exchange-plugins/pull/328#discussion_r1643557842)
+- [edge-exchange-plugins#329](https://github.com/EdgeApp/edge-exchange-plugins/pull/329#discussion_r1651414776)
+- [edge-exchange-plugins#329](https://github.com/EdgeApp/edge-exchange-plugins/pull/329#discussion_r1651415468)
+- [edge-exchange-plugins#329](https://github.com/EdgeApp/edge-exchange-plugins/pull/329#discussion_r1651516338)
+- [edge-exchange-plugins#329](https://github.com/EdgeApp/edge-exchange-plugins/pull/329#discussion_r1651516879)
+- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2807654161)
+- [edge-exchange-plugins#426](https://github.com/EdgeApp/edge-exchange-plugins/pull/426#discussion_r2766708330)
+- [edge-monitor-server#2](https://github.com/EdgeApp/edge-monitor-server/pull/2#discussion_r1402533773)
+- [edge-monitor-server#2](https://github.com/EdgeApp/edge-monitor-server/pull/2#discussion_r1402539513)
+- [edge-push-server#77](https://github.com/EdgeApp/edge-push-server/pull/77#discussion_r2331536010)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2258590799)
+- [edge-react-gui#4685](https://github.com/EdgeApp/edge-react-gui/pull/4685#discussion_r1445240461)
+- [edge-react-gui#4863](https://github.com/EdgeApp/edge-react-gui/pull/4863#discussion_r1501272854)
+- [edge-react-gui#4863](https://github.com/EdgeApp/edge-react-gui/pull/4863#discussion_r1501289052)
+- [edge-react-gui#4896](https://github.com/EdgeApp/edge-react-gui/pull/4896#discussion_r1520537662)
+- [edge-react-gui#4912](https://github.com/EdgeApp/edge-react-gui/pull/4912#pullrequestreview-1958176817)
+- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2422083597)
+- [edge-react-gui#5858](https://github.com/EdgeApp/edge-react-gui/pull/5858#discussion_r2586637367)
+- [edge-react-gui#5943](https://github.com/EdgeApp/edge-react-gui/pull/5943#discussion_r2818732711)
+- [edge-react-gui#6032](https://github.com/EdgeApp/edge-react-gui/pull/6032#issuecomment-4754303836)
+- [edge-reports-server#205](https://github.com/EdgeApp/edge-reports-server/pull/205#discussion_r2666674624)
+- [edge-reports-server#205](https://github.com/EdgeApp/edge-reports-server/pull/205#discussion_r2666740480)
+- [edge-reports-server#220](https://github.com/EdgeApp/edge-reports-server/pull/220#discussion_r3562353881)
+- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1715980872)
+- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1715981027)
+- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1715981206)
+- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1715981387)
+- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1716022458)
+- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1716022671)
+- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1716027781)
+- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#pullrequestreview-2236639027)
+- [react-native-monero-lwsf#2](https://github.com/EdgeApp/react-native-monero-lwsf/pull/2#discussion_r2849744001)
+- [react-native-monero-lwsf#2](https://github.com/EdgeApp/react-native-monero-lwsf/pull/2#discussion_r2849747176)
+- [react-native-monero-lwsf#2](https://github.com/EdgeApp/react-native-monero-lwsf/pull/2#discussion_r2849780067)
+
+## match-sibling-behavior
+
+review-standards.mdc, new. Reviewers: swansontec 16, peachbits 11, paullinator 6, samholmes 6.
+
+- [drupe#1](https://github.com/EdgeApp/drupe/pull/1#discussion_r2520369254)
+- [edge-core-js#633](https://github.com/EdgeApp/edge-core-js/pull/633#discussion_r1905936181)
+- [edge-core-js#685](https://github.com/EdgeApp/edge-core-js/pull/685#discussion_r2470575387)
+- [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#discussion_r4127223363)
+- [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#discussion_r4160149915)
+- [edge-currency-accountbased#654](https://github.com/EdgeApp/edge-currency-accountbased/pull/654#discussion_r1378170210)
+- [edge-currency-accountbased#669](https://github.com/EdgeApp/edge-currency-accountbased/pull/669#discussion_r1394899705)
+- [edge-currency-accountbased#719](https://github.com/EdgeApp/edge-currency-accountbased/pull/719#discussion_r1484668286)
+- [edge-currency-accountbased#780](https://github.com/EdgeApp/edge-currency-accountbased/pull/780#discussion_r1621519006)
+- [edge-currency-accountbased#923](https://github.com/EdgeApp/edge-currency-accountbased/pull/923#pullrequestreview-2795558048)
+- [edge-currency-accountbased#1055](https://github.com/EdgeApp/edge-currency-accountbased/pull/1055#discussion_r3992876598)
+- [edge-currency-accountbased#1084](https://github.com/EdgeApp/edge-currency-accountbased/pull/1084#discussion_r3847619312)
+- [edge-currency-plugins#292](https://github.com/EdgeApp/edge-currency-plugins/pull/292#discussion_r1376880443)
+- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623055836)
+- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623057035)
+- [edge-exchange-plugins#496](https://github.com/EdgeApp/edge-exchange-plugins/pull/496#discussion_r4101887340)
+- [edge-info-server#160](https://github.com/EdgeApp/edge-info-server/pull/160#discussion_r3814319574)
+- [edge-login-ui-rn#137](https://github.com/EdgeApp/edge-login-ui-rn/pull/137#discussion_r1367291061)
+- [edge-push-server#77](https://github.com/EdgeApp/edge-push-server/pull/77#discussion_r2331559025)
+- [edge-react-gui#3597](https://github.com/EdgeApp/edge-react-gui/pull/3597#discussion_r1630752229)
+- [edge-react-gui#5107](https://github.com/EdgeApp/edge-react-gui/pull/5107#discussion_r1653278936)
+- [edge-react-gui#5469](https://github.com/EdgeApp/edge-react-gui/pull/5469#discussion_r1966328928)
+- [edge-react-gui#5469](https://github.com/EdgeApp/edge-react-gui/pull/5469#discussion_r1966330713)
+- [edge-react-gui#5469](https://github.com/EdgeApp/edge-react-gui/pull/5469#pullrequestreview-2634459144)
+- [edge-react-gui#5950](https://github.com/EdgeApp/edge-react-gui/pull/5950#discussion_r2834933135)
+- [edge-react-gui#5950](https://github.com/EdgeApp/edge-react-gui/pull/5950#discussion_r2834933768)
+- [edge-react-gui#5967](https://github.com/EdgeApp/edge-react-gui/pull/5967#discussion_r2881073374)
+- [edge-react-gui#6193](https://github.com/EdgeApp/edge-react-gui/pull/6193#discussion_r4031589840)
+- [edge-react-gui#6206](https://github.com/EdgeApp/edge-react-gui/pull/6206#discussion_r4041486422)
+- [edge-react-gui#6218](https://github.com/EdgeApp/edge-react-gui/pull/6218#discussion_r4102620298)
+- [edge-react-gui#6240](https://github.com/EdgeApp/edge-react-gui/pull/6240#discussion_r4233126655)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#pullrequestreview-5589630059)
+- [edge-react-gui#6279](https://github.com/EdgeApp/edge-react-gui/pull/6279#discussion_r4340424143)
+- [edge-reports-server#196](https://github.com/EdgeApp/edge-reports-server/pull/196#discussion_r1917312895)
+- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2687749900)
+- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2688409406)
+- [react-native-piratechain#14](https://github.com/EdgeApp/react-native-piratechain/pull/14#discussion_r1741252565)
+- [react-native-zano#2](https://github.com/EdgeApp/react-native-zano/pull/2#discussion_r2060744135)
+- [react-native-zano#17](https://github.com/EdgeApp/react-native-zano/pull/17#pullrequestreview-4978795323)
+
+## plain-functions-over-iife
+
+review-standards.mdc, new. Reviewers: swansontec 5, samholmes 1.
+
+- [edge-core-js#697](https://github.com/EdgeApp/edge-core-js/pull/697#discussion_r2731473206)
+- [edge-currency-accountbased#973](https://github.com/EdgeApp/edge-currency-accountbased/pull/973#discussion_r2317283035)
+- [edge-currency-plugins#396](https://github.com/EdgeApp/edge-currency-plugins/pull/396#discussion_r1552596529)
+- [edge-currency-plugins#408](https://github.com/EdgeApp/edge-currency-plugins/pull/408#discussion_r1681808319)
+- [edge-react-gui#5206](https://github.com/EdgeApp/edge-react-gui/pull/5206#discussion_r1720386062)
+- [edge-react-gui#5373](https://github.com/EdgeApp/edge-react-gui/pull/5373#discussion_r1861385029)
+
+## declare-direct-dependencies
+
+review-standards.mdc, new. Reviewers: swansontec 3, peachbits 2, samholmes 1.
+
+- [drupe#1](https://github.com/EdgeApp/drupe/pull/1#discussion_r2520376341)
+- [edge-currency-accountbased#991](https://github.com/EdgeApp/edge-currency-accountbased/pull/991#discussion_r2482327113)
+- [edge-currency-accountbased#991](https://github.com/EdgeApp/edge-currency-accountbased/pull/991#pullrequestreview-3405551357)
+- [edge-currency-accountbased#1055](https://github.com/EdgeApp/edge-currency-accountbased/pull/1055#discussion_r3992876580)
+- [edge-currency-accountbased#1055](https://github.com/EdgeApp/edge-currency-accountbased/pull/1055#discussion_r3992876585)
+- [edge-exchange-plugins#297](https://github.com/EdgeApp/edge-exchange-plugins/pull/297#discussion_r1368103195)
+
+## guard-numeric-inputs
+
+review-standards.mdc, new. Reviewers: samholmes 4, paullinator 3, swansontec 3.
+
+- [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#discussion_r2807032547)
+- [edge-exchange-plugins#426](https://github.com/EdgeApp/edge-exchange-plugins/pull/426#discussion_r2735053707)
+- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446781170)
+- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1449906166)
+- [edge-react-gui#4811](https://github.com/EdgeApp/edge-react-gui/pull/4811#discussion_r1475392272)
+- [edge-react-gui#4912](https://github.com/EdgeApp/edge-react-gui/pull/4912#discussion_r1537862752)
+- [edge-react-gui#5744](https://github.com/EdgeApp/edge-react-gui/pull/5744#discussion_r2364602144)
+- [edge-reports-server#190](https://github.com/EdgeApp/edge-reports-server/pull/190#discussion_r1608669660)
+- [edge-reports-server#194](https://github.com/EdgeApp/edge-reports-server/pull/194#discussion_r1837288168)
+- [edge-reports-server#205](https://github.com/EdgeApp/edge-reports-server/pull/205#pullrequestreview-3892304799)
+
+## refactor-preserves-behavior
+
+review-standards.mdc, new. Reviewers: swansontec 8, samholmes 2, paullinator 2, peachbits 2.
+
+- [edge-currency-accountbased#749](https://github.com/EdgeApp/edge-currency-accountbased/pull/749#discussion_r1532915232)
+- [edge-currency-accountbased#773](https://github.com/EdgeApp/edge-currency-accountbased/pull/773#issuecomment-2105394101)
+- [edge-currency-plugins#414](https://github.com/EdgeApp/edge-currency-plugins/pull/414#discussion_r1774114966)
+- [edge-login-server#135](https://github.com/EdgeApp/edge-login-server/pull/135#discussion_r1724079920)
+- [edge-login-server#141](https://github.com/EdgeApp/edge-login-server/pull/141#discussion_r1788454984)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1433295720)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435294100)
+- [edge-react-gui#4648](https://github.com/EdgeApp/edge-react-gui/pull/4648#discussion_r1438744197)
+- [edge-react-gui#4664](https://github.com/EdgeApp/edge-react-gui/pull/4664#discussion_r1438440552)
+- [edge-react-gui#5469](https://github.com/EdgeApp/edge-react-gui/pull/5469#discussion_r1968165257)
+- [edge-react-gui#6141](https://github.com/EdgeApp/edge-react-gui/pull/6141#discussion_r3753852810)
+- [edge-react-gui#6141](https://github.com/EdgeApp/edge-react-gui/pull/6141#pullrequestreview-4901406386)
+- [edge-reports-server#193](https://github.com/EdgeApp/edge-reports-server/pull/193#discussion_r1837282819)
+- [edge-reports-server#197](https://github.com/EdgeApp/edge-reports-server/pull/197#discussion_r1956742952)
+
+## fix-root-cause
+
+review-standards.mdc, new. Reviewers: samholmes 4, peachbits 3, swansontec 2.
+
+- [edge-core-js#685](https://github.com/EdgeApp/edge-core-js/pull/685#pullrequestreview-3390167854)
+- [edge-currency-accountbased#732](https://github.com/EdgeApp/edge-currency-accountbased/pull/732#pullrequestreview-1899101025)
+- [edge-currency-accountbased#1121](https://github.com/EdgeApp/edge-currency-accountbased/pull/1121#discussion_r4233456674)
+- [edge-rates-server#107](https://github.com/EdgeApp/edge-rates-server/pull/107#discussion_r1933026301)
+- [edge-react-gui#4721](https://github.com/EdgeApp/edge-react-gui/pull/4721#discussion_r1456581217)
+- [edge-react-gui#4765](https://github.com/EdgeApp/edge-react-gui/pull/4765#discussion_r1467367107)
+- [edge-react-gui#4765](https://github.com/EdgeApp/edge-react-gui/pull/4765#pullrequestreview-1845291259)
+- [edge-react-gui#5104](https://github.com/EdgeApp/edge-react-gui/pull/5104#pullrequestreview-2129207498)
+- [edge-react-gui#5118](https://github.com/EdgeApp/edge-react-gui/pull/5118#discussion_r1663257022)
+
+## names-match-role
+
+review-standards.mdc, new. Reviewers: samholmes 6, swansontec 3, paullinator 2, peachbits 1.
+
+- [edge-core-js#608](https://github.com/EdgeApp/edge-core-js/pull/608#discussion_r1704482801)
+- [edge-currency-accountbased#673](https://github.com/EdgeApp/edge-currency-accountbased/pull/673#discussion_r1403683970)
+- [edge-currency-accountbased#716](https://github.com/EdgeApp/edge-currency-accountbased/pull/716#discussion_r1484610352)
+- [edge-currency-accountbased#731](https://github.com/EdgeApp/edge-currency-accountbased/pull/731#discussion_r1501239451)
+- [edge-currency-accountbased#822](https://github.com/EdgeApp/edge-currency-accountbased/pull/822#discussion_r1739496508)
+- [edge-currency-accountbased#822](https://github.com/EdgeApp/edge-currency-accountbased/pull/822#discussion_r1739498056)
+- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2143782650)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2278041543)
+- [edge-react-gui#4652](https://github.com/EdgeApp/edge-react-gui/pull/4652#discussion_r1441005571)
+- [edge-react-gui#4702](https://github.com/EdgeApp/edge-react-gui/pull/4702#discussion_r1450922724)
+- [edge-react-gui#5665](https://github.com/EdgeApp/edge-react-gui/pull/5665#discussion_r2216795147)
+- [edge-react-gui#6065](https://github.com/EdgeApp/edge-react-gui/pull/6065#discussion_r3723900858)
+
+## match-local-form
+
+review-standards.mdc, new. Reviewers: swansontec 13, samholmes 5, paullinator 2.
+
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1996078879)
+- [edge-core-js#600](https://github.com/EdgeApp/edge-core-js/pull/600#discussion_r1669354763)
+- [edge-currency-accountbased#662](https://github.com/EdgeApp/edge-currency-accountbased/pull/662#discussion_r1388646711)
+- [edge-currency-accountbased#722](https://github.com/EdgeApp/edge-currency-accountbased/pull/722#discussion_r1490195820)
+- [edge-currency-accountbased#749](https://github.com/EdgeApp/edge-currency-accountbased/pull/749#discussion_r1533410342)
+- [edge-currency-accountbased#973](https://github.com/EdgeApp/edge-currency-accountbased/pull/973#discussion_r2317292486)
+- [edge-currency-accountbased#973](https://github.com/EdgeApp/edge-currency-accountbased/pull/973#discussion_r2317296629)
+- [edge-currency-accountbased#1002](https://github.com/EdgeApp/edge-currency-accountbased/pull/1002#discussion_r2565892218)
+- [edge-currency-accountbased#1002](https://github.com/EdgeApp/edge-currency-accountbased/pull/1002#discussion_r2566070003)
+- [edge-currency-plugins#400](https://github.com/EdgeApp/edge-currency-plugins/pull/400#discussion_r1591357811)
+- [edge-currency-plugins#409](https://github.com/EdgeApp/edge-currency-plugins/pull/409#discussion_r1691859415)
+- [edge-devops#59](https://github.com/EdgeApp/edge-devops/pull/59#discussion_r1857546280)
+- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623048422)
+- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623048867)
+- [edge-login-server#160](https://github.com/EdgeApp/edge-login-server/pull/160#discussion_r1849117658)
+- [edge-react-gui#4685](https://github.com/EdgeApp/edge-react-gui/pull/4685#discussion_r1445269974)
+- [edge-react-gui#4912](https://github.com/EdgeApp/edge-react-gui/pull/4912#discussion_r1538596217)
+- [edge-react-gui#5732](https://github.com/EdgeApp/edge-react-gui/pull/5732#discussion_r2325691700)
+- [edge-react-gui#5858](https://github.com/EdgeApp/edge-react-gui/pull/5858#discussion_r2607746703)
+- [edge-reports-server#184](https://github.com/EdgeApp/edge-reports-server/pull/184#discussion_r1505117246)
+
+## methods-without-this
+
+review-standards.mdc, new. Reviewers: swansontec 2, paullinator 1.
+
+- [edge-autobot-server#2](https://github.com/EdgeApp/edge-autobot-server/pull/2#discussion_r2356784917)
+- [edge-currency-accountbased#723](https://github.com/EdgeApp/edge-currency-accountbased/pull/723#discussion_r1495075639)
+- [edge-react-gui#4547](https://github.com/EdgeApp/edge-react-gui/pull/4547#discussion_r1376648103)
+
+## const-over-reassigned-let
+
+review-standards.mdc, new. Reviewers: samholmes 3.
+
+- [edge-react-gui#5206](https://github.com/EdgeApp/edge-react-gui/pull/5206#discussion_r1720445709)
+- [edge-react-gui#5225](https://github.com/EdgeApp/edge-react-gui/pull/5225#discussion_r1739444612)
+- [edge-react-gui#5225](https://github.com/EdgeApp/edge-react-gui/pull/5225#discussion_r1739450977)
+
+## add-non-obvious-constraints
+
+review-standards.mdc, reword. Reviewers: samholmes 17, swansontec 13, peachbits 4, paullinator 2.
+
+- [biggystring#19](https://github.com/EdgeApp/biggystring/pull/19#discussion_r1505070945)
+- [edge-conventions#28](https://github.com/EdgeApp/edge-conventions/pull/28#discussion_r2784379367)
+- [edge-core-js#593](https://github.com/EdgeApp/edge-core-js/pull/593#discussion_r1544816361)
+- [edge-core-js#643](https://github.com/EdgeApp/edge-core-js/pull/643#discussion_r2036225073)
+- [edge-currency-accountbased#845](https://github.com/EdgeApp/edge-currency-accountbased/pull/845#discussion_r1792622369)
+- [edge-currency-accountbased#886](https://github.com/EdgeApp/edge-currency-accountbased/pull/886#discussion_r1931032496)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371578)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371588)
+- [edge-currency-accountbased#1047](https://github.com/EdgeApp/edge-currency-accountbased/pull/1047#discussion_r3066243172)
+- [edge-currency-accountbased#1047](https://github.com/EdgeApp/edge-currency-accountbased/pull/1047#discussion_r3066245976)
+- [edge-currency-accountbased#1070](https://github.com/EdgeApp/edge-currency-accountbased/pull/1070#pullrequestreview-4687932046)
+- [edge-exchange-plugins#320](https://github.com/EdgeApp/edge-exchange-plugins/pull/320#discussion_r1547013399)
+- [edge-exchange-plugins#320](https://github.com/EdgeApp/edge-exchange-plugins/pull/320#discussion_r1547013977)
+- [edge-exchange-plugins#402](https://github.com/EdgeApp/edge-exchange-plugins/pull/402#discussion_r2331473220)
+- [edge-exchange-plugins#464](https://github.com/EdgeApp/edge-exchange-plugins/pull/464#pullrequestreview-4548568300)
+- [edge-push-server#67](https://github.com/EdgeApp/edge-push-server/pull/67#discussion_r1874034498)
+- [edge-react-gui#4611](https://github.com/EdgeApp/edge-react-gui/pull/4611#discussion_r1418050736)
+- [edge-react-gui#4704](https://github.com/EdgeApp/edge-react-gui/pull/4704#discussion_r1450929360)
+- [edge-react-gui#4712](https://github.com/EdgeApp/edge-react-gui/pull/4712#discussion_r1452656857)
+- [edge-react-gui#4716](https://github.com/EdgeApp/edge-react-gui/pull/4716#discussion_r1456507803)
+- [edge-react-gui#4716](https://github.com/EdgeApp/edge-react-gui/pull/4716#discussion_r1456508170)
+- [edge-react-gui#4721](https://github.com/EdgeApp/edge-react-gui/pull/4721#pullrequestreview-1828777129)
+- [edge-react-gui#4832](https://github.com/EdgeApp/edge-react-gui/pull/4832#discussion_r1484713351)
+- [edge-react-gui#4863](https://github.com/EdgeApp/edge-react-gui/pull/4863#discussion_r1501290800)
+- [edge-react-gui#5355](https://github.com/EdgeApp/edge-react-gui/pull/5355#discussion_r1837082624)
+- [edge-react-gui#5454](https://github.com/EdgeApp/edge-react-gui/pull/5454#discussion_r1955242532)
+- [edge-react-gui#5790](https://github.com/EdgeApp/edge-react-gui/pull/5790#discussion_r2449955717)
+- [edge-react-gui#5855](https://github.com/EdgeApp/edge-react-gui/pull/5855#discussion_r2578124692)
+- [edge-react-gui#5855](https://github.com/EdgeApp/edge-react-gui/pull/5855#discussion_r2578126920)
+- [edge-react-gui#5855](https://github.com/EdgeApp/edge-react-gui/pull/5855#discussion_r2578129493)
+- [edge-react-gui#5950](https://github.com/EdgeApp/edge-react-gui/pull/5950#discussion_r2834936175)
+- [edge-react-gui#5967](https://github.com/EdgeApp/edge-react-gui/pull/5967#discussion_r2881073920)
+- [edge-react-gui#6240](https://github.com/EdgeApp/edge-react-gui/pull/6240#discussion_r4233126650)
+- [edge-reports-server#185](https://github.com/EdgeApp/edge-reports-server/pull/185#discussion_r1504998427)
+- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2688219709)
+- [react-native-zano#3](https://github.com/EdgeApp/react-native-zano/pull/3#discussion_r2071902878)
 
 ## doc-links-resolve
 
-review-standards.mdc, new. Reviewers: peachbits 11.
+review-standards.mdc, new. Reviewers: peachbits 11, paullinator 2, samholmes 1.
 
 - [edge-currency-accountbased#1098](https://github.com/EdgeApp/edge-currency-accountbased/pull/1098#discussion_r3993267174)
-- [edge-react-gui#6199](https://github.com/EdgeApp/edge-react-gui/pull/6199#pullrequestreview-5216144048)
-- [edge-react-gui#6199](https://github.com/EdgeApp/edge-react-gui/pull/6199#pullrequestreview-5270451650)
+- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1449908999)
 - [edge-react-gui#6199](https://github.com/EdgeApp/edge-react-gui/pull/6199#discussion_r4020532098)
+- [edge-react-gui#6199](https://github.com/EdgeApp/edge-react-gui/pull/6199#pullrequestreview-5270451650)
 - [edge-react-gui#6246](https://github.com/EdgeApp/edge-react-gui/pull/6246#discussion_r4233744730)
 - [edge-react-gui#6246](https://github.com/EdgeApp/edge-react-gui/pull/6246#discussion_r4233744760)
+- [edge-react-gui#6246](https://github.com/EdgeApp/edge-react-gui/pull/6246#pullrequestreview-5474401058)
 - [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4265158470)
 - [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4276082059)
 - [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4328622772)
 - [react-native-monero#9](https://github.com/EdgeApp/react-native-monero/pull/9#discussion_r3983889593)
 - [react-native-monero#9](https://github.com/EdgeApp/react-native-monero/pull/9#discussion_r3983889604)
-
-## rn-render-cost
-
-review-standards.mdc, new. Reviewers: swansontec 9, paullinator 5, samholmes 2, peachbits 1.
-
-- [edge-login-ui-rn#148](https://github.com/EdgeApp/edge-login-ui-rn/pull/148#discussion_r1444114612)
-- [edge-login-ui-rn#148](https://github.com/EdgeApp/edge-login-ui-rn/pull/148#discussion_r1444114675)
-- [edge-react-gui#4854](https://github.com/EdgeApp/edge-react-gui/pull/4854#pullrequestreview-1902330715)
-- [edge-react-gui#5505](https://github.com/EdgeApp/edge-react-gui/pull/5505#discussion_r2002077008)
-- [edge-react-gui#5397](https://github.com/EdgeApp/edge-react-gui/pull/5397#discussion_r1884612593)
-- [edge-react-gui#4762](https://github.com/EdgeApp/edge-react-gui/pull/4762#discussion_r1472049521)
-- [edge-react-gui#6141](https://github.com/EdgeApp/edge-react-gui/pull/6141#discussion_r3739397856)
-- [edge-react-gui#5397](https://github.com/EdgeApp/edge-react-gui/pull/5397#discussion_r1884609628)
-- [edge-react-gui#5691](https://github.com/EdgeApp/edge-react-gui/pull/5691#discussion_r2283807894)
-- [edge-react-gui#5724](https://github.com/EdgeApp/edge-react-gui/pull/5724#discussion_r2317374598)
-- [edge-react-gui#4716](https://github.com/EdgeApp/edge-react-gui/pull/4716#discussion_r1456867983)
-- [edge-react-gui#5724](https://github.com/EdgeApp/edge-react-gui/pull/5724#discussion_r2317382613)
-- [edge-react-gui#5397](https://github.com/EdgeApp/edge-react-gui/pull/5397#discussion_r1884600473)
-- [edge-react-gui#5397](https://github.com/EdgeApp/edge-react-gui/pull/5397#discussion_r1884620733)
-- [edge-react-gui#5107](https://github.com/EdgeApp/edge-react-gui/pull/5107#discussion_r1653437835)
-- [edge-react-gui#4708](https://github.com/EdgeApp/edge-react-gui/pull/4708#discussion_r1451036130)
-- [edge-react-gui#4648](https://github.com/EdgeApp/edge-react-gui/pull/4648#discussion_r1438750857)
-
-## comments-current-state
-
-typescript-standards.mdc, reword. Reviewers: swansontec 10, paullinator 8, peachbits 7, samholmes 3.
-
-- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#pullrequestreview-5013394137)
-- [edge-core-js#598](https://github.com/EdgeApp/edge-core-js/pull/598#discussion_r1631744098)
-- [edge-core-js#630](https://github.com/EdgeApp/edge-core-js/pull/630#discussion_r1879063323)
-- [edge-currency-accountbased#1096](https://github.com/EdgeApp/edge-currency-accountbased/pull/1096#pullrequestreview-5094219320)
-- [edge-currency-accountbased#1090](https://github.com/EdgeApp/edge-currency-accountbased/pull/1090#discussion_r3818711623)
-- [edge-currency-accountbased#1096](https://github.com/EdgeApp/edge-currency-accountbased/pull/1096#discussion_r3952169063)
-- [edge-currency-plugins#402](https://github.com/EdgeApp/edge-currency-plugins/pull/402#discussion_r1598798791)
-- [edge-currency-plugins#402](https://github.com/EdgeApp/edge-currency-plugins/pull/402#discussion_r1598803436)
-- [edge-currency-plugins#405](https://github.com/EdgeApp/edge-currency-plugins/pull/405#discussion_r1628259022)
-- [edge-devops#61](https://github.com/EdgeApp/edge-devops/pull/61#discussion_r1927590331)
-- [edge-exchange-plugins#402](https://github.com/EdgeApp/edge-exchange-plugins/pull/402#discussion_r2331376051)
-- [edge-exchange-plugins#402](https://github.com/EdgeApp/edge-exchange-plugins/pull/402#discussion_r2331376677)
-- [edge-exchange-plugins#402](https://github.com/EdgeApp/edge-exchange-plugins/pull/402#discussion_r2331379760)
-- [edge-exchange-plugins#297](https://github.com/EdgeApp/edge-exchange-plugins/pull/297#discussion_r1368106491)
-- [edge-exchange-plugins#297](https://github.com/EdgeApp/edge-exchange-plugins/pull/297#discussion_r1368108094)
-- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2302392608)
-- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292109328)
-- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292111303)
-- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292112898)
-- [edge-exchange-plugins#475](https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3799158774)
-- [edge-info-server#159](https://github.com/EdgeApp/edge-info-server/pull/159#discussion_r3762514639)
-- [edge-info-server#159](https://github.com/EdgeApp/edge-info-server/pull/159#discussion_r3762514636)
-- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#discussion_r3807687590)
-- [edge-react-gui#6241](https://github.com/EdgeApp/edge-react-gui/pull/6241#discussion_r4288159180)
-- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#discussion_r3807687595)
-- [edge-react-gui#5697](https://github.com/EdgeApp/edge-react-gui/pull/5697#discussion_r2334619201)
-- [edge-react-gui#6199](https://github.com/EdgeApp/edge-react-gui/pull/6199#discussion_r4020532093)
-- [edge-zignal#1](https://github.com/EdgeApp/edge-zignal/pull/1#discussion_r2159751396)
-
-## add-non-obvious-constraints
-
-review-standards.mdc, reword. Reviewers: samholmes 13, swansontec 4.
-
-- [edge-core-js#600](https://github.com/EdgeApp/edge-core-js/pull/600#discussion_r1669317697)
-- [edge-core-js#600](https://github.com/EdgeApp/edge-core-js/pull/600#discussion_r1669340479)
-- [edge-core-js#600](https://github.com/EdgeApp/edge-core-js/pull/600#discussion_r1669318510)
-- [edge-currency-accountbased#886](https://github.com/EdgeApp/edge-currency-accountbased/pull/886#discussion_r1931032496)
-- [edge-devops#54](https://github.com/EdgeApp/edge-devops/pull/54#discussion_r1720458302)
-- [edge-exchange-plugins#402](https://github.com/EdgeApp/edge-exchange-plugins/pull/402#discussion_r2331473220)
-- [edge-login-server#117](https://github.com/EdgeApp/edge-login-server/pull/117#discussion_r1403683776)
-- [edge-login-server#120](https://github.com/EdgeApp/edge-login-server/pull/120#discussion_r1501257742)
-- [edge-react-gui#4704](https://github.com/EdgeApp/edge-react-gui/pull/4704#discussion_r1450929360)
-- [edge-react-gui#5505](https://github.com/EdgeApp/edge-react-gui/pull/5505#discussion_r2002057814)
-- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446784554)
-- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1449908999)
-- [edge-react-gui#5505](https://github.com/EdgeApp/edge-react-gui/pull/5505#discussion_r2002063077)
-- [edge-react-gui#4716](https://github.com/EdgeApp/edge-react-gui/pull/4716#discussion_r1456507803)
-- [edge-react-gui#4716](https://github.com/EdgeApp/edge-react-gui/pull/4716#discussion_r1456508170)
-- [edge-react-gui#4716](https://github.com/EdgeApp/edge-react-gui/pull/4716#discussion_r1456867148)
-- [edge-sync-client#18](https://github.com/EdgeApp/edge-sync-client/pull/18#discussion_r1495041060)
-
-## delete-unnecessary-code
-
-review-standards.mdc, reword. Reviewers: samholmes 11, swansontec 9, paullinator 4, peachbits 3.
-
-- [edge-currency-accountbased#952](https://github.com/EdgeApp/edge-currency-accountbased/pull/952#discussion_r2180886489)
-- [edge-currency-accountbased#844](https://github.com/EdgeApp/edge-currency-accountbased/pull/844#discussion_r1786832084)
-- [edge-currency-monero#87](https://github.com/EdgeApp/edge-currency-monero/pull/87#pullrequestreview-1947573101)
-- [edge-currency-monero#87](https://github.com/EdgeApp/edge-currency-monero/pull/87#discussion_r1531235584)
-- [edge-currency-monero#100](https://github.com/EdgeApp/edge-currency-monero/pull/100#discussion_r2728647515)
-- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2807653940)
-- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2812980395)
-- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623048226)
-- [edge-login-server#145](https://github.com/EdgeApp/edge-login-server/pull/145#discussion_r1824949278)
-- [edge-react-gui#4893](https://github.com/EdgeApp/edge-react-gui/pull/4893#pullrequestreview-1930003099)
-- [edge-react-gui#5275](https://github.com/EdgeApp/edge-react-gui/pull/5275#discussion_r1778962395)
-- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2417986026)
-- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2417988157)
-- [edge-react-gui#4863](https://github.com/EdgeApp/edge-react-gui/pull/4863#discussion_r1501290087)
-- [edge-react-gui#4863](https://github.com/EdgeApp/edge-react-gui/pull/4863#discussion_r1501291944)
-- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2422218430)
-- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2422170571)
-- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446763165)
-- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446765526)
-- [edge-react-gui#4863](https://github.com/EdgeApp/edge-react-gui/pull/4863#discussion_r1501287096)
-- [edge-react-gui#5226](https://github.com/EdgeApp/edge-react-gui/pull/5226#discussion_r1818338113)
-- [edge-react-gui#5413](https://github.com/EdgeApp/edge-react-gui/pull/5413#discussion_r1899333652)
-- [edge-react-gui#4863](https://github.com/EdgeApp/edge-react-gui/pull/4863#discussion_r1501268120)
-- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2417961665)
-- [edge-react-gui#4893](https://github.com/EdgeApp/edge-react-gui/pull/4893#discussion_r1520780847)
-- [edge-react-gui#5665](https://github.com/EdgeApp/edge-react-gui/pull/5665#discussion_r2216796508)
-- [edge-reports-server#186](https://github.com/EdgeApp/edge-reports-server/pull/186#discussion_r1522108608)
-
-## use-existing-helpers
-
-review-standards.mdc, reword. Reviewers: swansontec 13, peachbits 5, paullinator 4, samholmes 2.
-
-- [edge-apps-stress#4](https://github.com/EdgeApp/edge-apps-stress/pull/4#discussion_r1610656237)
-- [edge-change-server#16](https://github.com/EdgeApp/edge-change-server/pull/16#pullrequestreview-3976928331)
-- [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#pullrequestreview-5344893732)
-- [edge-core-js#645](https://github.com/EdgeApp/edge-core-js/pull/645#discussion_r2064202512)
-- [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1412572418)
-- [edge-core-js#633](https://github.com/EdgeApp/edge-core-js/pull/633#discussion_r1905911632)
-- [edge-core-js#693](https://github.com/EdgeApp/edge-core-js/pull/693#discussion_r2674357653)
-- [edge-core-js#643](https://github.com/EdgeApp/edge-core-js/pull/643#discussion_r2036208381)
-- [edge-currency-accountbased#981](https://github.com/EdgeApp/edge-currency-accountbased/pull/981#discussion_r2380401493)
-- [edge-currency-accountbased#673](https://github.com/EdgeApp/edge-currency-accountbased/pull/673#discussion_r1403677486)
-- [edge-currency-accountbased#877](https://github.com/EdgeApp/edge-currency-accountbased/pull/877#discussion_r1909280560)
-- [edge-exchange-plugins#441](https://github.com/EdgeApp/edge-exchange-plugins/pull/441#discussion_r2886632395)
-- [edge-exchange-plugins#364](https://github.com/EdgeApp/edge-exchange-plugins/pull/364#discussion_r1911794446)
-- [edge-info-server#159](https://github.com/EdgeApp/edge-info-server/pull/159#discussion_r3762514626)
-- [edge-login-server#141](https://github.com/EdgeApp/edge-login-server/pull/141#discussion_r1790725586)
-- [edge-react-gui#5748](https://github.com/EdgeApp/edge-react-gui/pull/5748#discussion_r2370419412)
-- [edge-react-gui#6267](https://github.com/EdgeApp/edge-react-gui/pull/6267#discussion_r4300149788)
-- [edge-react-gui#4702](https://github.com/EdgeApp/edge-react-gui/pull/4702#discussion_r1450926913)
-- [edge-react-gui#4725](https://github.com/EdgeApp/edge-react-gui/pull/4725#discussion_r1458102077)
-- [edge-react-gui#4762](https://github.com/EdgeApp/edge-react-gui/pull/4762#discussion_r1470153850)
-- [edge-reports-server#184](https://github.com/EdgeApp/edge-reports-server/pull/184#discussion_r1505107029)
-- [git-refresher#1](https://github.com/EdgeApp/git-refresher/pull/1#discussion_r1790988716)
-- [monero-lws-balancer#1](https://github.com/EdgeApp/monero-lws-balancer/pull/1#discussion_r2395718229)
-- [monero-lws-balancer#1](https://github.com/EdgeApp/monero-lws-balancer/pull/1#discussion_r2395725109)
-
-## clean-all-external-data
-
-review-standards.mdc, reword. Reviewers: swansontec 4, paullinator 3, samholmes 1, peachbits 1.
-
-- [edge-currency-accountbased#925](https://github.com/EdgeApp/edge-currency-accountbased/pull/925#discussion_r2076024621)
-- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371580)
-- [edge-currency-accountbased#1044](https://github.com/EdgeApp/edge-currency-accountbased/pull/1044#discussion_r3048265592)
-- [edge-exchange-plugins#426](https://github.com/EdgeApp/edge-exchange-plugins/pull/426#discussion_r2735053707)
-- [edge-login-server#163](https://github.com/EdgeApp/edge-login-server/pull/163#discussion_r1900262533)
-- [edge-react-gui#6228](https://github.com/EdgeApp/edge-react-gui/pull/6228#discussion_r4189786769)
-- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435282916)
-- [edge-login-server#145](https://github.com/EdgeApp/edge-login-server/pull/145#discussion_r1823558426)
-- [edge-react-gui#4912](https://github.com/EdgeApp/edge-react-gui/pull/4912#discussion_r1537862752)
-
-## biggystring-arithmetic
-
-typescript-standards.mdc, reword. Reviewers: swansontec 6, peachbits 2.
-
-- [edge-currency-accountbased#751](https://github.com/EdgeApp/edge-currency-accountbased/pull/751#discussion_r1534771485)
-- [edge-currency-plugins#292](https://github.com/EdgeApp/edge-currency-plugins/pull/292#discussion_r1376894001)
-- [edge-exchange-plugins#475](https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3669497062)
-- [edge-exchange-plugins#475](https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3669519271)
-- [edge-react-gui#5787](https://github.com/EdgeApp/edge-react-gui/pull/5787#pullrequestreview-3352304138)
-- [edge-react-gui#5787](https://github.com/EdgeApp/edge-react-gui/pull/5787#discussion_r2441393305)
-- [edge-react-gui#5439](https://github.com/EdgeApp/edge-react-gui/pull/5439#discussion_r1958881133)
-- [edge-react-gui#5439](https://github.com/EdgeApp/edge-react-gui/pull/5439#discussion_r1958880006)
-
-## units-explicit
-
-review-standards.mdc, new. Reviewers: paullinator 3, samholmes 2, peachbits 1, swansontec 1.
-
-- [edge-currency-accountbased#919](https://github.com/EdgeApp/edge-currency-accountbased/pull/919#discussion_r2025626117)
-- [edge-currency-accountbased#735](https://github.com/EdgeApp/edge-currency-accountbased/pull/735#discussion_r1508214842)
-- [edge-currency-accountbased#877](https://github.com/EdgeApp/edge-currency-accountbased/pull/877#discussion_r1907894471)
-- [edge-currency-monero#94](https://github.com/EdgeApp/edge-currency-monero/pull/94#discussion_r2051150739)
-- [edge-exchange-plugins#429](https://github.com/EdgeApp/edge-exchange-plugins/pull/429#discussion_r2737726084)
-- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623060856)
-- [edge-reports-server#198](https://github.com/EdgeApp/edge-reports-server/pull/198#discussion_r2186030153)
+- [react-native-zano#17](https://github.com/EdgeApp/react-native-zano/pull/17#discussion_r3818711498)
+- [react-native-zano#17](https://github.com/EdgeApp/react-native-zano/pull/17#discussion_r3818711501)
 
 ## jsdoc-for-api-and-deprecations
 
-review-standards.mdc, new. Reviewers: samholmes 3, swansontec 2, paullinator 1.
+review-standards.mdc, new. Reviewers: swansontec 9, samholmes 4, paullinator 1.
 
 - [edge-core-js#589](https://github.com/EdgeApp/edge-core-js/pull/589#discussion_r1536641836)
+- [edge-core-js#599](https://github.com/EdgeApp/edge-core-js/pull/599#discussion_r1653599337)
+- [edge-core-js#626](https://github.com/EdgeApp/edge-core-js/pull/626#discussion_r1852549605)
+- [edge-core-js#630](https://github.com/EdgeApp/edge-core-js/pull/630#discussion_r1879063323)
 - [edge-core-js#636](https://github.com/EdgeApp/edge-core-js/pull/636#discussion_r1917536506)
+- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2169130152)
 - [edge-currency-accountbased#973](https://github.com/EdgeApp/edge-currency-accountbased/pull/973#pullrequestreview-3187312434)
 - [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371586)
-- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2169130152)
-- [edge-react-gui#4863](https://github.com/EdgeApp/edge-react-gui/pull/4863#discussion_r1501288932)
-
-## no-debug-scaffolding
-
-review-standards.mdc, new. Reviewers: swansontec 2, samholmes 2, peachbits 1.
-
-- [edge-currency-accountbased#799](https://github.com/EdgeApp/edge-currency-accountbased/pull/799#discussion_r1680136775)
-- [edge-react-gui#4896](https://github.com/EdgeApp/edge-react-gui/pull/4896#discussion_r1520537230)
-- [edge-react-gui#5469](https://github.com/EdgeApp/edge-react-gui/pull/5469#discussion_r1966331742)
-- [edge-reports-server#187](https://github.com/EdgeApp/edge-reports-server/pull/187#pullrequestreview-1972391751)
-- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3848172819)
-
-## tokenid-not-currencycode
-
-review-standards.mdc, new. Reviewers: paullinator 8, swansontec 2.
-
-- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292110225)
-- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292106784)
-- [edge-exchange-plugins#372](https://github.com/EdgeApp/edge-exchange-plugins/pull/372#discussion_r1970761964)
-- [edge-exchange-plugins#372](https://github.com/EdgeApp/edge-exchange-plugins/pull/372#discussion_r1970762189)
-- [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1412619219)
-- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292094177)
-- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292103770)
-- [edge-currency-accountbased#714](https://github.com/EdgeApp/edge-currency-accountbased/pull/714#discussion_r1472151937)
-- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623045669)
-- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623045825)
-
-## narrow-try-scope
-
-review-standards.mdc, new. Reviewers: peachbits 6, samholmes 1.
-
-- [edge-currency-accountbased#1044](https://github.com/EdgeApp/edge-currency-accountbased/pull/1044#discussion_r3048266066)
-- [edge-currency-accountbased#1098](https://github.com/EdgeApp/edge-currency-accountbased/pull/1098#discussion_r3983332843)
-- [edge-currency-plugins#454](https://github.com/EdgeApp/edge-currency-plugins/pull/454#discussion_r3723898208)
-- [edge-info-server#130](https://github.com/EdgeApp/edge-info-server/pull/130#discussion_r1741263862)
-- [edge-react-gui#6235](https://github.com/EdgeApp/edge-react-gui/pull/6235#discussion_r4200200259)
-- [edge-react-gui#6256](https://github.com/EdgeApp/edge-react-gui/pull/6256#discussion_r4328372697)
-- [edge-react-gui#6193](https://github.com/EdgeApp/edge-react-gui/pull/6193#discussion_r4031589840)
-
-## existing-user-paths
-
-review-standards.mdc, new. Reviewers: swansontec 8, samholmes 5, paullinator 2.
-
-- [edge-core-js#579](https://github.com/EdgeApp/edge-core-js/pull/579#discussion_r1441266626)
-- [edge-core-js#630](https://github.com/EdgeApp/edge-core-js/pull/630#pullrequestreview-2493912418)
-- [edge-core-js#661](https://github.com/EdgeApp/edge-core-js/pull/661#discussion_r2101215753)
-- [edge-currency-accountbased#745](https://github.com/EdgeApp/edge-currency-accountbased/pull/745#discussion_r1526957722)
-- [edge-currency-accountbased#673](https://github.com/EdgeApp/edge-currency-accountbased/pull/673#discussion_r1403674526)
-- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2143779923)
-- [edge-currency-accountbased#1044](https://github.com/EdgeApp/edge-currency-accountbased/pull/1044#discussion_r3047043539)
-- [edge-currency-accountbased#784](https://github.com/EdgeApp/edge-currency-accountbased/pull/784#discussion_r1637398707)
-- [edge-currency-plugins#406](https://github.com/EdgeApp/edge-currency-plugins/pull/406#discussion_r1631780006)
 - [edge-currency-plugins#406](https://github.com/EdgeApp/edge-currency-plugins/pull/406#discussion_r1631779659)
-- [edge-currency-plugins#399](https://github.com/EdgeApp/edge-currency-plugins/pull/399#discussion_r1585642234)
-- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435346461)
-- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2417938249)
-- [edge-reports-server#183](https://github.com/EdgeApp/edge-reports-server/pull/183#discussion_r1364563873)
-- [edge-reports-server#201](https://github.com/EdgeApp/edge-reports-server/pull/201#discussion_r2208756025)
-
-## check-response-ok
-
-review-standards.mdc, new. Reviewers: paullinator 4, peachbits 2.
-
-- [edge-currency-accountbased#811](https://github.com/EdgeApp/edge-currency-accountbased/pull/811#discussion_r1707483550)
-- [edge-exchange-plugins#480](https://github.com/EdgeApp/edge-exchange-plugins/pull/480#discussion_r4066871861)
-- [edge-exchange-plugins#403](https://github.com/EdgeApp/edge-exchange-plugins/pull/403#discussion_r2360440301)
-- [edge-exchange-plugins#330](https://github.com/EdgeApp/edge-exchange-plugins/pull/330#discussion_r1651473120)
-- [edge-react-gui#5553](https://github.com/EdgeApp/edge-react-gui/pull/5553#discussion_r2076725494)
-- [edge-exchange-plugins#429](https://github.com/EdgeApp/edge-exchange-plugins/pull/429#discussion_r2737716493)
-
-## no-silent-success
-
-review-standards.mdc, new. Reviewers: samholmes 6, paullinator 3, peachbits 2.
-
-- [biggystring#22](https://github.com/EdgeApp/biggystring/pull/22#issuecomment-2231982035)
-- [biggystring#21](https://github.com/EdgeApp/biggystring/pull/21#discussion_r1678293882)
-- [edge-currency-plugins#387](https://github.com/EdgeApp/edge-currency-plugins/pull/387#discussion_r1367585094)
-- [edge-currency-plugins#423](https://github.com/EdgeApp/edge-currency-plugins/pull/423#discussion_r1999678612)
-- [edge-exchange-plugins#429](https://github.com/EdgeApp/edge-exchange-plugins/pull/429#discussion_r2737716498)
-- [edge-exchange-plugins#429](https://github.com/EdgeApp/edge-exchange-plugins/pull/429#discussion_r2737726074)
-- [edge-info-server#159](https://github.com/EdgeApp/edge-info-server/pull/159#discussion_r3762514613)
-- [edge-react-gui#5413](https://github.com/EdgeApp/edge-react-gui/pull/5413#discussion_r1899341656)
-- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#discussion_r4127223641)
-- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2666773499)
-- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2688412197)
-
-## structured-logging
-
-review-standards.mdc, new. Reviewers: swansontec 6, paullinator 2.
-
-- [edge-autobot-server#3](https://github.com/EdgeApp/edge-autobot-server/pull/3#pullrequestreview-3720598688)
-- [edge-change-server#12](https://github.com/EdgeApp/edge-change-server/pull/12#discussion_r2714879339)
-- [edge-change-server#12](https://github.com/EdgeApp/edge-change-server/pull/12#discussion_r2714842654)
-- [edge-change-server#12](https://github.com/EdgeApp/edge-change-server/pull/12#discussion_r2714845320)
-- [edge-change-server#13](https://github.com/EdgeApp/edge-change-server/pull/13#discussion_r2733674173)
-- [edge-change-server#13](https://github.com/EdgeApp/edge-change-server/pull/13#discussion_r2733678754)
-- [edge-change-server#12](https://github.com/EdgeApp/edge-change-server/pull/12#discussion_r2714899823)
-- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371569)
-
-## log-only-real-work
-
-review-standards.mdc, new. Reviewers: swansontec 2, peachbits 1.
-
-- [edge-core-js#613](https://github.com/EdgeApp/edge-core-js/pull/613#discussion_r1739433632)
-- [edge-core-js#613](https://github.com/EdgeApp/edge-core-js/pull/613#discussion_r1739434095)
-- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3860039279)
-
-## surface-errors-not-console
-
-review-standards.mdc, new. Reviewers: swansontec 3, samholmes 1.
-
-- [edge-react-gui#5118](https://github.com/EdgeApp/edge-react-gui/pull/5118#discussion_r1663259327)
-- [edge-react-gui#5145](https://github.com/EdgeApp/edge-react-gui/pull/5145#discussion_r1676510022)
-- [edge-react-gui#4771](https://github.com/EdgeApp/edge-react-gui/pull/4771#discussion_r1467250170)
-- [edge-react-gui#5586](https://github.com/EdgeApp/edge-react-gui/pull/5586#discussion_r2098739482)
-
-## file-placement-conventions
-
-review-standards.mdc, new. Reviewers: swansontec 6, samholmes 1.
-
-- [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1430512921)
-- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446719917)
-- [edge-react-gui#4887](https://github.com/EdgeApp/edge-react-gui/pull/4887#discussion_r1513032248)
-- [edge-react-gui#4887](https://github.com/EdgeApp/edge-react-gui/pull/4887#discussion_r1513037914)
-- [edge-react-gui#5397](https://github.com/EdgeApp/edge-react-gui/pull/5397#discussion_r1884598822)
-- [edge-react-gui#5107](https://github.com/EdgeApp/edge-react-gui/pull/5107#discussion_r1651917959)
-- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2417997468)
-
-## normalize-at-the-boundary
-
-review-standards.mdc, new. Reviewers: peachbits 5.
-
-- [edge-info-server#166](https://github.com/EdgeApp/edge-info-server/pull/166#pullrequestreview-5511277435)
-- [edge-info-server#166](https://github.com/EdgeApp/edge-info-server/pull/166#discussion_r4265158097)
-- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#pullrequestreview-5511277743)
-- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4265158422)
-
-## logic-belongs-in-owning-layer
-
-review-standards.mdc, new. Reviewers: swansontec 5, peachbits 2.
-
-- [edge-core-js#618](https://github.com/EdgeApp/edge-core-js/pull/618#pullrequestreview-2298142883)
-- [edge-currency-accountbased#1036](https://github.com/EdgeApp/edge-currency-accountbased/pull/1036#discussion_r2886506282)
-- [edge-currency-accountbased#1084](https://github.com/EdgeApp/edge-currency-accountbased/pull/1084#discussion_r3847619306)
-- [edge-devops#58](https://github.com/EdgeApp/edge-devops/pull/58#pullrequestreview-2428331368)
-- [edge-devops#58](https://github.com/EdgeApp/edge-devops/pull/58#discussion_r1837319195)
-- [edge-react-gui#5461](https://github.com/EdgeApp/edge-react-gui/pull/5461#pullrequestreview-2630748434)
-- [edge-react-gui#5461](https://github.com/EdgeApp/edge-react-gui/pull/5461#discussion_r1964103909)
-
-## no-module-level-mutable-state
-
-review-standards.mdc, new. Reviewers: swansontec 2, samholmes 1.
-
-- [edge-currency-accountbased#729](https://github.com/EdgeApp/edge-currency-accountbased/pull/729#discussion_r1501054439)
-- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446780187)
-- [edge-currency-accountbased#729](https://github.com/EdgeApp/edge-currency-accountbased/pull/729#pullrequestreview-1898741302)
-
-## name-magic-values
-
-review-standards.mdc, new. Reviewers: paullinator 4, samholmes 1.
-
-- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371542)
-- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371555)
-- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371584)
-- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371582)
-- [edge-reports-server#184](https://github.com/EdgeApp/edge-reports-server/pull/184#discussion_r1505121610)
-
-## no-hardcoded-config
-
-review-standards.mdc, new. Reviewers: peachbits 4, samholmes 2, paullinator 1, swansontec 1.
-
-- [edge-autobot-server#3](https://github.com/EdgeApp/edge-autobot-server/pull/3#pullrequestreview-3720598688)
-- [edge-autobot-server#4](https://github.com/EdgeApp/edge-autobot-server/pull/4#pullrequestreview-3956911627)
-- [edge-autobot-server#4](https://github.com/EdgeApp/edge-autobot-server/pull/4#discussion_r2943202103)
-- [edge-autobot-server#4](https://github.com/EdgeApp/edge-autobot-server/pull/4#discussion_r2943246371)
-- [edge-autobot-server#4](https://github.com/EdgeApp/edge-autobot-server/pull/4#discussion_r2943251231)
-- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2855879786)
-- [edge-login-server#175](https://github.com/EdgeApp/edge-login-server/pull/175#discussion_r2198768510)
-- [edge-react-gui#5697](https://github.com/EdgeApp/edge-react-gui/pull/5697#discussion_r2334598699)
-
-## test-each-guard
-
-review-standards.mdc, new. Reviewers: peachbits 19, paullinator 8, samholmes 8, swansontec 2.
-
-- [biggystring#18](https://github.com/EdgeApp/biggystring/pull/18#discussion_r1325312744)
-- [biggystring#18](https://github.com/EdgeApp/biggystring/pull/18#discussion_r1391837140)
-- [edge-core-js#645](https://github.com/EdgeApp/edge-core-js/pull/645#pullrequestreview-2792620456)
-- [edge-core-js#654](https://github.com/EdgeApp/edge-core-js/pull/654#discussion_r2085587479)
-- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3848172817)
-- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#pullrequestreview-3906590963)
-- [edge-currency-accountbased#717](https://github.com/EdgeApp/edge-currency-accountbased/pull/717#discussion_r1485467715)
-- [edge-currency-accountbased#1098](https://github.com/EdgeApp/edge-currency-accountbased/pull/1098#discussion_r3983332855)
-- [edge-currency-accountbased#757](https://github.com/EdgeApp/edge-currency-accountbased/pull/757#discussion_r1554386557)
-- [edge-currency-accountbased#757](https://github.com/EdgeApp/edge-currency-accountbased/pull/757#discussion_r1554387140)
-- [edge-currency-accountbased#757](https://github.com/EdgeApp/edge-currency-accountbased/pull/757#discussion_r1554387275)
-- [edge-currency-accountbased#757](https://github.com/EdgeApp/edge-currency-accountbased/pull/757#discussion_r1554388580)
-- [edge-currency-accountbased#757](https://github.com/EdgeApp/edge-currency-accountbased/pull/757#discussion_r1556447679)
-- [edge-exchange-plugins#426](https://github.com/EdgeApp/edge-exchange-plugins/pull/426#pullrequestreview-3754084394)
-- [edge-exchange-plugins#433](https://github.com/EdgeApp/edge-exchange-plugins/pull/433#discussion_r3054932106)
-- [edge-exchange-plugins#510](https://github.com/EdgeApp/edge-exchange-plugins/pull/510#discussion_r4300149317)
-- [edge-exchange-plugins#495](https://github.com/EdgeApp/edge-exchange-plugins/pull/495#discussion_r4161212760)
-- [edge-exchange-plugins#484](https://github.com/EdgeApp/edge-exchange-plugins/pull/484#discussion_r4010503988)
-- [edge-login-server#148](https://github.com/EdgeApp/edge-login-server/pull/148#discussion_r1809528936)
-- [edge-react-gui#6211](https://github.com/EdgeApp/edge-react-gui/pull/6211#pullrequestreview-5344635087)
-- [edge-react-gui#6199](https://github.com/EdgeApp/edge-react-gui/pull/6199#discussion_r4020532109)
-- [edge-react-gui#5226](https://github.com/EdgeApp/edge-react-gui/pull/5226#discussion_r1819891891)
-- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#discussion_r3807687571)
-- [edge-react-gui#6211](https://github.com/EdgeApp/edge-react-gui/pull/6211#discussion_r4127022052)
-- [edge-react-gui#6256](https://github.com/EdgeApp/edge-react-gui/pull/6256#discussion_r4297888104)
-- [edge-react-gui#6256](https://github.com/EdgeApp/edge-react-gui/pull/6256#discussion_r4328372705)
-- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4265158443)
-- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4276082044)
-- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4297887119)
-- [edge-react-gui#6268](https://github.com/EdgeApp/edge-react-gui/pull/6268#discussion_r4300149653)
-- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4328622762)
-- [edge-react-gui#6279](https://github.com/EdgeApp/edge-react-gui/pull/6279#discussion_r4343216518)
-- [edge-react-gui#6267](https://github.com/EdgeApp/edge-react-gui/pull/6267#discussion_r4300149772)
-- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4276082052)
-- [edge-react-gui#6241](https://github.com/EdgeApp/edge-react-gui/pull/6241#discussion_r4288159194)
-- [edge-react-gui#5226](https://github.com/EdgeApp/edge-react-gui/pull/5226#discussion_r1819913777)
-- [edge-reports-server#211](https://github.com/EdgeApp/edge-reports-server/pull/211#discussion_r3095178069)
-
-## order-state-around-awaits
-
-review-standards.mdc, new. Reviewers: paullinator 5, swansontec 2, peachbits 2.
-
-- [edge-core-js#733](https://github.com/EdgeApp/edge-core-js/pull/733#pullrequestreview-5158964850)
-- [edge-core-js#643](https://github.com/EdgeApp/edge-core-js/pull/643#discussion_r2036197687)
-- [edge-core-js#733](https://github.com/EdgeApp/edge-core-js/pull/733#discussion_r3972249452)
-- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3848172812)
-- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3855599272)
-- [edge-currency-accountbased#811](https://github.com/EdgeApp/edge-currency-accountbased/pull/811#discussion_r1708092485)
-- [edge-currency-accountbased#811](https://github.com/EdgeApp/edge-currency-accountbased/pull/811#discussion_r1710489018)
-- [edge-react-gui#5109](https://github.com/EdgeApp/edge-react-gui/pull/5109#discussion_r1649438613)
-- [edge-reports-server#196](https://github.com/EdgeApp/edge-reports-server/pull/196#discussion_r1917311909)
-
-## stale-async-generation-check
-
-review-standards.mdc, new. Reviewers: paullinator 8.
-
-- [edge-currency-accountbased#1090](https://github.com/EdgeApp/edge-currency-accountbased/pull/1090#pullrequestreview-4978796037)
-- [edge-currency-accountbased#1090](https://github.com/EdgeApp/edge-currency-accountbased/pull/1090#pullrequestreview-4979167195)
-- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371539)
-- [edge-currency-accountbased#1090](https://github.com/EdgeApp/edge-currency-accountbased/pull/1090#discussion_r3818736432)
-
-## bound-pagination-and-timeouts
-
-review-standards.mdc, new. Reviewers: paullinator 2, samholmes 1.
-
-- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371553)
-- [edge-info-server#160](https://github.com/EdgeApp/edge-info-server/pull/160#discussion_r3814319537)
-- [edge-reports-server#211](https://github.com/EdgeApp/edge-reports-server/pull/211#discussion_r3095175563)
-
-## avoid-repeated-work
-
-review-standards.mdc, new. Reviewers: paullinator 7, swansontec 5, samholmes 4, peachbits 3.
-
-- [edge-react-gui#5691](https://github.com/EdgeApp/edge-react-gui/pull/5691#discussion_r2283794439)
-- [edge-core-js#733](https://github.com/EdgeApp/edge-core-js/pull/733#discussion_r3972249469)
-- [edge-currency-accountbased#654](https://github.com/EdgeApp/edge-currency-accountbased/pull/654#discussion_r1378198017)
-- [edge-currency-accountbased#693](https://github.com/EdgeApp/edge-currency-accountbased/pull/693#discussion_r1418166006)
-- [edge-currency-accountbased#1108](https://github.com/EdgeApp/edge-currency-accountbased/pull/1108#discussion_r4101764565)
-- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623048047)
-- [edge-info-server#159](https://github.com/EdgeApp/edge-info-server/pull/159#discussion_r3762514645)
-- [edge-react-gui#5691](https://github.com/EdgeApp/edge-react-gui/pull/5691#discussion_r2283792870)
-- [edge-react-gui#5455](https://github.com/EdgeApp/edge-react-gui/pull/5455#discussion_r1955427619)
-- [edge-reports-server#198](https://github.com/EdgeApp/edge-reports-server/pull/198#discussion_r1972602806)
-- [edge-reports-server#198](https://github.com/EdgeApp/edge-reports-server/pull/198#discussion_r2186040787)
-- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2684351461)
-- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2684356163)
-- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2688205006)
-- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2687739646)
-- [edge-exchange-plugins#366](https://github.com/EdgeApp/edge-exchange-plugins/pull/366#discussion_r1936245211)
-- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435256348)
-- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435267474)
-- [edge-react-gui#5107](https://github.com/EdgeApp/edge-react-gui/pull/5107#discussion_r1653306811)
-
-## no-secrets-in-dumps-or-logs
-
-review-standards.mdc, new. Reviewers: paullinator 4, peachbits 2, samholmes 1, swansontec 1.
-
-- [edge-currency-accountbased#1036](https://github.com/EdgeApp/edge-currency-accountbased/pull/1036#discussion_r2886432340)
-- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371558)
-- [edge-devops#63](https://github.com/EdgeApp/edge-devops/pull/63#discussion_r1972614112)
-- [edge-info-server#159](https://github.com/EdgeApp/edge-info-server/pull/159#discussion_r3762514603)
-- [edge-react-gui#4984](https://github.com/EdgeApp/edge-react-gui/pull/4984#discussion_r1623063330)
-- [edge-react-gui#4975](https://github.com/EdgeApp/edge-react-gui/pull/4975#discussion_r1562991732)
-- [edge-react-gui#5098](https://github.com/EdgeApp/edge-react-gui/pull/5098#discussion_r1643117800)
-- [edge-reports-server#204](https://github.com/EdgeApp/edge-reports-server/pull/204#discussion_r2224003641)
-
-## alphabetical-registration
-
-review-standards.mdc, new. Reviewers: peachbits 2, swansontec 2, paullinator 2.
-
-- [edge-core-js#615](https://github.com/EdgeApp/edge-core-js/pull/615#discussion_r1747674696)
-- [edge-core-js#615](https://github.com/EdgeApp/edge-core-js/pull/615#discussion_r1747677327)
-- [edge-currency-accountbased#433](https://github.com/EdgeApp/edge-currency-accountbased/pull/433#discussion_r1630742509)
-- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623037198)
-- [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#discussion_r2807654603)
-- [edge-react-gui#4912](https://github.com/EdgeApp/edge-react-gui/pull/4912#discussion_r1538596217)
-
-## deprecated-fields-last
-
-review-standards.mdc, new. Reviewers: samholmes 4, swansontec 1.
-
-- [edge-core-js#633](https://github.com/EdgeApp/edge-core-js/pull/633#discussion_r1906080057)
-- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2143776550)
-- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2143777260)
-- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2169132158)
-- [edge-currency-plugins#424](https://github.com/EdgeApp/edge-currency-plugins/pull/424#discussion_r2058987268)
-
-## follow-repo-naming-conventions
-
-review-standards.mdc, new. Reviewers: swansontec 11, samholmes 5, paullinator 1.
-
-- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1715981387)
-- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1715981027)
-- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1715980872)
-- [edge-conventions#28](https://github.com/EdgeApp/edge-conventions/pull/28#discussion_r2830809159)
-- [edge-conventions#28](https://github.com/EdgeApp/edge-conventions/pull/28#discussion_r2830809236)
-- [edge-core-js#607](https://github.com/EdgeApp/edge-core-js/pull/607#discussion_r1693449150)
-- [edge-currency-accountbased#799](https://github.com/EdgeApp/edge-currency-accountbased/pull/799#discussion_r1680112106)
-- [edge-currency-accountbased#679](https://github.com/EdgeApp/edge-currency-accountbased/pull/679#discussion_r1412436843)
-- [edge-currency-plugins#420](https://github.com/EdgeApp/edge-currency-plugins/pull/420#discussion_r1907513047)
-- [edge-devops#60](https://github.com/EdgeApp/edge-devops/pull/60#discussion_r1884615410)
-- [edge-exchange-plugins#426](https://github.com/EdgeApp/edge-exchange-plugins/pull/426#discussion_r2766708161)
-- [edge-login-server#145](https://github.com/EdgeApp/edge-login-server/pull/145#discussion_r1824932757)
-- [edge-react-gui#5943](https://github.com/EdgeApp/edge-react-gui/pull/5943#discussion_r2818732711)
-- [edge-react-gui#4896](https://github.com/EdgeApp/edge-react-gui/pull/4896#discussion_r1520537662)
-- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1716022458)
-- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1716022671)
-- [edge-sync-server#93](https://github.com/EdgeApp/edge-sync-server/pull/93#discussion_r1716027781)
-
-## match-sibling-behavior
-
-review-standards.mdc, new. Reviewers: swansontec 5, samholmes 5, peachbits 1, paullinator 1.
-
-- [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#discussion_r4160149915)
-- [edge-core-js#685](https://github.com/EdgeApp/edge-core-js/pull/685#discussion_r2470575387)
-- [edge-info-server#160](https://github.com/EdgeApp/edge-info-server/pull/160#discussion_r3814319574)
-- [edge-react-gui#5469](https://github.com/EdgeApp/edge-react-gui/pull/5469#pullrequestreview-2634459144)
-- [edge-react-gui#5950](https://github.com/EdgeApp/edge-react-gui/pull/5950#discussion_r2834934167)
-- [edge-react-gui#5950](https://github.com/EdgeApp/edge-react-gui/pull/5950#discussion_r2834934472)
-- [edge-react-gui#5950](https://github.com/EdgeApp/edge-react-gui/pull/5950#discussion_r2834935495)
-- [edge-react-gui#5967](https://github.com/EdgeApp/edge-react-gui/pull/5967#discussion_r2881073374)
-- [edge-react-gui#5107](https://github.com/EdgeApp/edge-react-gui/pull/5107#discussion_r1653278936)
-- [edge-react-gui#4725](https://github.com/EdgeApp/edge-react-gui/pull/4725#discussion_r1458079112)
-- [edge-react-gui#4725](https://github.com/EdgeApp/edge-react-gui/pull/4725#discussion_r1458079806)
-- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2687749900)
-
-## plain-functions-over-iife
-
-review-standards.mdc, new. Reviewers: swansontec 4, samholmes 1.
-
-- [edge-core-js#697](https://github.com/EdgeApp/edge-core-js/pull/697#discussion_r2731473206)
-- [edge-currency-plugins#408](https://github.com/EdgeApp/edge-currency-plugins/pull/408#discussion_r1681808319)
-- [edge-currency-plugins#396](https://github.com/EdgeApp/edge-currency-plugins/pull/396#discussion_r1552596529)
-- [edge-react-gui#5373](https://github.com/EdgeApp/edge-react-gui/pull/5373#discussion_r1861385029)
-- [edge-react-gui#5206](https://github.com/EdgeApp/edge-react-gui/pull/5206#discussion_r1720386062)
-
-## tokenid-typed-and-required
-
-review-standards.mdc, new. Reviewers: swansontec 10, peachbits 1.
-
-- [edge-react-gui#5275](https://github.com/EdgeApp/edge-react-gui/pull/5275#discussion_r1778954857)
-- [edge-core-js#577](https://github.com/EdgeApp/edge-core-js/pull/577#discussion_r1437254622)
-- [edge-currency-accountbased#1045](https://github.com/EdgeApp/edge-currency-accountbased/pull/1045#discussion_r3040841365)
-- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#pullrequestreview-1791908115)
-- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1441497868)
-- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435351695)
-- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435255642)
-- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1433290153)
-- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1433290340)
-- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435227074)
-- [edge-react-gui#5275](https://github.com/EdgeApp/edge-react-gui/pull/5275#discussion_r1778962863)
-
-## no-sentinel-empty-values
-
-review-standards.mdc, new. Reviewers: swansontec 4, peachbits 1, paullinator 1.
-
-- [edge-core-js#693](https://github.com/EdgeApp/edge-core-js/pull/693#discussion_r2674364062)
-- [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1430530646)
-- [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1430531237)
-- [edge-currency-accountbased#1036](https://github.com/EdgeApp/edge-currency-accountbased/pull/1036#discussion_r2886460285)
-- [edge-currency-plugins#420](https://github.com/EdgeApp/edge-currency-plugins/pull/420#discussion_r1907519523)
-- [edge-login-server#178](https://github.com/EdgeApp/edge-login-server/pull/178#discussion_r2258639857)
-
-## map-set-for-dictionaries
-
-review-standards.mdc, new. Reviewers: swansontec 5.
-
-- [edge-currency-accountbased#765](https://github.com/EdgeApp/edge-currency-accountbased/pull/765#pullrequestreview-2023583681)
-- [edge-currency-accountbased#765](https://github.com/EdgeApp/edge-currency-accountbased/pull/765#discussion_r1580129686)
-- [edge-currency-accountbased#906](https://github.com/EdgeApp/edge-currency-accountbased/pull/906#discussion_r1996050591)
-- [edge-currency-accountbased#877](https://github.com/EdgeApp/edge-currency-accountbased/pull/877#discussion_r1907936527)
-- [edge-exchange-plugins#351](https://github.com/EdgeApp/edge-exchange-plugins/pull/351#discussion_r1842550379)
-
-## discriminate-over-flags
-
-review-standards.mdc, new. Reviewers: peachbits 7, swansontec 3, paullinator 3, samholmes 1.
-
-- [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#pullrequestreview-5344893732)
-- [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#discussion_r4127223350)
-- [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#discussion_r4127223371)
-- [edge-currency-accountbased#973](https://github.com/EdgeApp/edge-currency-accountbased/pull/973#pullrequestreview-3177612922)
-- [edge-currency-accountbased#973](https://github.com/EdgeApp/edge-currency-accountbased/pull/973#discussion_r2317292486)
-- [edge-exchange-plugins#469](https://github.com/EdgeApp/edge-exchange-plugins/pull/469#pullrequestreview-5344714440)
-- [edge-exchange-plugins#402](https://github.com/EdgeApp/edge-exchange-plugins/pull/402#discussion_r2331438989)
-- [edge-rates-server#120](https://github.com/EdgeApp/edge-rates-server/pull/120#discussion_r2579305688)
-- [edge-react-gui#5691](https://github.com/EdgeApp/edge-react-gui/pull/5691#discussion_r2289426258)
-- [edge-react-gui#5691](https://github.com/EdgeApp/edge-react-gui/pull/5691#discussion_r2289436102)
-- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#discussion_r4127223677)
-- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#discussion_r4127223628)
-- [edge-reports-server#201](https://github.com/EdgeApp/edge-reports-server/pull/201#discussion_r2208749317)
-
-## narrowest-accurate-types
-
-review-standards.mdc, new. Reviewers: swansontec 6, paullinator 2, peachbits 1, samholmes 1.
-
-- [edge-change-server#3](https://github.com/EdgeApp/edge-change-server/pull/3#discussion_r2047947966)
-- [edge-currency-accountbased#745](https://github.com/EdgeApp/edge-currency-accountbased/pull/745#discussion_r1526963966)
-- [edge-currency-accountbased#745](https://github.com/EdgeApp/edge-currency-accountbased/pull/745#discussion_r1526964150)
-- [edge-currency-accountbased#844](https://github.com/EdgeApp/edge-currency-accountbased/pull/844#discussion_r1785443715)
-- [edge-devops#55](https://github.com/EdgeApp/edge-devops/pull/55#discussion_r1759527324)
-- [edge-react-gui#3597](https://github.com/EdgeApp/edge-react-gui/pull/3597#discussion_r1630748701)
-- [edge-react-gui#4663](https://github.com/EdgeApp/edge-react-gui/pull/4663#discussion_r1439103293)
-- [edge-react-gui#5226](https://github.com/EdgeApp/edge-react-gui/pull/5226#discussion_r1819939828)
-- [edge-react-gui#5226](https://github.com/EdgeApp/edge-react-gui/pull/5226#discussion_r1819941375)
-- [edge-react-gui#4912](https://github.com/EdgeApp/edge-react-gui/pull/4912#discussion_r1537900240)
+- [edge-react-gui#4863](https://github.com/EdgeApp/edge-react-gui/pull/4863#discussion_r1501288932)
+- [edge-react-gui#4898](https://github.com/EdgeApp/edge-react-gui/pull/4898#discussion_r1520500802)
+- [edge-react-gui#5665](https://github.com/EdgeApp/edge-react-gui/pull/5665#discussion_r2216752083)
+- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2417978326)
+- [react-native-monero-lwsf#2](https://github.com/EdgeApp/react-native-monero-lwsf/pull/2#discussion_r2843651738)
+
+## changelog-section-and-verb
+
+review-standards.mdc, new. Reviewers: samholmes 9, peachbits 9, swansontec 3, paullinator 2, j0ntz 1.
+
+- [edge-core-js#583](https://github.com/EdgeApp/edge-core-js/pull/583#discussion_r1458036518)
+- [edge-core-js#717](https://github.com/EdgeApp/edge-core-js/pull/717#discussion_r2949716335)
+- [edge-core-js#721](https://github.com/EdgeApp/edge-core-js/pull/721#discussion_r3040803133)
+- [edge-currency-accountbased#644](https://github.com/EdgeApp/edge-currency-accountbased/pull/644#discussion_r1364578762)
+- [edge-currency-accountbased#676](https://github.com/EdgeApp/edge-currency-accountbased/pull/676#discussion_r1403714854)
+- [edge-currency-accountbased#692](https://github.com/EdgeApp/edge-currency-accountbased/pull/692#discussion_r1418069087)
+- [edge-currency-accountbased#829](https://github.com/EdgeApp/edge-currency-accountbased/pull/829#discussion_r1746114771)
+- [edge-currency-accountbased#829](https://github.com/EdgeApp/edge-currency-accountbased/pull/829#pullrequestreview-2284011211)
+- [edge-currency-accountbased#1028](https://github.com/EdgeApp/edge-currency-accountbased/pull/1028#pullrequestreview-3842952301)
+- [edge-currency-accountbased#1035](https://github.com/EdgeApp/edge-currency-accountbased/pull/1035#issuecomment-4000385607)
+- [edge-currency-accountbased#1044](https://github.com/EdgeApp/edge-currency-accountbased/pull/1044#discussion_r3048267400)
+- [edge-currency-accountbased#1084](https://github.com/EdgeApp/edge-currency-accountbased/pull/1084#discussion_r3847619317)
+- [edge-login-server#128](https://github.com/EdgeApp/edge-login-server/pull/128#discussion_r1697639950)
+- [edge-react-gui#5206](https://github.com/EdgeApp/edge-react-gui/pull/5206#discussion_r1720381457)
+- [edge-react-gui#5950](https://github.com/EdgeApp/edge-react-gui/pull/5950#discussion_r2834934812)
+- [edge-react-gui#6128](https://github.com/EdgeApp/edge-react-gui/pull/6128#pullrequestreview-5313944957)
+- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#discussion_r3807687602)
+- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#pullrequestreview-4965479992)
+- [edge-react-gui#6211](https://github.com/EdgeApp/edge-react-gui/pull/6211#pullrequestreview-5359568343)
+- [edge-react-gui#6240](https://github.com/EdgeApp/edge-react-gui/pull/6240#discussion_r4233126633)
+- [edge-react-gui#6256](https://github.com/EdgeApp/edge-react-gui/pull/6256#discussion_r4276118281)
+- [edge-react-gui#6256](https://github.com/EdgeApp/edge-react-gui/pull/6256#pullrequestreview-5551941774)
+- [edge-react-gui#6267](https://github.com/EdgeApp/edge-react-gui/pull/6267#discussion_r4300149798)
+- [edge-react-gui#6267](https://github.com/EdgeApp/edge-react-gui/pull/6267#pullrequestreview-5554616684)
 
 ## changelog-entry-with-change
 
-review-standards.mdc, new. Reviewers: samholmes 9, peachbits 2, paullinator 1, swansontec 1.
+review-standards.mdc, new. Reviewers: samholmes 7, peachbits 2, paullinator 2.
 
-- [edge-currency-plugins#424](https://github.com/EdgeApp/edge-currency-plugins/pull/424#issuecomment-2859493713)
+- [edge-core-js#694](https://github.com/EdgeApp/edge-core-js/pull/694#discussion_r2674452965)
+- [edge-currency-accountbased#818](https://github.com/EdgeApp/edge-currency-accountbased/pull/818#issuecomment-2307600330)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#pullrequestreview-3906590963)
+- [edge-currency-plugins#425](https://github.com/EdgeApp/edge-currency-plugins/pull/425#pullrequestreview-2718795005)
 - [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#pullrequestreview-3802041438)
-- [edge-info-server#106](https://github.com/EdgeApp/edge-info-server/pull/106#discussion_r1384163415)
 - [edge-login-server#130](https://github.com/EdgeApp/edge-login-server/pull/130#pullrequestreview-2216113092)
-- [edge-react-gui#5152](https://github.com/EdgeApp/edge-react-gui/pull/5152#discussion_r1684887043)
-- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4265158473)
-- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#issuecomment-1883887268)
 - [edge-react-gui#4579](https://github.com/EdgeApp/edge-react-gui/pull/4579#pullrequestreview-1728426045)
+- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#issuecomment-1883887268)
 - [edge-react-gui#4863](https://github.com/EdgeApp/edge-react-gui/pull/4863#discussion_r1501267060)
-- [edge-devops#69](https://github.com/EdgeApp/edge-devops/pull/69#discussion_r2208864149)
-- [edge-react-gui#6247](https://github.com/EdgeApp/edge-react-gui/pull/6247#pullrequestreview-5475342297)
-- [edge-react-gui#5373](https://github.com/EdgeApp/edge-react-gui/pull/5373#discussion_r1861369686)
-- [edge-react-gui#4974](https://github.com/EdgeApp/edge-react-gui/pull/4974#discussion_r1563167994)
+- [edge-react-gui#5687](https://github.com/EdgeApp/edge-react-gui/pull/5687#pullrequestreview-3113052259)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4265158473)
 
 ## clean-commit-history
 
-review-standards.mdc, new. Reviewers: swansontec 7, samholmes 4, paullinator 4.
+review-standards.mdc, new. Reviewers: swansontec 22, samholmes 10, paullinator 4, j0ntz 3, peachbits 2.
 
+- [edge-change-server#5](https://github.com/EdgeApp/edge-change-server/pull/5#discussion_r2098939428)
+- [edge-change-server#5](https://github.com/EdgeApp/edge-change-server/pull/5#discussion_r2098940918)
+- [edge-change-server#5](https://github.com/EdgeApp/edge-change-server/pull/5#discussion_r2098943744)
+- [edge-change-server#5](https://github.com/EdgeApp/edge-change-server/pull/5#pullrequestreview-2855620738)
+- [edge-core-js#698](https://github.com/EdgeApp/edge-core-js/pull/698#discussion_r2723245807)
+- [edge-currency-accountbased#644](https://github.com/EdgeApp/edge-currency-accountbased/pull/644#pullrequestreview-1690576339)
 - [edge-currency-accountbased#645](https://github.com/EdgeApp/edge-currency-accountbased/pull/645#pullrequestreview-1690640672)
+- [edge-currency-accountbased#749](https://github.com/EdgeApp/edge-currency-accountbased/pull/749#pullrequestreview-1951138229)
+- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2195466139)
 - [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#pullrequestreview-2922831949)
 - [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#pullrequestreview-3906590963)
-- [edge-currency-plugins#424](https://github.com/EdgeApp/edge-currency-plugins/pull/424#pullrequestreview-2792009649)
+- [edge-currency-accountbased#1092](https://github.com/EdgeApp/edge-currency-accountbased/pull/1092#pullrequestreview-5025170585)
 - [edge-currency-plugins#408](https://github.com/EdgeApp/edge-currency-plugins/pull/408#discussion_r1681813983)
+- [edge-currency-plugins#424](https://github.com/EdgeApp/edge-currency-plugins/pull/424#pullrequestreview-2792009649)
+- [edge-exchange-plugins#386](https://github.com/EdgeApp/edge-exchange-plugins/pull/386#pullrequestreview-2876112879)
+- [edge-exchange-plugins#402](https://github.com/EdgeApp/edge-exchange-plugins/pull/402#pullrequestreview-3198333574)
 - [edge-exchange-plugins#405](https://github.com/EdgeApp/edge-exchange-plugins/pull/405#issuecomment-3634537210)
-- [edge-exchange-plugins#429](https://github.com/EdgeApp/edge-exchange-plugins/pull/429#issuecomment-3812783193)
 - [edge-exchange-plugins#426](https://github.com/EdgeApp/edge-exchange-plugins/pull/426#pullrequestreview-3754084394)
+- [edge-exchange-plugins#429](https://github.com/EdgeApp/edge-exchange-plugins/pull/429#issuecomment-3812783193)
+- [edge-login-ui-rn#137](https://github.com/EdgeApp/edge-login-ui-rn/pull/137#pullrequestreview-1690582898)
+- [edge-push-server#67](https://github.com/EdgeApp/edge-push-server/pull/67#discussion_r1874005047)
+- [edge-react-gui#4611](https://github.com/EdgeApp/edge-react-gui/pull/4611#discussion_r1422980602)
 - [edge-react-gui#4611](https://github.com/EdgeApp/edge-react-gui/pull/4611#pullrequestreview-1775918133)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#pullrequestreview-1791908115)
+- [edge-react-gui#4772](https://github.com/EdgeApp/edge-react-gui/pull/4772#discussion_r1468251808)
+- [edge-react-gui#4853](https://github.com/EdgeApp/edge-react-gui/pull/4853#discussion_r1495209210)
 - [edge-react-gui#4887](https://github.com/EdgeApp/edge-react-gui/pull/4887#pullrequestreview-1917377180)
+- [edge-react-gui#4898](https://github.com/EdgeApp/edge-react-gui/pull/4898#pullrequestreview-1929380613)
 - [edge-react-gui#4908](https://github.com/EdgeApp/edge-react-gui/pull/4908#pullrequestreview-1940813515)
+- [edge-react-gui#4912](https://github.com/EdgeApp/edge-react-gui/pull/4912#pullrequestreview-1953575006)
+- [edge-react-gui#4912](https://github.com/EdgeApp/edge-react-gui/pull/4912#pullrequestreview-1958176817)
 - [edge-react-gui#5107](https://github.com/EdgeApp/edge-react-gui/pull/5107#pullrequestreview-2175897637)
 - [edge-react-gui#5206](https://github.com/EdgeApp/edge-react-gui/pull/5206#discussion_r1725480043)
-- [edge-react-gui#4611](https://github.com/EdgeApp/edge-react-gui/pull/4611#discussion_r1422980602)
+- [edge-react-gui#5270](https://github.com/EdgeApp/edge-react-gui/pull/5270#pullrequestreview-2326075874)
+- [edge-react-gui#5446](https://github.com/EdgeApp/edge-react-gui/pull/5446#pullrequestreview-2609772697)
+- [edge-react-gui#6000](https://github.com/EdgeApp/edge-react-gui/pull/6000#discussion_r3156041285)
+- [edge-react-gui#6000](https://github.com/EdgeApp/edge-react-gui/pull/6000#discussion_r3156046249)
+- [edge-react-gui#6077](https://github.com/EdgeApp/edge-react-gui/pull/6077#discussion_r3687012509)
+- [edge-reports-server#186](https://github.com/EdgeApp/edge-reports-server/pull/186#discussion_r1522113169)
 - [edge-reports-server#211](https://github.com/EdgeApp/edge-reports-server/pull/211#issuecomment-3890703788)
+- [react-native-zano#18](https://github.com/EdgeApp/react-native-zano/pull/18#pullrequestreview-5025178625)
 
 ## split-unrelated-fixes
 
-review-standards.mdc, new. Reviewers: swansontec 6, peachbits 3, samholmes 2, paullinator 1.
+review-standards.mdc, new. Reviewers: swansontec 10, samholmes 9, peachbits 7, paullinator 5.
 
 - [biggystring#19](https://github.com/EdgeApp/biggystring/pull/19#discussion_r1505032654)
 - [biggystring#19](https://github.com/EdgeApp/biggystring/pull/19#discussion_r1505048005)
+- [edge-apps-stress#1](https://github.com/EdgeApp/edge-apps-stress/pull/1#discussion_r1575149908)
+- [edge-currency-accountbased#662](https://github.com/EdgeApp/edge-currency-accountbased/pull/662#pullrequestreview-1723572274)
 - [edge-currency-accountbased#744](https://github.com/EdgeApp/edge-currency-accountbased/pull/744#discussion_r1520545661)
+- [edge-currency-accountbased#744](https://github.com/EdgeApp/edge-currency-accountbased/pull/744#pullrequestreview-1929821643)
+- [edge-currency-accountbased#821](https://github.com/EdgeApp/edge-currency-accountbased/pull/821#discussion_r1741210508)
+- [edge-currency-accountbased#908](https://github.com/EdgeApp/edge-currency-accountbased/pull/908#discussion_r2058970312)
+- [edge-currency-accountbased#1108](https://github.com/EdgeApp/edge-currency-accountbased/pull/1108#pullrequestreview-5314250640)
 - [edge-currency-plugins#421](https://github.com/EdgeApp/edge-currency-plugins/pull/421#discussion_r1925984726)
+- [edge-devops#53](https://github.com/EdgeApp/edge-devops/pull/53#discussion_r1633666827)
+- [edge-devops#69](https://github.com/EdgeApp/edge-devops/pull/69#discussion_r2208864149)
+- [edge-exchange-plugins#386](https://github.com/EdgeApp/edge-exchange-plugins/pull/386#pullrequestreview-2876112879)
 - [edge-exchange-plugins#514](https://github.com/EdgeApp/edge-exchange-plugins/pull/514#pullrequestreview-5624410869)
-- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#pullrequestreview-5344894013)
-- [edge-react-gui#5673](https://github.com/EdgeApp/edge-react-gui/pull/5673#discussion_r2244374642)
-- [edge-react-gui#5245](https://github.com/EdgeApp/edge-react-gui/pull/5245#discussion_r1759606103)
+- [edge-info-server#106](https://github.com/EdgeApp/edge-info-server/pull/106#discussion_r1384163415)
+- [edge-rates-server#120](https://github.com/EdgeApp/edge-rates-server/pull/120#discussion_r2579295589)
 - [edge-react-gui#4648](https://github.com/EdgeApp/edge-react-gui/pull/4648#discussion_r1438742968)
-- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435281014)
 - [edge-react-gui#4648](https://github.com/EdgeApp/edge-react-gui/pull/4648#discussion_r1438742992)
-- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2417978326)
+- [edge-react-gui#4675](https://github.com/EdgeApp/edge-react-gui/pull/4675#discussion_r1446780494)
+- [edge-react-gui#4734](https://github.com/EdgeApp/edge-react-gui/pull/4734#pullrequestreview-1833835460)
+- [edge-react-gui#4755](https://github.com/EdgeApp/edge-react-gui/pull/4755#discussion_r1468249335)
+- [edge-react-gui#4912](https://github.com/EdgeApp/edge-react-gui/pull/4912#pullrequestreview-1953575006)
+- [edge-react-gui#4974](https://github.com/EdgeApp/edge-react-gui/pull/4974#discussion_r1563167994)
+- [edge-react-gui#5245](https://github.com/EdgeApp/edge-react-gui/pull/5245#discussion_r1759606103)
+- [edge-react-gui#5373](https://github.com/EdgeApp/edge-react-gui/pull/5373#discussion_r1861369686)
+- [edge-react-gui#5673](https://github.com/EdgeApp/edge-react-gui/pull/5673#discussion_r2244374642)
+- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#pullrequestreview-5344894013)
+- [edge-react-gui#6247](https://github.com/EdgeApp/edge-react-gui/pull/6247#pullrequestreview-5475342297)
+- [edge-react-gui#6256](https://github.com/EdgeApp/edge-react-gui/pull/6256#discussion_r4297888091)
+- [edge-reports-server#197](https://github.com/EdgeApp/edge-reports-server/pull/197#discussion_r1917547597)
+- [react-native-zano#8](https://github.com/EdgeApp/react-native-zano/pull/8#pullrequestreview-3226334954)
 
 ## commit-message-matches-diff
 
-review-standards.mdc, new. Reviewers: peachbits 10, samholmes 6, swansontec 4, paullinator 1.
+review-standards.mdc, new. Reviewers: swansontec 11, peachbits 11, samholmes 10, paullinator 1.
 
+- [edge-core-js#583](https://github.com/EdgeApp/edge-core-js/pull/583#pullrequestreview-1830650317)
+- [edge-core-js#630](https://github.com/EdgeApp/edge-core-js/pull/630#pullrequestreview-2493912418)
+- [edge-currency-accountbased#795](https://github.com/EdgeApp/edge-currency-accountbased/pull/795#pullrequestreview-2164512532)
+- [edge-currency-accountbased#799](https://github.com/EdgeApp/edge-currency-accountbased/pull/799#discussion_r1680162159)
 - [edge-currency-accountbased#829](https://github.com/EdgeApp/edge-currency-accountbased/pull/829#pullrequestreview-2284005823)
-- [edge-currency-accountbased#1108](https://github.com/EdgeApp/edge-currency-accountbased/pull/1108#pullrequestreview-5314250640)
+- [edge-currency-accountbased#935](https://github.com/EdgeApp/edge-currency-accountbased/pull/935#discussion_r2096607639)
+- [edge-currency-accountbased#935](https://github.com/EdgeApp/edge-currency-accountbased/pull/935#pullrequestreview-2852178170)
+- [edge-currency-accountbased#1096](https://github.com/EdgeApp/edge-currency-accountbased/pull/1096#pullrequestreview-5094219320)
+- [edge-currency-accountbased#1121](https://github.com/EdgeApp/edge-currency-accountbased/pull/1121#pullrequestreview-5476384804)
 - [edge-currency-plugins#399](https://github.com/EdgeApp/edge-currency-plugins/pull/399#discussion_r1585624927)
 - [edge-devops#69](https://github.com/EdgeApp/edge-devops/pull/69#discussion_r2208860416)
 - [edge-exchange-plugins#426](https://github.com/EdgeApp/edge-exchange-plugins/pull/426#pullrequestreview-3714798274)
 - [edge-exchange-plugins#480](https://github.com/EdgeApp/edge-exchange-plugins/pull/480#pullrequestreview-5272359960)
 - [edge-exchange-plugins#480](https://github.com/EdgeApp/edge-exchange-plugins/pull/480#pullrequestreview-5313944300)
 - [edge-info-server#166](https://github.com/EdgeApp/edge-info-server/pull/166#pullrequestreview-5524438800)
+- [edge-login-server#150](https://github.com/EdgeApp/edge-login-server/pull/150#pullrequestreview-2393384308)
 - [edge-login-ui-rn#181](https://github.com/EdgeApp/edge-login-ui-rn/pull/181#pullrequestreview-1995552432)
-- [edge-react-gui#5040](https://github.com/EdgeApp/edge-react-gui/pull/5040#issuecomment-2137809277)
+- [edge-react-gui#4653](https://github.com/EdgeApp/edge-react-gui/pull/4653#discussion_r1435432593)
 - [edge-react-gui#4818](https://github.com/EdgeApp/edge-react-gui/pull/4818#pullrequestreview-1864124248)
+- [edge-react-gui#4974](https://github.com/EdgeApp/edge-react-gui/pull/4974#discussion_r1563148631)
+- [edge-react-gui#5040](https://github.com/EdgeApp/edge-react-gui/pull/5040#issuecomment-2137809277)
+- [edge-react-gui#5206](https://github.com/EdgeApp/edge-react-gui/pull/5206#discussion_r1720379767)
+- [edge-react-gui#5413](https://github.com/EdgeApp/edge-react-gui/pull/5413#pullrequestreview-2526021019)
+- [edge-react-gui#5665](https://github.com/EdgeApp/edge-react-gui/pull/5665#pullrequestreview-3034581899)
 - [edge-react-gui#6247](https://github.com/EdgeApp/edge-react-gui/pull/6247#pullrequestreview-5476380423)
 - [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#pullrequestreview-5524439342)
 - [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#pullrequestreview-5538714999)
-- [edge-react-gui#6267](https://github.com/EdgeApp/edge-react-gui/pull/6267#pullrequestreview-5554616684)
 - [edge-react-gui#6256](https://github.com/EdgeApp/edge-react-gui/pull/6256#pullrequestreview-5589335420)
 - [edge-react-gui#6256](https://github.com/EdgeApp/edge-react-gui/pull/6256#pullrequestreview-5592015458)
-- [edge-react-gui#4974](https://github.com/EdgeApp/edge-react-gui/pull/4974#discussion_r1563148631)
-- [edge-react-gui#5206](https://github.com/EdgeApp/edge-react-gui/pull/5206#discussion_r1720379767)
+- [edge-react-gui#6267](https://github.com/EdgeApp/edge-react-gui/pull/6267#pullrequestreview-5554616684)
+- [edge-referral-server#70](https://github.com/EdgeApp/edge-referral-server/pull/70#pullrequestreview-2326064760)
 - [edge-reports-server#184](https://github.com/EdgeApp/edge-reports-server/pull/184#discussion_r1505125500)
 - [react-native-piratechain#13](https://github.com/EdgeApp/react-native-piratechain/pull/13#pullrequestreview-2105503536)
 
 ## no-unrelated-lockfile-churn
 
-review-standards.mdc, new. Reviewers: peachbits 4, swansontec 3.
+review-standards.mdc, new. Reviewers: swansontec 5, peachbits 5, samholmes 1.
 
+- [airbitz-whitelabel#2](https://github.com/EdgeApp/airbitz-whitelabel/pull/2#discussion_r1585623560)
 - [edge-currency-accountbased#957](https://github.com/EdgeApp/edge-currency-accountbased/pull/957#discussion_r2199606065)
 - [edge-currency-plugins#417](https://github.com/EdgeApp/edge-currency-plugins/pull/417#discussion_r1830043178)
-- [edge-react-gui#5680](https://github.com/EdgeApp/edge-react-gui/pull/5680#discussion_r2252319958)
-- [edge-react-gui#5449](https://github.com/EdgeApp/edge-react-gui/pull/5449#issuecomment-2649656271)
+- [edge-login-ui-rn#239](https://github.com/EdgeApp/edge-login-ui-rn/pull/239#discussion_r2085715399)
+- [edge-react-gui#4664](https://github.com/EdgeApp/edge-react-gui/pull/4664#discussion_r1438439069)
 - [edge-react-gui#5223](https://github.com/EdgeApp/edge-react-gui/pull/5223#discussion_r1741258507)
 - [edge-react-gui#5223](https://github.com/EdgeApp/edge-react-gui/pull/5223#discussion_r1741258579)
+- [edge-react-gui#5449](https://github.com/EdgeApp/edge-react-gui/pull/5449#issuecomment-2649656271)
 - [edge-react-gui#5680](https://github.com/EdgeApp/edge-react-gui/pull/5680#discussion_r2252313018)
+- [edge-react-gui#5680](https://github.com/EdgeApp/edge-react-gui/pull/5680#discussion_r2252314476)
+- [edge-react-gui#5680](https://github.com/EdgeApp/edge-react-gui/pull/5680#discussion_r2252319958)
 
-## declare-direct-dependencies
+## tokenid-not-currencycode
 
-review-standards.mdc, new. Reviewers: swansontec 2, samholmes 1.
+review-standards.mdc, new. Reviewers: swansontec 10, paullinator 9, peachbits 2.
 
-- [drupe#1](https://github.com/EdgeApp/drupe/pull/1#discussion_r2520376341)
-- [edge-currency-accountbased#991](https://github.com/EdgeApp/edge-currency-accountbased/pull/991#discussion_r2482327113)
-- [edge-exchange-plugins#297](https://github.com/EdgeApp/edge-exchange-plugins/pull/297#discussion_r1368103195)
+- [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1412619219)
+- [edge-currency-accountbased#714](https://github.com/EdgeApp/edge-currency-accountbased/pull/714#discussion_r1472151937)
+- [edge-currency-accountbased#747](https://github.com/EdgeApp/edge-currency-accountbased/pull/747#discussion_r1532867419)
+- [edge-currency-accountbased#747](https://github.com/EdgeApp/edge-currency-accountbased/pull/747#pullrequestreview-1950119674)
+- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623045669)
+- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623045825)
+- [edge-exchange-plugins#331](https://github.com/EdgeApp/edge-exchange-plugins/pull/331#discussion_r1651670202)
+- [edge-exchange-plugins#372](https://github.com/EdgeApp/edge-exchange-plugins/pull/372#discussion_r1970761964)
+- [edge-exchange-plugins#372](https://github.com/EdgeApp/edge-exchange-plugins/pull/372#discussion_r1970762189)
+- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292094177)
+- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292103770)
+- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292105937)
+- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292106784)
+- [edge-exchange-plugins#425](https://github.com/EdgeApp/edge-exchange-plugins/pull/425#discussion_r2621104612)
+- [edge-react-gui#4577](https://github.com/EdgeApp/edge-react-gui/pull/4577#discussion_r1391581525)
+- [edge-react-gui#4898](https://github.com/EdgeApp/edge-react-gui/pull/4898#discussion_r1521872155)
+- [edge-react-gui#5452](https://github.com/EdgeApp/edge-react-gui/pull/5452#discussion_r1953566767)
+- [edge-react-gui#5705](https://github.com/EdgeApp/edge-react-gui/pull/5705#discussion_r2286631414)
+- [edge-react-gui#5705](https://github.com/EdgeApp/edge-react-gui/pull/5705#discussion_r2286649535)
+- [edge-react-gui#5855](https://github.com/EdgeApp/edge-react-gui/pull/5855#discussion_r2586269528)
+- [edge-react-gui#5855](https://github.com/EdgeApp/edge-react-gui/pull/5855#discussion_r2586270883)
 
-## white-label-neutral
+## tokenid-typed-and-required
 
-review-standards.mdc, new. Reviewers: peachbits 2, swansontec 1.
+review-standards.mdc, new. Reviewers: swansontec 8.
 
-- [edge-apps-stress#1](https://github.com/EdgeApp/edge-apps-stress/pull/1#discussion_r1575151415)
-- [edge-react-gui#6001](https://github.com/EdgeApp/edge-react-gui/pull/6001#discussion_r3170253264)
-- [edge-react-gui#6001](https://github.com/EdgeApp/edge-react-gui/pull/6001#discussion_r3170312100)
+- [edge-currency-accountbased#719](https://github.com/EdgeApp/edge-currency-accountbased/pull/719#discussion_r1484664313)
+- [edge-currency-accountbased#719](https://github.com/EdgeApp/edge-currency-accountbased/pull/719#discussion_r1484664434)
+- [edge-currency-accountbased#749](https://github.com/EdgeApp/edge-currency-accountbased/pull/749#pullrequestreview-1950221538)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1433290340)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435255642)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#pullrequestreview-1791908115)
+- [edge-react-gui#5275](https://github.com/EdgeApp/edge-react-gui/pull/5275#discussion_r1778954857)
+- [edge-react-gui#5275](https://github.com/EdgeApp/edge-react-gui/pull/5275#discussion_r1778962395)
+
+## no-sentinel-empty-values
+
+review-standards.mdc, new. Reviewers: swansontec 10, paullinator 2, peachbits 1.
+
+- [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1430530646)
+- [edge-core-js#574](https://github.com/EdgeApp/edge-core-js/pull/574#discussion_r1430531237)
+- [edge-core-js#657](https://github.com/EdgeApp/edge-core-js/pull/657#discussion_r2096602947)
+- [edge-core-js#657](https://github.com/EdgeApp/edge-core-js/pull/657#pullrequestreview-2852171319)
+- [edge-core-js#693](https://github.com/EdgeApp/edge-core-js/pull/693#discussion_r2674364062)
+- [edge-currency-accountbased#784](https://github.com/EdgeApp/edge-currency-accountbased/pull/784#discussion_r1637401327)
+- [edge-currency-accountbased#884](https://github.com/EdgeApp/edge-currency-accountbased/pull/884#discussion_r1926005851)
+- [edge-currency-accountbased#888](https://github.com/EdgeApp/edge-currency-accountbased/pull/888#discussion_r1932689496)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2854642509)
+- [edge-currency-accountbased#1036](https://github.com/EdgeApp/edge-currency-accountbased/pull/1036#discussion_r2886460285)
+- [edge-currency-plugins#420](https://github.com/EdgeApp/edge-currency-plugins/pull/420#discussion_r1907519523)
+- [edge-login-server#178](https://github.com/EdgeApp/edge-login-server/pull/178#discussion_r2258639857)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2258578321)
+
+## map-set-for-dictionaries
+
+review-standards.mdc, new. Reviewers: swansontec 9.
+
+- [edge-currency-accountbased#644](https://github.com/EdgeApp/edge-currency-accountbased/pull/644#discussion_r1364585893)
+- [edge-currency-accountbased#765](https://github.com/EdgeApp/edge-currency-accountbased/pull/765#discussion_r1580129686)
+- [edge-currency-accountbased#765](https://github.com/EdgeApp/edge-currency-accountbased/pull/765#pullrequestreview-2023583681)
+- [edge-currency-accountbased#877](https://github.com/EdgeApp/edge-currency-accountbased/pull/877#discussion_r1907936527)
+- [edge-currency-accountbased#906](https://github.com/EdgeApp/edge-currency-accountbased/pull/906#discussion_r1996050591)
+- [edge-currency-accountbased#906](https://github.com/EdgeApp/edge-currency-accountbased/pull/906#pullrequestreview-2686420638)
+- [edge-exchange-plugins#351](https://github.com/EdgeApp/edge-exchange-plugins/pull/351#discussion_r1842550379)
+- [edge-exchange-plugins#351](https://github.com/EdgeApp/edge-exchange-plugins/pull/351#pullrequestreview-2436626278)
+- [edge-react-gui#5098](https://github.com/EdgeApp/edge-react-gui/pull/5098#discussion_r1643117800)
+
+## discriminate-over-flags
+
+review-standards.mdc, new. Reviewers: peachbits 5, swansontec 1, samholmes 1.
+
+- [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#discussion_r4127223350)
+- [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#discussion_r4127223371)
+- [edge-core-js#730](https://github.com/EdgeApp/edge-core-js/pull/730#pullrequestreview-5344893732)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1435227074)
+- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#discussion_r4127223628)
+- [edge-react-gui#6066](https://github.com/EdgeApp/edge-react-gui/pull/6066#pullrequestreview-5344894013)
+- [edge-reports-server#201](https://github.com/EdgeApp/edge-reports-server/pull/201#discussion_r2208749317)
+
+## narrowest-accurate-types
+
+review-standards.mdc, new. Reviewers: swansontec 22, paullinator 12, samholmes 8, peachbits 4.
+
+- [edge-change-server#3](https://github.com/EdgeApp/edge-change-server/pull/3#discussion_r2047947966)
+- [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#discussion_r2807032105)
+- [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#pullrequestreview-3800960702)
+- [edge-core-js#577](https://github.com/EdgeApp/edge-core-js/pull/577#discussion_r1437254622)
+- [edge-core-js#635](https://github.com/EdgeApp/edge-core-js/pull/635#discussion_r1910882276)
+- [edge-currency-accountbased#745](https://github.com/EdgeApp/edge-currency-accountbased/pull/745#discussion_r1526963966)
+- [edge-currency-accountbased#745](https://github.com/EdgeApp/edge-currency-accountbased/pull/745#discussion_r1526964150)
+- [edge-currency-accountbased#844](https://github.com/EdgeApp/edge-currency-accountbased/pull/844#discussion_r1785443715)
+- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2143775841)
+- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2143780815)
+- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2183855689)
+- [edge-currency-accountbased#973](https://github.com/EdgeApp/edge-currency-accountbased/pull/973#discussion_r2317301568)
+- [edge-currency-accountbased#997](https://github.com/EdgeApp/edge-currency-accountbased/pull/997#discussion_r2520009043)
+- [edge-currency-accountbased#1055](https://github.com/EdgeApp/edge-currency-accountbased/pull/1055#discussion_r3418567758)
+- [edge-currency-monero#89](https://github.com/EdgeApp/edge-currency-monero/pull/89#discussion_r2006355707)
+- [edge-currency-plugins#292](https://github.com/EdgeApp/edge-currency-plugins/pull/292#discussion_r1376859243)
+- [edge-currency-plugins#455](https://github.com/EdgeApp/edge-currency-plugins/pull/455#discussion_r3716971838)
+- [edge-devops#55](https://github.com/EdgeApp/edge-devops/pull/55#discussion_r1759527324)
+- [edge-exchange-plugins#322](https://github.com/EdgeApp/edge-exchange-plugins/pull/322#discussion_r1623048226)
+- [edge-info-server#152](https://github.com/EdgeApp/edge-info-server/pull/152#discussion_r2677302629)
+- [edge-rates-server#113](https://github.com/EdgeApp/edge-rates-server/pull/113#discussion_r2308744759)
+- [edge-rates-server#120](https://github.com/EdgeApp/edge-rates-server/pull/120#discussion_r2579305688)
+- [edge-rates-server#122](https://github.com/EdgeApp/edge-rates-server/pull/122#discussion_r2776247548)
+- [edge-react-gui#3597](https://github.com/EdgeApp/edge-react-gui/pull/3597#discussion_r1630748701)
+- [edge-react-gui#4573](https://github.com/EdgeApp/edge-react-gui/pull/4573#discussion_r1388727650)
+- [edge-react-gui#4641](https://github.com/EdgeApp/edge-react-gui/pull/4641#discussion_r1433290153)
+- [edge-react-gui#4663](https://github.com/EdgeApp/edge-react-gui/pull/4663#discussion_r1439103293)
+- [edge-react-gui#4663](https://github.com/EdgeApp/edge-react-gui/pull/4663#pullrequestreview-1799570849)
+- [edge-react-gui#4832](https://github.com/EdgeApp/edge-react-gui/pull/4832#discussion_r1484702739)
+- [edge-react-gui#4912](https://github.com/EdgeApp/edge-react-gui/pull/4912#discussion_r1537900240)
+- [edge-react-gui#4912](https://github.com/EdgeApp/edge-react-gui/pull/4912#pullrequestreview-1958176817)
+- [edge-react-gui#5021](https://github.com/EdgeApp/edge-react-gui/pull/5021#discussion_r1599134418)
+- [edge-react-gui#5226](https://github.com/EdgeApp/edge-react-gui/pull/5226#discussion_r1819939828)
+- [edge-react-gui#5226](https://github.com/EdgeApp/edge-react-gui/pull/5226#discussion_r1819941375)
+- [edge-react-gui#5275](https://github.com/EdgeApp/edge-react-gui/pull/5275#discussion_r1778962863)
+- [edge-react-gui#5691](https://github.com/EdgeApp/edge-react-gui/pull/5691#discussion_r2289424782)
+- [edge-react-gui#5715](https://github.com/EdgeApp/edge-react-gui/pull/5715#discussion_r2417986026)
+- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#discussion_r3807687577)
+- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#pullrequestreview-4965479992)
+- [edge-reports-server#183](https://github.com/EdgeApp/edge-reports-server/pull/183#discussion_r1364525134)
+- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2666764480)
+- [edge-reports-server#207](https://github.com/EdgeApp/edge-reports-server/pull/207#discussion_r2687815635)
+- [edge-server-tools#36](https://github.com/EdgeApp/edge-server-tools/pull/36#discussion_r2860980504)
+- [edge-server-tools#36](https://github.com/EdgeApp/edge-server-tools/pull/36#pullrequestreview-3863206398)
+- [react-native-monero-lwsf#2](https://github.com/EdgeApp/react-native-monero-lwsf/pull/2#discussion_r2842850733)
+- [react-native-zano#2](https://github.com/EdgeApp/react-native-zano/pull/2#discussion_r2060807277)
+
+## deprecated-fields-last
+
+review-standards.mdc, new. Reviewers: samholmes 4, swansontec 2.
+
+- [edge-core-js#633](https://github.com/EdgeApp/edge-core-js/pull/633#discussion_r1906080057)
+- [edge-core-js#633](https://github.com/EdgeApp/edge-core-js/pull/633#pullrequestreview-2535146999)
+- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2143776550)
+- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2143777260)
+- [edge-currency-accountbased#946](https://github.com/EdgeApp/edge-currency-accountbased/pull/946#discussion_r2169132158)
+- [edge-currency-plugins#424](https://github.com/EdgeApp/edge-currency-plugins/pull/424#discussion_r2058987268)
+
+## no-secrets-in-dumps-or-logs
+
+review-standards.mdc, new. Reviewers: peachbits 4, paullinator 1, samholmes 1.
+
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371558)
+- [edge-currency-accountbased#1036](https://github.com/EdgeApp/edge-currency-accountbased/pull/1036#discussion_r2886432340)
+- [edge-currency-plugins#455](https://github.com/EdgeApp/edge-currency-plugins/pull/455#discussion_r3716971828)
+- [edge-exchange-plugins#449](https://github.com/EdgeApp/edge-exchange-plugins/pull/449#discussion_r3081308571)
+- [edge-info-server#159](https://github.com/EdgeApp/edge-info-server/pull/159#discussion_r3762514603)
+- [edge-react-gui#4975](https://github.com/EdgeApp/edge-react-gui/pull/4975#discussion_r1562991732)
+
+## test-each-guard
+
+review-standards.mdc, new. Reviewers: peachbits 39, paullinator 13, samholmes 8, swansontec 4.
+
+- [biggystring#18](https://github.com/EdgeApp/biggystring/pull/18#discussion_r1325312744)
+- [biggystring#18](https://github.com/EdgeApp/biggystring/pull/18#discussion_r1391837140)
+- [biggystring#18](https://github.com/EdgeApp/biggystring/pull/18#pullrequestreview-1728484591)
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1996115603)
+- [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#discussion_r2807032823)
+- [edge-change-server#14](https://github.com/EdgeApp/edge-change-server/pull/14#pullrequestreview-3800960702)
+- [edge-core-js#645](https://github.com/EdgeApp/edge-core-js/pull/645#pullrequestreview-2792620456)
+- [edge-core-js#654](https://github.com/EdgeApp/edge-core-js/pull/654#discussion_r2085587479)
+- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3848172817)
+- [edge-currency-accountbased#717](https://github.com/EdgeApp/edge-currency-accountbased/pull/717#discussion_r1485467715)
+- [edge-currency-accountbased#757](https://github.com/EdgeApp/edge-currency-accountbased/pull/757#discussion_r1554386557)
+- [edge-currency-accountbased#757](https://github.com/EdgeApp/edge-currency-accountbased/pull/757#discussion_r1554387140)
+- [edge-currency-accountbased#757](https://github.com/EdgeApp/edge-currency-accountbased/pull/757#discussion_r1554387275)
+- [edge-currency-accountbased#757](https://github.com/EdgeApp/edge-currency-accountbased/pull/757#discussion_r1554388580)
+- [edge-currency-accountbased#757](https://github.com/EdgeApp/edge-currency-accountbased/pull/757#discussion_r1556447679)
+- [edge-currency-accountbased#765](https://github.com/EdgeApp/edge-currency-accountbased/pull/765#discussion_r1580133390)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#pullrequestreview-3906590963)
+- [edge-currency-accountbased#1088](https://github.com/EdgeApp/edge-currency-accountbased/pull/1088#discussion_r4010331067)
+- [edge-currency-accountbased#1088](https://github.com/EdgeApp/edge-currency-accountbased/pull/1088#pullrequestreview-5203697607)
+- [edge-currency-accountbased#1098](https://github.com/EdgeApp/edge-currency-accountbased/pull/1098#discussion_r3983332855)
+- [edge-currency-accountbased#1121](https://github.com/EdgeApp/edge-currency-accountbased/pull/1121#discussion_r4233456702)
+- [edge-currency-plugins#461](https://github.com/EdgeApp/edge-currency-plugins/pull/461#discussion_r4139174202)
+- [edge-currency-plugins#461](https://github.com/EdgeApp/edge-currency-plugins/pull/461#pullrequestreview-5359519991)
+- [edge-exchange-plugins#426](https://github.com/EdgeApp/edge-exchange-plugins/pull/426#pullrequestreview-3754084394)
+- [edge-exchange-plugins#433](https://github.com/EdgeApp/edge-exchange-plugins/pull/433#discussion_r3054932106)
+- [edge-exchange-plugins#484](https://github.com/EdgeApp/edge-exchange-plugins/pull/484#discussion_r4010503988)
+- [edge-exchange-plugins#495](https://github.com/EdgeApp/edge-exchange-plugins/pull/495#discussion_r4161212760)
+- [edge-exchange-plugins#495](https://github.com/EdgeApp/edge-exchange-plugins/pull/495#pullrequestreview-5386439180)
+- [edge-exchange-plugins#510](https://github.com/EdgeApp/edge-exchange-plugins/pull/510#discussion_r4300149317)
+- [edge-exchange-plugins#510](https://github.com/EdgeApp/edge-exchange-plugins/pull/510#pullrequestreview-5554616194)
+- [edge-login-server#148](https://github.com/EdgeApp/edge-login-server/pull/148#discussion_r1809528936)
+- [edge-react-gui#5226](https://github.com/EdgeApp/edge-react-gui/pull/5226#discussion_r1819891891)
+- [edge-react-gui#5226](https://github.com/EdgeApp/edge-react-gui/pull/5226#discussion_r1819913777)
+- [edge-react-gui#6131](https://github.com/EdgeApp/edge-react-gui/pull/6131#pullrequestreview-4877138697)
+- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#discussion_r3807687571)
+- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#pullrequestreview-4965479992)
+- [edge-react-gui#6199](https://github.com/EdgeApp/edge-react-gui/pull/6199#discussion_r4020532109)
+- [edge-react-gui#6211](https://github.com/EdgeApp/edge-react-gui/pull/6211#discussion_r4127022052)
+- [edge-react-gui#6241](https://github.com/EdgeApp/edge-react-gui/pull/6241#discussion_r4288159194)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4265158443)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4276082044)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4276082052)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4297887119)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4328622762)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#pullrequestreview-5524439342)
+- [edge-react-gui#6256](https://github.com/EdgeApp/edge-react-gui/pull/6256#discussion_r4297888104)
+- [edge-react-gui#6256](https://github.com/EdgeApp/edge-react-gui/pull/6256#discussion_r4328372705)
+- [edge-react-gui#6256](https://github.com/EdgeApp/edge-react-gui/pull/6256#pullrequestreview-5551941774)
+- [edge-react-gui#6256](https://github.com/EdgeApp/edge-react-gui/pull/6256#pullrequestreview-5589335420)
+- [edge-react-gui#6257](https://github.com/EdgeApp/edge-react-gui/pull/6257#discussion_r4288074240)
+- [edge-react-gui#6257](https://github.com/EdgeApp/edge-react-gui/pull/6257#discussion_r4288074264)
+- [edge-react-gui#6257](https://github.com/EdgeApp/edge-react-gui/pull/6257#discussion_r4288074269)
+- [edge-react-gui#6257](https://github.com/EdgeApp/edge-react-gui/pull/6257#pullrequestreview-5551941523)
+- [edge-react-gui#6267](https://github.com/EdgeApp/edge-react-gui/pull/6267#discussion_r4300149772)
+- [edge-react-gui#6267](https://github.com/EdgeApp/edge-react-gui/pull/6267#pullrequestreview-5554616684)
+- [edge-react-gui#6268](https://github.com/EdgeApp/edge-react-gui/pull/6268#discussion_r4300149653)
+- [edge-react-gui#6268](https://github.com/EdgeApp/edge-react-gui/pull/6268#pullrequestreview-5554616533)
+- [edge-react-gui#6269](https://github.com/EdgeApp/edge-react-gui/pull/6269#discussion_r4300149469)
+- [edge-react-gui#6269](https://github.com/EdgeApp/edge-react-gui/pull/6269#discussion_r4300149472)
+- [edge-react-gui#6269](https://github.com/EdgeApp/edge-react-gui/pull/6269#discussion_r4328447901)
+- [edge-react-gui#6269](https://github.com/EdgeApp/edge-react-gui/pull/6269#pullrequestreview-5554616344)
+- [edge-react-gui#6279](https://github.com/EdgeApp/edge-react-gui/pull/6279#discussion_r4343216518)
+- [edge-reports-server#211](https://github.com/EdgeApp/edge-reports-server/pull/211#discussion_r3095178069)
+- [react-native-zano#17](https://github.com/EdgeApp/react-native-zano/pull/17#pullrequestreview-4978795323)
+
+## no-redundant-tests
+
+review-standards.mdc, new. Reviewers: swansontec 5, paullinator 1.
+
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1996112622)
+- [edge-change-server#3](https://github.com/EdgeApp/edge-change-server/pull/3#discussion_r2047963507)
+- [edge-core-js#689](https://github.com/EdgeApp/edge-core-js/pull/689#discussion_r2696538080)
+- [edge-core-js#689](https://github.com/EdgeApp/edge-core-js/pull/689#discussion_r2696542040)
+- [edge-currency-accountbased#973](https://github.com/EdgeApp/edge-currency-accountbased/pull/973#pullrequestreview-3177612922)
+- [edge-exchange-plugins#425](https://github.com/EdgeApp/edge-exchange-plugins/pull/425#discussion_r2621018137)
+
+## comments-current-state
+
+typescript-standards.mdc, reword. Reviewers: peachbits 21, paullinator 12, swansontec 8.
+
+- [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1996095380)
+- [edge-core-js#598](https://github.com/EdgeApp/edge-core-js/pull/598#discussion_r1631744098)
+- [edge-core-js#617](https://github.com/EdgeApp/edge-core-js/pull/617#discussion_r1750812612)
+- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3848172811)
+- [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#discussion_r3855599292)
+- [edge-currency-accountbased#1090](https://github.com/EdgeApp/edge-currency-accountbased/pull/1090#discussion_r3818711623)
+- [edge-currency-accountbased#1096](https://github.com/EdgeApp/edge-currency-accountbased/pull/1096#discussion_r3952169063)
+- [edge-currency-accountbased#1099](https://github.com/EdgeApp/edge-currency-accountbased/pull/1099#discussion_r3993371841)
+- [edge-currency-monero#91](https://github.com/EdgeApp/edge-currency-monero/pull/91#discussion_r2017474260)
+- [edge-currency-plugins#402](https://github.com/EdgeApp/edge-currency-plugins/pull/402#discussion_r1598798791)
+- [edge-currency-plugins#402](https://github.com/EdgeApp/edge-currency-plugins/pull/402#discussion_r1598803436)
+- [edge-currency-plugins#405](https://github.com/EdgeApp/edge-currency-plugins/pull/405#discussion_r1628259022)
+- [edge-currency-plugins#455](https://github.com/EdgeApp/edge-currency-plugins/pull/455#discussion_r3716971824)
+- [edge-devops#61](https://github.com/EdgeApp/edge-devops/pull/61#discussion_r1927590331)
+- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292110225)
+- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292111303)
+- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2292112898)
+- [edge-exchange-plugins#400](https://github.com/EdgeApp/edge-exchange-plugins/pull/400#discussion_r2302392608)
+- [edge-exchange-plugins#402](https://github.com/EdgeApp/edge-exchange-plugins/pull/402#discussion_r2331376051)
+- [edge-exchange-plugins#402](https://github.com/EdgeApp/edge-exchange-plugins/pull/402#discussion_r2331379760)
+- [edge-exchange-plugins#426](https://github.com/EdgeApp/edge-exchange-plugins/pull/426#discussion_r2735058707)
+- [edge-exchange-plugins#475](https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3799158774)
+- [edge-exchange-plugins#510](https://github.com/EdgeApp/edge-exchange-plugins/pull/510#discussion_r4300149323)
+- [edge-info-server#159](https://github.com/EdgeApp/edge-info-server/pull/159#discussion_r3762514636)
+- [edge-info-server#159](https://github.com/EdgeApp/edge-info-server/pull/159#discussion_r3762514639)
+- [edge-react-gui#6128](https://github.com/EdgeApp/edge-react-gui/pull/6128#discussion_r4101541119)
+- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#discussion_r3807687590)
+- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#discussion_r3807687595)
+- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#discussion_r3807687597)
+- [edge-react-gui#6151](https://github.com/EdgeApp/edge-react-gui/pull/6151#pullrequestreview-4965479992)
+- [edge-react-gui#6199](https://github.com/EdgeApp/edge-react-gui/pull/6199#discussion_r4020532093)
+- [edge-react-gui#6199](https://github.com/EdgeApp/edge-react-gui/pull/6199#discussion_r4041586966)
+- [edge-react-gui#6241](https://github.com/EdgeApp/edge-react-gui/pull/6241#discussion_r4288159180)
+- [edge-react-gui#6247](https://github.com/EdgeApp/edge-react-gui/pull/6247#discussion_r4234538205)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#discussion_r4276082063)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#pullrequestreview-5538714999)
+- [edge-react-gui#6253](https://github.com/EdgeApp/edge-react-gui/pull/6253#pullrequestreview-5589630059)
+- [edge-react-gui#6257](https://github.com/EdgeApp/edge-react-gui/pull/6257#discussion_r4288074256)
+- [edge-react-gui#6257](https://github.com/EdgeApp/edge-react-gui/pull/6257#discussion_r4288074277)
+- [edge-react-gui#6269](https://github.com/EdgeApp/edge-react-gui/pull/6269#discussion_r4328447918)
+- [react-native-monero#9](https://github.com/EdgeApp/react-native-monero/pull/9#discussion_r3983889612)
+
+## biggystring-arithmetic
+
+typescript-standards.mdc, reword. Reviewers: swansontec 6, paullinator 3, peachbits 3.
+
+- [edge-currency-accountbased#877](https://github.com/EdgeApp/edge-currency-accountbased/pull/877#discussion_r1907894471)
+- [edge-currency-accountbased#992](https://github.com/EdgeApp/edge-currency-accountbased/pull/992#discussion_r2488077534)
+- [edge-currency-accountbased#1027](https://github.com/EdgeApp/edge-currency-accountbased/pull/1027#discussion_r2898371532)
+- [edge-currency-accountbased#1055](https://github.com/EdgeApp/edge-currency-accountbased/pull/1055#discussion_r3418567763)
+- [edge-currency-plugins#292](https://github.com/EdgeApp/edge-currency-plugins/pull/292#discussion_r1376894001)
+- [edge-currency-plugins#387](https://github.com/EdgeApp/edge-currency-plugins/pull/387#discussion_r1367586330)
+- [edge-exchange-plugins#475](https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3669497062)
+- [edge-exchange-plugins#475](https://github.com/EdgeApp/edge-exchange-plugins/pull/475#discussion_r3669519271)
+- [edge-react-gui#5439](https://github.com/EdgeApp/edge-react-gui/pull/5439#discussion_r1958880006)
+- [edge-react-gui#5439](https://github.com/EdgeApp/edge-react-gui/pull/5439#discussion_r1958881133)
+- [edge-react-gui#5787](https://github.com/EdgeApp/edge-react-gui/pull/5787#discussion_r2441393305)
+- [edge-react-gui#5787](https://github.com/EdgeApp/edge-react-gui/pull/5787#pullrequestreview-3352304138)

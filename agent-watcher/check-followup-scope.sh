@@ -249,6 +249,27 @@ if [[ -n "$SEG_START" ]]; then
 else
   SEG_WATERMARK="$WATERMARK"
 fi
+# FAILED QA REPORT AS SCOPE (qa-run). The QA verdict comment is agent-authored, so
+# the comment filter drops it; the scope is keyed on the QA report ATTACHMENT
+# instead: the newest <N>-qa-report.md newer than the segment watermark whose
+# frontmatter says `verdict: Failed`. Its failed cases are this followup's ask, and
+# the retest bar is those cases only (one-shot followup.md). Best-effort: a download
+# failure leaves qa_failed_report null and prints a line saying so.
+QA_FAILED='null'
+QA_W="${SEG_WATERMARK:-$WATERMARK}"
+QA_ATT="$(echo "$ATT" | jq -c --arg re "$QA_ATTACH_RE" --arg w "$QA_W" '[.data[] | select(.name | test($re)) | select(($w == "") or (.created_at > $w))] | sort_by(.created_at) | last // empty')"
+if [[ -n "$QA_ATT" ]]; then
+  QA_GID="$(jq -r .gid <<<"$QA_ATT")"
+  QA_DL="$(curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" "$API/attachments/$QA_GID?opt_fields=download_url" 2>/dev/null | jq -r '.data.download_url // empty' 2>/dev/null || true)"
+  QA_BODY=""; [[ -n "$QA_DL" ]] && QA_BODY="$(curl -sSL --max-time 30 "$QA_DL" 2>/dev/null || true)"
+  if [[ -z "$QA_BODY" ]]; then
+    QA_FAILED="$(jq -c '{name, created_at, gid, download: "failed"}' <<<"$QA_ATT")"
+  elif printf '%s\n' "$QA_BODY" | awk '/^---$/{n++; next} n==1' | grep -qE '^verdict: *Failed'; then
+    QA_CASES="$(printf '%s\n' "$QA_BODY" | awk '/^## Failed cases/{f=1; print; next} /^## /{f=0} f' | head -c 8000)"
+    QA_FAILED="$(jq -c --arg cases "$QA_CASES" '{name, created_at, gid, failed_cases: $cases}' <<<"$QA_ATT")"
+  fi
+fi
+
 SEG_NEWER="$(echo "$STORIES" | jq --arg w "$SEG_WATERMARK" '[.data[] | select(.resource_subtype == "comment_added") | select(($w == "") or (.created_at > $w))]')"
 
 MARKER="/tmp/agent-followup-scope-$TASK_GID.json"
@@ -272,10 +293,11 @@ jq -n \
   --argjson gh_bots_incomplete "${GH_BOTS_INCOMPLETE:-0}" \
   --argjson gh_unanswered "${GH_UNANSWERED:-0}" \
   --argjson gh_bots_waived "$GH_BOTS_WAIVED" \
+  --argjson qa_failed_report "$QA_FAILED" \
   '{task_gid: $gid, checked_at: $checked_at, watermark: $watermark, newest_comment_at: $newest_comment_at, newer_count: $newer_count, agent_comments_after_watermark: $agent_after_wm, comments: $comments,
     segment_start: $segment_start, segment_watermark: $segment_watermark, segment_comments: $segment_comments,
     field_delta_status: $delta_status, field_baseline_ts: $baseline_ts, field_deltas: $field_deltas,
-    github_status: $gh_status, github_prs: $gh_scope, github_blocking_threads: $gh_blocking, github_bots_incomplete: $gh_bots_incomplete, github_bots_waived: $gh_bots_waived, github_unanswered_bodies: $gh_unanswered}' \
+    github_status: $gh_status, github_prs: $gh_scope, github_blocking_threads: $gh_blocking, github_bots_incomplete: $gh_bots_incomplete, github_bots_waived: $gh_bots_waived, github_unanswered_bodies: $gh_unanswered, qa_failed_report: $qa_failed_report}' \
   > "$MARKER"
 
 echo ">> check-followup-scope: task $TASK_GID"
@@ -330,6 +352,14 @@ if [[ "$GH_STATUS" == "ok" ]]; then
   fi
 else
   echo ">>   github: $GH_STATUS"
+fi
+if [[ "$QA_FAILED" != null ]]; then
+  if [[ "$(jq -r '.download // empty' <<<"$QA_FAILED")" == failed ]]; then
+    echo ">>   QA report $(jq -r .name <<<"$QA_FAILED") is newer than the watermark but its download failed: open it on the task; when its verdict is Failed, its failed cases are this run's scope"
+  else
+    echo ">>   FAILED QA REPORT $(jq -r .name <<<"$QA_FAILED") ($(jq -r .created_at <<<"$QA_FAILED")): its failed cases ARE this run's scope. Fix each defect, then retest ONLY these cases (one-shot followup.md qa-failed-retest):"
+    jq -r '.failed_cases' <<<"$QA_FAILED" | sed 's/^/     /'
+  fi
 fi
 echo ">>   marker written: $MARKER"
 

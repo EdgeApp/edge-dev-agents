@@ -132,6 +132,13 @@ if [[ "$STATUS_NAME" == "Complete" && -x "$HOME/.config/agent-watcher/sync-repo-
     || echo ">> Repo sync: WARN, sync-repo-field.sh failed; run it by hand: ~/.config/agent-watcher/sync-repo-field.sh --task-gid $TASK_GID" >&2
 fi
 
+# QA queue: a dev Complete hands the task to the qa-run skill's hook (first
+# Complete queues agent_qa=Pending and pins the native app cache entry; a Complete
+# while agent_qa=Fixing records the fix). Best-effort, like the Repo sync above.
+if [[ "$STATUS_NAME" == "Complete" && "${AGENT_MODE:-}" != "qa" && -x "$HOME/.cursor/skills/qa-run/scripts/qa-on-complete.sh" ]]; then
+  "$HOME/.cursor/skills/qa-run/scripts/qa-on-complete.sh" --task-gid "$TASK_GID" ${BLOCKED:+--blocked "$BLOCKED"} 2>&1 || true
+fi
+
 # Best-effort section move so a Board view of the kanban reflects the status.
 SECTION_GID=$(jq -r --arg s "$STATUS_NAME" '.custom_fields.agent_status.section_gids[$s] // empty' "$CONFIG")
 if [[ -z "$SECTION_GID" ]]; then

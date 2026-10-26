@@ -62,7 +62,7 @@ Exit 75 on a repo = another session is landing there: wait and retry per `repo-l
 | 5 | Merge: auto-merge and watch, local fallback | `references/merge.md` |
 | 6-7 | Batched publish, GUI dependency bumps | `references/publish.md` |
 | 8 | Deferred GUI PRs, one at a time | `references/merge.md` |
-| 9, 9b, 10 | Staging cherry-pick, late bot findings sweep, Asana QA handoff | `references/post-merge.md` |
+| 9, 9b, 10 | Staging cherry-pick, late bot findings sweep, Asana board-state move to QA Verification | `references/post-merge.md` |
 | 11 | Return checkouts, release the hold, report | this file |
 
 Step 9 runs no pr-land script, so the gate cannot deliver `references/post-merge.md` before it: read that file yourself before step 9.
@@ -121,7 +121,7 @@ Before printing the summary, in this order:
 === PR Land Summary ===
 
 Fully landed:
-  ✓ <repo>#<number> (<branch>) — merged, cherry-picked to staging, Asana → QA Verification (N QA items)
+  ✓ <repo>#<number> (<branch>) — merged, cherry-picked to staging, Asana → QA Verification
   ✓ <repo>#<number> (<branch>) — merged, Asana → QA Verification
   ✓ <repo>#<number> (<branch>) — merged, published v<version>, GUI deps updated, Asana → QA Verification
 

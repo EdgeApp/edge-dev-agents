@@ -64,7 +64,12 @@ for name, text in texts:
         check(rid not in seen, 'rule %s appears in both %s and %s'
               % (rid, seen.get(rid), name))
         seen[rid] = name
+# Baseline rules deleted on purpose after the split (the feature was retired).
+RETIRED = {'qa-subtasks-before-handoff'}
 for rid in RULE_RE.findall(pre):
+    if rid in RETIRED:
+        check(rid not in seen, 'retired rule %s is back' % rid)
+        continue
     check(rid in seen, 'rule %s was lost in the split' % rid)
 
 # --- 3. step ids: every baseline id in exactly one file -----------------------
@@ -172,8 +177,8 @@ clear_markers()
 # --- report ------------------------------------------------------------------
 for name, text in texts:
     print('  %-24s %6d chars' % (name, len(text)))
-print('rules: %d baseline, %d placed; gate slices: %s'
-      % (len(RULE_RE.findall(pre)), len(seen), ', '.join(sorted(covered))))
+print('rules: %d baseline (%d retired), %d placed; gate slices: %s'
+      % (len(RULE_RE.findall(pre)), len(RETIRED), len(seen), ', '.join(sorted(covered))))
 if fails:
     print('\nFAIL (%d)' % len(fails))
     for f in fails:

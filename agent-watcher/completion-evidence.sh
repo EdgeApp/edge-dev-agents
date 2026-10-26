@@ -110,6 +110,13 @@ if [ -s "$MARKER" ]; then
 else
   line "(no followup-scope marker: run check-followup-scope.sh --task-gid $GID)"
 fi
+# A Failed QA report newer than the watermark is an ask of its own (check-followup-scope.sh
+# owns the rationale): its failed cases, retested alone, are this segment's testing bar.
+QA_FAILED_CASES=$(jq -r '.qa_failed_report.failed_cases // empty' "$MARKER" 2>/dev/null)
+if [ -n "$QA_FAILED_CASES" ]; then
+  line ""; line "FAILED QA REPORT in scope ($(jq -r '.qa_failed_report.name' "$MARKER")): each failed case below is an ask. The fix must make it pass, and the retest bar is these cases only, not the full build-and-test baseline."
+  line '```'; printf '%s\n' "$QA_FAILED_CASES" | cap 8000 >> "$TMP"; line '```'
+fi
 
 # ---- Run report ----
 section "Run report"
@@ -154,8 +161,10 @@ for wt in "$WT_ROOT"/*/; do
   [ -n "$prinfo" ] && line "pr: $prinfo" || line "pr: none found"
   # No PR yet (the pr-create event): the base the run is about to open the PR
   # against (--base, passed through by the gate), else the repo default from
-  # the shared resolver.
-  [ -z "$base" ] && base="$BASE_ARG"
+  # the shared resolver. In a multi-repo run --base belongs to the repo the
+  # pr-create runs in, so a worktree whose origin has no such branch falls
+  # through to its own default instead of reading as an empty diff.
+  [ -z "$base" ] && [ -n "$BASE_ARG" ] && git -C "$wt" rev-parse -q --verify "origin/$BASE_ARG" >/dev/null 2>&1 && base="$BASE_ARG"
   [ -z "$base" ] && base=$("$HOME/.cursor/skills/git-default-branch.sh" -C "$wt" --short 2>/dev/null || true)
   if [ -z "$base" ]; then line "(no base branch resolvable)"; continue; fi
   line "base: origin/$base"

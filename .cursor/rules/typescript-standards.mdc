@@ -113,13 +113,13 @@ Exception: Empty handlers are acceptable ONLY when the rejection is an expected 
 <standard id="useeffect-cleanup">Always include cleanup functions in `useEffect` hooks that create timers, intervals, subscriptions, or other side effects.</standard>
 
 <standard id="comments-current-state">Code comments, READMEs and committed docs (AGENTS.md, docs/*.md, script echo text) document the current state of the code, not the history of changes, and every claim matches what the code does: the stated mechanism, library behavior, commands, header names, file names, infrastructure (Caddy vs nginx, droplets vs a load balancer) and API shapes exist as written. Verify an example against the real types before committing it.
-Sources: [edge-core-js#738](https://github.com/EdgeApp/edge-core-js/pull/738#pullrequestreview-5013394137); all 28 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 10, paullinator 8, peachbits 7, samholmes 3.
+Sources: [edge-change-server#2](https://github.com/EdgeApp/edge-change-server/pull/2#discussion_r1996095380); all 41 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: peachbits 21, paullinator 12, swansontec 8.
 </standard>
 
 <standard id="biggystring-arithmetic">Use `biggystring` for all numeric calculations involving crypto amounts or exchange rates that feed an exact native amount. Native JS floating-point math loses precision. Round in the direction that protects the user: ceil for enforced minimums, floor for displayed receive amounts, and apply operations in the order the source spec gives (double before rounding). Fiat display estimates may use plain number math, since biggystring is slow and the estimate is not sent. Values from `convertCurrency`, `convertNativeToExchange`, and similar helpers are already biggystring-compatible strings.
 ❌ `const impact = (parseFloat(from) - parseFloat(to)) / parseFloat(from)`
 ✅ `const impact = div(sub(from, to), from, 8)`
-Sources: [edge-currency-accountbased#751](https://github.com/EdgeApp/edge-currency-accountbased/pull/751#discussion_r1534771485); all 8 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 6, peachbits 2.
+Sources: [edge-currency-accountbased#877](https://github.com/EdgeApp/edge-currency-accountbased/pull/877#discussion_r1907894471); all 12 in `~/.cursor/skills/pr-review/rule-sources.md`. Reviewers: swansontec 6, paullinator 3, peachbits 3.
 </standard>
 
 <standard id="memoize-derived-collections">When deriving arrays or objects from props/state (e.g. `Object.values()`, `Object.keys()`, `.filter()`, `.map()`), wrap in `React.useMemo` if the result is used in a dependency array or passed as a prop. Bare derivations create new references every render.

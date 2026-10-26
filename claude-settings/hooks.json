@@ -237,6 +237,11 @@
           "command": "~/.config/agent-watcher/hooks/block-shadow-writes.sh",
           "timeout": 10,
           "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/qa-read-only-profile.sh",
+          "timeout": 10,
+          "type": "command"
         }
       ],
       "matcher": "Bash"
@@ -272,6 +277,11 @@
           "command": "~/.config/agent-watcher/hooks/cap-skill-slice-size.sh",
           "timeout": 10,
           "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/qa-read-only-profile.sh",
+          "timeout": 10,
+          "type": "command"
         }
       ],
       "matcher": "Write|Edit"
@@ -300,6 +310,11 @@
       "hooks": [
         {
           "command": "~/.config/agent-watcher/hooks/mark-agent-authored-asana.sh",
+          "timeout": 10,
+          "type": "command"
+        },
+        {
+          "command": "~/.config/agent-watcher/hooks/qa-read-only-profile.sh",
           "timeout": 10,
           "type": "command"
         }

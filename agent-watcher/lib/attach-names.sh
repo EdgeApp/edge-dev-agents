@@ -2,6 +2,11 @@
 #
 #   run report:  <N>-agent-run-report.md     (N = report ordinal on the task)
 #   plan:        <N>-plan-<anything>.md      (N = plan ordinal on the task)
+#   QA report:   <N>-qa-report.md            (N = QA report ordinal; qa-run's verdict script)
+#
+# A QA report never matches REPORT_ATTACH_RE: the followup watermark is the newest
+# run report, and a QA report counted as one would move the watermark past its own
+# Failed findings (check-followup-scope.sh reads those findings as scope).
 #
 # Operator request 2026-09-11: consistent, orderable names. Every producer
 # (require-clean-run-report.sh renames reports, asana-task-update.sh numbers
@@ -16,8 +21,9 @@
 # jq/ERE-compatible patterns matching BOTH new and legacy names.
 REPORT_ATTACH_RE='^([0-9]+-)?agent-run-report.*\.md$'
 PLAN_ATTACH_RE='^([0-9]+-)?plan-.*\.md$'
+QA_ATTACH_RE='^[0-9]+-qa-report\.md$'
 
-# next_attach_ordinal <report|plan>  (attachment names on stdin, one per line)
+# next_attach_ordinal <report|plan|qa>  (attachment names on stdin, one per line)
 # Prints max(highest existing ordinal, count of matching names) + 1, so a bare
 # pre-scheme name still takes a slot.
 next_attach_ordinal() {
@@ -26,11 +32,14 @@ next_attach_ordinal() {
   case "$kind" in
     report) re="$REPORT_ATTACH_RE" ;;
     plan) re="$PLAN_ATTACH_RE" ;;
+    qa) re="$QA_ATTACH_RE" ;;
     *) echo "next_attach_ordinal: unknown kind '$kind'" >&2; return 1 ;;
   esac
   names=$(printf '%s\n' "$names" | grep -E "$re" || true)
   if [ "$kind" = report ]; then
     max=$(printf '%s\n' "$names" | sed -nE 's/^([0-9]+)-agent-run-report.*/\1/p; s/^agent-run-report-([0-9]+)-.*/\1/p' | sort -n | tail -1)
+  elif [ "$kind" = qa ]; then
+    max=$(printf '%s\n' "$names" | sed -nE 's/^([0-9]+)-qa-report.*/\1/p' | sort -n | tail -1)
   else
     max=$(printf '%s\n' "$names" | sed -nE 's/^([0-9]+)-plan-.*/\1/p' | sort -n | tail -1)
   fi
@@ -47,6 +56,9 @@ next_attach_ordinal() {
 
 # report_attach_name <N>
 report_attach_name() { printf '%s-agent-run-report.md\n' "$1"; }
+
+# qa_attach_name <N>
+qa_attach_name() { printf '%s-qa-report.md\n' "$1"; }
 
 # plan_attach_suffix <name>: the <anything> part of a plan name, ordinal and
 # "plan-" prefix stripped ("3-plan-foo.md" and "plan-foo.md" both -> "foo.md").

@@ -20,7 +20,7 @@
       ]
     },
     "file:update-status.sh": {
-      "hash": "28ee23d36208",
+      "hash": "ac81974b2d03",
       "dims": [
         "A4",
         "O8"
@@ -45,7 +45,7 @@
       ]
     },
     "one-shot:yolo-true-blockers": {
-      "hash": "4bb7e4e8c140",
+      "hash": "041823af7b98",
       "dims": [
         "A7",
         "O7"
@@ -228,7 +228,7 @@
       ]
     },
     "build-and-test:test-on-sim-by-default": {
-      "hash": "1435d588fa2c",
+      "hash": "5cd5959a4705",
       "dims": [
         "A21"
       ]
@@ -246,7 +246,7 @@
       ]
     },
     "file:asana-watcher.js": {
-      "hash": "ede67e5ba2b3",
+      "hash": "b921c93324d5",
       "dims": [
         "O1"
       ]
@@ -654,7 +654,7 @@
       ]
     },
     "file:concession-taxonomy.md": {
-      "hash": "4144b55f59ef",
+      "hash": "d613de4d336b",
       "dims": [
         "A32",
         "A7"
@@ -673,7 +673,7 @@
       ]
     },
     "file:completion-judge.sh": {
-      "hash": "417ab6300d7f",
+      "hash": "a511708f8a8a",
       "dims": [
         "O9"
       ]
@@ -850,6 +850,18 @@
       "hash": "4686219fcd04",
       "dims": [
         "A15"
+      ]
+    },
+    "file:qa-queue.js": {
+      "hash": "9ffa701a48b3",
+      "dims": [
+        "O1"
+      ]
+    },
+    "one-shot:qa-failed-retest": {
+      "hash": "007bae5a1fab",
+      "dims": [
+        "A23"
       ]
     }
   },
@@ -1211,8 +1223,8 @@
       "hash": "279a6ed8e3eb"
     },
     "review-standards:preserve-stack-traces": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "dd35f725212a"
+      "reason": "2026-10-25: code-review content standard applied by pr-review/bugbot findings; agent-eval and orch-eval grade process, not review content (re-judged 2026-10-25 after the 2026-10-24 wording edit)",
+      "hash": "25222812d8cc"
     },
     "review-standards:avoid-ts-expect-error": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1231,12 +1243,12 @@
       "hash": "63b28bf5340c"
     },
     "review-standards:tokenid-no-null-fallback": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "86613b7cbe1d"
+      "reason": "2026-10-25: code-review content standard applied by pr-review/bugbot findings; agent-eval and orch-eval grade process, not review content (re-judged 2026-10-25 after the 2026-10-24 wording edit)",
+      "hash": "7ca6f25a44be"
     },
     "review-standards:no-redundant-error-handling": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "5cae724816cf"
+      "reason": "2026-10-25: code-review content standard applied by pr-review/bugbot findings; agent-eval and orch-eval grade process, not review content (re-judged 2026-10-25 after the 2026-10-24 wording edit)",
+      "hash": "5eaca5be9b3d"
     },
     "review-standards:handle-user-cancellation": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1247,12 +1259,12 @@
       "hash": "fddd52fb8b46"
     },
     "review-standards:check-array-bounds": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "722356811ebf"
+      "reason": "2026-10-25: code-review content standard applied by pr-review/bugbot findings; agent-eval and orch-eval grade process, not review content (re-judged 2026-10-25 after the 2026-10-24 wording edit)",
+      "hash": "fefe13c1cfc6"
     },
     "review-standards:compare-same-types": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "1981481f0653"
+      "reason": "2026-10-25: code-review content standard applied by pr-review/bugbot findings; agent-eval and orch-eval grade process, not review content (re-judged 2026-10-25 after the 2026-10-24 wording edit)",
+      "hash": "c537e46cb798"
     },
     "review-standards:lookup-table-defensive-access": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1263,8 +1275,8 @@
       "hash": "9fe79537ad7a"
     },
     "review-standards:useHandler-over-useCallback": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "58d92ef47494"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "4efe1148b77e"
     },
     "review-standards:combine-related-effects": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1275,16 +1287,16 @@
       "hash": "8a493139e5ae"
     },
     "review-standards:stylesheet-compose": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "ed0c717918df"
+      "reason": "2026-10-25: code-review content standard applied by pr-review/bugbot findings; agent-eval and orch-eval grade process, not review content (re-judged 2026-10-25 after the 2026-10-24 wording edit)",
+      "hash": "044c0feac9c3"
     },
     "review-standards:platform-keyboard": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "cef8e3200f6a"
     },
     "review-standards:preserve-props-replacement": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "b3eca30f1f03"
+      "reason": "2026-10-25: code-review content standard applied by pr-review/bugbot findings; agent-eval and orch-eval grade process, not review content (re-judged 2026-10-25 after the 2026-10-24 wording edit)",
+      "hash": "822399b875d8"
     },
     "review-standards:maintain-styling-icon-switch": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1299,12 +1311,12 @@
       "hash": "fcda9f7a8f6b"
     },
     "review-standards:no-duplicate-redux-local": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "77a2c8c4b184"
+      "reason": "2026-10-25: code-review content standard applied by pr-review/bugbot findings; agent-eval and orch-eval grade process, not review content (re-judged 2026-10-25 after the 2026-10-24 wording edit)",
+      "hash": "a4b3e4d43464"
     },
     "review-standards:module-level-cache-bugs": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "4912703dc4b6"
+      "reason": "2026-10-25: code-review content standard applied by pr-review/bugbot findings; agent-eval and orch-eval grade process, not review content (re-judged 2026-10-25 after the 2026-10-24 wording edit)",
+      "hash": "a488da1d111f"
     },
     "review-standards:settings-in-redux": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1327,8 +1339,8 @@
       "hash": "cc940bffc750"
     },
     "review-standards:background-services-location": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "90a95480c7ab"
+      "reason": "2026-10-25: code-review content standard applied by pr-review/bugbot findings; agent-eval and orch-eval grade process, not review content (re-judged 2026-10-25 after the 2026-10-24 wording edit)",
+      "hash": "308f446f5429"
     },
     "review-standards:prevent-concurrent-execution": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1339,8 +1351,8 @@
       "hash": "dab89449fdb5"
     },
     "review-standards:refresh-state-callbacks": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "8b1df39222b4"
+      "reason": "2026-10-25: code-review content standard applied by pr-review/bugbot findings; agent-eval and orch-eval grade process, not review content (re-judged 2026-10-25 after the 2026-10-24 wording edit)",
+      "hash": "4f15dbebdb2b"
     },
     "review-standards:cleanup-timeouts-shutdown": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1351,8 +1363,8 @@
       "hash": "83505b090011"
     },
     "review-standards:clean-all-external-data": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "dd33606bc54f"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "b167ab922044"
     },
     "review-standards:derive-types-from-cleaners": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1363,24 +1375,24 @@
       "hash": "4d944fa9c091"
     },
     "review-standards:new-fields-optional": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "314f13077c09"
+      "reason": "2026-10-25: code-review content standard applied by pr-review/bugbot findings; agent-eval and orch-eval grade process, not review content (re-judged 2026-10-25 after the 2026-10-24 wording edit)",
+      "hash": "2116302ec442"
     },
     "review-standards:remove-unused-cleaner-fields": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
       "hash": "ac2d4b9e665c"
     },
     "review-standards:delete-unnecessary-code": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "640d13214f0f"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "e34c5c4e83c2"
     },
     "review-standards:put-parameters-inline": {
-      "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
-      "hash": "f3023e485d5a"
+      "reason": "2026-10-25: code-review content standard applied by pr-review/bugbot findings; agent-eval and orch-eval grade process, not review content (re-judged 2026-10-25 after the 2026-10-24 wording edit)",
+      "hash": "f3dd984b6568"
     },
     "review-standards:use-existing-helpers": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "e7438dfa09f9"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "ea2b66c74ae3"
     },
     "review-standards:avoid-duplicated-mocks": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1435,8 +1447,8 @@
       "hash": "d8ca34f82fe2"
     },
     "review-standards:add-non-obvious-constraints": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "f0d60eb3cea1"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "8910575a84f8"
     },
     "review-standards:remove-stale-comments": {
       "reason": "2026-07-02: pre-baseline: rubric derived from the 2026-06-10 local-research pass; not re-triaged individually",
@@ -1646,14 +1658,6 @@
       "reason": "2026-10-20: findings-comment wording only; review posting is graded via pr-review rules",
       "hash": "ac0cbc71a863"
     },
-    "asana-task-update:qa-subtasks": {
-      "reason": "2026-10-08: mechanically enforced by asana-task-update.sh (QA_SUBTASKS_REQUIRED gate; QA_NOT_PLAIN check); writing rules owned by pr-land references/qa-writeup.md",
-      "hash": "bb0a526c5259"
-    },
-    "pr-land:qa-subtasks-before-handoff": {
-      "reason": "2026-10-08: existence gated by asana-task-update.sh (QA_SUBTASKS_REQUIRED); plain language by its QA_NOT_PLAIN check; writing rules moved to references/qa-writeup.md",
-      "hash": "011891c2fa81"
-    },
     "one-shot:claude-calls-on-subscription": {
       "reason": "2026-10-14: 2026-10-13: wording only, the call now goes in a script file because no-self-respawn.sh denies a typed claude -p; operator standing preference 2026-09-27, a missed case surfaces as a blocked completion or an API bill, both visible without an eval dimension",
       "hash": "eebd0075422f"
@@ -1690,10 +1694,6 @@
       "reason": "2026-10-10: operator ruling 2026-10-08 stands: a rule only, not graded; the frame half is enforced by pr-create/scripts/pr-attach-screenshots.sh through evidence-privacy.sh",
       "hash": "98e30ef75239"
     },
-    "pr-land:qa-writeups-by-opus-subagent": {
-      "reason": "2026-10-08: who writes the QA items and from what reading; item quality is not an eval dimension, existence and plain language are gated by asana-task-update.sh",
-      "hash": "f911dfda821e"
-    },
     "build-and-test:explore-on-interpreter-prove-on-flow": {
       "reason": "2026-10-08: split verbatim from maestro-flows-are-shortcuts; which tool reads or drives the screen is guidance, the drive outcome is graded by testing-depth and the proof rules",
       "hash": "99c63fbcd97e"
@@ -1701,30 +1701,6 @@
     "build-and-test:playbook-and-flow-proposals": {
       "reason": "2026-10-08: split verbatim from maestro-flows-are-shortcuts; proposal tagging in the report is graded under the report dimensions (A18/A20), not as its own dimension",
       "hash": "eaec61e8e0f5"
-    },
-    "pr-land:read-what-landed": {
-      "reason": "2026-10-09: rule of the QA write-up subagent brief (references/qa-writeup.md), not read by the landing session; its outcome is gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
-      "hash": "10bc1f12da7a"
-    },
-    "pr-land:what-goes-in": {
-      "reason": "2026-10-09: rule of the QA write-up subagent brief (references/qa-writeup.md), not read by the landing session; its outcome is gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
-      "hash": "58251e89c190"
-    },
-    "pr-land:tester-voice": {
-      "reason": "2026-10-09: rule of the QA write-up subagent brief (references/qa-writeup.md), not read by the landing session; its outcome is gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
-      "hash": "2b94b0db83c6"
-    },
-    "pr-land:item-body": {
-      "reason": "2026-10-09: subagent brief rule, gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
-      "hash": "cb47d1c5c88a"
-    },
-    "pr-land:nothing-to-verify": {
-      "reason": "2026-10-09: rule of the QA write-up subagent brief (references/qa-writeup.md), not read by the landing session; its outcome is gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
-      "hash": "3cc92f9cb3f9"
-    },
-    "pr-land:info-server-docs": {
-      "reason": "2026-10-09: subagent brief rule, gated through pr-land qa-subtasks-before-handoff and asana-task-update.sh QA_NOT_PLAIN",
-      "hash": "e15873467f4a"
     },
     "pr-create:evidence-privacy-refusal": {
       "reason": "2026-10-10: refusal mechanically enforced by pr-create/scripts/pr-attach-screenshots.sh (exit 3, nothing uploaded); the rule only names the remedy; a dimension for working around the refusal is proposed to the operator in the task A status file",
@@ -1739,176 +1715,280 @@
       "hash": "e48c0c5d9826"
     },
     "review-standards:changelog-section-and-verb": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "2eb54bd6ca57"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "df984b76a939"
     },
     "review-standards:doc-links-resolve": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "6b4c80fffc55"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "ef6b989bc7be"
     },
     "review-standards:rn-render-cost": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "0cb2f1e47573"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "c0bd8019b2d5"
     },
     "review-standards:units-explicit": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "781659d16fe2"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "61ead1333ae2"
     },
     "review-standards:jsdoc-for-api-and-deprecations": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "b4c2f7811c0f"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "b00f1a568a2e"
     },
     "review-standards:no-debug-scaffolding": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "93d79a413c1a"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "161d1c6c2e90"
     },
     "review-standards:tokenid-not-currencycode": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "5a8fbc2af800"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "ca91bde9a3b8"
     },
     "review-standards:narrow-try-scope": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "9c6f3b6d0b9c"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "f9e45f63cbcd"
     },
     "review-standards:existing-user-paths": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "ff91424b3f14"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "7062a318cbd9"
     },
     "review-standards:check-response-ok": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "19641412b3b2"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "55791487f123"
     },
     "review-standards:no-silent-success": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "784a457c6114"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "4330c92a8014"
     },
     "review-standards:structured-logging": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "58ab46fe7fdd"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "f71a4048ee39"
     },
     "review-standards:log-only-real-work": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "67888768ddb6"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "cfd676d99be7"
     },
     "review-standards:surface-errors-not-console": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "72228d804f74"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "7da7190410c1"
     },
     "review-standards:file-placement-conventions": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "f48436ccaa07"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "22cab193c806"
     },
     "review-standards:normalize-at-the-boundary": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "de38e6f85745"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "3ce6fc2fa0d7"
     },
     "review-standards:logic-belongs-in-owning-layer": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "02e3fbf9a5b2"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "9ccdee2fd074"
     },
     "review-standards:no-module-level-mutable-state": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "608607115555"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "ee6cc50c7c67"
     },
     "review-standards:name-magic-values": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "2c27d5f5bdcc"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "77a721aa57ed"
     },
     "review-standards:no-hardcoded-config": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "144a966e1a22"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "659feeb2b470"
     },
     "review-standards:test-each-guard": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "4ed88f928bd2"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "67a34ae28762"
     },
     "review-standards:order-state-around-awaits": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "a6180c2d3c0c"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "a53920425b99"
     },
     "review-standards:stale-async-generation-check": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "80f748c3f94a"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "bd3966eb6a5a"
     },
     "review-standards:bound-pagination-and-timeouts": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "0fef69d07796"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "f75894cf9a00"
     },
     "review-standards:avoid-repeated-work": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "0e4f7658aa95"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "715afcdd6e2b"
     },
     "review-standards:no-secrets-in-dumps-or-logs": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "f5d05cf34cdd"
-    },
-    "review-standards:alphabetical-registration": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "2bc8d5ab9f40"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "adf3bc8c35a5"
     },
     "review-standards:deprecated-fields-last": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "79665deaa9e5"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "a2d05e06bf21"
     },
     "review-standards:follow-repo-naming-conventions": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "5e39059849ac"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "9b7a94b9a2af"
     },
     "review-standards:match-sibling-behavior": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "1bdbbfc5a045"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "f4d985c247bf"
     },
     "review-standards:plain-functions-over-iife": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "6c1de35688d8"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "cfe5549c1a63"
     },
     "review-standards:tokenid-typed-and-required": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "2fa52bd5e0a7"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "19644f8c1926"
     },
     "review-standards:no-sentinel-empty-values": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "20a8f9252924"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "551912c00bd0"
     },
     "review-standards:map-set-for-dictionaries": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "feb6bcfffd4e"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "6051fc783102"
     },
     "review-standards:discriminate-over-flags": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "a76d6f2a0a02"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "e0f376448a79"
     },
     "review-standards:narrowest-accurate-types": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "adacce115bde"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "ab963084d7f1"
     },
     "review-standards:changelog-entry-with-change": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "18b159bf48fd"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "5ded2c880aa8"
     },
     "review-standards:clean-commit-history": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "fba5930e24a2"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "387174ee7c8f"
     },
     "review-standards:split-unrelated-fixes": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "ca1ec11b7b85"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "2d998fbc3c50"
     },
     "review-standards:commit-message-matches-diff": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "997e17ae0e38"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "8ceafd3fff4e"
     },
     "review-standards:no-unrelated-lockfile-churn": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "4b534c4a6a52"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "b76a4e3bd541"
     },
     "review-standards:declare-direct-dependencies": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "97bb5b5ad883"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "eb50fd2a5021"
     },
     "review-standards:white-label-neutral": {
-      "reason": "2026-10-24: 2026-10-24: review-side checklist rule mined from human review comments for /pr-review; graded per rule by rule:<id> finding tags and the replay harness, not by an agent-eval dimension",
-      "hash": "62cedf803aa9"
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "937a43fe5292"
+    },
+    "qa-run:read-only-session": {
+      "reason": "2026-10-25: mechanically enforced by ~/.config/agent-watcher/hooks/qa-read-only-profile.sh",
+      "hash": "87d744ce1485"
+    },
+    "qa-run:verdict-script-only": {
+      "reason": "2026-10-25: mechanically enforced by hooks/qa-read-only-profile.sh (Asana MCP and asana-task-update writes blocked); posting shape checked by qa-verdict.sh",
+      "hash": "a88dcc7598b9"
+    },
+    "qa-run:phase-from-script": {
+      "reason": "2026-10-25: 2026-10-25: mechanically decided by qa-start.sh (PHASE output); the post-gate rerun is printed by qa-gate.sh",
+      "hash": "c929c846365b"
+    },
+    "qa-run:end-turn-after-gate-or-verdict": {
+      "reason": "2026-10-25: 2026-10-25: mechanically enforced: qa-verdict.sh kills the session after POSTED; the QA Stop hook blocks any earlier end",
+      "hash": "5b175fc0572b"
+    },
+    "qa-run:no-sim-in-planning": {
+      "reason": "2026-10-25: 2026-10-25: a drive before the gate is not evidence (the verdict judge reads only attempts after run-started), so an early drive costs minutes, not a wrong verdict",
+      "hash": "64710d8fcac6"
+    },
+    "qa-run:beyond-dev-never-repeat": {
+      "reason": "2026-10-25: graded per QA pass by the QA judge (qa-run/references/rubric.md P1 delta-only, P2 case-reasonableness)",
+      "hash": "a3c68a0394ab"
+    },
+    "qa-run:approved-cases-only": {
+      "reason": "2026-10-25: graded per QA pass by the QA judge (qa-run/references/rubric.md V1 plan-adherence)",
+      "hash": "e9904492ae34"
+    },
+    "qa-run:no-product-fixes": {
+      "reason": "2026-10-25: tracked edits blocked by hooks/qa-read-only-profile.sh; graded per QA pass by the QA judge (qa-run/references/rubric.md V5 report-honesty)",
+      "hash": "7d796cfbec92"
+    },
+    "qa-run:account-parity": {
+      "reason": "2026-10-25: graded per QA pass by the QA judge (qa-run/references/rubric.md P4 account-parity, V4 account-and-funds)",
+      "hash": "55476bfe7c07"
+    },
+    "qa-run:probe-before-plan": {
+      "reason": "2026-10-25: graded per QA pass by the QA judge (qa-run/references/rubric.md P3 skip-validity, P2 case-reasonableness)",
+      "hash": "dc56bf34de63"
+    },
+    "qa-run:drive-through-build-and-test": {
+      "reason": "2026-10-25: graded per QA pass by the QA judge (qa-run/references/rubric.md V1 plan-adherence); build-and-test qa-mode bounds enforced by the read-only hook",
+      "hash": "9219b79729cf"
+    },
+    "qa-run:reuse-the-dev-app": {
+      "reason": "2026-10-25: graded per QA pass by the QA judge (qa-run/references/rubric.md V5: report environment line states cache hit or rebuild)",
+      "hash": "3c9af5cef348"
+    },
+    "qa-run:log-every-attempt": {
+      "reason": "2026-10-25: graded per QA pass by the QA judge (qa-run/references/rubric.md V2 failure-evidence reads the attempt log)",
+      "hash": "f2a10a105da1"
+    },
+    "qa-run:plain-comment": {
+      "reason": "2026-10-25: graded per QA pass by the QA judge (qa-run/references/rubric.md V5 report-honesty); comment prose linted by orch-prose-lint.sh inside asana-task-update.sh, which qa-verdict.sh posts through",
+      "hash": "9a789db1856c"
+    },
+    "qa-run:failed-cases-section": {
+      "reason": "2026-10-25: graded per QA pass by the QA judge (qa-run/references/rubric.md V2 failure-evidence); section presence checked by qa-verdict.sh",
+      "hash": "1fe31450a449"
+    },
+    "build-and-test:qa-mode": {
+      "reason": "2026-10-25: QA-mode drives are graded per pass by the QA judge (qa-run/references/rubric.md V1, V5); tracked-edit and install bounds enforced by hooks/qa-read-only-profile.sh",
+      "hash": "65c05493f68e"
+    },
+    "review-standards:combine-dispatches": {
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "8b58019256b1"
+    },
+    "review-standards:recover-from-network-failures": {
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "8d8596775cf7"
+    },
+    "review-standards:release-resources-on-error": {
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "5334179b5657"
+    },
+    "review-standards:guard-numeric-inputs": {
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "7c3194f18e01"
+    },
+    "review-standards:refactor-preserves-behavior": {
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "211f928e438c"
+    },
+    "review-standards:fix-root-cause": {
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "25e9770914d2"
+    },
+    "review-standards:names-match-role": {
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "c3c522cbb94d"
+    },
+    "review-standards:match-local-form": {
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "b0dbbc8d4335"
+    },
+    "review-standards:methods-without-this": {
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "8e37991b2887"
+    },
+    "review-standards:const-over-reassigned-let": {
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "c0f4794ff502"
+    },
+    "review-standards:no-redundant-tests": {
+      "reason": "2026-10-25: code-review content standard (what a reviewer flags in product code); eval rubrics grade orch process, not review findings. Re-mine 2026-10-25 rewrote its Sources line or wording.",
+      "hash": "f1fda3c777bc"
     }
   },
   "excluded_skills": {

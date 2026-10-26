@@ -48,9 +48,9 @@ const RUN_SIGNATURE_RE = (() => {
 const PREVIEW_LINE_RE = /"\/(one-shot|task-run) --yolo/
 const PREVIEW_RE = /"(\/(?:one-shot|task-run) --yolo [^"]{0,80})[^"]*"/g
 // The task URL the run was launched with, in either recorded prompt form.
-const PROMPT_URL_RE = /(?:"\/(?:one-shot|task-run) --yolo|<command-args>--yolo)\s+(https?:\/\/app\.asana\.com[A-Za-z0-9/._-]*)/
+const PROMPT_URL_RE = /(?:"\/(?:one-shot|task-run) --yolo|<command-name>\/(?:one-shot|task-run)<\/command-name>[^"]{0,8}<command-args>--yolo)\s+(https?:\/\/app\.asana\.com[A-Za-z0-9/._-]*)/
 // Bump when derive() changes; entries stamped with another version are recomputed.
-const FACTS_VERSION = 3
+const FACTS_VERSION = 4
 
 // Read until both windows are covered (HEAD_LINES newlines and GID_WINDOW
 // bytes) or EOF.

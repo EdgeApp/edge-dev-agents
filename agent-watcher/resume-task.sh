@@ -88,7 +88,7 @@ if [[ -z "$SESSION_ID" ]]; then
     # No resumable match. Distinguish "only a worktree-cwd session exists" (which
     # cannot be resumed from ~/git — needs a fresh run) from "nothing at all".
     WT_MATCH=$(node "$HEADS" "$PROJECTS"/*"$TASK_GID"*/*.jsonl 2>/dev/null \
-      | awk -F'\t' -v g="$TASK_GID" '$4 == g { print $1; exit }' || true)
+      | awk -F'\t' -v g="$TASK_GID" '$3 == 1 && $4 == g { print $1; exit }' || true)
     if [[ -n "$WT_MATCH" ]]; then
       echo "resume-task: task $TASK_GID has only a WORKTREE-cwd session ($(basename "$WT_MATCH" .jsonl)), which 'claude --resume' cannot load from ~/git. Start a FRESH session for this task instead of resuming (or pass --session-id to force)." >&2
       exit 2

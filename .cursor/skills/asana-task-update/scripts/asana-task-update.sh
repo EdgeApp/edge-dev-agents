@@ -5,16 +5,11 @@
 # Exit codes:
 #   0 = success
 #   1 = error
-#   2 = needs user input (PROMPT_REVIEWER, or the QA-subtask gate below)
+#   2 = needs user input (PROMPT_REVIEWER)
 #
-# Manual QA subtasks: a subtask titled "QA: <what a human verifies>" is a manual
-# verification item for the QA handoff, not scope. asana-get-context.sh hides
-# these from every run's ingestion, so an orchestrated run never plans from
-# them. --create-subtask --subtask-name "QA: ..." --subtask-notes <file> makes
+# Subtasks: --create-subtask --subtask-name <name> [--subtask-notes <file>] makes
 # one (plain notes, verbatim; the CURRENT STATE section is never written on a
-# subtask). --set-board-state "QA Verification" refuses (exit 2) when the task
-# has no open QA: subtask, unless --no-manual-qa "<why nothing needs a human>"
-# is passed; the reason is posted as a comment so QA sees why the list is empty.
+# subtask).
 #
 # Description writes: --set-current-state rewrites the agent-maintained tail;
 # --set-notes replaces the prose above it while agent_status is unset or Complete.
@@ -33,8 +28,6 @@
 # has no agent_status of its own (a per-PR subtask). A run still in flight is
 # left to its own Complete, and a call carrying --set-repos sets the field itself.
 set -euo pipefail
-
-QA_SUBTASK_PREFIX="QA: "
 
 TASK_GID=""
 DO_ATTACH=false
@@ -63,7 +56,6 @@ SET_REPOS=""
 CREATE_SUBTASK=false
 SUBTASK_NAME=""
 SUBTASK_NOTES_FILE=""
-NO_MANUAL_QA=""
 
 SET_CURRENT_STATE_FILE=""
 SET_NOTES_FILE=""
@@ -79,7 +71,6 @@ while [[ $# -gt 0 ]]; do
     --create-subtask) CREATE_SUBTASK=true; shift ;;
     --subtask-name) SUBTASK_NAME="$2"; shift 2 ;;
     --subtask-notes) SUBTASK_NOTES_FILE="$2"; shift 2 ;;
-    --no-manual-qa) NO_MANUAL_QA="$2"; shift 2 ;;
     --attach-pr) DO_ATTACH=true; shift ;;
     --detach-pr) DETACH_PR_URL="$2"; shift 2 ;;
     --pr-url) PR_URL="$2"; shift 2 ;;
@@ -130,10 +121,6 @@ fi
 # over POST).
 if [[ -n "$EDIT_COMMENT_GID" && -n "$DELETE_COMMENT_GID" ]]; then
   echo "Error: --edit-comment and --delete-comment are mutually exclusive" >&2
-  exit 1
-fi
-if [[ -n "$EDIT_COMMENT_GID" && -n "$NO_MANUAL_QA" ]]; then
-  echo "Error: --no-manual-qa posts its reason as a comment, so it does not pair with --edit-comment" >&2
   exit 1
 fi
 if [[ -n "$EDIT_COMMENT_GID" && -z "$COMMENT_FILE" ]]; then
@@ -225,35 +212,6 @@ asana_request() {
 # prepended to the delimiter line must not hide a stale section from the strip.
 CURRENT_STATE_DELIM="===== CURRENT STATE (agent-maintained; supersedes any stale prose above) ====="
 
-# QA: subtasks are read by non-technical testers who never open GitHub. Refuse
-# developer artifacts in the title or body: PR references, GitHub links, commit
-# hashes, branch/merge/publish vocabulary, package names, source paths. Hex runs
-# need a letter AND a digit and stop at 40 chars, so 0x addresses and 64-char
-# txids (sometimes legitimately quoted to a tester) pass. Exit 1 lists each hit.
-qa_plain_language_check() {
-  local hits
-  hits="$(printf '%s\n%s\n' "$1" "$2" | node -e '
-    const pats = [
-      /github\.com/i, /\bPR\s*#?\d+/i, /\bpull request/i,
-      /\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b/,
-      /\b(commits?|merged?|branch(es)?|rebase|cherry-pick(ed)?|npm|changelog|repo(sitory)?|(un)?published|master)\b/i,
-      /\bedge-[a-z]+(-[a-z]+)+\b/, /\bsrc\/|\.tsx?\b/
-    ];
-    const lines = require("fs").readFileSync(0, "utf8").split("\n");
-    lines.forEach((line, i) => {
-      for (const re of pats) {
-        const m = line.match(re);
-        if (m) { console.log(`  line ${i + 1}: "${m[0]}"`); break; }
-      }
-    });
-  ')"
-  if [[ -n "$hits" ]]; then
-    echo "Error: QA_NOT_PLAIN: '${QA_SUBTASK_PREFIX}' subtasks are read by non-technical testers (writing rules: pr-land references/qa-writeup.md). Remove the developer detail below; name the build by app version:" >&2
-    printf '%s\n' "$hits" >&2
-    exit 1
-  fi
-}
-
 # pr_repo <url>: prints the lowercased owner/repo of a GitHub PR URL, or nothing.
 pr_repo() {
   [[ "$1" =~ ^https://github\.com/([^/]+/[^/]+)/pull/[0-9]+ ]] && printf '%s' "${BASH_REMATCH[1]}" | tr '[:upper:]' '[:lower:]'
@@ -306,9 +264,6 @@ if $CREATE_SUBTASK; then
     if grep -qF "CURRENT STATE" "$SUBTASK_NOTES_FILE"; then
       echo "Error: --subtask-notes must not carry a CURRENT STATE section (write plain steps and expected results)" >&2; exit 1
     fi
-  fi
-  if [[ "$SUBTASK_NAME" == "$QA_SUBTASK_PREFIX"* ]]; then
-    qa_plain_language_check "$SUBTASK_NAME" "$SUB_NOTES"
   fi
   SUB_GID="$(jq -n --arg n "$SUBTASK_NAME" --arg notes "$SUB_NOTES" '{data: ({name: $n} + (if $notes == "" then {} else {notes: $notes} end))}' \
     | curl -sS -X POST "$ASANA_API/tasks/$TASK_GID/subtasks" \
@@ -521,33 +476,6 @@ if [[ -n "$DELETE_COMMENT_GID" ]]; then
     mv "$LEDGER.tmp" "$LEDGER" 2>/dev/null || rm -f "$LEDGER.tmp"
   fi
   echo ">> Comment: deleted story $DELETE_COMMENT_GID from task $TASK_GID"
-fi
-
-# QA handoff gate: the move to QA Verification is where the manual verification
-# list must already exist as "QA: ..." subtasks (pr-land qa-subtasks-before-handoff).
-# It runs ahead of the comment step so a refusal writes nothing, and so the
-# --no-manual-qa reason reaches that step: as the comment when the call has no
-# --comment-file, else as a last paragraph of that comment.
-if [[ "$SET_BOARD_STATE" == "QA Verification" ]]; then
-  QA_OPEN="$(curl -sS "$ASANA_API/tasks/$TASK_GID/subtasks?opt_fields=name,completed" \
-    -H "Authorization: Bearer $ASANA_TOKEN" \
-    | jq --arg p "$QA_SUBTASK_PREFIX" '[.data[]? | select((.completed | not) and (.name | startswith($p)))] | length')"
-  if [[ "${QA_OPEN:-0}" -eq 0 && -z "$NO_MANUAL_QA" ]]; then
-    echo "QA_SUBTASKS_REQUIRED: task $TASK_GID has no open '${QA_SUBTASK_PREFIX}...' subtask. Create one per manual verification item (--create-subtask --subtask-name \"${QA_SUBTASK_PREFIX}<what a human checks>\" --subtask-notes <file>) before --set-board-state \"QA Verification\", or pass --no-manual-qa \"<why nothing needs a human>\"." >&2
-    exit 2
-  fi
-  if [[ "${QA_OPEN:-0}" -eq 0 && -n "$NO_MANUAL_QA" ]]; then
-    NO_QA_BODY="$(mktemp)"
-    if [[ -n "$COMMENT_FILE" ]]; then
-      [[ -f "$COMMENT_FILE" ]] || { echo "Error: --comment-file not found: $COMMENT_FILE" >&2; exit 1; }
-      { cat "$COMMENT_FILE"; printf '\n\n'; } > "$NO_QA_BODY"
-    fi
-    printf 'No manual QA items: %s\n' "$NO_MANUAL_QA" >> "$NO_QA_BODY"
-    COMMENT_FILE="$NO_QA_BODY"
-    echo ">> no manual QA items (reason recorded as a comment)"
-  else
-    echo ">> manual QA items: $QA_OPEN open '${QA_SUBTASK_PREFIX}' subtask(s)"
-  fi
 fi
 
 # --comment-file <path>: post the file's text as a task comment. Runs BEFORE
@@ -906,8 +834,7 @@ fi
 # blocked completion included). Refused at Pending and every phase status, where
 # a run reads the description as its spec. An existing CURRENT STATE section is
 # kept below the new prose; --set-current-state owns it. Same comms gate and
-# authorship marking as asana-task-create.sh, plus the QA plain-language check
-# when the task is a "QA: " subtask.
+# authorship marking as asana-task-create.sh.
 if [[ -n "$SET_NOTES_FILE" ]]; then
   [[ -f "$SET_NOTES_FILE" ]] || { echo "Error: --set-notes file not found: $SET_NOTES_FILE" >&2; exit 1; }
   [[ -n "$(tr -d '[:space:]' < "$SET_NOTES_FILE")" ]] || { echo "Error: --set-notes file is empty: $SET_NOTES_FILE" >&2; exit 1; }
@@ -923,9 +850,8 @@ if [[ -n "$SET_NOTES_FILE" ]]; then
       echo "Error: --set-notes refused: task $TASK_GID has agent_status=$SN_STATUS (a run is queued or in flight; write the description once the task is Complete)" >&2
       exit 1 ;;
   esac
-  asana_request "NOTES" "$ASANA_API/tasks/$TASK_GID?opt_fields=name,notes" \
+  asana_request "NOTES" "$ASANA_API/tasks/$TASK_GID?opt_fields=notes" \
     -H "Authorization: Bearer $ASANA_TOKEN" || exit 1
-  SN_NAME="$(printf '%s' "$ASANA_RESPONSE" | jq -r '.data.name // ""')"
   SN_TAIL="$(printf '%s' "$ASANA_RESPONSE" | jq -r '.data.notes // ""' \
     | awk -v d="$CURRENT_STATE_DELIM" 'index($0, d) > 0 { on = 1 } on { print }')"
 
@@ -933,7 +859,6 @@ if [[ -n "$SET_NOTES_FILE" ]]; then
 
   [[ ! -x "$HOME/.cursor/skills/orch-prose-lint.sh" ]] || "$HOME/.cursor/skills/orch-prose-lint.sh" "$SET_NOTES_FILE" >&2 || { echo "Error: --set-notes fails the reporting-convention lint (orch-prose-lint.sh). Rewrite the lines above and retry." >&2; exit 1; }
   SN_BODY="$(cat "$SET_NOTES_FILE")"
-  [[ "$SN_NAME" != "$QA_SUBTASK_PREFIX"* ]] || qa_plain_language_check "$SN_NAME" "$SN_BODY"
   SN_MARKER="$HOME/.config/agent-watcher/agent-authored-text.sh"
   if [[ -x "$SN_MARKER" ]]; then
     SN_BODY="$(printf '%s' "$SN_BODY" | "$SN_MARKER")"

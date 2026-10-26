@@ -13,6 +13,10 @@
 #     state file (/tmp/agent-state-<gid>.md) if the run keeps one, the
 #     one-shot followup slice when the task already carries a run report, and
 #     re-read pointers for contract files.
+#   QA RUN (AGENT_TASK_GID set and AGENT_MODE=qa, a qa-run session): the QA
+#     phase from its state dir, the plan file, and the re-read pointer to the
+#     qa-run skill. None of the dev payload: QA works from the task, the diff and
+#     the dev run reports, which qa-start.sh prints, never from the dev segment.
 #   ANCHOR (tmux claude-asana-<name> with <name> in persistent_anchors):
 #     identity line + the anchor's open-threads ledger, and a pointer to its
 #     closed-threads archive (searched on demand, never injected).
@@ -205,6 +209,22 @@ EOF
   fi
 }
 
+emit_qa() {
+  local gid="$1" qd="$ST/qa/$1" phase=plan
+  [[ -f "$qd/approved" ]] && phase=run
+  [[ -f "$qd/verdict.json" ]] && phase=done
+  if [[ "$SRC" == "startup" || "$SRC" == "resume" || "$SRC" == "compact" || "$SRC" == "clear" ]]; then
+    rm -f /tmp/agent-skill-read-"$gid"-* 2>/dev/null || true
+  fi
+  echo "[qa-context refresh] QA session (qa-run skill, AGENT_MODE=qa) for task $gid. Phase: $phase."
+  echo "Re-read ~/.cursor/skills/qa-run/SKILL.md and the slice for this phase before acting; summarized memory of it is stale."
+  echo "Start (or re-establish state after a boundary) with: ~/.cursor/skills/qa-run/scripts/qa-start.sh"
+  [[ -f /tmp/qa-plan-$gid.md ]] && echo "Working plan: /tmp/qa-plan-$gid.md"
+  [[ -f "$qd/plan.md" ]] && echo "Approved plan: $qd/plan.md (drive exactly these cases)"
+  [[ "$phase" == done ]] && echo "The verdict is posted. End the turn; the watcher ends this session."
+  echo "Read-only profile: no commits, pushes, PR writes, installs, tracked-file edits, or Asana writes outside qa-run's scripts."
+}
+
 emit_chat() {
   # Discussion sessions (claude-asana-chat-*): the boundary that keeps a chat
   # from silently becoming an unmanaged run. A chat that "helps out" edits the
@@ -253,7 +273,9 @@ if [[ -z "${AGENT_TASK_GID:-}" && ( "$SRC" == "compact" || "$SRC" == "clear" ) ]
   [[ -n "$SID" ]] && rm -f /tmp/agent-skill-read-sess-"$SID"-* 2>/dev/null
 fi
 
-if [[ -n "${AGENT_TASK_GID:-}" ]]; then
+if [[ -n "${AGENT_TASK_GID:-}" && "${AGENT_MODE:-}" == qa ]]; then
+  emit_qa "$AGENT_TASK_GID" 2>/dev/null
+elif [[ -n "${AGENT_TASK_GID:-}" ]]; then
   emit_run "$AGENT_TASK_GID" 2>/dev/null
 elif [[ -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]]; then
   NAME=$(tmux display-message -p -t "$TMUX_PANE" '#{session_name}' 2>/dev/null || true)

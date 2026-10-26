@@ -1,9 +1,4 @@
-Governs steps 9, 9b and 10 of `/pr-land` (staging cherry-pick, late bot findings sweep, Asana QA handoff); the core step map points here.
-
-<rules description="Non-negotiable constraints, binding exactly as if written in the core SKILL.md.">
-<rule id="qa-subtasks-before-handoff">The QA handoff carries its own checklist: before `--set-board-state "QA Verification"`, each landed task gets one subtask per MANUAL verification item, titled `QA: <what a human verifies>`. Nothing to verify by hand is stated with `--no-manual-qa "<reason>"`, never by skipping. `asana-task-update.sh` enforces the gate (exit 2 `QA_SUBTASKS_REQUIRED`) and refuses developer detail in a `QA:` title or body (exit 1 `QA_NOT_PLAIN`, offending lines on stderr); `asana-get-context.sh` hides `QA:` subtasks from every run, so an orchestrated run never treats them as scope.</rule>
-<rule id="qa-writeups-by-opus-subagent">The `QA:` items are WRITTEN by a subagent on Opus, never by the landing session: one Agent call per task with `model: "opus"`. Deciding what a human must verify takes reading what actually landed, and the landing session has only driven scripts. The subagent's whole contract (what to read, what counts as an item, the tester voice, the body shape, the output format) lives in `references/qa-writeup.md`: the subagent reads that file; the landing session does NOT, and passes only the task gid and the landed PRs. The landing session creates the subtasks from the subagent's files unedited; it does not draft, trim or add items. A result whose `READ:` line misses a landed PR has not done the job: re-run the subagent.</rule>
-</rules>
+Governs steps 9, 9b and 10 of `/pr-land` (staging cherry-pick, late bot findings sweep, Asana board-state move to QA Verification); the core step map points here.
 
 <scripts description="This phase's companion scripts and their exit codes. Any exit code not listed here or in the core table = STOP and report (`unexpected-exit`).">
 
@@ -107,27 +102,6 @@ The helper outputs JSON like `{ "tasks": [{ "taskGid": "...", "label": "repo#123
 **Parent-walking:** `taskGid` is the PR's linked task's PARENT when a parent exists (the feature-level task that represents the unit of work across repos). Standalone tasks (no parent) return themselves. Only updates the parent — leave subtasks alone; they have their own state that is managed separately. Sibling subtasks of the same parent dedupe to one entry; `label` lists all contributing PRs (e.g. `"edge-react-gui#123, edge-core-js#456"`).
 
 Review the `missing` array, report any entries lacking an Asana link, and skip those PRs for Asana updates.
-</sub-step>
-
-<sub-step name="Manual QA subtasks">
-For each task in `.tasks`, per `qa-writeups-by-opus-subagent`, spawn one Agent call with `model: "opus"` and this prompt, filled in:
-
-```
-Read ~/.cursor/skills/pr-land/references/qa-writeup.md and follow it exactly; it is your full brief.
-Task gid: <task_gid>
-Landed PRs (repo#number | merge sha | local checkout):
-- <repo>#<n> | <merge-sha> | ~/git/<repo>
-```
-
-It returns one `<n> | QA: <title>` line per item (bodies in `/tmp/qa-<task_gid>-<n>.md`) and a `READ:` line. Create each subtask from those (one call per item):
-
-```bash
-~/.cursor/skills/asana-task-update/scripts/asana-task-update.sh \
-  --task <task_gid> \
-  --create-subtask --subtask-name "QA: <title>" --subtask-notes /tmp/qa-<task_gid>-<n>.md
-```
-
-Exit 1 `QA_NOT_PLAIN` → send the offending lines back to the SAME subagent (SendMessage) to rewrite the file, then re-run the call. `NO_MANUAL_QA: <reason>` → pass `--no-manual-qa "<reason>"` on the handoff call below instead. Put each task's `READ:` line in the step 11 summary.
 </sub-step>
 
 <sub-step name="Update tasks">

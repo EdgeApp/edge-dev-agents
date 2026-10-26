@@ -24,6 +24,12 @@
 #        --sim-udid <udid> --metro-port <port> --worktree-path ~/git --resume <session-id>
 #    CWD must match the session's original launch dir (orch sessions launch in ~/git).
 #
+# --qa: a QA session (qa-run skill) instead of a dev run. Session is named
+#    qa-asana-<task-gid>, exports AGENT_MODE=qa (the hooks' read-only QA profile),
+#    and --slot-index is optional (the Planning phase holds no slot). Leaves the dev
+#    segment's state alone: no orch-version stamp (versions/<gid>.jsonl marks dev
+#    segment starts, the followup-scope watermark), no hold/waiver cleanup.
+#
 # Exit codes: 0 = session spawned, 1 = error (session exists, missing tooling).
 
 set -euo pipefail
@@ -38,6 +44,7 @@ LABEL=""
 RESUME_ID=""
 DELIVERABLE=""
 LANES=""
+QA=false
 POSITIONAL=()
 
 while [[ $# -gt 0 ]]; do
@@ -52,6 +59,7 @@ while [[ $# -gt 0 ]]; do
     --resume)         RESUME_ID="$2";      shift 2 ;;
     --deliverable)    DELIVERABLE="$2";    shift 2 ;;
     --lanes)          LANES="$2";          shift 2 ;;
+    --qa)             QA=true;             shift ;;
     *) POSITIONAL+=("$1"); shift ;;
   esac
 done
@@ -60,8 +68,8 @@ command -v tmux  >/dev/null 2>&1 || { echo "tmux not found"; exit 1; }
 command -v claude >/dev/null 2>&1 || { echo "claude CLI not found"; exit 1; }
 
 # ── Resolve mode ──────────────────────────────────────────────────────────────
-if [[ -n "$SLOT_INDEX" ]]; then
-  # SLOT MODE
+if [[ -n "$SLOT_INDEX" || "$QA" == true ]]; then
+  # SLOT MODE (a QA session is slot-shaped even when it holds no slot)
   [[ -n "$TASK_GID" && -n "$WORKTREE_PATH" ]] || {
     echo "slot mode requires --task-gid and --worktree-path" >&2; exit 1; }
   ID="$TASK_GID"
@@ -75,6 +83,21 @@ else
 fi
 
 SESSION="claude-asana-${ID}"
+[[ "$QA" == true ]] && SESSION="qa-asana-${ID}"
+
+# Pre-trust the CWD. Claude Code keys folder trust for a git worktree to its MAIN
+# repo (the parent of --git-common-dir), so a worktree of a repo whose main checkout
+# was never trusted (a server or plugin repo) parks the unattended session on the
+# "trust this folder?" prompt and the prompt is never delivered. A CWD outside any
+# repo (a fresh dev spawn starts in ~/git) yields an empty TRUST_DIR; the `|| true`
+# keeps set -e from exiting on that substitution's non-zero status.
+TRUST_DIR=$(cd "$CWD" 2>/dev/null && common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && dirname "$common") || true
+if [[ -n "$TRUST_DIR" && -f "$HOME/.claude.json" ]] &&
+   [[ "$(jq -r --arg p "$TRUST_DIR" '.projects[$p].hasTrustDialogAccepted // false' "$HOME/.claude.json" 2>/dev/null)" != true ]]; then
+  tmp=$(mktemp "$HOME/.claude.json.trust.XXXXXX") &&
+    jq --arg p "$TRUST_DIR" '.projects[$p] = ((.projects[$p] // {}) + {hasTrustDialogAccepted: true})' "$HOME/.claude.json" > "$tmp" &&
+    mv "$tmp" "$HOME/.claude.json" && echo "pre-trusted $TRUST_DIR" || rm -f "$tmp"
+fi
 
 if tmux has-session -t "=$SESSION" 2>/dev/null; then
   echo "Session '$SESSION' already exists. Attach with: tmux attach -t '=$SESSION'"
@@ -204,7 +227,7 @@ ENV_EXPORTS+="export NODE_OPTIONS=\"\${NODE_OPTIONS:---max-old-space-size=8192}\
 # belonged to the conversation that just ended. Same for a judge waiver: it covers
 # ONE completion event and the gate consumes it there, so anything left here was
 # never spent and does not carry into the new segment.
-[[ -n "${TASK_GID:-}" ]] && rm -f "/tmp/agent-operator-hold-$TASK_GID" "/tmp/agent-judge-waiver-$TASK_GID" 2>/dev/null
+[[ -n "${TASK_GID:-}" && "$QA" != true ]] && rm -f "/tmp/agent-operator-hold-$TASK_GID" "/tmp/agent-judge-waiver-$TASK_GID" 2>/dev/null
 AGENT_SESSION_UUID="$(uuidgen 2>/dev/null || true)"
 if [[ -n "$AGENT_SESSION_UUID" ]]; then
   ENV_EXPORTS+="export AGENT_SESSION_UUID=\"$AGENT_SESSION_UUID\"
@@ -215,7 +238,7 @@ fi
 # (per-segment: spawn AND resume both pass through here). Appends to
 # $STATE/versions/<gid>.jsonl and exports AGENT_ORCH_VERSION for the run report
 # frontmatter. Best-effort — a stamp failure never blocks a spawn.
-if [[ -n "$TASK_GID" ]]; then
+if [[ -n "$TASK_GID" && "$QA" != true ]]; then
   _SEG="spawn"; [[ -n "$RESUME_ID" ]] && _SEG="resume"
   AGENT_ORCH_VERSION="$("$HOME/.config/agent-watcher/stamp-orch-version.sh" \
     --gid "$TASK_GID" --segment "$_SEG" --model "${AGENT_MODEL:-default}" \
@@ -234,7 +257,9 @@ if [[ -n "$TASK_GID" ]]; then
     disown 2>/dev/null || true
   fi
 fi
-if [[ -n "$SLOT_INDEX" ]]; then
+if [[ -n "$SLOT_INDEX" || "$QA" == true ]]; then
+  [[ "$QA" == true ]]    && ENV_EXPORTS+="export AGENT_MODE=\"qa\"
+"
   [[ -n "$TASK_GID" ]]   && ENV_EXPORTS+="export AGENT_TASK_GID=\"$TASK_GID\"
 "
   [[ -n "$SIM_UDID" ]]   && ENV_EXPORTS+="export AGENT_SIM_UDID=\"$SIM_UDID\"
@@ -287,7 +312,7 @@ if [[ -n "$RESUME_ID" ]]; then
 fi
 
 echo "Spawned tmux session: $SESSION${YOLO:+ (yolo)}"
-if [[ -n "$SLOT_INDEX" ]]; then
+if [[ -n "$SLOT_INDEX" || "$QA" == true ]]; then
   echo "  slot $SLOT_INDEX  |  cwd $CWD  |  sim ${SIM_UDID:-none}  |  metro ${METRO_PORT:-8081}  |  maestro-mcp $([[ -n "$MCP_FLAG" ]] && echo yes || echo no)"
 fi
 echo "  Attach locally: tmux attach -t '=$SESSION'"

@@ -9,7 +9,8 @@
 #
 # SPARED even when orphaned (the same policy as session-watchdog.js
 # pruneSessionlessWorktrees(), so a manual run never removes what the watchdog keeps):
-#   - the task still has a tmux session (claude-asana-<gid> or retired done-asana-<gid>);
+#   - the task still has a tmux session (claude-asana-<gid>, retired done-asana-<gid>,
+#     or QA qa-asana-<gid>) or a fresh qa-holds.json entry;
 #   - any of the task's worktrees holds unsaved work (lib/worktree-unsaved.sh). The
 #     whole task is spared, because cleanup of one repo can take its gid dir with it.
 #
@@ -68,7 +69,16 @@ fetch_status() {
 }
 
 has_session() {
-  tmux has-session -t "=claude-asana-$1" 2>/dev/null || tmux has-session -t "=done-asana-$1" 2>/dev/null
+  tmux has-session -t "=claude-asana-$1" 2>/dev/null || tmux has-session -t "=done-asana-$1" 2>/dev/null ||
+    tmux has-session -t "=qa-asana-$1" 2>/dev/null || qa_held "$1"
+}
+
+# The async QA phase still needs this worktree (qa-holds.json from lib/qa-queue.js,
+# honored while fresher than 6h, the watchdog qaHeldGids() policy).
+qa_held() {
+  local holds="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/qa-holds.json"
+  [[ -f "$holds" ]] || return 1
+  jq -e --arg g "$1" '(now - (.updated_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601)) < 21600 and (.gids | has($g))' "$holds" >/dev/null 2>&1
 }
 
 # lib/remove-task-worktrees.sh holds this marker (its pid) while it runs.

@@ -692,6 +692,7 @@ function reapOrphanMetros(liveSessions) {
   const sessionGids = new Set([
     ...liveSessions.map((s) => s.slice(SESSION_PREFIX.length)),
     ...listRetiredSessions().map((s) => s.gid),
+    ...qaHeldGids(),
   ])
   for (const line of out.split('\n').filter(Boolean)) {
     const pid = parseInt(line.trim().split(/\s+/)[0], 10)
@@ -756,6 +757,7 @@ function reapStaleWatchmanRoots(liveSessions) {
   const sessionGids = new Set([
     ...liveSessions.map((s) => s.slice(SESSION_PREFIX.length)),
     ...listRetiredSessions().map((s) => s.gid),
+    ...qaHeldGids(),
   ])
   for (const r of roots) {
     if (!r.startsWith(WORKTREES_ROOT)) continue
@@ -913,6 +915,22 @@ function listRetiredSessions() {
     .map((line) => { const [name, created] = line.split(' '); return { name, gid: name.slice(RETIRED_PREFIX.length), created: parseInt(created, 10) || 0 } })
     .filter((s) => s.name.startsWith(RETIRED_PREFIX))
     .sort((a, b) => b.created - a.created)
+}
+
+// Gids the async QA phase still needs (lib/qa-queue.js): a live qa-asana-<gid>
+// session, or an entry in qa-holds.json (written every watcher tick). A holds file
+// older than QA_HOLDS_STALE_MS means the watcher stopped writing it; only live
+// sessions count then. Every reaper that keys off "no session for gid" adds these.
+const QA_HOLDS_FILE = path.join(slots.STATE_DIR, 'qa-holds.json')
+const QA_HOLDS_STALE_MS = 6 * 60 * 60 * 1000
+function qaHeldGids() {
+  const gids = sh('tmux list-sessions -F "#{session_name}"').split('\n')
+    .filter((s) => s.startsWith('qa-asana-')).map((s) => s.slice('qa-asana-'.length))
+  try {
+    const h = JSON.parse(fs.readFileSync(QA_HOLDS_FILE, 'utf8'))
+    if (Date.now() - Date.parse(h.updated_at) < QA_HOLDS_STALE_MS) gids.push(...Object.keys(h.gids || {}))
+  } catch { /* no holds file */ }
+  return gids
 }
 
 // REMOVED 2026-06-25 — un-retire sweep (was unretireFollowups):
@@ -1111,6 +1129,7 @@ function pruneSessionlessWorktrees(liveSessions, state) {
   const activeGids = new Set([
     ...liveSessions.map((s) => s.slice(SESSION_PREFIX.length)),
     ...listRetiredSessions().map((s) => s.gid), // retired-but-alive sessions keep their worktree
+    ...qaHeldGids(), // QA still drives this worktree
   ])
   const kept = []
   for (const gid of gidDirs) {
@@ -1196,7 +1215,7 @@ function mergedPrUrls(wt) {
 function teardownMergedWork(liveSessions, state) {
   let gidDirs
   try { gidDirs = fs.readdirSync(WORKTREES_ROOT) } catch { return }
-  const running = new Set(liveSessions.map((s) => s.slice(SESSION_PREFIX.length)))
+  const running = new Set([...liveSessions.map((s) => s.slice(SESSION_PREFIX.length)), ...qaHeldGids()])
   for (const gid of gidDirs) {
     if (!/^\d+$/.test(gid) || running.has(gid) || removalInProgress(gid)) continue
     const gidDir = path.join(WORKTREES_ROOT, gid)
