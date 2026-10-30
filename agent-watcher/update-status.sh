@@ -139,6 +139,14 @@ if [[ "$STATUS_NAME" == "Complete" && "${AGENT_MODE:-}" != "qa" && -x "$HOME/.cu
   "$HOME/.cursor/skills/qa-run/scripts/qa-on-complete.sh" --task-gid "$TASK_GID" ${BLOCKED:+--blocked "$BLOCKED"} 2>&1 || true
 fi
 
+# Token ledger: a dev Complete records this session's tokens by phase
+# (token-ledger.sh owns the rule; a repeat Complete adds only new calls).
+# Detached so it survives the session ending; output goes to token-ledger.log.
+if [[ "$STATUS_NAME" == "Complete" && "${AGENT_MODE:-}" != "qa" && -x "$HOME/.config/agent-watcher/token-ledger.sh" ]]; then
+  nohup "$HOME/.config/agent-watcher/token-ledger.sh" record --gid "$TASK_GID" --kind dev \
+    >>"${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/token-ledger.log" 2>&1 &
+fi
+
 # Best-effort section move so a Board view of the kanban reflects the status.
 SECTION_GID=$(jq -r --arg s "$STATUS_NAME" '.custom_fields.agent_status.section_gids[$s] // empty' "$CONFIG")
 if [[ -z "$SECTION_GID" ]]; then

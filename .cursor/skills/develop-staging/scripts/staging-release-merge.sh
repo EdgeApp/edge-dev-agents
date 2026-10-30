@@ -278,8 +278,16 @@ dep_step() {
   local branch dirty
   branch="$(git -C "$repo_dir" branch --show-current)"
   dirty="$(git -C "$repo_dir" status --porcelain | head -1)"
-  [ "$branch" = "master" ] || { step "$phase" failed "$pkg checkout is on '$branch', not master"; die "dep: $pkg not on master"; }
   [ -z "$dirty" ] || { step "$phase" failed "$pkg checkout is dirty"; die "dep: $pkg has uncommitted changes"; }
+  # The primary checkout is scratch space that review and test sessions leave on
+  # other branches or a detached HEAD. A clean tree loses nothing by switching
+  # (branch commits stay on their branch, a detached HEAD stays in the reflog),
+  # so only a dirty tree is worth stopping for.
+  if [ "$branch" != "master" ]; then
+    git -C "$repo_dir" checkout --quiet master \
+      || { step "$phase" failed "could not switch $pkg checkout from '${branch:-detached HEAD}' to master"; die "dep: $pkg checkout master failed"; }
+    say "$pkg: switched clean checkout from ${branch:-detached HEAD at $(git -C "$repo_dir" rev-parse --short 'HEAD@{1}')} to master"
+  fi
   git -C "$repo_dir" pull --ff-only --quiet || { step "$phase" failed "pull failed"; die "dep: $pkg pull failed"; }
 
   # The refresh scripts run under `node -r sucrase/register`, so the repo's own

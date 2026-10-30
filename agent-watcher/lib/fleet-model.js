@@ -289,8 +289,9 @@ function collectVitals (cfgAll) {
   const fseRestart = sh("grep '\\[fseventsd\\]' /tmp/session-watchdog.out 2>/dev/null | tail -1").match(/^\[([0-9T:.Z-]+)\].*→ restarted/)
   const fseventsd = fse ? { cpu: Number(fse[0]), rssGb: Number(fse[1]) / 1024 / 1024, etime: fse[2], lastRestart: fseRestart ? Date.parse(fseRestart[1]) : null } : null
   const holds = sh('ls /tmp/reanchor-hold* /tmp/agent-watcher-hold* 2>/dev/null').split('\n').filter(Boolean).map(h => h.replace('/tmp/', ''))
+  const mainStashes = Number(sh(`git -C '${HOME}/git/${w.default_repo || 'edge-react-gui'}' stash list 2>/dev/null | wc -l`).trim()) || 0
   return {
-    load, loads, maxLoad, freeGb, minFree, hogs, memLevel, runaway, fseventsd, holds,
+    load, loads, maxLoad, freeGb, minFree, hogs, memLevel, runaway, fseventsd, holds, mainStashes,
     cores: os.cpus().length,
     maxConcurrent: Number(process.env.AGENT_WATCHER_MAX_CONCURRENT || w.max_concurrent || 2),
     maxConcurrentNosim: Number(process.env.AGENT_WATCHER_MAX_CONCURRENT_NOSIM || w.max_concurrent_nosim || 3),

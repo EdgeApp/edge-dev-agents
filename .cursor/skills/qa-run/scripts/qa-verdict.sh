@@ -23,7 +23,8 @@
 #      verdicts posts as Blocked "auto re-arm cap reached".
 #   6. Comment (asana-task-update.sh --comment-file), then the report attachment
 #      (qa_attach_name with the next qa ordinal), then agent_qa, then the ledger
-#      line and <QA_DIR>/verdict.json. Inside a qa-asana session the session is
+#      line, <QA_DIR>/verdict.json and a detached token-ledger.sh record (skipped
+#      without a session id). Inside a qa-asana session the session is
 #      killed about 45s later.
 # Exit: 0 posted | 1 judge deny (items on stdout) | 3 judge unavailable |
 #       4 refused (snapshot, pinned sha or report shape; reason on stdout) | 2 usage
@@ -130,6 +131,8 @@ TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 jq -cn --arg ts "$TS" --arg gid "$GID" --arg v "$([ "$CAPPED" = 1 ] && echo Failed-capped || echo "$VERDICT")" --arg n "$NAME" --arg sha "$SHA" \
   '{ts:$ts, gid:$gid, verdict:$v, report:$n, sha:$sha}' >> "$(qa_ledger "$GID")"
 jq -cn --arg ts "$TS" --arg v "$VERDICT" --arg n "$NAME" --argjson capped "$CAPPED" '{ts:$ts, verdict:$v, report:$n, capped:($capped==1)}' > "$QD/verdict.json"
+[ -x "$HOME/.config/agent-watcher/token-ledger.sh" ] && nohup "$HOME/.config/agent-watcher/token-ledger.sh" record --gid "$GID" --kind qa \
+  >>"${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/token-ledger.log" 2>&1 &
 echo "POSTED: agent_qa=$VERDICT, comment, $NAME$([ "$CAPPED" = 1 ] && echo ' (auto re-arm cap reached)')"
 if [ "${AGENT_MODE:-}" = qa ]; then
   qa_kill_self_later "$GID" 45

@@ -16,7 +16,7 @@
 #            the comment bodies) on stdout, plus a per-tag count on stderr. Same payload and
 #            tag checks as submit; no GitHub call, so a --no-comment dry run can print it.
 #   features --pr <n> --owner <o> --repo <r> [--candidates]   Route the PR's changed files
-#            (gh pr diff --name-only) to the repo's review features and print the manifest
+#            (the paginated pulls/<n>/files API) to the repo's review features and print the manifest
 #            on stdout (feature-routing.rb route; its header owns the manifest shape). The
 #            features tree is read from FEATURES_SLUG at FEATURES_REF, or at the PR's base
 #            branch when the PR is on FEATURES_SLUG itself: never from the PR head.
@@ -552,7 +552,7 @@ case "$CMD" in
     if [[ "$(printf '%s' "$OWNER/$REPO" | tr '[:upper:]' '[:lower:]')" == "$(printf '%s' "$FEATURES_SLUG" | tr '[:upper:]' '[:lower:]')" ]]; then
       REF=$(gh pr view "$PR" --repo "$OWNER/$REPO" --json baseRefName --jq .baseRefName)
     fi
-    CHANGED=$(gh pr diff "$PR" --repo "$OWNER/$REPO" --name-only)
+    CHANGED=$(gh api --paginate "repos/$OWNER/$REPO/pulls/$PR/files" --jq '.[].filename')
     printf '%s\n' "$CHANGED" | "$FEATURE_ROUTER" route --repo "$REPO" --gh "$FEATURES_SLUG" --ref "$REF" ${CANDIDATES:+--candidates}
     ;;
 

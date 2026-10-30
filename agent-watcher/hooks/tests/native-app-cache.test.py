@@ -5,9 +5,13 @@ Run: python3 ~/.config/agent-watcher/hooks/tests/native-app-cache.test.py
 
 Key half: two trees with the same native inputs share a key whatever their JS
 differs in; any native input (pods lock, committed ios/ source, a patch, an
-embedded webview asset) changes it; a tree with uncommitted native source has
+embedded webview asset, the native source or prebuilt library size of a pod
+taken from node_modules) changes it; a tree with uncommitted native source has
 no key, and a Podfile.lock whose hermes-engine line a build rewrote still has
 the clean tree's key.
+
+Module stamp: an installed app with no module stamp reads absent, one written
+from the tree reads match, and an edited module source reads drift.
 
 Store half: put then get returns the bundle, a miss prints nothing, a second
 put replaces the entry, and trim keeps the most recently used entries.
@@ -22,6 +26,8 @@ LIBDIR = os.path.expanduser('~/.cursor/skills/build-and-test/scripts/lib')
 fails = []
 HERMES_A = '  hermes-engine: ' + 'a' * 40
 HERMES_B = '  hermes-engine: ' + 'b' * 40
+LOCK = ('PODS:\n  - A (%s)\nEXTERNAL SOURCES:\n  ZMod:\n    :path: "../node_modules/@z/mod"\n'
+        '  React-Core:\n    :path: "../node_modules/react-native/"\nSPEC CHECKSUMS:\n%s\n')
 
 
 def check(cond, msg):
@@ -54,11 +60,15 @@ def make_repo():
     git(repo, 'config', 'user.name', 't')
     git(repo, 'config', 'commit.gpgsign', 'false')
     write(repo, '.gitignore', 'node_modules\n')
-    write(repo, 'ios/Podfile.lock', 'PODS:\n  - A (1.0)\nSPEC CHECKSUMS:\n' + HERMES_A + '\n')
+    write(repo, 'ios/Podfile.lock', LOCK % ('1.0', HERMES_A))
     write(repo, 'ios/app/AppDelegate.swift', 'let a = 1\n')
     write(repo, 'patches/mod+1.0.0.patch', 'patch one\n')
     write(repo, 'src/index.ts', 'export const x = 1\n')
     write(repo, 'node_modules/edge-core/android/src/main/assets/core.js', 'core v1\n')
+    write(repo, 'node_modules/@z/mod/ios/Mod.swift', 'let m = 1\n')
+    write(repo, 'node_modules/@z/mod/ios/lib/libmod.a', 'abcd')
+    write(repo, 'node_modules/@z/mod/index.js', 'js v1\n')
+    write(repo, 'node_modules/react-native/React/RCT.m', 'rn v1\n')
     git(repo, 'add', '-A')
     git(repo, 'commit', '-q', '-m', 'base')
     return repo
@@ -88,9 +98,9 @@ write(b, 'src/other.ts', 'export const y = 1\n')
 commit(b)
 check(key(b) == k, 'committed JS changes keep the key')
 
-write(b, 'ios/Podfile.lock', 'PODS:\n  - A (1.0)\nSPEC CHECKSUMS:\n' + HERMES_B + '\n')
+write(b, 'ios/Podfile.lock', LOCK % ('1.0', HERMES_B))
 check(key(b) == k, 'a build-rewritten hermes line keeps the clean key')
-write(b, 'ios/Podfile.lock', 'PODS:\n  - A (2.0)\nSPEC CHECKSUMS:\n' + HERMES_A + '\n')
+write(b, 'ios/Podfile.lock', LOCK % ('2.0', HERMES_A))
 check(key(b) not in ('', k), 'a moved pod changes the key (uncommitted lock change still keyed)')
 git(b, 'checkout', '--', 'ios/Podfile.lock')
 
@@ -112,7 +122,27 @@ e = make_repo()
 write(e, 'node_modules/edge-core/android/src/main/assets/core.js', 'core v2\n')
 check(key(e) not in ('', k), 'a different embedded webview asset changes the key')
 
+m = make_repo()
+write(m, 'node_modules/@z/mod/index.js', 'js v2\n')
+write(m, 'node_modules/react-native/React/RCT.m', 'rn v2\n')
+check(key(m) == k, 'pod-module JS and react-native source keep the key')
+write(m, 'node_modules/@z/mod/ios/Mod.swift', 'let m = 2\n')
+km = key(m)
+check(km not in ('', k), 'edited native source of a node_modules pod changes the key')
+write(m, 'node_modules/@z/mod/ios/Mod.swift', 'let m = 1\n')
+check(key(m) == k, 'restored native source restores the key')
+write(m, 'node_modules/@z/mod/ios/lib/libmod.a', 'abcdef')
+check(key(m) not in ('', k, km), 'a prebuilt library of another size changes the key')
+
 check(sh('native_app_cache_key .', cwd=tempfile.mkdtemp()) == '', 'not a git repo: no key')
+
+# --- installed-app module stamp -----------------------------------------------
+data = tempfile.mkdtemp()
+check(sh('native_module_stamp_check "%s" .' % data, cwd=m) == 'absent', 'no module stamp: absent')
+open(os.path.join(data, '.agent-native-module-stamp'), 'w').write(sh('native_module_sources_hash .', cwd=m) + '\n')
+check(sh('native_module_stamp_check "%s" .' % data, cwd=m) == 'match', 'stamp written from the tree: match')
+write(m, 'node_modules/@z/mod/ios/Mod.swift', 'let m = 3\n')
+check(sh('native_module_stamp_check "%s" .' % data, cwd=m).startswith('drift '), 'edited module source: drift')
 
 # --- store half ----------------------------------------------------------------
 cache = tempfile.mkdtemp()
@@ -158,4 +188,4 @@ if fails:
     for f in fails:
         print('  - ' + f)
     sys.exit(1)
-print('PASS (13 key cases, 9 store cases)')
+print('PASS (18 key cases, 3 module-stamp cases, 9 store cases)')

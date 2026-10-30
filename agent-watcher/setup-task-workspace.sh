@@ -53,7 +53,7 @@
 #
 # Exit codes:
 #   0 = worktree ready (path on stdout)
-#   1 = error (missing repo, worktree add failed)
+#   1 = error (missing repo, broken gui main-checkout config, worktree add failed)
 #   2 = usage error
 
 set -euo pipefail
@@ -112,6 +112,20 @@ if [[ -z "$BASE" ]]; then
   BASE="$("$HOME/.cursor/skills/git-default-branch.sh" -C "$MAIN_REPO" 2>/dev/null || true)"
   [[ -z "$BASE" ]] && { echo "setup-task-workspace: cannot resolve a base ref for $REPO (no origin/HEAD, main, master, or develop) — refusing to guess" >&2; exit 1; }
   echo ">> setup-task-workspace: base ref for $REPO → $BASE" >&2
+fi
+
+# Refuse before any worktree work when the gui main checkout's config would break the
+# run (lib/main-config.sh); fit config refreshes the last-known-good copy.
+if [[ "$REPO" == "edge-react-gui" ]]; then
+  source "$HOME/.config/agent-watcher/lib/main-config.sh"
+  CONFIG_PROBLEMS="$(main_config_problems "$MAIN_REPO" "$BASE")"
+  if [[ -n "$CONFIG_PROBLEMS" ]]; then
+    echo ">> setup-task-workspace: FAIL — $MAIN_REPO config is broken, so this run cannot build or test:" >&2
+    sed 's/^/>>   /' <<<"$CONFIG_PROBLEMS" >&2
+    echo ">>   Restore: cp $MAIN_CONFIG_GOOD/* $MAIN_REPO/ (last-known-good copy), then re-run." >&2
+    exit 1
+  fi
+  snapshot_main_config "$MAIN_REPO"
 fi
 
 WT="$WORKTREES_ROOT/$TASK_GID/$REPO"

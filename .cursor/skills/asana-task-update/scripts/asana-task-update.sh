@@ -27,6 +27,11 @@
 # task is already Complete. The task is --task itself, or its parent when --task
 # has no agent_status of its own (a per-PR subtask). A run still in flight is
 # left to its own Complete, and a call carrying --set-repos sets the field itself.
+#
+# Completion: --complete checks the task off in Asana (the task's own completed
+# flag, not agent_status); --incomplete reopens it. --complete is refused while
+# agent_status is Pending or a phase, so a queued or live run is never closed
+# under itself. It runs last, after the call's comment, fields and attachments.
 set -euo pipefail
 
 TASK_GID=""
@@ -52,6 +57,7 @@ SET_PRIORITY=""
 SET_RELEASE=""
 SET_DEVELOPER_GID=""
 SET_REPOS=""
+SET_COMPLETED=""
 
 CREATE_SUBTASK=false
 SUBTASK_NAME=""
@@ -101,6 +107,8 @@ while [[ $# -gt 0 ]]; do
     --set-release) SET_RELEASE="$2"; shift 2 ;;
     --set-developer) SET_DEVELOPER_GID="$2"; shift 2 ;;
     --set-repos) SET_REPOS="$2"; shift 2 ;;
+    --complete) SET_COMPLETED=true; shift ;;
+    --incomplete) SET_COMPLETED=false; shift ;;
     *) echo "Unknown flag: $1" >&2; exit 1 ;;
   esac
 done
@@ -110,7 +118,7 @@ if [[ -z "$TASK_GID" ]]; then
   exit 1
 fi
 
-if ! $CREATE_SUBTASK && ! $DO_ATTACH && [[ -z "$DETACH_PR_URL" ]] && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$MOVE_TO_SECTION" ]] && [[ -z "$SET_PRIORITY" ]] && [[ -z "$SET_RELEASE" ]] && [[ -z "$SET_DEVELOPER_GID" ]] && [[ -z "$SET_REPOS" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$SET_NOTES_FILE" ]] && [[ -z "$COMMENT_FILE" ]] && [[ -z "$DELETE_COMMENT_GID" ]] && [[ -z "$EDIT_COMMENT_GID" ]]; then
+if ! $CREATE_SUBTASK && ! $DO_ATTACH && [[ -z "$DETACH_PR_URL" ]] && ! $DO_ATTACH_FILE && ! $DO_ASSIGN && ! $DO_UNASSIGN && [[ -z "$SET_BOARD_STATE" ]] && [[ -z "$MOVE_TO_SECTION" ]] && [[ -z "$SET_PRIORITY" ]] && [[ -z "$SET_RELEASE" ]] && [[ -z "$SET_DEVELOPER_GID" ]] && [[ -z "$SET_REPOS" ]] && [[ -z "$SET_COMPLETED" ]] && [[ -z "$SET_CURRENT_STATE_FILE" ]] && [[ -z "$SET_NOTES_FILE" ]] && [[ -z "$COMMENT_FILE" ]] && [[ -z "$DELETE_COMMENT_GID" ]] && [[ -z "$EDIT_COMMENT_GID" ]]; then
   echo "Error: No operations specified" >&2
   exit 1
 fi
@@ -911,4 +919,22 @@ if [[ -n "$SET_CURRENT_STATE_FILE" ]]; then
     echo ">> CURRENT STATE: FAILED (PUT rejected for task $TASK_GID)" >&2
     exit 1
   fi
+fi
+
+if [[ -n "$SET_COMPLETED" ]]; then
+  if [[ "$SET_COMPLETED" == true ]]; then
+    SC_STATUS="$("$HOME/.cursor/skills/asana-field-value.sh" "$TASK_GID" "agent_status")" || {
+      echo ">> COMPLETED: FAILED (could not read agent_status for task $TASK_GID)" >&2; exit 1; }
+    case "$(printf '%s' "$SC_STATUS" | tr '[:upper:]' '[:lower:]')" in
+      none|complete) ;;
+      *)
+        echo "Error: --complete refused: task $TASK_GID has agent_status=$SC_STATUS (a run is queued or in flight)" >&2
+        exit 1 ;;
+    esac
+  fi
+  asana_request "COMPLETED" -X PUT "$ASANA_API/tasks/$TASK_GID" \
+    -H "Authorization: Bearer $ASANA_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$(jq -cn --argjson c "$SET_COMPLETED" '{data:{completed:$c}}')" || exit 1
+  echo ">> COMPLETED: $SET_COMPLETED on task $TASK_GID"
 fi

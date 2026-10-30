@@ -76,6 +76,7 @@
 set -euo pipefail
 # launchd starts scripts with a bare PATH; add nvm/homebrew/~/.local/bin (lib header has the details).
 source "$HOME/.config/agent-watcher/lib/launchd-env.sh"
+source "$HOME/.cursor/skills/build-and-test/scripts/lib/native-deps-hash.sh"  # podfile_lock_only_hermes_changed
 
 DIR="$HOME/.config/agent-watcher"
 CONFIG="$DIR/asana-config.json"
@@ -248,12 +249,19 @@ build_failed() {
   $STRICT && exit 1 || exit 0
 }
 
-# 1. Put the main checkout exactly on develop. Refuse if it has uncommitted work —
-#    never reset a dirty operator checkout. (Agent work lives in worktrees, not here.)
-if [[ -n "$(git -C "$REPO_DIR" status --porcelain 2>/dev/null)" ]]; then
-  log "WARN — $REPO_DIR has uncommitted changes; refusing to reset it. Skipping refresh (non-fatal)."
+# 1. Put the main checkout exactly on develop. A prior build's hermes-engine lock
+#    line is build output and gets discarded. Anything else is a person's one-off
+#    (agent work lives in worktrees): it goes in a labeled stash so a forgotten edit
+#    cannot pin the fleet to a stale master. A stash git refuses skips this refresh.
+if ( cd "$REPO_DIR" && podfile_lock_only_hermes_changed ); then
+  git -C "$REPO_DIR" checkout --quiet -- ios/Podfile.lock
+  log "discarded the previous build's hermes-engine line in ios/Podfile.lock"
+fi
+if ! STASH_RESULT="$("$HOME/.cursor/skills/git-autostash.sh" --repo "$REPO_DIR" --message "master-refresh-autostash $(date -u +%Y-%m-%dT%H:%M:%SZ) (was on $(git -C "$REPO_DIR" branch --show-current))" --ignore-ref "$DEVELOP_REF" 2>&1 | tail -1; exit "${PIPESTATUS[0]}")"; then
+  log "WARN — could not stash $REPO_DIR ($STASH_RESULT). Skipping refresh (non-fatal)."
   exit 0
 fi
+[[ "$STASH_RESULT" == STASHED* ]] && log "WARN — $REPO_DIR held uncommitted work: $STASH_RESULT (recover: git stash list)"
 log "checking out $DEVELOP_REF in $REPO_DIR (${TARGET_SHA:0:9})"
 git -C "$REPO_DIR" checkout --quiet "$BRANCH" 2>/dev/null || git -C "$REPO_DIR" checkout --quiet -B "$BRANCH" "$DEVELOP_REF"
 git -C "$REPO_DIR" reset --hard --quiet "$DEVELOP_REF" || build_failed "could not reset $REPO_DIR to $DEVELOP_REF"

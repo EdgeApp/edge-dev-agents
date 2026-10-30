@@ -109,6 +109,7 @@ Determine which updates are needed by the caller and build one command with all 
   ```
 - `--set-developer <user_gid>` (🤖 - Developer people field)
 - `--set-repos <csv>` (Repo multi-enum set to exactly these; GitHub repo names or option names; options outside the repo map are never removed). `update-status.sh <gid> Complete` already runs it with every repo the task changed, so call it by hand only to fix a task outside a run.
+- `--complete` / `--incomplete` (check the task off in Asana, or reopen it; this is the task's own completed flag, separate from `agent_status`. `--complete` exits 1 while `agent_status` is Pending or a phase, and runs after every other operation in the call, so a closing comment goes in the same call via `--comment-file`)
 - `--set-current-state <file>` (rewrite the description's agent-maintained tail; body file carries the bullets only)
 - `--set-notes <file> [--comms-authorized "<words>"]` (replace the description's prose on a task whose `agent_status` is unset or Complete, per `set-notes-when-no-run-is-live`)
 </step>

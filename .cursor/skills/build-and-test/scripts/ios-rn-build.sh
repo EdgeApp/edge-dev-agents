@@ -216,7 +216,12 @@ ensure_metro_ready_and_pin() {
   if [[ -z "$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)" ]]; then
     echo ">> ios-rn-build: no Metro on port $PORT; starting one (log: /tmp/metro-$PORT.log)" >&2
     # Metro opens React Native DevTools in a Chrome instance teardown can kill
-    # (see metro-devtools-chrome.sh).
+    # (see metro-devtools-chrome.sh). Left alone, Metro prefers its standalone
+    # Electron shell: one detached app shared by every Metro, which ignores
+    # CHROME_PATH and outlives teardown. RNDT_DEV=1 points shell preparation at
+    # the dev flavor, which needs the electron package (not installed), so
+    # preparation fails and Metro falls back to the Chrome window.
+    RNDT_DEV=1 \
     CHROME_PATH="$HOME/.cursor/skills/build-and-test/scripts/metro-devtools-chrome.sh" \
       nohup npx react-native start --port "$PORT" >/tmp/metro-"$PORT".log 2>&1 &
     local ready=false
@@ -252,9 +257,11 @@ app_stamp_path() {
   [[ -n "$data" ]] && printf '%s/.agent-native-build-stamp' "$data"
 }
 write_build_stamp() {
-  local sp want; sp="$(app_stamp_path)"; want="$(native_deps_hash)"
+  local sp want mods; sp="$(app_stamp_path)"; want="$(native_deps_hash)"
   [[ -n "$sp" ]] || return 0
   printf '%s\n' "$want" > "$sp" 2>/dev/null && echo ">> ios-rn-build: wrote native-build stamp ($want)" >&2 || true
+  mods="$(native_module_sources_hash)"
+  printf '%s\n' "$mods" > "$(dirname "$sp")/.agent-native-module-stamp" 2>/dev/null || true
 }
 
 # ── Stored builds ───────────────────────────────────────────────────────────────
@@ -299,8 +306,10 @@ if ! $FORCE && xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>
   STAMP_FILE="$(app_stamp_path)"
   HAVE_HASH=""
   [[ -n "$STAMP_FILE" && -f "$STAMP_FILE" ]] && HAVE_HASH="$(tr -d '[:space:]' < "$STAMP_FILE" 2>/dev/null || true)"
-  if [[ -n "$HAVE_HASH" && "$HAVE_HASH" == "$WANT_HASH" ]]; then
-    echo ">> ios-rn-build: $BUNDLE_ID installed on $UDID, native stamp matches ($WANT_HASH); launching only (port $PORT)" >&2
+  MODULES="absent"
+  [[ -n "$STAMP_FILE" ]] && MODULES="$(native_module_stamp_check "$(dirname "$STAMP_FILE")")"
+  if [[ -n "$HAVE_HASH" && "$HAVE_HASH" == "$WANT_HASH" && "$MODULES" != drift* ]]; then
+    echo ">> ios-rn-build: $BUNDLE_ID installed on $UDID, native stamp matches ($WANT_HASH, node_modules native source: $MODULES); launching only (port $PORT)" >&2
     # Cached app may have been baked for a default packager host; pin it to THIS
     # slot's Metro before launching so it bundles from the right place.
     ensure_metro_ready_and_pin
@@ -308,7 +317,8 @@ if ! $FORCE && xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>
     echo ">> ios-rn-build: PASS (cached install, launched on Metro port $PORT)"
     exit 0
   fi
-  echo ">> ios-rn-build: installed app's native stamp '${HAVE_HASH:-<none>}' != worktree '$WANT_HASH' — pods drifted (reanimated/new-arch/native module) or never stamped; replacing it (a stored build of this native state, else a full rebuild) so develop's JS does not throw on a stale native app" >&2
+  [[ "$MODULES" == drift* ]] && echo ">> ios-rn-build: node_modules native source differs from what the installed app was built from ($MODULES): a native module was updot-linked or edited" >&2
+  echo ">> ios-rn-build: installed app's native stamp '${HAVE_HASH:-<none>}' vs worktree '$WANT_HASH' — pods drifted (reanimated/new-arch/native module) or never stamped; replacing it (a stored build of this native state, else a full rebuild) so develop's JS does not throw on a stale native app" >&2
   # fall through: a stored build when there is one, else the full build path
   # (both restamp on success)
 fi

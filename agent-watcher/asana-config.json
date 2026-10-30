@@ -158,7 +158,13 @@
     },
     "agent_review": {
       "gid": "1218643120920355",
-      "name": "agent_review"
+      "name": "agent_review",
+      "options": {
+        "low": "1218643120920356",
+        "medium": "1218643120920357",
+        "high": "1218643120997759",
+        "xhigh": "1218643120997760"
+      }
     },
     "agent_on_complete": {
       "gid": "1218856424282016",

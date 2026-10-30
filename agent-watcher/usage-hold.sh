@@ -21,6 +21,11 @@
 #                                        the idle reaper
 #   hooks/require-continuation-or-block.sh  allows the stop while the stamp exists
 #
+# Samples: each fresh reading whose 5h or 7d pct (or 7d reset) differs from the last line
+# is appended to usage-samples.jsonl ({ts,five_hour,seven_day,seven_day_resets}); stale
+# readings are not samples. token-calibrate.sh reads it to price tokens per 1% of the
+# weekly limit.
+#
 # Unknown usage (claude-usage.sh exit 1: stale token, network) fails OPEN for spawns and leaves
 # the pause stamp as it was, so a blip neither blocks work nor flaps paused sessions. During a
 # rate-limit backoff claude-usage.sh serves the last good reading (stale, under 30 min), which
@@ -32,6 +37,7 @@ set -uo pipefail
 CFG="${AGENT_WATCHER_CONFIG:-$HOME/.config/agent-watcher/asana-config.json}"
 USAGE="$HOME/.cursor/skills/claude-usage/scripts/claude-usage.sh"
 STAMP="${AGENT_USAGE_PAUSE_STAMP:-/tmp/agent-usage-pause.json}"
+SAMPLES="${XDG_STATE_HOME:-$HOME/.local/state}/agent-watcher/usage-samples.jsonl"
 
 HOLD="$(jq -c '.watcher.usage_hold // empty' "$CFG" 2>/dev/null)"
 if [ -z "$HOLD" ]; then
@@ -42,7 +48,7 @@ fi
 
 SUMMARY="$("$USAGE" --wake 2>/dev/null)"; RC=$?
 
-HOLD="$HOLD" SUMMARY="$SUMMARY" RC="$RC" STAMP="$STAMP" exec node -e '
+HOLD="$HOLD" SUMMARY="$SUMMARY" RC="$RC" STAMP="$STAMP" SAMPLES="$SAMPLES" exec node -e '
 const fs = require("fs")
 const hold = JSON.parse(process.env.HOLD)
 const stamp = process.env.STAMP
@@ -53,6 +59,18 @@ let s = null
 try { s = JSON.parse(process.env.SUMMARY) } catch {}
 if (process.env.RC !== "0" || !s || !s.ok) {
   out({ spawn_hold: false, paused: !!prev, reason: "usage unknown (" + (s?.error || "no output") + "); failing open" })
+}
+if (!s.stale) {
+  try {
+    const f = process.env.SAMPLES
+    const sample = { five_hour: s.five_hour?.pct ?? null, seven_day: s.seven_day?.pct ?? null, seven_day_resets: s.seven_day?.resets_at ?? null }
+    let last = null
+    try { last = JSON.parse(fs.readFileSync(f, "utf8").trimEnd().split("\n").pop()) } catch {}
+    if (!last || ["five_hour", "seven_day", "seven_day_resets"].some(k => last[k] !== sample[k])) {
+      fs.mkdirSync(require("path").dirname(f), { recursive: true })
+      fs.appendFileSync(f, JSON.stringify({ ts: s.fetched_at || new Date().toISOString(), ...sample }) + "\n")
+    }
+  } catch {}
 }
 const over = (gate) => {
   for (const [key, win] of [["five_hour", "five_hour"], ["seven_day", "seven_day"]]) {

@@ -10,7 +10,7 @@
 # source's features tree (skills/pr-review/features, the edge-dev-agents copy of
 # ~/.cursor/skills/pr-review/features). The schema is documented in that tree's
 # README.md. Routing is deterministic: changed paths (one per line on stdin, as
-# `gh pr diff --name-only` prints them) are matched against each feature's
+# the pulls/<n>/files API lists them) are matched against each feature's
 # `paths` globs with File.fnmatch, no model call.
 #
 # --git and --gh read committed content at --ref (the caller passes a base

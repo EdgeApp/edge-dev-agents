@@ -2,13 +2,23 @@
 // transcript-analyze.sh — read Claude Code transcripts without putting them in
 // a model's context.
 //
-// Two subcommands, one parser:
+// Three subcommands, one parser:
 //
 //   cost <target>
 //       Where a session's tokens went: call count, context curve, compaction
 //       count, image-Read positions, and the weighted cost of holding those
 //       images vs checking them in a subagent. Output is ~20 lines, so it is
 //       safe to run inline with `!` in any session.
+//
+//   phases <target> [--since ISO] [--until ISO] [--initial NAME] [--mark NAME=ISO]... [--json]
+//       Raw token totals (calls, input, cache read, cache write, output) split by
+//       the phase in effect at each call, main transcript plus its subagents
+//       (<uuid>/subagents/*.jsonl). Phase boundaries are the session's own
+//       `update-status.sh <gid> <Status>` calls; --mark adds a boundary the
+//       transcript cannot show (a QA pass's `approved` file), --initial names the
+//       phase before the first boundary (default Startup). --since/--until keep
+//       only calls in that window, so a resumed session is not counted twice.
+//       token-ledger.sh is the caller; --json is its input.
 //
 //   compact-windows <target> [--before N] [--after N] [--out DIR]
 //       The slice around every compaction, rendered as readable markdown: the
@@ -41,12 +51,12 @@ const IMG_RE = /\.(png|jpe?g|gif|webp)$/i;
 // --- args ---------------------------------------------------------------
 const argv = process.argv.slice(2);
 const cmd = argv.shift();
-if (!cmd || !["cost", "compact-windows"].includes(cmd)) {
-  console.error("usage: transcript-analyze.sh <cost|compact-windows> <--self|session-uuid|path|--gid GID> [opts]");
+if (!cmd || !["cost", "phases", "compact-windows"].includes(cmd)) {
+  console.error("usage: transcript-analyze.sh <cost|phases|compact-windows> <--self|session-uuid|path|--gid GID> [opts]");
   process.exit(2);
 }
 let target = "";
-const opt = { before: 12, after: 25, out: "", since: "" };
+const opt = { before: 12, after: 25, out: "", since: "", until: "", initial: "Startup", marks: [], json: false };
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a === "--self") {
@@ -58,8 +68,16 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === "--before") opt.before = Number(argv[++i]);
   else if (a === "--after") opt.after = Number(argv[++i]);
   else if (a === "--out") opt.out = argv[++i];
-  // --since is accepted and ignored: no subcommand ever filtered on it.
+  // --since/--until filter `phases` only.
   else if (a === "--since") opt.since = argv[++i];
+  else if (a === "--until") opt.until = argv[++i];
+  else if (a === "--initial") opt.initial = argv[++i];
+  else if (a === "--mark") {
+    const m = /^([^=]+)=(.+)$/.exec(argv[++i] || "");
+    if (!m || isNaN(Date.parse(m[2]))) die(`--mark wants NAME=ISO-time, got ${argv[i]}`);
+    opt.marks.push({ ts: Date.parse(m[2]), phase: m[1] });
+  }
+  else if (a === "--json") opt.json = true;
   else target = a;
 }
 if (!target) {
@@ -206,6 +224,92 @@ async function cost(file) {
   console.log(`one batched subagent: ~${k(15000 * 1.25 + imgs.length * 2500 * 1.25 + imgs.length * imgs.length * 125)} weighted`);
 }
 
+// --- phases -------------------------------------------------------------
+const STATUS_RE = /update-status\.sh\s+\S+\s+(Pending|Planning|Developing|Reviewing|Testing|Complete)\b/;
+const zero = () => ({ calls: 0, input: 0, cache_read: 0, cache_write: 0, output: 0 });
+function addUsage(b, u) {
+  b.calls++;
+  b.input += u.input_tokens || 0;
+  b.cache_read += u.cache_read_input_tokens || 0;
+  b.cache_write += u.cache_creation_input_tokens || 0;
+  b.output += u.output_tokens || 0;
+}
+
+// One entry per model call, deduped by message.id across the main transcript
+// and every subagent file.
+async function usageRows(file, seen) {
+  const out = [];
+  const rl = readline.createInterface({ input: fs.createReadStream(file), crlfDelay: Infinity });
+  for await (const line of rl) {
+    if (!line.includes('"assistant"')) continue;
+    let j;
+    try { j = JSON.parse(line); } catch (e) { continue; }
+    if (j.type !== "assistant" || !j.message) continue;
+    let status = null;
+    for (const c of j.message.content || []) {
+      if (c.type === "tool_use" && c.name === "Bash") {
+        const m = STATUS_RE.exec(String(c.input?.command || ""));
+        if (m) status = m[1];
+      }
+    }
+    const id = j.message.id;
+    // A status write can sit in a later content-block row of the same call.
+    if (seen.has(id)) { if (status) out.push({ ts: Date.parse(j.timestamp), status, dup: true }); continue; }
+    seen.add(id);
+    out.push({ ts: Date.parse(j.timestamp), model: j.message.model || "?", u: j.message.usage || {}, status });
+  }
+  return out;
+}
+
+async function phases(file) {
+  const seen = new Set();
+  const main = await usageRows(file, seen);
+  const subDir = path.join(path.dirname(file), path.basename(file, ".jsonl"), "subagents");
+  let sub = [];
+  if (fs.existsSync(subDir)) {
+    for (const f of fs.readdirSync(subDir).filter((f) => f.endsWith(".jsonl"))) {
+      sub = sub.concat(await usageRows(path.join(subDir, f), seen));
+    }
+  }
+  // Boundaries: a status write takes effect on the NEXT call, a --mark at its time.
+  const bounds = opt.marks.slice();
+  for (const r of main) if (r.status) bounds.push({ ts: r.ts + 1, phase: r.status });
+  bounds.sort((a, b) => a.ts - b.ts);
+  const phaseAt = (ts) => {
+    let p = opt.initial;
+    for (const b of bounds) { if (b.ts <= ts) p = b.phase; else break; }
+    return p;
+  };
+  const since = opt.since ? Date.parse(opt.since) : -Infinity;
+  const until = opt.until ? Date.parse(opt.until) : Infinity;
+  const res = { transcript: file, since: opt.since || null, until: opt.until || null, models: {}, phases: {}, subagents: zero(), total: zero(), first: null, last: null };
+  const order = [];
+  for (const [rows, isSub] of [[main, false], [sub, true]]) {
+    for (const r of rows) {
+      if (r.dup || isNaN(r.ts) || r.ts <= since || r.ts > until) continue;
+      const p = phaseAt(r.ts);
+      if (!res.phases[p]) { res.phases[p] = zero(); order.push(p); }
+      addUsage(res.phases[p], r.u);
+      addUsage(res.total, r.u);
+      if (isSub) addUsage(res.subagents, r.u);
+      res.models[r.model] = (res.models[r.model] || 0) + 1;
+      if (res.first === null || r.ts < res.first) res.first = r.ts;
+      if (res.last === null || r.ts > res.last) res.last = r.ts;
+    }
+  }
+  res.first = res.first && new Date(res.first).toISOString();
+  res.last = res.last && new Date(res.last).toISOString();
+  if (opt.json) { console.log(JSON.stringify(res)); return; }
+  const k = (n) => `${Math.round(n / 1000)}k`.padStart(8);
+  console.log(`transcript: ${file}`);
+  console.log(`window:     ${res.first || "-"} .. ${res.last || "-"}`);
+  console.log(`models:     ${Object.entries(res.models).map(([m, n]) => `${m} (${n})`).join(", ") || "-"}`);
+  console.log(`${"phase".padEnd(12)}${"calls".padStart(7)}${"input".padStart(8)}${"cRead".padStart(8)}${"cWrite".padStart(8)}${"output".padStart(8)}`);
+  for (const [name, b] of [...order.map((p) => [p, res.phases[p]]), ["(subagents)", res.subagents], ["TOTAL", res.total]]) {
+    console.log(`${name.padEnd(12)}${String(b.calls).padStart(7)}${k(b.input)}${k(b.cache_read)}${k(b.cache_write)}${k(b.output)}`);
+  }
+}
+
 // --- compact-windows ----------------------------------------------------
 async function compactWindows(file) {
   const { rows, calls } = await parse(file);
@@ -273,5 +377,6 @@ async function compactWindows(file) {
 (async () => {
   const file = resolveTranscript(target);
   if (cmd === "cost") await cost(file);
+  else if (cmd === "phases") await phases(file);
   else await compactWindows(file);
 })().catch((e) => die(e.message));

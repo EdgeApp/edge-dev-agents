@@ -718,8 +718,8 @@ case "$CMD" in
       STASHED=false
       if ! git diff --quiet HEAD 2>/dev/null || ! git diff --cached --quiet HEAD 2>/dev/null || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
         echo ">> Stashing uncommitted changes on $CURRENT_BRANCH"
-        git stash -u
-        STASHED=true
+        STASH_RESULT="$("$HOME/.cursor/skills/git-autostash.sh" --repo . --message "pr-address-autostash $(date -u +%Y-%m-%dT%H:%M:%SZ) (was on $CURRENT_BRANCH)" --ignore-ref "origin/$PR_BRANCH")"
+        [[ "$STASH_RESULT" == STASHED* ]] && STASHED=true
       fi
       echo ">> Switching from $CURRENT_BRANCH to $PR_BRANCH"
       git checkout "$PR_BRANCH" 2>&1

@@ -19,7 +19,9 @@
 //
 // Metrics, per findings file and per label (version) in aggregate:
 //   recall           caught actionable human items / actionable human items
-//   precision        matched findings / findings
+//   human match      matched findings / findings (overlap with what humans
+//                    raised; a valid finding no human raised lowers it)
+//   precision        (matched + valid) / findings, the share that is not noise
 //   signal-to-noise  (matched + valid) / noise
 // plus counts per finding tag (the rule or lens behind each finding).
 //
@@ -527,7 +529,8 @@ function metrics(c) {
   return {
     ...c,
     recall: ratio(c.caught, c.actionable),
-    precision: ratio(c.matched, c.findings),
+    humanMatch: ratio(c.matched, c.findings),
+    precision: ratio(c.matched + c.valid, c.findings),
     signalToNoise: c.noise === 0 ? (c.matched + c.valid > 0 ? 'inf' : null) : ratio(c.matched + c.valid, c.noise)
   }
 }
@@ -548,10 +551,10 @@ function fmt(v) {
 
 function renderReport(results, aggregates, run) {
   const out = ['# Replay comparator results', '', `Export: ${run.export}. Judge: ${run.model}, prompt ${PROMPT_VERSION}. Judge calls: ${run.stats.calls} new, ${run.stats.cached} cached.`, '']
-  out.push('## Aggregate by label', '', '| Label | PRs | Actionable human | Caught | Recall | Findings | Match | Valid | Noise | Precision | Signal:noise |', '|---|---|---|---|---|---|---|---|---|---|---|')
+  out.push('## Aggregate by label', '', '| Label | PRs | Actionable human | Caught | Recall | Findings | Match | Valid | Noise | Human match | Precision | Signal:noise |', '|---|---|---|---|---|---|---|---|---|---|---|---|')
   for (const [label, a] of Object.entries(aggregates)) {
     const m = a.totals
-    out.push(`| ${label} | ${m.prs} | ${m.actionable} | ${m.caught} | ${fmt(m.recall)} | ${m.findings} | ${m.matched} | ${m.valid} | ${m.noise} | ${fmt(m.precision)} | ${m.signalToNoise === 'inf' ? 'inf' : m.signalToNoise ?? 'n/a'} |`)
+    out.push(`| ${label} | ${m.prs} | ${m.actionable} | ${m.caught} | ${fmt(m.recall)} | ${m.findings} | ${m.matched} | ${m.valid} | ${m.noise} | ${fmt(m.humanMatch)} | ${fmt(m.precision)} | ${m.signalToNoise === 'inf' ? 'inf' : m.signalToNoise ?? 'n/a'} |`)
   }
   for (const [label, a] of Object.entries(aggregates)) {
     out.push('', `### Findings by tag (${label})`, '', '| Tag | Findings | Match | Valid | Noise |', '|---|---|---|---|---|')
@@ -559,7 +562,7 @@ function renderReport(results, aggregates, run) {
   }
   for (const r of results) {
     const m = r.metrics
-    out.push('', `## ${r.pr.repo}#${r.pr.number} (${r.label})`, '', `Findings file: ${r.file}`, '', `Recall ${fmt(m.recall)} (${m.caught}/${m.actionable} actionable), precision ${fmt(m.precision)} (${m.matched}/${m.findings}), signal:noise ${m.signalToNoise ?? 'n/a'}.`, '')
+    out.push('', `## ${r.pr.repo}#${r.pr.number} (${r.label})`, '', `Findings file: ${r.file}`, '', `Recall ${fmt(m.recall)} (${m.caught}/${m.actionable} actionable), human match ${fmt(m.humanMatch)} (${m.matched}/${m.findings}), precision ${fmt(m.precision)} (${m.matched + m.valid}/${m.findings}), signal:noise ${m.signalToNoise ?? 'n/a'}.`, '')
     out.push('| Finding | Where | Tag | Label | Matches | Reason |', '|---|---|---|---|---|---|')
     for (const f of r.findings) out.push(`| ${f.id} | ${f.path ?? ''}:${f.line ?? ''} | ${f.tag} | ${f.label} | ${f.humans.join(', ')} | ${String(f.reason).replace(/\|/g, '/')} |`)
     out.push('', '| Human item | Kind | Where | Actionable | Caught by | Gist |', '|---|---|---|---|---|---|')
@@ -642,7 +645,7 @@ async function main() {
 
   for (const [label, a] of Object.entries(aggregates)) {
     const m = a.totals
-    console.log(`${label}: ${m.prs} PRs, recall ${fmt(m.recall)} (${m.caught}/${m.actionable}), precision ${fmt(m.precision)} (${m.matched}/${m.findings}), valid ${m.valid}, noise ${m.noise}, signal:noise ${m.signalToNoise ?? 'n/a'}`)
+    console.log(`${label}: ${m.prs} PRs, recall ${fmt(m.recall)} (${m.caught}/${m.actionable}), human match ${fmt(m.humanMatch)} (${m.matched}/${m.findings}), precision ${fmt(m.precision)} (${m.matched + m.valid}/${m.findings}), valid ${m.valid}, noise ${m.noise}, signal:noise ${m.signalToNoise ?? 'n/a'}`)
   }
   console.log(`judge: ${stats.calls} calls, ${stats.cached} cached, ${stats.inTok} in / ${stats.outTok} out tokens, failures ${stats.failures.length}`)
   for (const f of stats.failures) console.log(`  ${f}`)

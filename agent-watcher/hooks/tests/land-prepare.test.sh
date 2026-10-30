@@ -41,6 +41,7 @@ FAKE="$TMP/fake"
 mkdir -p "$SK/pr-land/scripts" "$CFG" "$FH/git" "$TMP/state" "$FAKE"
 cp "$REAL/pr-land/scripts/pr-land-prepare.sh" "$REAL/pr-land/scripts/edge-repo.js" \
    "$REAL/pr-land/scripts/repo-land-lock.sh" "$SK/pr-land/scripts/"
+cp "$REAL/git-autostash.sh" "$SK/"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$SK/pr-land/scripts/wait-for-quiet-load.sh"
 printf '#!/usr/bin/env bash\nexit "${FAKE_INSTALL_RC:-0}"\n' > "$SK/install-deps.sh"
 printf '#!/usr/bin/env bash\necho "base marked unbuildable" >&2\nexit "${FAKE_BASE_RC:-0}"\n' > "$CFG/develop-buildable.sh"

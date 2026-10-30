@@ -71,7 +71,8 @@
 #       1   a check failed, Travis included (read `gh run view --log-failed`, fix)
 #       76  ZERO checks on the PR for NOCHECKS_GRACE seconds (default 300): the
 #             repo posts nothing on this branch, so there is nothing to wait
-#             on. Final line: RESULT: no-checks. The caller reports it as a
+#             on. Final line: RESULT: no-checks, with the reviewer-unavailable
+#             suffix (and waiver) for every reviewer bot. The caller reports it as a
 #             CI-configuration problem; it is NOT a budget exhaustion and NOT a
 #             green.
 #       7   CONTINUE: this call hit its per-call cap (MAX_CALL, default 540s, under
@@ -297,7 +298,18 @@ while :; do
     [ -n "$ZERO_SINCE" ] || ZERO_SINCE=$(date +%s)
     if [ $(( $(date +%s) - ZERO_SINCE )) -ge "$NOCHECKS_GRACE" ]; then
       echo ">> watch-pr: NO checks on HEAD ${CUR_HEAD:0:8} after $((NOCHECKS_GRACE / 60))m — nothing to gate on. Does this repo run CI on this branch?" >&2
-      echo "RESULT: no-checks"
+      # No check posted at all, reviewers included: every reviewer is
+      # unavailable on this HEAD (disabled for the repo, or down). Record the
+      # same waiver the green path writes, or the Complete gate counts the
+      # reviewers as owed on a repo that can never post them.
+      MISS_TEXT=$(jq -r '[.[] | select(.verdict == "unavailable") | "\(.bot)(\(.detail))"] | join(", ")' \
+        <<<"$(reviewer_bot_verdicts "$REPO" "$PR" "[]")" 2>/dev/null || true)
+      if [ -n "$MISS_TEXT" ] && [ -n "$TASK_GID" ]; then
+        printf 'reviewer-unavailable: %s posted no check-run/review on ready HEAD %s at %s (no checks posted)\n' \
+          "$MISS_TEXT" "${CUR_HEAD:0:12}" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "/tmp/agent-bot-unavailable-${TASK_GID}" 2>/dev/null || true
+        echo ">> watch-pr: $MISS_TEXT did not review HEAD. Record it ONLY as the unchecked reviewer box in the run report's Finalize Gate." >&2
+      fi
+      echo "RESULT: no-checks${MISS_TEXT:+ reviewer-unavailable:$MISS_TEXT(no review on HEAD)}"
       exit 76
     fi
   else

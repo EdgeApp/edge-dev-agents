@@ -102,8 +102,11 @@ else
   STAMP_FILE="$DATA_DIR/.agent-native-build-stamp"
   HAVE="$(cat "$STAMP_FILE" 2>/dev/null || echo "no-stamp")"
   WANT="$(native_deps_hash "$REPO_DIR")"
-  if [[ "$HAVE" == "$WANT" ]]; then
-    echo "NATIVE: stamp match ($HAVE) — JS bundles live from Metro; NO rebuild needed"
+  MODULES="$(native_module_stamp_check "$DATA_DIR" "$REPO_DIR")"
+  if [[ "$HAVE" == "$WANT" && "$MODULES" == drift* ]]; then
+    rebuild_or_install "NATIVE: node_modules native source DRIFT ($MODULES), a native module was updot-linked or edited"
+  elif [[ "$HAVE" == "$WANT" ]]; then
+    echo "NATIVE: stamp match ($HAVE, node_modules native source: $MODULES) — JS bundles live from Metro; NO rebuild needed"
   elif [[ "$HAVE" == "no-stamp" ]]; then
     rebuild_or_install "NATIVE: no stamp on installed app (its native side is unknown)"
   else

@@ -93,9 +93,11 @@ release_ws_prep() {
 }
 
 # release_classify_conflict <conflicted-file> <ours-label> <theirs-label>
-# Prints one verdict line (plus up to three "only on <ours>" lines). The verdict
+# Prints one verdict line (plus up to three evidence lines). The verdict
 # contains "loses nothing" exactly when taking the THEIRS side drops nothing the
-# OURS side has; callers route on that phrase.
+# OURS side has that THEIRS did not drop itself; callers route on that phrase.
+# Run inside the conflicted merge (HEAD = ours, MERGE_HEAD = theirs): the
+# history check below reads both from the file's worktree.
 release_classify_conflict() {
   node - "$1" "$2" "$3" <<'NODE'
 // A purely textual subset test is not enough. A dependency pin that moved on
@@ -104,9 +106,44 @@ release_classify_conflict() {
 // "ours carries content theirs lacks" would tell the operator to downgrade,
 // and it would fire on package.json / package-lock.json / Podfile.lock at
 // every single release.
+// A two-sided comparison is not enough either. When THEIRS deliberately
+// deleted a line (an upgrade that removed a workaround) and OURS touched the
+// same hunk (a cherry-pick), the line shows up on OURS only, yet taking THEIRS
+// is correct. So an OURS-only line THEIRS's own history added or removed since
+// the merge base (git log -S, scoped to this file) counts as dropped by THEIRS.
+// A line THEIRS never had keeps the "carries content" verdict.
 const fs = require("fs");
+const path = require("path");
+const { execFileSync } = require("child_process");
 const [file, OURS, THEIRS] = process.argv.slice(2);
 const lines = fs.readFileSync(file, "utf8").split("\n");
+
+// A jest snapshot is generated output: its hunks are repeated tokens whose
+// count no commit changes, so neither test above can read them. Both release
+// merges end with THEIRS's tree (the parity gate), so THEIRS's snapshot is the
+// one that matches the merged code, and the Verify phase reruns jest on it.
+if (file.endsWith(".snap")) {
+  const n = lines.filter((l) => l.startsWith("<<<<<<< ")).length;
+  console.log(`${n} hunk(s): generated jest snapshot, ${THEIRS}'s copy matches the merged code (Verify reruns jest), taking ${THEIRS}'s side loses nothing`);
+  process.exit(0);
+}
+
+const cwd = path.dirname(file), rel = path.basename(file);
+const git = (...a) => {
+  try { return execFileSync("git", a, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); }
+  catch { return ""; }
+};
+const base = git("rev-parse", "-q", "--verify", "MERGE_HEAD") ? git("merge-base", "HEAD", "MERGE_HEAD") : "";
+const droppedCache = new Map();
+// "<sha> <subject>" of THEIRS's newest commit since the base that changed the
+// count of this exact line in this file, or "" when there is none.
+const droppedBy = (l) => {
+  if (!base) return "";
+  if (!droppedCache.has(l)) {
+    droppedCache.set(l, git("log", "-1", "--format=%h %s", "-S", l, `${base}..MERGE_HEAD`, "--", rel));
+  }
+  return droppedCache.get(l);
+};
 
 // A semver range prefix is part of the version: an exact pin on one side and a
 // caret range on the other ("2.48.2" vs "^2.53.0") are the same entry.
@@ -129,8 +166,8 @@ const cmpVer = (a, b) => {
   return 0;
 };
 
-let i = 0, hunks = 0, superseded = 0;
-const missing = [];
+let i = 0, hunks = 0, superseded = 0, dropped = 0;
+const missing = [], droppedShown = [];
 while (i < lines.length) {
   if (!lines[i].startsWith("<<<<<<< ")) { i++; continue; }
   i++; const ours = [];
@@ -159,6 +196,15 @@ while (i < lines.length) {
       return tv.length === sv.length && sv.every((v, n) => cmpVer(v, tv[n]) <= 0);
     });
     if (newerOnTheirs) { superseded++; continue; }
+    // THEIRS extended the line in place (a widened import, an added cast).
+    // Length floor so a bare brace or keyword never matches by accident.
+    if (l.length >= 12 && theirs.some((t) => t.includes(l))) continue;
+    const by = droppedBy(l);
+    if (by) {
+      dropped++;
+      if (droppedShown.length < 3) droppedShown.push(`${by.slice(0, 60)}: ${l.slice(0, 60)}`);
+      continue;
+    }
     if (missing.length < 3) missing.push(l);
   }
 }
@@ -166,6 +212,9 @@ while (i < lines.length) {
 if (missing.length) {
   console.log(`${hunks} hunk(s): ${OURS} carries content ${THEIRS} lacks, back-port it to ${THEIRS} first`);
   for (const m of missing) console.log(`         only on ${OURS}: ${m.slice(0, 110)}`);
+} else if (dropped) {
+  console.log(`${hunks} hunk(s): ${THEIRS} removed ${dropped} line(s) ${OURS} still has, taking ${THEIRS}'s side loses nothing`);
+  for (const d of droppedShown) console.log(`         removed on ${THEIRS} by ${d}`);
 } else if (superseded) {
   console.log(`${hunks} hunk(s): ${THEIRS} supersedes ${OURS} (${superseded} entr(y/ies) at a newer version), taking ${THEIRS}'s side loses nothing`);
 } else {

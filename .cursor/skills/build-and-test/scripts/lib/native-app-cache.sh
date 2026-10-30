@@ -15,15 +15,18 @@
 #   - the committed tree of ios/ (app target sources, Podfile, project file);
 #   - the committed tree of patches/ (patch-package rewrites native modules
 #     without touching Podfile.lock);
-#   - no key when either holds an uncommitted change. A build of such a tree
-#     must not be stored (another run would receive those edits), and such a
-#     tree must not take a stored app (it would lose its own edits).
+#   - the native source of every pod Podfile.lock takes from node_modules
+#     (native_module_sources_hash in lib/native-deps-hash.sh, which says what
+#     it covers);
+#   - no key when ios/ or patches/ holds an uncommitted change. A build of such
+#     a tree must not be stored (another run would receive those edits), and
+#     such a tree must not take a stored app (it would lose its own edits).
 # ios/Podfile.lock is exempt from the dirty check: every build rewrites its
 # hermes-engine line, and its content is already in the key through the stamp.
 #
 # WHAT A MISS LOOKS LIKE: native state nobody built yet (a PR that moves a pod,
-# a dependency linked in from a sibling worktree), or a dirty native tree. Those
-# take the full build exactly as before.
+# a native module updot-linked or edited in node_modules), or a dirty ios/ or
+# patches/ tree. Those take the full build.
 #
 # Layout: $NATIVE_APP_CACHE_DIR/<bundle-id>/<key>/<Name>.app plus a `built-from`
 # note. Entries are APFS clones of the installed bundle (about 330 MB logical,
@@ -40,15 +43,16 @@ native_app_cache_key() {
     cd "${1:-.}" 2>/dev/null || exit 0
     git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
     [[ -d ios ]] || exit 0
-    local dirty stamp ios_tree patches_tree
+    local dirty stamp ios_tree patches_tree modules
     dirty="$(git status --porcelain --untracked-files=all -- ios patches 2>/dev/null \
       | grep -v -E '^.. ios/Podfile\.lock$' | head -1)"
     [[ -z "$dirty" ]] || exit 0
     stamp="$(native_deps_hash .)"
     ios_tree="$(git rev-parse -q --verify 'HEAD:ios' 2>/dev/null || true)"
     patches_tree="$(git rev-parse -q --verify 'HEAD:patches' 2>/dev/null || echo none)"
-    [[ -n "$stamp" && -n "$ios_tree" ]] || exit 0
-    printf '%s-%s\n' "$stamp" "$(printf '%s %s' "$ios_tree" "$patches_tree" | shasum -a 256 | cut -c1-12)"
+    modules="$(native_module_sources_hash .)"
+    [[ -n "$stamp" && -n "$ios_tree" && -n "$modules" ]] || exit 0
+    printf '%s-%s\n' "$stamp" "$(printf '%s %s %s' "$ios_tree" "$patches_tree" "$modules" | shasum -a 256 | cut -c1-12)"
   )
 }
 

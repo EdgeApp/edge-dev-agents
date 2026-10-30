@@ -178,6 +178,7 @@ name/runtime, Metro defaults to 8081.
 | `lib/task-names.js` | Asana gid to name: `asana-task-names.tsv` (6h project-list refresh, first row wins) plus a negative cache `asana-task-names-missing.tsv` so a failed per-gid GET is not repeated for 6h (15 min when the request itself failed) |
 | `lib/collect-worker.js` | runs `fleet-model.collect()` on a worker thread for orch-tui, so its synchronous shell reads never block keys; warms the task-name cache after each collect |
 | `lib/frame.js` | full-screen painter for orch-tui and session-tui: rewrites only the rows that changed since the last paint, never a clear-and-redraw per tick (Terminal.app leaks heap on that churn); `invalidate()` on resize and alt-screen re-entry |
+| `lib/main-config.sh` | is the gui main checkout config fit to copy into worktrees (`setup-task-workspace.sh` exits 1 and names the file when not), plus the last-known-good copy in `$STATE/main-config-good/`, refreshed whenever a setup finds it fit |
 | `lib/autocompact-flag.sh` | prints the `--autocompact <window>` flag every claude spawn on the box passes (orch runs, chat sessions, rc-heal anchors, resume-agent resumes; the watchdog's RC respawn carries it over from the old argv), from `watcher.autocompact_window` (default 200k, `auto` = no flag) |
 | `slots.json` | slot state |
 | `gc-worktrees.sh` | manual orphan cleanup |

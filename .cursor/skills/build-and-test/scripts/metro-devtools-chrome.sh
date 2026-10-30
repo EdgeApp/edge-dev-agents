@@ -3,7 +3,8 @@
 #
 # ios-rn-build.sh starts Metro with CHROME_PATH pointing here, so Metro's DevTools
 # launcher (LogBox toast tap, dev menu "Open Debugger") runs this instead of the
-# system Chrome. Plain Chrome hands an --app window to the operator's running Chrome
+# system Chrome (it also sets RNDT_DEV=1 so Metro takes this Chrome path over its
+# standalone Electron shell). Plain Chrome hands an --app window to the operator's running Chrome
 # and exits, leaving a window no teardown can reach. This runs a separate Chrome
 # instance with its own profile at /tmp/metro-devtools/<metro port>, so the window
 # belongs to a process cleanup-task-workspace.sh finds by that path and kills along

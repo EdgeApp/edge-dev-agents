@@ -78,12 +78,17 @@ The script classifies each conflicted file. Relay which classification it printe
   different commit, so the histories disagree about lines that agree textually.
 - *develop supersedes staging (N entries at a newer version)*: the same dependency entries moved on
   both branches and develop went further. The routine case for the manifest and the lockfiles.
+- *develop removed N line(s) staging still has*: develop's own history since the merge base added
+  or removed each of those lines in that file (a develop upgrade deleted a workaround a staging
+  cherry-pick touched). The script names the develop commit per line; relay those.
+- *generated jest snapshot*: a `.snap` file. The merged tree is develop's, so develop's snapshot
+  matches it, and the Verify phase reruns jest.
 - *staging carries content develop lacks*: the only one that matters. The script names the offending
   lines. Something on staging never made it back to develop, so it has to be back-ported to develop
   first. This is the checklist's "Extra changes in staging? Need to ensure they're also in develop".
   Never clear one of these with `--resolve-theirs`.
 
-For the first two the script prints a ready-to-paste re-run with a `--resolve-theirs` per safe file.
+For every classification except the last, the script prints a ready-to-paste re-run with a `--resolve-theirs` per safe file.
 Show it to the operator and run it once they agree.
 </sub-step>
 

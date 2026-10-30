@@ -3,7 +3,8 @@
 //   HEALTH    answers "why is nothing spawning?": the watcher's spawn verdict
 //             with the first blocker named; load with the processes pinning
 //             it; RAM plus memory-monitor level; capacity (runs/slots/sims/
-//             pending); guards (fseventsd, runaway count, hold files); launchd
+//             pending); guards (fseventsd, runaway count, hold files, main
+//             checkout stashes); launchd
 //             job health (config-watch exit 1 = CONFIG DRIFT); the watcher's
 //             last tick line; Asana agent_status tally. Then SLOTS ⨯ liveness,
 //             SIM POOL, WORKTREES, and the merged ACTIVITY tail. Read-only;
@@ -144,7 +145,7 @@ function healthPanel (v, cols) {
     : `${C.dim}fseventsd ?${C.off}`
   const rg = v.runaway ? `   runaway ${v.runaway.total >= v.runaway.cap * 0.8 ? C.yel : C.grn}${v.runaway.total}/${v.runaway.cap}${C.off} agent procs` : ''
   const holds = v.holds.length ? `   ${C.red}holds: ${v.holds.join(' ')}${C.off}` : `   ${C.dim}holds: none${C.off}`
-  L.push(row('guards', `${fse}${rg}${holds}`))
+  L.push(row('guards', `${fse}${rg}${holds}   ${C.dim}main stashes ${v.mainStashes}${C.off}`))
   L.push(row('jobs', `${jobsLine(v.jobs)}   ${C.dim}watcher tick ${v.watcherTickAge == null ? '?' : fmtAgo(Date.now() / 1000 - v.watcherTickAge) + ' ago'} · watchdog ${v.watchdogTickAge == null ? '?' : fmtAgo(Date.now() / 1000 - v.watchdogTickAge) + ' ago'}${C.off}`))
   const lw = v.lastWatcherLine ? `${/skipped|deferred|held/.test(v.lastWatcherLine) ? C.yel : C.dim}${v.lastWatcherLine.slice(0, cols - 14)}${C.off}` : `${C.dim}(no watcher line)${C.off}`
   L.push(row('watcher', lw))

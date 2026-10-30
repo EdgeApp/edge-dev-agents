@@ -310,9 +310,16 @@ async function prepareBranch(repo, branch, buildField, taskGid) {
         allowFailure: true,
       });
       const stashMsg = `pr-land-autostash ${new Date().toISOString()} (was on ${onBranch.stdout || "unknown"})`;
-      runGit(["stash", "push", "--include-untracked", "-m", stashMsg], repoDir);
-      console.error(`⚠ Dirty working tree — auto-stashed: "${stashMsg}"`);
-      result.autostash = stashMsg;
+      const stash = spawnSync(
+        path.join(process.env.HOME, ".cursor/skills/git-autostash.sh"),
+        ["--repo", repoDir, "--message", stashMsg, "--ignore-ref", `origin/${branch}`],
+        { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] }
+      );
+      if (stash.status !== 0) throw new Error(`git-autostash.sh exited ${stash.status} in ${repoDir}`);
+      if (stash.stdout.startsWith("STASHED")) {
+        console.error(`⚠ Dirty working tree — auto-stashed: "${stashMsg}"`);
+        result.autostash = stashMsg;
+      }
     }
     runGit(["fetch", "origin"], repoDir);
     runGit(["fetch", "origin", branch], repoDir, { allowFailure: true });
