@@ -162,6 +162,7 @@ const SESSION_PREFIX = 'claude-asana-'
 // inspection / remote re-engagement. pruneRetiredSessions() caps how many linger.
 const RETIRED_PREFIX = 'done-asana-'
 const WORKTREES_ROOT = require('./lib/worktree-root.js').worktreeRoot()
+const { mergedPrUrlsForTask } = require('./lib/worktree-merge-state.js')
 const DEFAULT_KEEP_COMPLETED_SESSIONS = 3
 
 // Cache: token + status field GID read once per process run.
@@ -1191,27 +1192,21 @@ function sweepOrphanDerivedData() {
   }
 }
 
-// Merged PRs for one worktree's branch, or null when the work is not fully merged
-// (no PR, any PR still open, only closed-unmerged PRs, a non-agent branch, or a gh
-// failure). Cross-repo PRs are ignored so a fork's same-named branch cannot match.
-function mergedPrUrls(wt) {
-  const branch = sh(`git -C "${wt}" rev-parse --abbrev-ref HEAD`)
-  const prefix = process.env.GIT_BRANCH_PREFIX || 'jon'
-  if (!branch || branch === 'HEAD' || !(branch.startsWith('agent/') || branch.startsWith(`${prefix}/`))) return null
-  const out = sh(`cd "${wt}" && gh pr list --head "${branch}" --state all --limit 20 --json url,state,isCrossRepository`)
-  let prs
-  try { prs = JSON.parse(out).filter((p) => !p.isCrossRepository) } catch { return null }
-  if (prs.some((p) => p.state === 'OPEN')) return null
-  const merged = prs.filter((p) => p.state === 'MERGED').map((p) => p.url)
-  return merged.length ? merged : null
+// Delete UI test output from the user temp dir by age. test-output-reap.sh owns the
+// limits and skips anything a process holds open. Detached, for the same reason.
+const TEST_OUTPUT_LOG = '/tmp/test-output-reap.log'
+function sweepTestOutput() {
+  if (spawnDetached(path.join(DIR, 'test-output-reap.sh'), [], TEST_OUTPUT_LOG)) {
+    log(`[test-output] sweep started (detached; results in ${TEST_OUTPUT_LOG})`)
+  }
 }
 
 // Tear down finished work as soon as it merges, regardless of the retired-session
-// caps: when EVERY repo worktree of a task has a merged PR and none open, kill its
-// retired session (if any) and remove the worktrees (removeTaskWorktrees → detached
-// cleanup-task-workspace, which also deletes their DerivedData). A task with a live
-// claude-asana-<gid> session is in flight and never touched. Transcripts survive;
-// re-engage via Pending.
+// caps: when lib/worktree-merge-state.js finds a task's work on merged PRs with none
+// open, kill its retired session (if any) and remove the worktrees
+// (removeTaskWorktrees → detached cleanup-task-workspace, which also deletes their
+// DerivedData). A task with a live claude-asana-<gid> session is in flight and never
+// touched. Transcripts survive; re-engage via Pending.
 function teardownMergedWork(liveSessions, state) {
   let gidDirs
   try { gidDirs = fs.readdirSync(WORKTREES_ROOT) } catch { return }
@@ -1222,9 +1217,9 @@ function teardownMergedWork(liveSessions, state) {
     let repos
     try { repos = fs.readdirSync(gidDir).filter((r) => fs.statSync(path.join(gidDir, r)).isDirectory()) } catch { continue }
     if (repos.length === 0) continue
-    const merged = repos.map((repo) => mergedPrUrls(path.join(gidDir, repo)))
-    if (merged.some((m) => m === null)) continue
-    log(`[${gid}] all PRs merged (${merged.flat().join(', ')}) → tearing down worktree(s) ${repos.join(', ')}`)
+    const merged = mergedPrUrlsForTask(repos.map((repo) => path.join(gidDir, repo)))
+    if (merged === null) continue
+    log(`[${gid}] all PRs merged (${merged.join(', ')}) → tearing down worktree(s) ${repos.join(', ')}`)
     const retired = `${RETIRED_PREFIX}${gid}`
     if (sh(`tmux has-session -t "=${retired}" 2>/dev/null && echo yes`) === 'yes') {
       sh(`tmux kill-session -t "=${retired}"`)
@@ -1518,6 +1513,9 @@ function main() {
 
   // Delete DerivedData whose workspace is gone (runs after the prunes above).
   if (sweepDue(state, 'lastDerivedDataSweepAt', DERIVED_DATA_SWEEP_MS, now)) sweepOrphanDerivedData()
+
+  // Delete old UI test output from the temp dir, on the same cadence.
+  if (sweepDue(state, 'lastTestOutputSweepAt', DERIVED_DATA_SWEEP_MS, now)) sweepTestOutput()
 
   // Surface silent death of the memory gate (detection only).
   checkMonitorHeartbeat()

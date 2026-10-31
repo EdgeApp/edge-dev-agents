@@ -230,7 +230,9 @@ the task's own unpublished dep PRs when the deliverable requires them.
   uncommitted or untracked files), which keeps the whole task dir
 - merged-work teardown (every 30 min): a task with no running session whose
   worktrees all have a merged PR (none open) loses its retired session and
-  worktrees ahead of the session caps
+  worktrees ahead of the session caps. A worktree `/pr-land` detached counts under
+  the branch it detached from, and a clean sibling with no PR does not hold the
+  task (`lib/worktree-merge-state.js`)
 - removals never hold the tick: `lib/remove-task-worktrees.sh` runs detached in
   its own session (launchd kills the watchdog's process group when a tick ends)
   and holds `removing/<gid>`, which later ticks skip and `setup-task-workspace.sh`
@@ -240,6 +242,9 @@ the task's own unpublished dep PRs when the deliverable requires them.
   --orphans --stale-hours 24` deletes folders whose workspace is gone, plus
   folders a retained worktree has not built into for a day (each holds about
   5.5 GB; an in-use slot and the primary checkouts are exempt)
+- UI test output: a 6-hourly detached `test-output-reap.sh` deletes `edge-flow-runs`
+  runs after 7 days and Maestro driver output after 2 from the temp dir, skipping
+  any folder a process holds open
 - orphan-Metro reap, idle-dirty-sim reclaim, and operator escalation for
   parked prompts or stuck sessions
 - Jev shadow: spools one named anchor's pane with its own regex state for
